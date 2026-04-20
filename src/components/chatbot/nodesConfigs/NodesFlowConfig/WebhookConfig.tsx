@@ -80,8 +80,10 @@ export const WebhookConfig = ({ config, setConfig }: WebhookConfigProps) => {
     allowedOrigins,
   ]);
 
-  const baseUrl = import.meta.env.VITE_CHATBOT_RUNTIME_URL || 
-    `https://${import.meta.env.VITE_SUPABASE_PROJECT_ID}.supabase.co/functions/v1`;
+  const runtimeUrl = process.env.NEXT_PUBLIC_CHATBOT_RUNTIME_URL;
+  const projectId = process.env.NEXT_PUBLIC_SUPABASE_PROJECT_ID;
+  const baseUrl = runtimeUrl ||
+    (projectId ? `https://${projectId}.supabase.co/functions/v1` : "");
   const webhookUrl = `${baseUrl}/chatbot-webhook/${path || "meu-webhook"}`;
 
   const handleCopyUrl = () => {

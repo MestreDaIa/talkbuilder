@@ -36,6 +36,19 @@ export interface Node {
   config: NodeConfig;
 }
 
+/**
+ * Legacy alias used by the static example flow in src/data/flow.ts.
+ * Kept loose so the example file (which uses simplified shapes like
+ * { type: "bubble", content: "..." }) still typechecks.
+ */
+export interface ChatNode {
+  id: string;
+  type: string;
+  content?: string;
+  next?: string;
+  [key: string]: unknown;
+}
+
 export interface Container {
   id: string;
   nodes: Node[];
