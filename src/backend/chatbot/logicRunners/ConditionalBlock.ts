@@ -1,0 +1,1 @@
+// Bloco condicional permite que o fluxo tome decisões com base em condições específicas, alterando o caminho da conversa conforme necessário.

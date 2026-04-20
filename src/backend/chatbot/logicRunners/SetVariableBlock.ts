@@ -1,0 +1,1 @@
+// Bloco de definição de variável permite que o fluxo armazene valores em variáveis, que podem ser usadas posteriormente na conversa.

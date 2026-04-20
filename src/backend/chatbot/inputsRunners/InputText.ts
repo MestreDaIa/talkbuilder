@@ -1,0 +1,1 @@
+// Bloco de entrada de texto permite que o usuário forneça informações em formato de texto livre durante a conversa, facilitando a coleta de dados abertos e desestruturados.

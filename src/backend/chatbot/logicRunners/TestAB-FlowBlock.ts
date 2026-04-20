@@ -1,0 +1,1 @@
+// Bloco de teste AB permite dividir a conversa em dois caminhos diferentes, A e B, para testar diferentes abordagens e desempenho em um determinado contexto e fluxo.

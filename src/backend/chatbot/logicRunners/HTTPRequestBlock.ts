@@ -1,0 +1,1 @@
+// Bloco de requisição HTTP permite que o fluxo faça chamadas a APIs externas, enviando e recebendo dados durante a conversa.

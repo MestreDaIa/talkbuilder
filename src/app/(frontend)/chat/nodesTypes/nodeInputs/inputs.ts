@@ -1,0 +1,2 @@
+export type InputsType = 
+  | "audioNode" | "buttonsNode" | "dateNode" | "fileNode" | "imageNode" | "emailNode" | "numberNode" | "paymentNode" | "phoneNode" | "ratingNode" | "textNode" | "timeNode" | "videoNode" | "webSiteNode"   ;

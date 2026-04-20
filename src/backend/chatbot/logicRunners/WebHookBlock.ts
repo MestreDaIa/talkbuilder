@@ -1,0 +1,1 @@
+// Bloco de WebHook permite que o fluxo se integre a serviços externos, enviando e recebendo dados de APIs ou outros sistemas durante a conversa.

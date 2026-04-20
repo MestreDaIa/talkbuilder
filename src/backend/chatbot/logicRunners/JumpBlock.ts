@@ -1,0 +1,1 @@
+// Bloco de salto permite que o fluxo mude para um ponto específico, ignorando as etapas intermediárias.

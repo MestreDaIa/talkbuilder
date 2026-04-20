@@ -1,0 +1,1 @@
+// Bloco de botão de entrada permite que o usuário interaja com o bot por meio de botões clicáveis, facilitando a seleção de opções e a navegação no fluxo de conversa.
