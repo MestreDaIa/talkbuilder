@@ -1,1 +1,0 @@
-// Bloco de espera permite que o fluxo pause e aguarde a interação do usuário ou um evento específico antes de continuar.

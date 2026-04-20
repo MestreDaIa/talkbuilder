@@ -1,2 +1,0 @@
-export type LogicsType = 
-| "BackToJumpNode" | "ConditionalNode" | "HTTPRequestNode" | "JumpNode" |"LinkToBotNode" | "RedirectNode" | "ScriptNode"| "SetVariableNode" | "TestABNode" | "WaitNode" | "WebHookNode"  ;

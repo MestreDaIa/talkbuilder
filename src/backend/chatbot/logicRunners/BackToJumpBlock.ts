@@ -1,1 +1,0 @@
-// Bloco de retorno permite que o fluxo volte a um ponto anterior antes do bloco Jump (salto) ser acionado.

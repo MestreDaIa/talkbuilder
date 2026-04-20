@@ -1,1 +1,0 @@
-// Bloco de link para bot permite integrar o fluxo de outro bot no fluxo atual, mantendo variáveis e contexto entre as interações.

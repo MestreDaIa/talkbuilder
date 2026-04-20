@@ -1,1 +1,0 @@
-// Bloco de entrada de site permite que o usuário forneça um URL de site durante a conversa, facilitando a coleta de informações de navegação e referências online.
