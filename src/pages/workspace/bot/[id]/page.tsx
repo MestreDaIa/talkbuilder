@@ -97,23 +97,19 @@ export default function BotPage() {
     };
 
     setContainers((prev) => {
-      if (prev.length === 0) {
-        const position = getCenter ? getCenter() : { x: 300, y: 200 };
-        return [
-          {
-            id: `container-${Date.now()}`,
-            nodes: [newNode],
-            position,
-          },
-        ];
-      }
-      const updated = [...prev];
-      const last = updated[updated.length - 1];
-      updated[updated.length - 1] = {
-        ...last,
-        nodes: [...last.nodes, newNode],
+      const basePosition = getCenter ? getCenter() : { x: 300, y: 200 };
+      // Offset cada novo container para não sobrepor os existentes
+      const offset = prev.length * 40;
+      const position = {
+        x: basePosition.x + offset,
+        y: basePosition.y + offset,
       };
-      return updated;
+      const newContainer: Container = {
+        id: `container-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`,
+        nodes: [newNode],
+        position,
+      };
+      return [...prev, newContainer];
     });
     toast.success("Node adicionado!");
   };
