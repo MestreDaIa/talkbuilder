@@ -6,12 +6,17 @@ export default function Header() {
   const navigate = useNavigate();
 
   return (
-    <div className="fixed top-0  left-0 h-16 w-full bg-gray-800 text-white flex flex-col justify-between py-2 px-9 z-[99]">
-      <h1 className="w-full text-center">Talk-Flow-Creator</h1>
-      <div className=" flex w-full justify-between">
-        <span className="cursor-pointer" onClick={() => navigate("/")}>
-          WORKSPACE
-        </span>
+    <div className="relative top-0 left-0 w-full bg-gray-800 text-white flex items-center justify-between py-2 px-4 sm:px-9 z-[99] gap-3">
+      <span
+        className="cursor-pointer text-sm font-medium tracking-wide shrink-0"
+        onClick={() => navigate("/")}
+      >
+        WORKSPACE
+      </span>
+      <h1 className="flex-1 text-center text-base sm:text-lg font-semibold truncate">
+        Talk-Flow-Creator
+      </h1>
+      <div className="flex items-center shrink-0">
         <DropdownMenu.Root>
           <DropdownMenu.Trigger asChild>
             <Settings className="relative z-10 w-6 h-6 cursor-pointer" />
