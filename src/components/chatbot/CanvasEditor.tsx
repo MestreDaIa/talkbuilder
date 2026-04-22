@@ -362,9 +362,9 @@ const CanvasContent = ({
     onEdgesChange(changes);
     // After applying changes, sync with parent state
     setTimeout(() => {
-      setEdges((currentEdges) => {
+      setEdges((currentEdges: FlowEdge[]) => {
         if (onEdgesChangeProp) {
-          onEdgesChangeProp(currentEdges.map(e => ({
+          onEdgesChangeProp(currentEdges.map((e: FlowEdge) => ({
             source: e.source,
             target: e.target,
             sourceHandle: e.sourceHandle || undefined
