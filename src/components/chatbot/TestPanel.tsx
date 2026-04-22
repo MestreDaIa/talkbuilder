@@ -273,6 +273,8 @@ export const TestPanel = ({ isOpen, onClose, startContainer, allContainers, edge
       setActiveButtons([]);
       setIsMultipleChoice(false);
       setSelectedButtons([]);
+      setMediaPreview(null);
+      setIsRecordingAudio(false);
       pendingVarsRef.current = {};
       // Reset all variables so a fresh test session doesn't reuse stale values
       setVariables({});
