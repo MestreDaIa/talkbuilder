@@ -11,6 +11,7 @@ import {
   Zap,
   Calendar,
   AlertCircle,
+  FlaskConical,
 } from 'lucide-react'
 import {
   Card,
@@ -23,35 +24,29 @@ import { Button } from '../../../../components/ui/button'
 import { Badge } from '../../../../components/ui/badge'
 import { Separator } from '../../../../components/ui/separator'
 import { Progress } from '../../../../components/ui/progress'
+import { usePlan, PLAN_LIMITS, type PlanId } from '../../../../context/PlanContext'
 
-type PlanId = 'starter' | 'pro' | 'business'
-
-interface Plan {
+type Plan = {
   id: PlanId
   name: string
   price: number
   description: string
   highlight?: boolean
   features: string[]
-  limits: {
-    bots: number
-    messages: number
-  }
 }
 
 const plans: Plan[] = [
   {
     id: 'starter',
     name: 'Starter',
-    price: 49,
+    price: 0,
     description: 'Para quem está começando a automatizar',
     features: [
-      'Até 3 chatbots ativos',
-      '1.000 mensagens/mês',
+      `Até ${PLAN_LIMITS.starter.bots} chatbot por workspace`,
+      `${PLAN_LIMITS.starter.messages.toLocaleString('pt-BR')} mensagens/mês`,
       'Integrações básicas',
       'Suporte por e-mail',
     ],
-    limits: { bots: 3, messages: 1000 },
   },
   {
     id: 'pro',
@@ -60,13 +55,12 @@ const plans: Plan[] = [
     description: 'Para times que precisam de mais escala',
     highlight: true,
     features: [
-      'Até 15 chatbots ativos',
-      '10.000 mensagens/mês',
+      `Até ${PLAN_LIMITS.pro.bots} chatbots por workspace`,
+      `${PLAN_LIMITS.pro.messages.toLocaleString('pt-BR')} mensagens/mês`,
       'Todas as integrações',
       'Webhooks e API',
       'Suporte prioritário',
     ],
-    limits: { bots: 15, messages: 10000 },
   },
   {
     id: 'business',
@@ -74,13 +68,12 @@ const plans: Plan[] = [
     price: 349,
     description: 'Volume ilimitado para operações maiores',
     features: [
-      'Chatbots ilimitados',
-      '50.000 mensagens/mês',
+      'Chatbots ilimitados por workspace',
+      `${PLAN_LIMITS.business.messages.toLocaleString('pt-BR')} mensagens/mês`,
       'IA avançada incluída',
       'SLA dedicado',
       'Gerente de conta',
     ],
-    limits: { bots: 999, messages: 50000 },
   },
 ]
 
@@ -92,18 +85,23 @@ const invoices = [
 
 export default function PaymentPlan() {
   // Simula a detecção da integração com flow-appoint
-  // Quando true, a gestão é feita externamente pelo sistema de agendamento
   const [managedByAppoint] = useState(false)
-  const [currentPlan] = useState<PlanId>('pro')
+  const { currentPlan, setCurrentPlan, botsUsed, limits } = usePlan()
 
   const usage = {
-    botsUsed: 7,
-    botsLimit: 15,
-    messagesUsed: 4280,
-    messagesLimit: 10000,
+    botsUsed,
+    botsLimit: limits.bots,
+    messagesUsed: 0,
+    messagesLimit: limits.messages,
   }
 
   const activePlan = plans.find((p) => p.id === currentPlan)!
+  const botsLimitLabel = Number.isFinite(usage.botsLimit)
+    ? usage.botsLimit
+    : '∞'
+  const botsProgress = Number.isFinite(usage.botsLimit)
+    ? Math.min(100, (usage.botsUsed / usage.botsLimit) * 100)
+    : 0
 
   // ===== Cenário: Gestão externa via flow-appoint =====
   if (managedByAppoint) {
@@ -159,8 +157,8 @@ export default function PaymentPlan() {
                   </Badge>
                 </div>
                 <CardDescription>
-                  R$ {activePlan.price.toFixed(2).replace('.', ',')}/mês ·
-                  Próxima cobrança em 15 Abr 2026
+                  R$ {activePlan.price.toFixed(2).replace('.', ',')}/mês
+                  {activePlan.price > 0 && ' · Próxima cobrança em 15 Abr 2026'}
                 </CardDescription>
               </div>
             </div>
@@ -183,11 +181,11 @@ export default function PaymentPlan() {
                   <span className="text-sm font-medium">Chatbots ativos</span>
                 </div>
                 <span className="text-sm text-gray-600">
-                  {usage.botsUsed}/{usage.botsLimit}
+                  {usage.botsUsed}/{botsLimitLabel}
                 </span>
               </div>
               <Progress
-                value={(usage.botsUsed / usage.botsLimit) * 100}
+                value={botsProgress}
                 className="h-2"
               />
             </div>
@@ -278,6 +276,7 @@ export default function PaymentPlan() {
                   </ul>
                   <Button
                     disabled={isCurrent}
+                    onClick={() => setCurrentPlan(plan.id)}
                     className={
                       plan.highlight
                         ? 'bg-cyan-500 text-white hover:bg-cyan-400'
