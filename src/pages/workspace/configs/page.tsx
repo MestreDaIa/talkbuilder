@@ -84,7 +84,9 @@ export default function ConfigurationWorkspace() {
 							</div>
 						</TabsContent>
 						<TabsContent value="paymentPlan">
-							<div>Conteúdo da aba mensalidade de plano</div>
+							<div>
+								<PaymentPlan />
+							</div>
 						</TabsContent>
 					</Tabs>
 				</div>
