@@ -19,7 +19,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "../../../components/ui
 
 export default function ConfigurationWorkspace() {
 	return (
-		<div className="relative flex border border-red-600 h-full mt-16 overflow-hidden">
+		<div className="relative flex border border-red-600 h-full overflow-hidden">
 			<div className='bg-gray-200/40 px-6 py-4 flex w-full flex-col items-center justify-start gap-4 h-full overflow-auto'>
 				<div className="flex-1 w-full text-left">
 					<h2 className="text-3xl font-bold">Configurações</h2>
