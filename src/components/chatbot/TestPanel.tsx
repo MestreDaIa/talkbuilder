@@ -252,6 +252,15 @@ export const TestPanel = ({ isOpen, onClose, startContainer, allContainers, edge
   const [isMultipleChoice, setIsMultipleChoice] = useState(false);
   const [selectedButtons, setSelectedButtons] = useState<string[]>([]);
   const [submitLabel, setSubmitLabel] = useState("Enviar");
+  // Media upload state
+  const [mediaPreview, setMediaPreview] = useState<{ url: string; name?: string } | null>(null);
+  const [isRecordingAudio, setIsRecordingAudio] = useState(false);
+  const [recordingTime, setRecordingTime] = useState(0);
+  const mediaRecorderRef = useRef<MediaRecorder | null>(null);
+  const recordedChunksRef = useRef<Blob[]>([]);
+  const recordingTimerRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
+  const cameraInputRef = useRef<HTMLInputElement>(null);
   const pendingVarsRef = useRef<Record<string, string>>({});
 
   useEffect(() => {
