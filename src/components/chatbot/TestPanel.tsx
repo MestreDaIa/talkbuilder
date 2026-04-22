@@ -740,21 +740,43 @@ export const TestPanel = ({ isOpen, onClose, startContainer, allContainers, edge
     try {
       const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
       recordedChunksRef.current = [];
-      const recorder = new MediaRecorder(stream);
+
+      // Pick the best supported mime type (Safari/iOS prefers mp4, others webm)
+      const candidates = [
+        "audio/webm;codecs=opus",
+        "audio/webm",
+        "audio/mp4",
+        "audio/ogg;codecs=opus",
+        "audio/ogg",
+      ];
+      const supported = candidates.find(
+        (t) => typeof MediaRecorder !== "undefined" && MediaRecorder.isTypeSupported?.(t)
+      );
+      const recorder = supported
+        ? new MediaRecorder(stream, { mimeType: supported })
+        : new MediaRecorder(stream);
+
       mediaRecorderRef.current = recorder;
       recorder.ondataavailable = (ev) => {
         if (ev.data.size > 0) recordedChunksRef.current.push(ev.data);
       };
       recorder.onstop = async () => {
-        const blob = new Blob(recordedChunksRef.current, { type: "audio/webm" });
+        const mimeType = recorder.mimeType || supported || "audio/webm";
+        const blob = new Blob(recordedChunksRef.current, { type: mimeType });
+        const ext = mimeType.includes("mp4")
+          ? "m4a"
+          : mimeType.includes("ogg")
+          ? "ogg"
+          : "webm";
         const reader = new FileReader();
         reader.onload = () => {
-          setMediaPreview({ url: reader.result as string, name: "gravacao.webm" });
+          setMediaPreview({ url: reader.result as string, name: `gravacao.${ext}` });
         };
         reader.readAsDataURL(blob);
         stream.getTracks().forEach((t) => t.stop());
       };
-      recorder.start();
+      // Request periodic dataavailable so the blob has proper duration metadata
+      recorder.start(250);
       setIsRecordingAudio(true);
       setRecordingTime(0);
       recordingTimerRef.current = setInterval(() => {
@@ -925,7 +947,13 @@ export const TestPanel = ({ isOpen, onClose, startContainer, allContainers, edge
                     <video src={mediaPreview.url} controls className="max-h-40 w-full rounded" />
                   )}
                   {mediaInputType === "audio" && (
-                    <audio src={mediaPreview.url} controls className="w-full" />
+                    <div
+                      className="rounded-xl px-3 py-2 flex items-center gap-2"
+                      style={{ background: "var(--user-msg-bg)", color: "var(--user-msg-fg)" }}
+                    >
+                      <Headphones className="h-4 w-4 flex-shrink-0" />
+                      <AudioPlayer src={mediaPreview.url} />
+                    </div>
                   )}
                   {mediaInputType === "document" && (
                     <div className="flex items-center gap-2 text-sm text-foreground">
