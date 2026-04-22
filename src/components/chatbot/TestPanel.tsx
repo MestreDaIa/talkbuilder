@@ -576,6 +576,8 @@ export const TestPanel = ({ isOpen, onClose, startContainer, allContainers, edge
       setCurrentInputNode(node);
       setCurrentNodeIndex(nodeIndex);
     } else if (node.type.startsWith("input")) {
+      console.log("[TestPanel] reached input node, waiting for user", { nodeId: node.id, nodeType: node.type, containerId: container.id, nodeIndex });
+      setCurrentContainerId(container.id);
       setCurrentInputNode(node);
       setWaitingForInput(true);
       setCurrentNodeIndex(nodeIndex);
