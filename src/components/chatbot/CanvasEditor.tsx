@@ -124,16 +124,21 @@ const CanvasContent = ({
     const containerToDuplicate = containers.find(c => c.id === containerId);
     if (!containerToDuplicate) return;
 
+    const baseName =
+      containerToDuplicate.nameContainer ||
+      `BLOCO #${containerToDuplicate.id.slice(-6)}`;
+
     const newContainer: Container = {
-      id: `container-${Date.now()}`,
+      id: `container-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`,
+      nameContainer: `${baseName} - copy`,
       nodes: containerToDuplicate.nodes.map(node => ({
         ...node,
-        id: `node-${Date.now()}-${Math.random()}`
+        id: `node-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`,
       })),
       position: {
         x: containerToDuplicate.position.x + 320,
-        y: containerToDuplicate.position.y
-      }
+        y: containerToDuplicate.position.y,
+      },
     };
 
     onContainersChange([...containers, newContainer]);

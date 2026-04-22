@@ -11,6 +11,7 @@ import {
 } from "lucide-react";
 import { CanvasEditor } from "@/components/chatbot/CanvasEditor";
 import { NodesSidebar } from "@/components/chatbot/NodesSidebar";
+import { TestPanel } from "@/components/chatbot/TestPanel";
 import { Button } from "@/components/ui/button";
 import { useWorkspace } from "@/context/WorkspaceContext";
 import type { Container, Edge, Node, NodeType } from "@/types/chatbot";
@@ -63,6 +64,7 @@ export default function BotPage() {
   const [getCenter, setGetCenter] = useState<
     (() => { x: number; y: number }) | null
   >(null);
+  const [testContainer, setTestContainer] = useState<Container | null>(null);
 
   useEffect(() => {
     const flow = loadFlow(botId);
@@ -205,11 +207,19 @@ export default function BotPage() {
             onContainersChange={setContainers}
             edges={edges}
             onEdgesChange={setEdges}
-            onTest={() => {}}
+            onTest={(container) => setTestContainer(container)}
             onGetCenterPosition={(getter) => setGetCenter(() => getter)}
           />
         </div>
       </div>
+
+      <TestPanel
+        isOpen={testContainer !== null}
+        onClose={() => setTestContainer(null)}
+        startContainer={testContainer}
+        allContainers={containers}
+        edges={edges}
+      />
     </div>
   );
 }

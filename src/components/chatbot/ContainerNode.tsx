@@ -134,7 +134,7 @@ export const ContainerNode = memo(({ data }: NodeProps<ContainerNodeData>) => {
           <Handle type="target" position={Position.Top} className="!bg-green-600 !w-4 !h-4 -top-2" />
         )}
 
-        <div className="flex items-center justify-between mb-4 rounded-md">
+        <div className="flex items-center justify-between mb-4 rounded-md nodrag">
         {isEditingContainerNameNode ? (
           <input
             type="text"
@@ -150,18 +150,25 @@ export const ContainerNode = memo(({ data }: NodeProps<ContainerNodeData>) => {
         )}
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
-              <Button variant="ghost" size="icon" className="h-8 w-8">
+              <Button
+                variant="ghost"
+                size="icon"
+                className="h-8 w-8 nodrag"
+                onPointerDown={(e) => e.stopPropagation()}
+                onMouseDown={(e) => e.stopPropagation()}
+                onClick={(e) => e.stopPropagation()}
+              >
                 <MoreVertical className="h-4 w-4" />
               </Button>
             </DropdownMenuTrigger>
-            <DropdownMenuContent align="end">
-              <DropdownMenuItem onClick={onTest}>
+            <DropdownMenuContent align="end" onClick={(e) => e.stopPropagation()}>
+              <DropdownMenuItem onSelect={() => onTest()}>
                 Testar
               </DropdownMenuItem>
-              <DropdownMenuItem onClick={onDuplicate}>
+              <DropdownMenuItem onSelect={() => onDuplicate()}>
                 Duplicar
               </DropdownMenuItem>
-              <DropdownMenuItem onClick={onDelete} className="text-destructive">
+              <DropdownMenuItem onSelect={() => onDelete()} className="text-destructive">
                 Excluir
               </DropdownMenuItem>
             </DropdownMenuContent>
