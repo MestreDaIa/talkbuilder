@@ -315,13 +315,11 @@ const CanvasContent = ({
   // being added because handlers/refs were churned each render).
   useEffect(() => {
     setNodes((currentNodes) => {
-      return containers.map((container) => {
+      const next: FlowNode[] = containers.map((container) => {
         const existing = currentNodes.find((n) => n.id === container.id);
         return {
           id: container.id,
           type: 'container',
-          // preserve the live position from ReactFlow if it exists,
-          // otherwise fall back to the container's stored position
           position: existing?.position ?? container.position,
           data: {
             container,
@@ -335,8 +333,9 @@ const CanvasContent = ({
             onDelete: () => handleDelete(container.id),
             onNodeDrop: handleNodeDrop,
           },
-        };
+        } as unknown as FlowNode;
       });
+      return next;
     });
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [containers]);
