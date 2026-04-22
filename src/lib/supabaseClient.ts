@@ -54,3 +54,21 @@ export function getSupabase(): SupabaseClient | null {
 export function isSupabaseConfigured(): boolean {
   return getSupabaseConfig() !== null;
 }
+
+// Backwards-compatible named export used across the chatbot components.
+// Returns a Proxy that lazily resolves to the real client on every access,
+// so `supabaseClient.from(...)` works after the user configures Supabase
+// at runtime via the Integrations settings page.
+export const supabaseClient: SupabaseClient = new Proxy({} as SupabaseClient, {
+  get(_target, prop, receiver) {
+    const client = getSupabase();
+    if (!client) {
+      throw new Error(
+        "Supabase não está configurado. Vá em Configurações → Integrações para conectar."
+      );
+    }
+    const value = Reflect.get(client as object, prop, receiver);
+    return typeof value === "function" ? value.bind(client) : value;
+  },
+});
+
