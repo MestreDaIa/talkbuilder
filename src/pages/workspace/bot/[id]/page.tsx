@@ -96,25 +96,25 @@ export default function BotPage() {
       config: {},
     };
 
-    if (containers.length === 0) {
-      const position = getCenter ? getCenter() : { x: 300, y: 200 };
-      setContainers([
-        {
-          id: `container-${Date.now()}`,
-          nodes: [newNode],
-          position,
-        },
-      ]);
-    } else {
-      // append to last container
-      const updated = [...containers];
+    setContainers((prev) => {
+      if (prev.length === 0) {
+        const position = getCenter ? getCenter() : { x: 300, y: 200 };
+        return [
+          {
+            id: `container-${Date.now()}`,
+            nodes: [newNode],
+            position,
+          },
+        ];
+      }
+      const updated = [...prev];
       const last = updated[updated.length - 1];
       updated[updated.length - 1] = {
         ...last,
         nodes: [...last.nodes, newNode],
       };
-      setContainers(updated);
-    }
+      return updated;
+    });
     toast.success("Node adicionado!");
   };
 
