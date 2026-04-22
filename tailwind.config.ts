@@ -9,45 +9,45 @@ export default {
   theme: {
     extend: {
       colors: {
-        border: "hsl(var(--border))",
-        input: "hsl(var(--input))",
-        ring: "hsl(var(--ring))",
-        background: "hsl(var(--background))",
-        foreground: "hsl(var(--foreground))",
+        border: "color-mix(in oklch, var(--border) calc(<alpha-value> * 100%), transparent)",
+        input: "color-mix(in oklch, var(--input) calc(<alpha-value> * 100%), transparent)",
+        ring: "color-mix(in oklch, var(--ring) calc(<alpha-value> * 100%), transparent)",
+        background: "color-mix(in oklch, var(--background) calc(<alpha-value> * 100%), transparent)",
+        foreground: "color-mix(in oklch, var(--foreground) calc(<alpha-value> * 100%), transparent)",
 
         primary: {
-          DEFAULT: "hsl(var(--primary))",
-          foreground: "hsl(var(--primary-foreground))",
+          DEFAULT: "color-mix(in oklch, var(--primary) calc(<alpha-value> * 100%), transparent)",
+          foreground: "color-mix(in oklch, var(--primary-foreground) calc(<alpha-value> * 100%), transparent)",
         },
 
         secondary: {
-          DEFAULT: "hsl(var(--secondary))",
-          foreground: "hsl(var(--secondary-foreground))",
+          DEFAULT: "color-mix(in oklch, var(--secondary) calc(<alpha-value> * 100%), transparent)",
+          foreground: "color-mix(in oklch, var(--secondary-foreground) calc(<alpha-value> * 100%), transparent)",
         },
 
         destructive: {
-          DEFAULT: "hsl(var(--destructive))",
-          foreground: "hsl(var(--destructive-foreground))",
+          DEFAULT: "color-mix(in oklch, var(--destructive) calc(<alpha-value> * 100%), transparent)",
+          foreground: "color-mix(in oklch, var(--destructive-foreground) calc(<alpha-value> * 100%), transparent)",
         },
 
         muted: {
-          DEFAULT: "hsl(var(--muted))",
-          foreground: "hsl(var(--muted-foreground))",
+          DEFAULT: "color-mix(in oklch, var(--muted) calc(<alpha-value> * 100%), transparent)",
+          foreground: "color-mix(in oklch, var(--muted-foreground) calc(<alpha-value> * 100%), transparent)",
         },
 
         accent: {
-          DEFAULT: "hsl(var(--accent))",
-          foreground: "hsl(var(--accent-foreground))",
+          DEFAULT: "color-mix(in oklch, var(--accent) calc(<alpha-value> * 100%), transparent)",
+          foreground: "color-mix(in oklch, var(--accent-foreground) calc(<alpha-value> * 100%), transparent)",
         },
 
         popover: {
-          DEFAULT: "hsl(var(--popover))",
-          foreground: "hsl(var(--popover-foreground))",
+          DEFAULT: "color-mix(in oklch, var(--popover) calc(<alpha-value> * 100%), transparent)",
+          foreground: "color-mix(in oklch, var(--popover-foreground) calc(<alpha-value> * 100%), transparent)",
         },
 
         card: {
-          DEFAULT: "hsl(var(--card))",
-          foreground: "hsl(var(--card-foreground))",
+          DEFAULT: "color-mix(in oklch, var(--card) calc(<alpha-value> * 100%), transparent)",
+          foreground: "color-mix(in oklch, var(--card-foreground) calc(<alpha-value> * 100%), transparent)",
         },
       },
     },
