@@ -309,27 +309,37 @@ const CanvasContent = ({
     [setEdges, onEdgesChangeProp]
   );
 
-  // Update ReactFlow nodes when containers change
+  // Update ReactFlow nodes when containers change.
+  // IMPORTANT: depend ONLY on `containers` to avoid re-creating flowNodes on
+  // every parent render (which caused containers to "disappear" right after
+  // being added because handlers/refs were churned each render).
   useEffect(() => {
-    const flowNodes: FlowNode[] = containers.map((container) => ({
-      id: container.id,
-      type: 'container',
-      position: container.position,
-      data: {
-        container,
-        onNodeClick: handleNodeClick,
-        onButtonClick: handleButtonClick,
-        onAddButton: handleAddButton,
-        onUpdateButton: handleUpdateButton,
-        onDeleteButton: handleDeleteButton,
-        onTest: () => onTest(container),
-        onDuplicate: () => handleDuplicate(container.id),
-        onDelete: () => handleDelete(container.id),
-        onNodeDrop: handleNodeDrop,
-      },
-    }));
-    setNodes(flowNodes);
-  }, [containers, handleNodeClick, handleButtonClick, handleAddButton, handleUpdateButton, handleDeleteButton, onTest, handleDuplicate, handleDelete, handleNodeDrop, setNodes]);
+    setNodes((currentNodes) => {
+      return containers.map((container) => {
+        const existing = currentNodes.find((n) => n.id === container.id);
+        return {
+          id: container.id,
+          type: 'container',
+          // preserve the live position from ReactFlow if it exists,
+          // otherwise fall back to the container's stored position
+          position: existing?.position ?? container.position,
+          data: {
+            container,
+            onNodeClick: handleNodeClick,
+            onButtonClick: handleButtonClick,
+            onAddButton: handleAddButton,
+            onUpdateButton: handleUpdateButton,
+            onDeleteButton: handleDeleteButton,
+            onTest: () => onTest(container),
+            onDuplicate: () => handleDuplicate(container.id),
+            onDelete: () => handleDelete(container.id),
+            onNodeDrop: handleNodeDrop,
+          },
+        };
+      });
+    });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [containers]);
 
   // Update edges from props (including empty array)
   useEffect(() => {
