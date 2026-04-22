@@ -14,6 +14,7 @@ import { NodesSidebar } from "@/components/chatbot/NodesSidebar";
 import { TestPanel } from "@/components/chatbot/TestPanel";
 import { Button } from "@/components/ui/button";
 import { useWorkspace } from "@/context/WorkspaceContext";
+import { VariablesProvider } from "@/context/VariablesContext";
 import type { Container, Edge, Node, NodeType } from "@/types/chatbot";
 import { toast } from "sonner";
 
