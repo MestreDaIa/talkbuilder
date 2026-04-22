@@ -710,9 +710,7 @@ export const TestPanel = ({ isOpen, onClose, startContainer, allContainers, edge
               <div key={message.id} className={`flex ${message.type === "bot" ? "justify-start" : "justify-end"}`}>
                 <div
                   className={`max-w-[85%] px-3 py-2 rounded-2xl text-sm shadow-md ${
-                    message.type === "bot"
-                      ? "bg-[hsl(var(--bot-msg-bg,220_70%_45%))] text-white rounded-bl-sm"
-                      : "bg-primary text-primary-foreground rounded-br-sm"
+                    message.type === "bot" ? "rounded-bl-sm" : "rounded-br-sm"
                   }`}
                   style={
                     message.type === "bot"
