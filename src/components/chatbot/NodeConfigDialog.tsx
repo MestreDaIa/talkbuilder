@@ -57,11 +57,11 @@ export const NodeConfigDialog = ({ node, open, onClose, onSave, containers = [] 
           )}
         </div>
         <div className="shrink-0 w-full py-4 px-5 border-t border-border bg-background">
-          <div className="w-full flex gap-2">
-            <Button variant="outline" onClick={onClose} className="w-full">
+          <div className="grid w-full grid-cols-2 gap-2">
+            <Button variant="outline" onClick={onClose} className="w-full min-w-0">
               Cancelar
             </Button>
-            <Button onClick={handleSave} className="w-full">
+            <Button onClick={handleSave} className="w-full min-w-0">
               Salvar
             </Button>
           </div>
