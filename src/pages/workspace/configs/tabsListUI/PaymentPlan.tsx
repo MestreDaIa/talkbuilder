@@ -157,8 +157,8 @@ export default function PaymentPlan() {
                   </Badge>
                 </div>
                 <CardDescription>
-                  R$ {activePlan.price.toFixed(2).replace('.', ',')}/mês ·
-                  Próxima cobrança em 15 Abr 2026
+                  R$ {activePlan.price.toFixed(2).replace('.', ',')}/mês
+                  {activePlan.price > 0 && ' · Próxima cobrança em 15 Abr 2026'}
                 </CardDescription>
               </div>
             </div>
@@ -181,11 +181,11 @@ export default function PaymentPlan() {
                   <span className="text-sm font-medium">Chatbots ativos</span>
                 </div>
                 <span className="text-sm text-gray-600">
-                  {usage.botsUsed}/{usage.botsLimit}
+                  {usage.botsUsed}/{botsLimitLabel}
                 </span>
               </div>
               <Progress
-                value={(usage.botsUsed / usage.botsLimit) * 100}
+                value={botsProgress}
                 className="h-2"
               />
             </div>
@@ -276,6 +276,7 @@ export default function PaymentPlan() {
                   </ul>
                   <Button
                     disabled={isCurrent}
+                    onClick={() => setCurrentPlan(plan.id)}
                     className={
                       plan.highlight
                         ? 'bg-cyan-500 text-white hover:bg-cyan-400'
