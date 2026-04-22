@@ -64,6 +64,7 @@ export default function BotPage() {
   const [getCenter, setGetCenter] = useState<
     (() => { x: number; y: number }) | null
   >(null);
+  const [testContainer, setTestContainer] = useState<Container | null>(null);
 
   useEffect(() => {
     const flow = loadFlow(botId);
