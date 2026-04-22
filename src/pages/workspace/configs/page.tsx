@@ -15,6 +15,7 @@ import Preference from "./tabsListUI/Preference";
 import SecurityConfig from "./tabsListUI/Security";
 import KeysApi from "./tabsListUI/KeysApi";
 import IntegrationsSettings from "./tabsListUI/IntegrationsSettings";
+import PaymentPlan from "./tabsListUI/PaymentPlan";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "../../../components/ui/tabs";
 
 export default function ConfigurationWorkspace() {
