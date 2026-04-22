@@ -14,6 +14,7 @@
     type: "folder" | "bot"
     title: string
     description: string
+    emoji?: string
     indexItem?: number
     parentId: string | null
   }

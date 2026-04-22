@@ -16,6 +16,7 @@ import { useLocation } from "react-router-dom";
 import FoldersSidebarNavigation from "./FoldersSidebarNavigation";
 import AddOptionToolbar from "./AddOptionToolbar";
 import Breadcrumb from "./Breadcrumb";
+import Header from "./Header";
 import { Toaster } from "./ui/toaster";
 
 export default function WorkspaceLayout({
@@ -108,6 +109,7 @@ export default function WorkspaceLayout({
 		
 			return (
 				<div className="flex flex-col h-svh relative overflow-y-hidden">
+					<Header />
 					<Breadcrumb />
 					<div className="flex-1 flex relative overflow-hidden">
 						<div className="flex ">
