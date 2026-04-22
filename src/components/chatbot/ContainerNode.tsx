@@ -1,4 +1,4 @@
-import { memo, useState, useRef } from "react";
+import { memo, useEffect, useRef, useState } from "react";
 import { Handle, Position, NodeProps } from 'reactflow';
 import { MoreVertical } from "lucide-react";
 import { Container, Node, ButtonConfig, ConditionGroup } from "@/types/chatbot";
@@ -6,12 +6,6 @@ import { NodeItem } from "./NodeItem";
 import { ButtonGroupNodeItem } from "./ButtonGroupNodeItem";
 import { ConditionNodeItem } from "./ConditionNodeItem";
 import { Button } from "@/components/ui/button";
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu";
 import { cn } from "@/lib/utils";
 
 interface ContainerNodeData {
@@ -37,47 +31,67 @@ const InsertPreview = () => (
 );
 
 export const ContainerNode = memo(({ data }: NodeProps<ContainerNodeData>) => {
-  const { 
-    container, 
-    onNodeClick, 
+  const {
+    container,
+    onNodeClick,
     onButtonClick,
     onConditionClick,
     onAddButton,
     onUpdateButton,
     onDeleteButton,
-    onTest, 
-    onDuplicate, 
-    onDelete, 
-    onNodeDrop 
+    onTest,
+    onDuplicate,
+    onDelete,
+    onNodeDrop,
   } = data;
   const [isDragOver, setIsDragOver] = useState(false);
   const [insertIndex, setInsertIndex] = useState<number | null>(null);
+  const [isMenuOpen, setIsMenuOpen] = useState(false);
   const nodesListRef = useRef<HTMLDivElement>(null);
+  const menuRef = useRef<HTMLDivElement>(null);
 
   const [isEditingContainerNameNode, setIsEditingContainerNameNode] = useState(false);
   const [nameContainerNode, setNameContainerNode] = useState(container.nameContainer || `BLOCO #${container.id.slice(-6)}`);
 
-  // Check if container has a button or condition node - if so, don't show bottom handle
+  useEffect(() => {
+    const handlePointerDown = (event: PointerEvent) => {
+      if (!menuRef.current?.contains(event.target as Node)) {
+        setIsMenuOpen(false);
+      }
+    };
+
+    if (isMenuOpen) {
+      window.addEventListener('pointerdown', handlePointerDown);
+    }
+
+    return () => {
+      window.removeEventListener('pointerdown', handlePointerDown);
+    };
+  }, [isMenuOpen]);
+
+  const handleMenuAction = (action: () => void) => {
+    setIsMenuOpen(false);
+    action();
+  };
+
   const hasButtonNode = container.nodes.some(n => n.type === 'input-buttons');
   const hasConditionNode = container.nodes.some(n => n.type === 'condition');
   const hideBottomHandle = hasButtonNode || hasConditionNode;
-  
-  // Check if container is a start node (no input handle) - webhook CAN have input
+
   const isEntryNode = container.nodes.some(n => n.type === 'start');
   const hideTopHandle = isEntryNode;
 
   const handleDragOver = (e: React.DragEvent) => {
     e.preventDefault();
     setIsDragOver(true);
-    
-    // Calculate insert index based on mouse Y position
+
     if (nodesListRef.current && container.nodes.length > 0) {
       const containerRect = nodesListRef.current.getBoundingClientRect();
       const mouseY = e.clientY - containerRect.top;
-      
+
       const nodeElements = nodesListRef.current.querySelectorAll('[data-node-index]');
       let newIndex = container.nodes.length;
-      
+
       nodeElements.forEach((el, idx) => {
         const rect = el.getBoundingClientRect();
         const nodeMiddle = rect.top - containerRect.top + rect.height / 2;
@@ -85,7 +99,7 @@ export const ContainerNode = memo(({ data }: NodeProps<ContainerNodeData>) => {
           newIndex = idx;
         }
       });
-      
+
       setInsertIndex(newIndex);
     } else {
       setInsertIndex(0);
@@ -103,22 +117,22 @@ export const ContainerNode = memo(({ data }: NodeProps<ContainerNodeData>) => {
   const handleDrop = (e: React.DragEvent) => {
     e.preventDefault();
     e.stopPropagation();
-    
+
     let nodeId = e.dataTransfer.getData('nodeId');
     if (!nodeId) {
       nodeId = e.dataTransfer.getData('text/plain');
     }
-    
+
     if (nodeId) {
       onNodeDrop(nodeId, container.id, insertIndex ?? container.nodes.length);
     }
-    
+
     setIsDragOver(false);
     setInsertIndex(null);
   };
 
   return (
-    <div 
+    <div
       className={cn(
         'relative bg-card py-1 px-0 rounded-xl shadow-lg border border-border max-w-[300px] transition-all duration-200',
         isDragOver && 'ring-2 ring-green-500 border-green-500 bg-green-50/10'
@@ -135,44 +149,73 @@ export const ContainerNode = memo(({ data }: NodeProps<ContainerNodeData>) => {
         )}
 
         <div className="flex items-center justify-between mb-4 rounded-md nodrag">
-        {isEditingContainerNameNode ? (
-          <input
-            type="text"
-            value={nameContainerNode}
-            autoFocus
-            onChange={(e) => setNameContainerNode(e.target.value)}
-            onBlur={() => setIsEditingContainerNameNode(false)}
-            placeholder='Renomear Bloco'
-            className=" rounded-md p-1.5 pl-2 placeholder:text-black focus:bg-gray-100/5 text-sm w-full focus:outline-none bg-gray-100/5 text-violet-800"
-          />
-        ) : (
-              <h3 onClick={() => setIsEditingContainerNameNode(true)} className="rounded-md p-1.5 w-full pl-2 border border-border/40 text-sm text-foreground px-0.5">{nameContainerNode || <span className='text-muted-foreground italic'>{`Bloco #${container.id.slice(-6)}`}</span>}</h3>
-        )}
-          <DropdownMenu>
-            <DropdownMenuTrigger asChild>
-              <Button
-                variant="ghost"
-                size="icon"
-                className="h-8 w-8 nodrag"
-                onPointerDown={(e) => e.stopPropagation()}
-                onMouseDown={(e) => e.stopPropagation()}
-                onClick={(e) => e.stopPropagation()}
-              >
-                <MoreVertical className="h-4 w-4" />
-              </Button>
-            </DropdownMenuTrigger>
-            <DropdownMenuContent align="end" onClick={(e) => e.stopPropagation()}>
-              <DropdownMenuItem onSelect={() => onTest()}>
-                Testar
-              </DropdownMenuItem>
-              <DropdownMenuItem onSelect={() => onDuplicate()}>
-                Duplicar
-              </DropdownMenuItem>
-              <DropdownMenuItem onSelect={() => onDelete()} className="text-destructive">
-                Excluir
-              </DropdownMenuItem>
-            </DropdownMenuContent>
-          </DropdownMenu>
+          {isEditingContainerNameNode ? (
+            <input
+              type="text"
+              value={nameContainerNode}
+              autoFocus
+              onChange={(e) => setNameContainerNode(e.target.value)}
+              onBlur={() => setIsEditingContainerNameNode(false)}
+              placeholder='Renomear Bloco'
+              className=" rounded-md p-1.5 pl-2 placeholder:text-black focus:bg-gray-100/5 text-sm w-full focus:outline-none bg-gray-100/5 text-violet-800"
+            />
+          ) : (
+            <h3 onClick={() => setIsEditingContainerNameNode(true)} className="rounded-md p-1.5 w-full pl-2 border border-border/40 text-sm text-foreground px-0.5">{nameContainerNode || <span className='text-muted-foreground italic'>{`Bloco #${container.id.slice(-6)}`}</span>}</h3>
+          )}
+
+          <div ref={menuRef} className="relative ml-2 shrink-0 nodrag nopan">
+            <Button
+              type="button"
+              variant="ghost"
+              size="icon"
+              className="h-8 w-8 nodrag"
+              onPointerDown={(e) => {
+                e.stopPropagation();
+                e.preventDefault();
+              }}
+              onClick={(e) => {
+                e.stopPropagation();
+                setIsMenuOpen((prev) => !prev);
+              }}
+            >
+              <MoreVertical className="h-4 w-4" />
+            </Button>
+
+            {isMenuOpen && (
+              <div className="absolute right-0 top-10 z-50 min-w-36 overflow-hidden rounded-md border border-border bg-popover shadow-md">
+                <button
+                  type="button"
+                  className="block w-full px-3 py-2 text-left text-sm text-popover-foreground hover:bg-accent hover:text-accent-foreground"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    handleMenuAction(onTest);
+                  }}
+                >
+                  Testar
+                </button>
+                <button
+                  type="button"
+                  className="block w-full px-3 py-2 text-left text-sm text-popover-foreground hover:bg-accent hover:text-accent-foreground"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    handleMenuAction(onDuplicate);
+                  }}
+                >
+                  Duplicar
+                </button>
+                <button
+                  type="button"
+                  className="block w-full px-3 py-2 text-left text-sm text-destructive hover:bg-accent"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    handleMenuAction(onDelete);
+                  }}
+                >
+                  Excluir
+                </button>
+              </div>
+            )}
+          </div>
         </div>
 
         <div ref={nodesListRef} className="space-y-2 nodrag nopan">
