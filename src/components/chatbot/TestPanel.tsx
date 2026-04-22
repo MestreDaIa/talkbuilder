@@ -693,17 +693,33 @@ export const TestPanel = ({ isOpen, onClose, startContainer, allContainers, edge
   if (!isOpen) return null;
 
   return (
-    <aside className="w-72 absolute top-0 right-0 h-full bg-sidebar border-l border-border shadow-lg">
+    <aside className="w-80 absolute top-0 right-0 h-full bg-card border-l border-border shadow-2xl flex flex-col">
       <div className="flex flex-col w-full h-full">
-        <div className="h-14 border-b px-3 flex items-center justify-between">
-          <h2 className="font-semibold text-sm">Teste do Fluxo</h2>
-          <Button variant="ghost" size="icon" onClick={onClose}><X className="h-5 w-5" /></Button>
+        <div className="h-14 border-b border-border px-3 flex items-center justify-between bg-gradient-to-r from-primary/20 via-card to-card">
+          <div className="flex items-center gap-2">
+            <div className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse" />
+            <h2 className="font-semibold text-sm text-foreground">Teste do Fluxo</h2>
+          </div>
+          <Button variant="ghost" size="icon" onClick={onClose}>
+            <X className="h-5 w-5" />
+          </Button>
         </div>
-        <ScrollArea className="flex-1 p-2">
-          <div className="space-y-2">
+        <ScrollArea className="flex-1 p-3 bg-background/40">
+          <div className="space-y-3">
             {messages.map((message) => (
               <div key={message.id} className={`flex ${message.type === "bot" ? "justify-start" : "justify-end"}`}>
-                <div className={`max-w-[85%] px-3 py-2 rounded-lg text-sm ${message.type === "bot" ? "bg-blue-500 text-white" : "bg-orange-500 text-white"}`}>
+                <div
+                  className={`max-w-[85%] px-3 py-2 rounded-2xl text-sm shadow-md ${
+                    message.type === "bot"
+                      ? "bg-[hsl(var(--bot-msg-bg,220_70%_45%))] text-white rounded-bl-sm"
+                      : "bg-primary text-primary-foreground rounded-br-sm"
+                  }`}
+                  style={
+                    message.type === "bot"
+                      ? { background: "var(--bot-msg-bg)", color: "var(--bot-msg-fg)" }
+                      : { background: "var(--user-msg-bg)", color: "var(--user-msg-fg)" }
+                  }
+                >
                   {message.isImage ? (
                     <img src={message.content} alt={message.alt} className="max-w-full rounded" />
                   ) : message.isVideo ? (
@@ -722,23 +738,23 @@ export const TestPanel = ({ isOpen, onClose, startContainer, allContainers, edge
           </div>
         </ScrollArea>
         {waitingForButton && activeButtons.length > 0 && (
-          <div className="p-2 border-t space-y-2">
+          <div className="p-3 border-t border-border space-y-2 bg-card">
             {isMultipleChoice ? (
               <>
                 {activeButtons.map((btn) => (
-                  <label 
-                    key={btn.id} 
-                    className="flex items-center gap-2 p-2 rounded-md border cursor-pointer hover:bg-muted/50 transition-colors"
+                  <label
+                    key={btn.id}
+                    className="flex items-center gap-2 p-2 rounded-md border border-border bg-muted/40 cursor-pointer hover:bg-muted transition-colors"
                   >
-                    <Checkbox 
+                    <Checkbox
                       checked={selectedButtons.includes(btn.id)}
                       onCheckedChange={() => handleToggleButton(btn.id)}
                     />
-                    <span className="text-sm">{btn.label}</span>
+                    <span className="text-sm text-foreground">{btn.label}</span>
                   </label>
                 ))}
-                <Button 
-                  className="w-full" 
+                <Button
+                  className="w-full"
                   onClick={handleMultipleChoiceSubmit}
                   disabled={selectedButtons.length === 0}
                 >
@@ -748,9 +764,9 @@ export const TestPanel = ({ isOpen, onClose, startContainer, allContainers, edge
             ) : (
               <div className="flex flex-wrap gap-2">
                 {activeButtons.map((btn) => (
-                  <Button 
-                    key={btn.id} 
-                    variant="outline" 
+                  <Button
+                    key={btn.id}
+                    variant="outline"
                     size="sm"
                     onClick={() => handleButtonClick(btn)}
                   >
@@ -762,9 +778,17 @@ export const TestPanel = ({ isOpen, onClose, startContainer, allContainers, edge
           </div>
         )}
         {waitingForInput && !waitingForButton && (
-          <div className="p-2 border-t flex gap-2">
-            <Input value={currentInput} onChange={(e) => setCurrentInput(e.target.value)} onKeyPress={(e) => e.key === "Enter" && handleSendMessage()} placeholder="Digite..." className="flex-1" />
-            <Button size="icon" onClick={handleSendMessage}><Send className="h-4 w-4" /></Button>
+          <div className="p-3 border-t border-border flex gap-2 bg-card">
+            <Input
+              value={currentInput}
+              onChange={(e) => setCurrentInput(e.target.value)}
+              onKeyPress={(e) => e.key === "Enter" && handleSendMessage()}
+              placeholder="Digite..."
+              className="flex-1 bg-background border-border"
+            />
+            <Button size="icon" onClick={handleSendMessage}>
+              <Send className="h-4 w-4" />
+            </Button>
           </div>
         )}
       </div>
