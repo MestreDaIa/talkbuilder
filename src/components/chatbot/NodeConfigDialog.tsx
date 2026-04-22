@@ -41,13 +41,15 @@ export const NodeConfigDialog = ({ node, open, onClose, onSave, containers = [] 
   return (
     <Dialog open={open} onOpenChange={onClose}>
       <DialogContent
-        className={`${maxWidth} w-[95vw] p-0 gap-0 bg-background/95 backdrop-blur border border-border rounded-lg overflow-hidden`}
+        className={`bot-editor-portal ${maxWidth} w-[95vw] p-0 gap-0 bg-card border border-border rounded-xl overflow-hidden shadow-2xl`}
         style={{ display: 'flex', flexDirection: 'column', maxHeight: '85vh' }}
       >
-        <DialogHeader className="w-full pt-5 px-5 flex items-center justify-center pb-3 uppercase underline underline-offset-8 shrink-0">
-          <DialogTitle className="w-full text-center text-foreground">{node.type}</DialogTitle>
+        <DialogHeader className="w-full pt-5 px-5 pb-4 shrink-0 bg-gradient-to-br from-primary/20 via-card to-card border-b border-border">
+          <DialogTitle className="w-full text-center text-foreground uppercase tracking-wider text-sm font-semibold">
+            {node.type}
+          </DialogTitle>
         </DialogHeader>
-        <div className="flex-1 overflow-y-auto min-h-0">
+        <div className="flex-1 overflow-y-auto min-h-0 bg-card text-foreground">
           {ConfigComponent ? (
             <ConfigComponent config={config} setConfig={setConfig} containers={containers} />
           ) : (
@@ -56,7 +58,7 @@ export const NodeConfigDialog = ({ node, open, onClose, onSave, containers = [] 
             </div>
           )}
         </div>
-        <div className="shrink-0 w-full py-4 px-5 border-t border-border bg-background">
+        <div className="shrink-0 w-full py-4 px-5 border-t border-border bg-muted/40">
           <div className="grid w-full grid-cols-2 gap-2">
             <Button variant="outline" onClick={onClose} className="w-full min-w-0">
               Cancelar
