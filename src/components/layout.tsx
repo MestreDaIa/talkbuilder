@@ -38,11 +38,13 @@ export default function WorkspaceLayout({
 
 			const isBotEditor = pathname.startsWith("/workspace/bot/");
 
-			const showToolbar =
+			const showBreadcrumb =
 				!isBotEditor &&
 				(pathname === "/" ||
 					pathname === "/workspace" ||
 					pathname.startsWith("/workspace/folder/"));
+
+			const showToolbar = showBreadcrumb;
 		
 			const [openModalADD, setOpenModalADD] = useState(false);
 			const [addOption, setAddOption] = useState<"folder" | "bot">("folder");
@@ -112,7 +114,7 @@ export default function WorkspaceLayout({
 			return (
 				<div className="flex flex-col h-svh relative overflow-y-hidden">
 					{!isBotEditor && <Header />}
-					{!isBotEditor && <Breadcrumb />}
+					{showBreadcrumb && <Breadcrumb />}
 					<div className="flex-1 flex relative overflow-hidden">
 						{!isBotEditor && (
 							<div className="flex ">

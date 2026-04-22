@@ -48,7 +48,7 @@ export default function Breadcrumb() {
   }
 
   return (
-    <div className="p-3 h-12 flex items-center border-b relative mt-16 gap-2">
+    <div className="p-3 h-12 flex items-center border-b relative gap-2">
       {folderId && (
         <button onClick={handleBack}>
           <ArrowLeft className="w-7 h-7 rounded-lg border p-1 text-white bg-gray-500/50 shadow-black shadow-[2px_3px_6px_-1px]" />
