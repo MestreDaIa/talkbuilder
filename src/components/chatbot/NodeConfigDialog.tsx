@@ -36,29 +36,36 @@ export const NodeConfigDialog = ({ node, open, onClose, onSave, containers = [] 
 
   // Complex nodes need larger dialog
   const isComplexNode = ['http-request', 'webhook', 'start'].includes(node.type);
-  const dialogSize = isComplexNode
-    ? 'sm:max-w-2xl w-[95vw] max-h-[85vh]'
-    : 'sm:max-w-md w-[95vw] max-h-[85vh]';
+  const maxWidth = isComplexNode ? 'sm:max-w-2xl' : 'sm:max-w-md';
 
   return (
     <Dialog open={open} onOpenChange={onClose}>
-      <DialogContent className={`${dialogSize} overflow-hidden bg-background/95 backdrop-blur border border-border rounded-lg gap-0 flex flex-col p-0`}>
+      <DialogContent
+        className={`${maxWidth} w-[95vw] p-0 gap-0 bg-background/95 backdrop-blur border border-border rounded-lg overflow-hidden`}
+        style={{ display: 'flex', flexDirection: 'column', maxHeight: '85vh' }}
+      >
         <DialogHeader className="w-full pt-5 px-5 flex items-center justify-center pb-3 uppercase underline underline-offset-8 shrink-0">
-          <DialogTitle className='w-full text-center text-foreground'>{node.type}</DialogTitle>
+          <DialogTitle className="w-full text-center text-foreground">{node.type}</DialogTitle>
         </DialogHeader>
         <div className="flex-1 overflow-y-auto min-h-0">
-          {ConfigComponent ? <ConfigComponent config={config} setConfig={setConfig} containers={containers} /> : (
+          {ConfigComponent ? (
+            <ConfigComponent config={config} setConfig={setConfig} containers={containers} />
+          ) : (
             <div className="p-4 text-center text-muted-foreground">
               Configuração não disponível para este tipo de node.
             </div>
           )}
         </div>
-        <DialogFooter className="shrink-0 flex w-full py-4 gap-1 border-t border-border">
-          <div className="w-full flex gap-2 px-5">
-            <Button variant="outline" onClick={onClose} className="w-full">Cancelar</Button>
-            <Button onClick={handleSave} className="w-full">Salvar</Button>
+        <div className="shrink-0 w-full py-4 px-5 border-t border-border bg-background">
+          <div className="w-full flex gap-2">
+            <Button variant="outline" onClick={onClose} className="w-full">
+              Cancelar
+            </Button>
+            <Button onClick={handleSave} className="w-full">
+              Salvar
+            </Button>
           </div>
-        </DialogFooter>
+        </div>
       </DialogContent>
     </Dialog>
   );
