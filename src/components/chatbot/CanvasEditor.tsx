@@ -299,10 +299,10 @@ const CanvasContent = ({
 
   const onConnect = useCallback(
     (params: Connection | FlowEdge) => {
-      setEdges((eds) => {
+      setEdges((eds: FlowEdge[]) => {
         const newEdges = addEdge(params, eds);
         if (onEdgesChangeProp) {
-          onEdgesChangeProp(newEdges.map(e => ({
+          onEdgesChangeProp(newEdges.map((e: FlowEdge) => ({
             source: e.source,
             target: e.target,
             sourceHandle: e.sourceHandle || undefined
