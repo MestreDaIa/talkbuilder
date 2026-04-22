@@ -62,20 +62,12 @@ const nodeTypes: {
   { type: "script", label: "Script", icon: <Code className="h-5 w-5" />, category: "logic" },
 ];
 
-const getCategoryColor = (category: string, nodeType: NodeType) => {
-  if (category === "flow") return "bg-green-600/80 border-green-950 text-white";
-  if (category === "bubbles") return "bg-indigo-950 border-blue-500 text-blue-500";
-  if (category === "inputs") return "bg-orange-600/80 border-indigo-950 text-white";
-  if (category === "logic") return "bg-purple-600/80 border-purple-950 text-white";
-  return "";
-};
-
-const getIconColor = (category: string) => {
-  if (category === "flow") return "text-green-950 group-hover:text-green-600/80";
-  if (category === "bubbles") return "text-blue-500";
-  if (category === "inputs") return "text-indigo-950 group-hover:text-orange-600/80";
-  if (category === "logic") return "text-purple-950 group-hover:text-purple-600/80";
-  return "";
+const getCategoryStyle = (category: string): React.CSSProperties => {
+  if (category === "flow") return { background: "var(--bot-flow)", color: "var(--bot-flow-fg)" };
+  if (category === "bubbles") return { background: "var(--bot-bubbles)", color: "var(--bot-bubbles-fg)" };
+  if (category === "inputs") return { background: "var(--bot-inputs)", color: "var(--bot-inputs-fg)" };
+  if (category === "logic") return { background: "var(--bot-logic)", color: "var(--bot-logic-fg)" };
+  return {};
 };
 
 export const NodesSidebar = ({ onAddNode }: NodesSidebarProps) => {
@@ -83,34 +75,47 @@ export const NodesSidebar = ({ onAddNode }: NodesSidebarProps) => {
   const categories = Array.from(new Set(nodeTypes.map((node) => node.category)));
 
   return (
-    <aside className={`${!collapsed ? "w-20 flex flex-col" : "w-72 px-3"} relative flex-grow-0 bg-sidebar transition-all duration-300 flex flex-col`}>
+    <aside
+      className={`${!collapsed ? "w-20 flex flex-col" : "w-72 px-3"} relative flex-grow-0 bg-card border-r border-border transition-all duration-300 flex flex-col`}
+    >
       <Button
         variant="ghost"
         size="icon"
-        className="absolute -right-3 border p-0 z-10 top-4 w-6 h-6 rounded-full bg-background shadow-md"
+        className="absolute -right-3 border border-border p-0 z-10 top-4 w-6 h-6 rounded-full bg-card shadow-md text-foreground"
         onClick={() => setCollapsed(!collapsed)}
       >
         {!collapsed ? <ChevronRight className="h-4 w-4" /> : <ChevronLeft className="h-4 w-4" />}
       </Button>
 
       <div className="flex overflow-hidden h-full">
-        <div className={`${!collapsed ? "flex flex-col gap-3" : "flex flex-col gap-0 uppercase text-muted-foreground"} gap-3 w-full h-full overflow-y-auto`}>
+        <div className={`${!collapsed ? "flex flex-col gap-3" : "flex flex-col gap-0"} gap-3 w-full h-full overflow-y-auto`}>
           {categories.map((category) => (
             <div key={category} className="flex flex-col gap-2 py-3 px-1 w-full justify-start">
-              <h4 className={`${!collapsed ? 'hidden' : "flex flex-col"} text-left text-sm font-medium`}>{category}</h4>
-              <div className={`${collapsed ? 'grid grid-cols-2 gap-1' : "flex flex-col gap-2"} flex justify-center items-center w-full`}>
-                {nodeTypes.filter((node) => node.category === category).map((node) => (
-                  <Button
-                    key={node.type}
-                    onClick={() => onAddNode(node.type)}
-                    className={`${getCategoryColor(category, node.type)} ${collapsed ? "w-full" : "w-fit"} rounded-lg gap-0 group hover:bg-muted transition-all duration-200 flex items-center justify-start p-0 cursor-pointer border`}
-                  >
-                    <div className={`${getIconColor(category)} p-0 w-10 h-10 items-center flex justify-center rounded-md group-hover:scale-110 transition-transform`}>
-                      {node.icon}
-                    </div>
-                    <span className={`text-sm font-medium ${collapsed ? "flex" : "hidden"}`}>{node.label}</span>
-                  </Button>
-                ))}
+              <h4
+                className={`${!collapsed ? "hidden" : "flex flex-col"} text-left text-[11px] font-semibold uppercase tracking-wider text-muted-foreground px-1`}
+              >
+                {category}
+              </h4>
+              <div
+                className={`${collapsed ? "grid grid-cols-2 gap-1.5" : "flex flex-col gap-2"} flex justify-center items-center w-full`}
+              >
+                {nodeTypes
+                  .filter((node) => node.category === category)
+                  .map((node) => (
+                    <Button
+                      key={node.type}
+                      onClick={() => onAddNode(node.type)}
+                      style={getCategoryStyle(category)}
+                      className={`${collapsed ? "w-full justify-start gap-2 px-2" : "w-12 h-12 p-0"} rounded-lg shadow-sm hover:opacity-90 hover:scale-[1.02] transition-all duration-200 flex items-center cursor-pointer border-0`}
+                    >
+                      <div className="w-8 h-8 flex items-center justify-center rounded-md shrink-0">
+                        {node.icon}
+                      </div>
+                      <span className={`text-sm font-medium ${collapsed ? "flex" : "hidden"}`}>
+                        {node.label}
+                      </span>
+                    </Button>
+                  ))}
               </div>
             </div>
           ))}

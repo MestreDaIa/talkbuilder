@@ -156,24 +156,26 @@ code {
     --sidebar-ring: oklch(0.708 0 0);
   }
   .dark {
-    --background: oklch(0.145 0 0);
-    --foreground: oklch(0.985 0 0);
-    --card: oklch(0.205 0 0);
-    --card-foreground: oklch(0.985 0 0);
-    --popover: oklch(0.205 0 0);
-    --popover-foreground: oklch(0.985 0 0);
-    --primary: oklch(0.922 0 0);
-    --primary-foreground: oklch(0.205 0 0);
-    --secondary: oklch(0.269 0 0);
-    --secondary-foreground: oklch(0.985 0 0);
-    --muted: oklch(0.269 0 0);
-    --muted-foreground: oklch(0.708 0 0);
-    --accent: oklch(0.269 0 0);
-    --accent-foreground: oklch(0.985 0 0);
-    --destructive: oklch(0.704 0.191 22.216);
-    --border: oklch(1 0 0 / 10%);
-    --input: oklch(1 0 0 / 15%);
-    --ring: oklch(0.556 0 0);
+    /* Rich dark slate base with subtle blue tint */
+    --background: oklch(0.18 0.012 270);
+    --foreground: oklch(0.97 0.005 270);
+    --card: oklch(0.235 0.014 270);
+    --card-foreground: oklch(0.97 0.005 270);
+    --popover: oklch(0.235 0.014 270);
+    --popover-foreground: oklch(0.97 0.005 270);
+    /* Vibrant violet primary */
+    --primary: oklch(0.62 0.21 295);
+    --primary-foreground: oklch(0.99 0 0);
+    --secondary: oklch(0.32 0.02 270);
+    --secondary-foreground: oklch(0.97 0 0);
+    --muted: oklch(0.28 0.015 270);
+    --muted-foreground: oklch(0.72 0.015 270);
+    --accent: oklch(0.4 0.12 295);
+    --accent-foreground: oklch(0.99 0 0);
+    --destructive: oklch(0.65 0.22 25);
+    --border: oklch(0.35 0.02 270);
+    --input: oklch(0.3 0.018 270);
+    --ring: oklch(0.62 0.21 295);
     --chart-1: oklch(0.87 0 0);
     --chart-2: oklch(0.556 0 0);
     --chart-3: oklch(0.439 0 0);
@@ -197,4 +199,70 @@ code {
   html {
     @apply font-sans;
   }
+}
+
+/* ==========================================================
+   Bot Editor scope: force rich dark UI inside the editor
+   ========================================================== */
+.bot-editor {
+  --background: oklch(0.18 0.012 270);
+  --foreground: oklch(0.97 0.005 270);
+  --card: oklch(0.235 0.014 270);
+  --card-foreground: oklch(0.97 0.005 270);
+  --popover: oklch(0.245 0.014 270);
+  --popover-foreground: oklch(0.97 0.005 270);
+  --primary: oklch(0.62 0.21 295);
+  --primary-foreground: oklch(0.99 0 0);
+  --secondary: oklch(0.32 0.02 270);
+  --secondary-foreground: oklch(0.97 0 0);
+  --muted: oklch(0.28 0.015 270);
+  --muted-foreground: oklch(0.78 0.015 270);
+  --accent: oklch(0.4 0.12 295);
+  --accent-foreground: oklch(0.99 0 0);
+  --border: oklch(0.36 0.02 270);
+  --input: oklch(0.3 0.018 270);
+  --ring: oklch(0.62 0.21 295);
+  --sidebar: oklch(0.21 0.013 270);
+  --sidebar-foreground: oklch(0.97 0 0);
+  --sidebar-border: oklch(0.32 0.02 270);
+
+  /* Bot category accents */
+  --bot-flow: oklch(0.65 0.18 150);
+  --bot-flow-fg: oklch(0.99 0 0);
+  --bot-bubbles: oklch(0.65 0.2 240);
+  --bot-bubbles-fg: oklch(0.99 0 0);
+  --bot-inputs: oklch(0.7 0.18 50);
+  --bot-inputs-fg: oklch(0.16 0 0);
+  --bot-logic: oklch(0.62 0.22 295);
+  --bot-logic-fg: oklch(0.99 0 0);
+
+  /* Chat bubble accents */
+  --bot-msg-bg: oklch(0.45 0.16 250);
+  --bot-msg-fg: oklch(0.99 0 0);
+  --user-msg-bg: oklch(0.62 0.21 295);
+  --user-msg-fg: oklch(0.99 0 0);
+
+  color: var(--foreground);
+}
+
+/* Portal content (Dialogs/Popovers) needs the variables too */
+.bot-editor-portal {
+  --background: oklch(0.18 0.012 270);
+  --foreground: oklch(0.97 0.005 270);
+  --card: oklch(0.235 0.014 270);
+  --card-foreground: oklch(0.97 0.005 270);
+  --popover: oklch(0.245 0.014 270);
+  --popover-foreground: oklch(0.97 0.005 270);
+  --primary: oklch(0.62 0.21 295);
+  --primary-foreground: oklch(0.99 0 0);
+  --secondary: oklch(0.32 0.02 270);
+  --secondary-foreground: oklch(0.97 0 0);
+  --muted: oklch(0.28 0.015 270);
+  --muted-foreground: oklch(0.78 0.015 270);
+  --accent: oklch(0.4 0.12 295);
+  --accent-foreground: oklch(0.99 0 0);
+  --border: oklch(0.36 0.02 270);
+  --input: oklch(0.3 0.018 270);
+  --ring: oklch(0.62 0.21 295);
+  color: var(--foreground);
 }

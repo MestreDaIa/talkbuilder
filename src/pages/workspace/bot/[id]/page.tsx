@@ -79,6 +79,16 @@ export default function BotPage() {
     saveFlow(botId, { containers, edges });
   }, [botId, containers, edges, hydrated]);
 
+  // Force dark theme variables while inside the bot editor (so Radix portals inherit too)
+  useEffect(() => {
+    const root = document.documentElement;
+    const hadDark = root.classList.contains("dark");
+    root.classList.add("dark");
+    return () => {
+      if (!hadDark) root.classList.remove("dark");
+    };
+  }, []);
+
   const handleAddBlock = () => {
     const position = getCenter
       ? getCenter()
@@ -124,78 +134,49 @@ export default function BotPage() {
 
   return (
     <VariablesProvider>
-    <div className="fixed inset-0 flex flex-col bg-gray-950 z-50">
+    <div className="bot-editor fixed inset-0 flex flex-col bg-background z-50 text-foreground">
       {/* Header customizado do editor */}
-      <header className="flex items-center gap-2 px-3 py-2 bg-gray-900 border-b border-gray-800 text-white">
+      <header className="flex items-center gap-2 px-3 py-2 bg-card border-b border-border text-foreground shadow-sm">
         <Button
           variant="ghost"
           size="sm"
           onClick={() => navigate(-1)}
-          className="text-white hover:bg-gray-800 gap-1"
+          className="gap-1"
         >
           <ArrowLeft className="w-4 h-4" /> Voltar
         </Button>
 
-        <div className="h-6 w-px bg-gray-700 mx-1" />
+        <div className="h-6 w-px bg-border mx-1" />
 
         <div className="flex items-center gap-2 mr-2">
           {bot?.emoji && <span className="text-base">{bot.emoji}</span>}
           <span className="text-sm font-semibold truncate max-w-[180px]">
             {bot?.title ?? `Bot: ${botId}`}
           </span>
-          <span className="text-[10px] uppercase tracking-wide bg-gray-700/70 text-gray-300 rounded px-2 py-0.5">
+          <span className="text-[10px] uppercase tracking-wide bg-muted text-muted-foreground rounded px-2 py-0.5 border border-border">
             Rascunho
           </span>
         </div>
 
         <div className="flex-1" />
 
-        <Button
-          variant="ghost"
-          size="sm"
-          className="text-white hover:bg-gray-800 gap-1"
-          onClick={() => toast.info("Configurações em breve")}
-        >
+        <Button variant="ghost" size="sm" className="gap-1" onClick={() => toast.info("Configurações em breve")}>
           <Settings className="w-4 h-4" /> Configurações
         </Button>
-        <Button
-          variant="ghost"
-          size="sm"
-          className="text-white hover:bg-gray-800 gap-1"
-          onClick={handleAddBlock}
-        >
+        <Button variant="ghost" size="sm" className="gap-1" onClick={handleAddBlock}>
           <Plus className="w-4 h-4" /> Bloco
         </Button>
-        <Button
-          variant="ghost"
-          size="sm"
-          className="text-white hover:bg-gray-800 gap-1"
-          onClick={() => toast.info("Teste em breve")}
-        >
+        <Button variant="ghost" size="sm" className="gap-1" onClick={() => toast.info("Teste em breve")}>
           <Play className="w-4 h-4" /> Testar
         </Button>
-        <Button
-          variant="ghost"
-          size="sm"
-          className="text-white hover:bg-gray-800 gap-1"
-          onClick={() => toast.info("Visualizar em breve")}
-        >
+        <Button variant="ghost" size="sm" className="gap-1" onClick={() => toast.info("Visualizar em breve")}>
           <Eye className="w-4 h-4" /> Visualizar
         </Button>
-        <Button
-          variant="ghost"
-          size="sm"
-          className="text-white hover:bg-gray-800 gap-1"
-          onClick={handleSave}
-        >
+        <Button variant="ghost" size="sm" className="gap-1" onClick={handleSave}>
           <Save className="w-4 h-4" /> Salvar
         </Button>
 
-        <Button
-          size="sm"
-          className="bg-violet-600 hover:bg-violet-500 text-white gap-1 ml-1"
-          onClick={() => toast.info("Publicação em breve")}
-        >
+        <Button size="sm" className="gap-1 ml-1" onClick={() => toast.info("Publicação em breve")}>
           <Send className="w-4 h-4" />
         </Button>
       </header>
