@@ -687,6 +687,121 @@ export const TestPanel = ({ isOpen, onClose, startContainer, allContainers, edge
     }
   };
 
+  // Determine which media-input type the current input node expects
+  const mediaInputType: "image" | "video" | "audio" | "document" | null = (() => {
+    if (!currentInputNode) return null;
+    switch (currentInputNode.type) {
+      case "input-image": return "image";
+      case "input-video": return "video";
+      case "input-audio": return "audio";
+      case "input-document": return "document";
+      default: return null;
+    }
+  })();
+
+  const isMediaInput = mediaInputType !== null;
+
+  const acceptByType: Record<string, string> = {
+    image: "image/*",
+    video: "video/*",
+    audio: "audio/*",
+    document: ".pdf,.doc,.docx,.xls,.xlsx,.ppt,.pptx,.txt,.csv,application/pdf,application/msword,application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+  };
+
+  const placeholderByType: Record<string, string> = {
+    image: "Toque para enviar uma imagem",
+    video: "Toque para enviar um vídeo",
+    audio: "Toque para gravar ou enviar áudio",
+    document: "Toque para enviar um documento",
+  };
+
+  const readFileAsDataUrl = (file: File): Promise<string> =>
+    new Promise((resolve, reject) => {
+      const reader = new FileReader();
+      reader.onload = () => resolve(reader.result as string);
+      reader.onerror = reject;
+      reader.readAsDataURL(file);
+    });
+
+  const handleFilePick = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    try {
+      const dataUrl = await readFileAsDataUrl(file);
+      setMediaPreview({ url: dataUrl, name: file.name });
+    } catch (err) {
+      console.error(err);
+    } finally {
+      e.target.value = "";
+    }
+  };
+
+  const startAudioRecording = async () => {
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+      recordedChunksRef.current = [];
+      const recorder = new MediaRecorder(stream);
+      mediaRecorderRef.current = recorder;
+      recorder.ondataavailable = (ev) => {
+        if (ev.data.size > 0) recordedChunksRef.current.push(ev.data);
+      };
+      recorder.onstop = async () => {
+        const blob = new Blob(recordedChunksRef.current, { type: "audio/webm" });
+        const reader = new FileReader();
+        reader.onload = () => {
+          setMediaPreview({ url: reader.result as string, name: "gravacao.webm" });
+        };
+        reader.readAsDataURL(blob);
+        stream.getTracks().forEach((t) => t.stop());
+      };
+      recorder.start();
+      setIsRecordingAudio(true);
+      setRecordingTime(0);
+      recordingTimerRef.current = setInterval(() => {
+        setRecordingTime((t) => t + 1);
+      }, 1000);
+    } catch (err) {
+      console.error("Erro ao acessar microfone:", err);
+      alert("Não foi possível acessar o microfone.");
+    }
+  };
+
+  const stopAudioRecording = () => {
+    mediaRecorderRef.current?.stop();
+    if (recordingTimerRef.current) {
+      clearInterval(recordingTimerRef.current);
+      recordingTimerRef.current = null;
+    }
+    setIsRecordingAudio(false);
+  };
+
+  const handleSendMedia = () => {
+    if (!mediaPreview || !currentInputNode || !mediaInputType) return;
+    const saveVariable = currentInputNode.config.saveVariable;
+    if (saveVariable) {
+      setVariable(saveVariable, mediaPreview.url);
+      pendingVarsRef.current[saveVariable] = mediaPreview.url;
+    }
+    setMessages((prev) => [
+      ...prev,
+      {
+        id: Date.now().toString(),
+        type: "user",
+        content: mediaInputType === "document" ? (mediaPreview.name || "documento") : mediaPreview.url,
+        isImage: mediaInputType === "image",
+        isVideo: mediaInputType === "video",
+        isAudio: mediaInputType === "audio",
+        isFile: mediaInputType === "document",
+        alt: mediaPreview.name,
+      },
+    ]);
+    setMediaPreview(null);
+    setWaitingForInput(false);
+    setCurrentInputNode(null);
+    const currentContainer = allContainers.find((c) => c.id === currentContainerId);
+    if (currentContainer) setTimeout(() => processNextNode(currentContainer, currentNodeIndex + 1, pendingVarsRef.current), 500);
+  };
+
   const handleSendMessage = () => {
     if (!currentInput.trim() || !waitingForInput) return;
     if (currentInputNode?.config.saveVariable) {
@@ -699,6 +814,12 @@ export const TestPanel = ({ isOpen, onClose, startContainer, allContainers, edge
     setCurrentInputNode(null);
     const currentContainer = allContainers.find((c) => c.id === currentContainerId);
     if (currentContainer) setTimeout(() => processNextNode(currentContainer, currentNodeIndex + 1, pendingVarsRef.current), 500);
+  };
+
+  const formatRecTime = (s: number) => {
+    const m = Math.floor(s / 60);
+    const sec = s % 60;
+    return `${m}:${sec.toString().padStart(2, "0")}`;
   };
 
   if (!isOpen) return null;
