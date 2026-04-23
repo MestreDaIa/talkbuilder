@@ -1,8 +1,11 @@
 import {SiInstagram, SiTelegram, SiWhatsapp} from '@icons-pack/react-simple-icons'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '../../../../components/ui/card'
-import { Ellipsis } from 'lucide-react'
+import { Button } from '../../../../components/ui/button'
+import { CalendarCheck2, Ellipsis } from 'lucide-react'
+import { useEmbed } from '../../../../context/EmbedContext'
 
 export default function IntegrationsSettings() {
+  const { flags } = useEmbed();
 
   return (
     <Card>
