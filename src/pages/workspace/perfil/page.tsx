@@ -11,13 +11,14 @@ import {
 	MapPin,
 	Phone,
 	Save,
-	User2,
+	Trash2,
 	X,
 } from "lucide-react";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { getSupabase } from "../../../lib/supabaseClient";
 import { useAuth } from "../../../context/AuthContext";
 import { useToast } from "../../../hooks/use-toast";
+import { getInitials } from "../../../lib/initials";
 
 type ProfileExtra = {
 	display_name: string | null;
