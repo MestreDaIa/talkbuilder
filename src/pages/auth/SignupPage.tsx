@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { Link } from "react-router-dom";
+import { Link, useNavigate } from "react-router-dom";
 import { z } from "zod";
 import { getSupabase } from "../../lib/supabaseClient";
 import { Button } from "../../components/ui/button";
@@ -23,6 +23,7 @@ const slugRegex = /^[a-z0-9](?:[a-z0-9-]{1,30}[a-z0-9])?$/;
 const schema = z.object({
 	display_name: z.string().trim().min(1, "Nome obrigatório").max(100),
 	email: z.string().trim().email("Email inválido").max(255),
+	password: z.string().min(6, "Senha deve ter ao menos 6 caracteres").max(72),
 	slug: z
 		.string()
 		.trim()
@@ -44,14 +45,15 @@ const PLAN_PRICES: Record<PlanId, string> = {
 
 export default function SignupPage() {
 	const { toast } = useToast();
+	const navigate = useNavigate();
 
 	const [displayName, setDisplayName] = useState("");
 	const [email, setEmail] = useState("");
+	const [password, setPassword] = useState("");
 	const [slug, setSlug] = useState("");
 	const [plan, setPlan] = useState<PlanId>("starter");
 	const [slugStatus, setSlugStatus] = useState<SlugStatus>("idle");
 	const [submitting, setSubmitting] = useState(false);
-	const [sent, setSent] = useState(false);
 
 	// debounce slug check
 	useEffect(() => {
@@ -85,6 +87,7 @@ export default function SignupPage() {
 		const parsed = schema.safeParse({
 			display_name: displayName,
 			email,
+			password,
 			slug,
 			plan,
 		});
@@ -107,10 +110,10 @@ export default function SignupPage() {
 
 		setSubmitting(true);
 		const supabase = getSupabase()!;
-		const { error } = await supabase.auth.signInWithOtp({
+		const { data, error } = await supabase.auth.signUp({
 			email: parsed.data.email,
+			password: parsed.data.password,
 			options: {
-				shouldCreateUser: true,
 				emailRedirectTo: `${window.location.origin}/`,
 				data: {
 					display_name: parsed.data.display_name,
@@ -129,7 +132,18 @@ export default function SignupPage() {
 			});
 			return;
 		}
-		setSent(true);
+
+		// Se confirmação de email estiver desativada, já vem com session
+		if (data.session) {
+			toast({ title: "Conta criada!", description: "Bem-vindo ao TalkMap." });
+			navigate("/", { replace: true });
+		} else {
+			toast({
+				title: "Confira seu email",
+				description: `Mandamos um link de confirmação pra ${parsed.data.email}.`,
+			});
+			navigate("/login", { replace: true });
+		}
 	}
 
 	return (

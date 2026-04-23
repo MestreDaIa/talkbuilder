@@ -1,24 +1,32 @@
 "use client";
 
 import { useState } from "react";
-import { Link, useLocation } from "react-router-dom";
+import { Link, useLocation, useNavigate } from "react-router-dom";
 import { z } from "zod";
 import { getSupabase } from "../../lib/supabaseClient";
 import { Button } from "../../components/ui/button";
 import { Input } from "../../components/ui/input";
 import { Label } from "../../components/ui/label";
-import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "../../components/ui/card";
+import {
+	Card,
+	CardContent,
+	CardHeader,
+	CardTitle,
+	CardDescription,
+} from "../../components/ui/card";
 import { useToast } from "../../hooks/use-toast";
 
 const schema = z.object({
 	email: z.string().trim().email("Email inválido").max(255),
+	password: z.string().min(6, "Senha deve ter ao menos 6 caracteres").max(72),
 });
 
 export default function LoginPage() {
 	const location = useLocation();
+	const navigate = useNavigate();
 	const { toast } = useToast();
 	const [email, setEmail] = useState("");
-	const [sent, setSent] = useState(false);
+	const [password, setPassword] = useState("");
 	const [submitting, setSubmitting] = useState(false);
 
 	const redirectTo =
@@ -26,10 +34,10 @@ export default function LoginPage() {
 
 	async function handleSubmit(e: React.FormEvent) {
 		e.preventDefault();
-		const parsed = schema.safeParse({ email });
+		const parsed = schema.safeParse({ email, password });
 		if (!parsed.success) {
 			toast({
-				title: "Email inválido",
+				title: "Confira os campos",
 				description: parsed.error.issues[0].message,
 				variant: "destructive",
 			});
@@ -38,24 +46,23 @@ export default function LoginPage() {
 
 		setSubmitting(true);
 		const supabase = getSupabase()!;
-		const { error } = await supabase.auth.signInWithOtp({
+		const { error } = await supabase.auth.signInWithPassword({
 			email: parsed.data.email,
-			options: {
-				shouldCreateUser: false,
-				emailRedirectTo: `${window.location.origin}${redirectTo}`,
-			},
+			password: parsed.data.password,
 		});
 		setSubmitting(false);
 
 		if (error) {
 			toast({
-				title: "Falha ao enviar link",
+				title: "Falha ao entrar",
 				description: error.message,
 				variant: "destructive",
 			});
 			return;
 		}
-		setSent(true);
+
+		toast({ title: "Bem-vindo de volta!" });
+		navigate(redirectTo, { replace: true });
 	}
 
 	return (
@@ -64,53 +71,46 @@ export default function LoginPage() {
 				<CardHeader>
 					<CardTitle>Entrar no TalkMap</CardTitle>
 					<CardDescription>
-						Vamos te mandar um link mágico por email. Sem senha.
+						Use seu email e senha pra acessar sua conta.
 					</CardDescription>
 				</CardHeader>
 				<CardContent>
-					{sent ? (
-						<div className="text-sm space-y-2">
-							<p className="font-medium">📬 Link enviado!</p>
-							<p className="text-muted-foreground">
-								Confira sua caixa de entrada em <strong>{email}</strong> e
-								clique no link pra entrar.
-							</p>
-							<Button
-								variant="ghost"
-								className="px-0"
-								onClick={() => {
-									setSent(false);
-									setEmail("");
-								}}
-							>
-								Usar outro email
-							</Button>
+					<form onSubmit={handleSubmit} className="space-y-4">
+						<div>
+							<Label htmlFor="email">Email</Label>
+							<Input
+								id="email"
+								type="email"
+								placeholder="voce@empresa.com"
+								value={email}
+								onChange={(e) => setEmail(e.target.value)}
+								required
+								autoFocus
+								autoComplete="email"
+							/>
 						</div>
-					) : (
-						<form onSubmit={handleSubmit} className="space-y-4">
-							<div>
-								<Label htmlFor="email">Email</Label>
-								<Input
-									id="email"
-									type="email"
-									placeholder="voce@empresa.com"
-									value={email}
-									onChange={(e) => setEmail(e.target.value)}
-									required
-									autoFocus
-								/>
-							</div>
-							<Button type="submit" className="w-full" disabled={submitting}>
-								{submitting ? "Enviando..." : "Receber link mágico"}
-							</Button>
-							<p className="text-sm text-muted-foreground text-center">
-								Ainda não tem conta?{" "}
-								<Link to="/signup" className="text-primary underline">
-									Criar agora
-								</Link>
-							</p>
-						</form>
-					)}
+						<div>
+							<Label htmlFor="password">Senha</Label>
+							<Input
+								id="password"
+								type="password"
+								placeholder="••••••••"
+								value={password}
+								onChange={(e) => setPassword(e.target.value)}
+								required
+								autoComplete="current-password"
+							/>
+						</div>
+						<Button type="submit" className="w-full" disabled={submitting}>
+							{submitting ? "Entrando..." : "Entrar"}
+						</Button>
+						<p className="text-sm text-muted-foreground text-center">
+							Ainda não tem conta?{" "}
+							<Link to="/signup" className="text-primary underline">
+								Criar agora
+							</Link>
+						</p>
+					</form>
 				</CardContent>
 			</Card>
 		</div>
