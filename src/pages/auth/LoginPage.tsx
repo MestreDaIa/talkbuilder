@@ -30,12 +30,17 @@ export default function LoginPage() {
 			<div className="min-h-svh flex items-center justify-center p-6">
 				<Card className="max-w-md w-full">
 					<CardHeader>
-						<CardTitle>Supabase não configurado</CardTitle>
+						<CardTitle>Configure o Supabase primeiro</CardTitle>
 						<CardDescription>
-							Antes de logar, conecte seu projeto Supabase em
-							Configurações → Integrações.
+							Pra entrar, o TalkMap precisa estar conectado a um projeto
+							Supabase.
 						</CardDescription>
 					</CardHeader>
+					<CardContent>
+						<Button className="w-full" onClick={() => navigate("/setup")}>
+							Configurar agora
+						</Button>
+					</CardContent>
 				</Card>
 			</div>
 		);
