@@ -1,8 +1,11 @@
 import {SiInstagram, SiTelegram, SiWhatsapp} from '@icons-pack/react-simple-icons'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '../../../../components/ui/card'
-import { Ellipsis } from 'lucide-react'
+import { Button } from '../../../../components/ui/button'
+import { CalendarCheck2, Ellipsis } from 'lucide-react'
+import { useEmbed } from '../../../../context/EmbedContext'
 
 export default function IntegrationsSettings() {
+  const { flags } = useEmbed();
 
   return (
     <Card>
@@ -63,7 +66,22 @@ export default function IntegrationsSettings() {
           </CardContent>
         </Card>
 
-    
+        {flags.showBookingfyIntegrationCard && (
+          <Card className='flex items-center p-4 justify-between relative border-dashed'>
+            <div className='p-3 h-fit w-fit rounded-xl bg-gray-200/90'>
+              <CalendarCheck2 className='w-5 h-5 text-orange-500'/>
+            </div>
+            <CardHeader className='flex flex-col text-left items-start w-full'>
+              <CardTitle>BookingFy</CardTitle>
+              <CardDescription>
+                Conecte ao seu sistema de agendamento para que o chatbot leia e escreva dados de clientes, serviços e horários.
+              </CardDescription>
+            </CardHeader>
+            <CardContent className='flex absolute right-2 top-1/2 -translate-y-1/2 h-full items-center'>
+              <Button variant='outline' size='sm'>Conectar</Button>
+            </CardContent>
+          </Card>
+        )}
       </CardContent>
     </Card>
   )

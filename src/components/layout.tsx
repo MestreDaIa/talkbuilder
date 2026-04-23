@@ -12,6 +12,7 @@ import { useState } from "react";
 import * as DropdownMenu from "@radix-ui/react-dropdown-menu";
 import { useWorkspace, WorkspaceProvider } from "../context/WorkspaceContext";
 import { PlanProvider } from "../context/PlanContext";
+import { EmbedProvider, useEmbed } from "../context/EmbedContext";
 import DnDProvider from "../context/DnDProvider";
 import { useLocation } from "react-router-dom";
 import FoldersSidebarNavigation from "./FoldersSidebarNavigation";
@@ -26,16 +27,19 @@ export default function WorkspaceLayout({
 	children: React.ReactNode;
 }) {
 	return (
-		<WorkspaceProvider>
-			<PlanProvider>
-				<DnDProvider>
-					<WorkspaceLayoutContent>{children}</WorkspaceLayoutContent>
-				</DnDProvider>
-			</PlanProvider>
-		</WorkspaceProvider>
+		<EmbedProvider>
+			<WorkspaceProvider>
+				<PlanProvider>
+					<DnDProvider>
+						<WorkspaceLayoutContent>{children}</WorkspaceLayoutContent>
+					</DnDProvider>
+				</PlanProvider>
+			</WorkspaceProvider>
+		</EmbedProvider>
 	);
 		function WorkspaceLayoutContent({ children }: { children: React.ReactNode }) {
 			const { items, setItems } = useWorkspace();
+			const { flags, mode } = useEmbed();
 		
 			const { pathname } = useLocation();
 
@@ -115,8 +119,11 @@ export default function WorkspaceLayout({
 			}
 		
 			return (
-				<div className="flex flex-col h-svh relative overflow-y-hidden">
-				{!isBotEditor && <Header />}
+				<div
+					className="flex flex-col h-svh relative overflow-y-hidden"
+					data-embed-mode={mode}
+				>
+				{!isBotEditor && flags.showHeader && <Header />}
 					{showBreadcrumb && <Breadcrumb />}
 					<div className="flex-1 flex relative overflow-hidden">
 						{showBreadcrumb && (

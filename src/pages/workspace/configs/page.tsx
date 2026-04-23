@@ -17,8 +17,11 @@ import KeysApi from "./tabsListUI/KeysApi";
 import IntegrationsSettings from "./tabsListUI/IntegrationsSettings";
 import PaymentPlan from "./tabsListUI/PaymentPlan";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "../../../components/ui/tabs";
+import { useEmbed } from "../../../context/EmbedContext";
 
 export default function ConfigurationWorkspace() {
+	const { flags } = useEmbed();
+	const defaultTab = "workspace";
 	return (
 		<div className="relative flex border border-red-600 h-full overflow-hidden">
 			<div className='bg-gray-200/40 px-6 py-4 flex w-full flex-col items-center justify-start gap-4 h-full overflow-auto'>
@@ -29,11 +32,13 @@ export default function ConfigurationWorkspace() {
 					</span>
 				</div>
 				<div className="w-full">
-					<Tabs defaultValue="workspace" className="w-full">
+					<Tabs defaultValue={defaultTab} className="w-full">
 						<TabsList className="bg-gray-200 w-full flex items-center justify-start px-2 py-6 gap-2">
-							<TabsTrigger value="building" className="capitalize bg-gray-300">
-								<Building2 />
-							</TabsTrigger>
+							{flags.showCompanyTab && (
+								<TabsTrigger value="building" className="capitalize bg-gray-300">
+									<Building2 />
+								</TabsTrigger>
+							)}
 							<TabsTrigger value="workspace" className="capitalize bg-gray-300">
 								<Users />
 							</TabsTrigger>
@@ -49,15 +54,19 @@ export default function ConfigurationWorkspace() {
 							<TabsTrigger value="integration" className="capitalize bg-gray-300">
 								<Plug />
 							</TabsTrigger>
-							<TabsTrigger value="paymentPlan" className="capitalize bg-gray-300">
-								<CreditCard />
-							</TabsTrigger>
+							{flags.showBilling && (
+								<TabsTrigger value="paymentPlan" className="capitalize bg-gray-300">
+									<CreditCard />
+								</TabsTrigger>
+							)}
 						</TabsList>
-						<TabsContent value="building">
-							<div>
-								<Building />{" "}
-							</div>
-						</TabsContent>
+						{flags.showCompanyTab && (
+							<TabsContent value="building">
+								<div>
+									<Building />{" "}
+								</div>
+							</TabsContent>
+						)}
 						<TabsContent value="workspace">
 							<div>
 								<WorkspaceConfig />{" "}
@@ -83,11 +92,13 @@ export default function ConfigurationWorkspace() {
 								<IntegrationsSettings />
 							</div>
 						</TabsContent>
-						<TabsContent value="paymentPlan">
-							<div>
-								<PaymentPlan />
-							</div>
-						</TabsContent>
+						{flags.showBilling && (
+							<TabsContent value="paymentPlan">
+								<div>
+									<PaymentPlan />
+								</div>
+							</TabsContent>
+						)}
 					</Tabs>
 				</div>
 			</div>
