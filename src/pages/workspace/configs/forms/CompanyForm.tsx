@@ -86,13 +86,14 @@ export function CompanyForm({ onNameChange }: CompanyFormProps = {}) {
 						sector: data.sector ?? "",
 						webSite: data.website ?? "",
 					});
+					onNameChange?.(data.name ?? "");
 				}
 				setLoading(false);
 			});
 		return () => {
 			cancelled = true;
 		};
-	}, [user, reset]);
+	}, [user, reset, onNameChange]);
 
 	async function onSubmit(data: CompanyFormData) {
 		const supabase = getSupabase();
@@ -111,6 +112,7 @@ export function CompanyForm({ onNameChange }: CompanyFormProps = {}) {
 			toast({ title: "Erro ao salvar empresa", description: error.message });
 			return;
 		}
+		onNameChange?.(data.name);
 		toast({
 			title: "Empresa Salva",
 			description: "As informações da empresa foram atualizadas com sucesso.",
