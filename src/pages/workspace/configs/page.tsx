@@ -92,11 +92,13 @@ export default function ConfigurationWorkspace() {
 								<IntegrationsSettings />
 							</div>
 						</TabsContent>
-						<TabsContent value="paymentPlan">
-							<div>
-								<PaymentPlan />
-							</div>
-						</TabsContent>
+						{flags.showBilling && (
+							<TabsContent value="paymentPlan">
+								<div>
+									<PaymentPlan />
+								</div>
+							</TabsContent>
+						)}
 					</Tabs>
 				</div>
 			</div>
