@@ -86,18 +86,18 @@ export default function SignupPage() {
 			<div className="min-h-svh flex items-center justify-center p-6">
 				<Card className="max-w-md w-full">
 					<CardHeader>
-						<CardTitle>Configure o Supabase primeiro</CardTitle>
+						<CardTitle>Banco do TalkMap não conectado</CardTitle>
 						<CardDescription>
-							Pra criar contas, o TalkMap precisa estar conectado a um
-							projeto Supabase. Leva uns 2 minutos.
+							As credenciais do sistema (.env.local) não foram carregadas
+							no build. Abra o checklist de setup pra resolver.
 						</CardDescription>
 					</CardHeader>
 					<CardContent>
 						<Button
 							className="w-full"
-							onClick={() => navigate("/setup")}
+							onClick={() => navigate("/setup-db")}
 						>
-							Configurar agora
+							Abrir checklist do banco
 						</Button>
 					</CardContent>
 				</Card>
