@@ -288,3 +288,43 @@ create policy "avatars_user_delete"
     bucket_id = 'avatars'
     and (storage.foldername(name))[1] = auth.uid()::text
   );
+
+-- =============================================================================
+-- 11) STORAGE — bucket público de logos da empresa
+-- =============================================================================
+insert into storage.buckets (id, name, public)
+values ('company-logos', 'company-logos', true)
+on conflict (id) do nothing;
+
+drop policy if exists "company_logos_public_read" on storage.objects;
+create policy "company_logos_public_read"
+  on storage.objects for select
+  to anon, authenticated
+  using (bucket_id = 'company-logos');
+
+drop policy if exists "company_logos_user_insert" on storage.objects;
+create policy "company_logos_user_insert"
+  on storage.objects for insert
+  to authenticated
+  with check (
+    bucket_id = 'company-logos'
+    and (storage.foldername(name))[1] = auth.uid()::text
+  );
+
+drop policy if exists "company_logos_user_update" on storage.objects;
+create policy "company_logos_user_update"
+  on storage.objects for update
+  to authenticated
+  using (
+    bucket_id = 'company-logos'
+    and (storage.foldername(name))[1] = auth.uid()::text
+  );
+
+drop policy if exists "company_logos_user_delete" on storage.objects;
+create policy "company_logos_user_delete"
+  on storage.objects for delete
+  to authenticated
+  using (
+    bucket_id = 'company-logos'
+    and (storage.foldername(name))[1] = auth.uid()::text
+  );
