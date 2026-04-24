@@ -91,20 +91,14 @@ export function PublishDialog({
     };
   }, [companyId, companySlug]);
 
-  // Resolve o origin público correto:
-  // - Dentro do iframe do editor Lovable, hostname é "<id>.lovableproject.com"
-  //   (não responde a deep links de SPA fora do contexto do editor).
-  // - Fora do editor, é "id-preview--<id>.lovable.app" (preview compartilhável)
-  //   ou o domínio publicado/customizado — nesses casos usamos como está.
-  const getPublicOrigin = () => {
-    if (typeof window === 'undefined') return '';
-    const { hostname, origin } = window.location;
-    const m = hostname.match(/^([0-9a-f-]+)\.lovableproject\.com$/i);
-    if (m) return `https://id-preview--${m[1]}.lovable.app`;
-    return origin;
+  // Usa o origin atual do navegador. Quando o app está publicado em
+  // <projeto>.lovable.app (ou domínio custom), o link copiado já fica
+  // acessível diretamente. No preview do editor, o link só funciona
+  // se aberto pelo botão (que abre em nova aba e usa o fallback SPA).
+  const getPublicUrl = () => {
+    const baseUrl = typeof window !== 'undefined' ? window.location.origin : '';
+    return `${baseUrl}/${resolvedSlug}/flow/${publicId}`;
   };
-
-  const getPublicUrl = () => `${getPublicOrigin()}/${resolvedSlug}/flow/${publicId}`;
 
   const validatePublicId = (value: string) => {
     if (!value) {

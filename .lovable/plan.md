@@ -1,96 +1,57 @@
-## Problema
+## Diagnóstico
 
-Há três sintomas relacionados ao link público do bot:
+Comparei o seu projeto com o **flow-appoint** (que funciona). O código de roteamento é praticamente idêntico:
 
-1. **Botão "abrir" (ícone ↗) ao lado do copy → "page not found"** dentro do navegador in-app do preview Lovable.
-2. **Cole-e-vá manual na barra do preview interno** carrega a rota mas exibe **tela preta sem informação** (imagem 4).
-3. **URL gerada usa o host errado**: dentro do iframe do preview o `window.location.origin` é `…lovableproject.com`, mas o domínio que realmente serve a SPA fora do preview é `id-preview--<id>.lovable.app` (e, quando publicado, o `.lovable.app` final). Isso quebra ao compartilhar.
+- Ambos usam `BrowserRouter` + React Router DOM.
+- Ambos registram a rota `/:slug/flow/:publicId` apontando para a página pública do bot.
+- Ambos geram a URL pública no formato `${origin}/${slug}/flow/${publicId}`.
 
-## Causa-raiz
+A diferença não está no código. Está em **dois pontos de infraestrutura**:
 
-### Sintoma 1 (botão "abrir")
-O `navigate(getPublicPath())` é executado dentro do editor que vive sob `ProtectedRoute` + `WorkspaceProvider`. A rota `/:slug/flow/:publicId` está fora desses providers no `App.tsx`, mas como o React Router **não desmonta/monta automaticamente os providers do nível pai** quando você navega entre rotas-irmãs no mesmo `<Routes>`, o `PublicFlowPage` monta corretamente — exceto que, na visualização in-app do navegador móvel, certos handlers do preview interceptam navegações com hosts diferentes do iframe pai e mostram "page not found" porque o caminho `/teste02/flow/...` é colidido com a rota `/workspace/...` quando tem state residual. Na prática: a navegação interna funciona em desktop, mas no in-app browser do iOS o `window.open`/redirect falha. Precisamos garantir que o link aberto seja **absoluto** com host correto, e que o ícone ↗ abra em **nova aba** com `target="_blank"` em vez de navegação SPA (que dentro do in-app browser estava perdendo contexto).
+### 1. Seu projeto NÃO está publicado
 
-### Sintoma 2 (tela preta)
-O `PublicFlowPage` tem três estados visuais (loading/error/empty/TestPanel). Quando o RPC `get_public_flow` retorna erro (por exemplo, função ainda não aplicada no Supabase, ou nenhum bot publicado com `is_active=true`), o componente cai no ramo `error`, mas o texto do erro é renderizado com `text-muted-foreground` sobre `bg-background` no tema escuro — fica visível, mas o usuário relata "tela preta sem informações". Provavelmente o RPC está retornando `null` silenciosamente (bot existe mas `is_active=false`, ou slug não bate). Precisamos:
-- Logar mais explicitamente o que veio do RPC.
-- Mostrar uma mensagem mais útil (qual slug, qual publicId, sugerir verificar se está publicado).
-- Garantir que `published_at` e `is_active=true` estejam setados (já estão no `handlePublish`).
+Verifiquei o status: `is_published: false`. O flow-appoint está em `https://flow-appoint.lovable.app`. Isso explica a tela **"Not Found" preta no navegador (imagem 2)**:
 
-### Sintoma 3 (host errado na URL pública)
-`window.location.origin` no iframe do preview é `https://<id>.lovableproject.com` (domínio interno que não responde a deep links de SPA fora do contexto do editor). A URL compartilhável deve ser:
-- Em preview: `https://id-preview--<id>.lovable.app/<slug>/flow/<publicId>`
-- Quando publicado: `https://<custom-domain-ou-app-host>/<slug>/flow/<publicId>`
+- Quando você cola `https://a74b5844-...lovableproject.com/teste02/flow/...` no navegador, esse domínio é o do **iframe interno do editor Lovable**, que **só responde a requests vindos de dentro do editor**. Acessado de fora, devolve "Not Found" puro do servidor — não chega nem a carregar o React.
+- O domínio `id-preview--<id>.lovable.app` (preview estático) só existe enquanto o preview estático está ativo, e às vezes precisa de um build novo para reagir a deep links. Por isso ora aparece "Not Found", ora aparece a tela.
+- Quando o app está **publicado**, o domínio fica `https://<seu-app>.lovable.app` (ou domínio custom) e o SPA fallback funciona corretamente para qualquer deep link.
 
-Precisamos derivar o host público correto a partir do hostname atual em vez de usar `window.location.origin` cru.
+### 2. A lógica de "mapear host do editor para preview público" está atrapalhando
 
-## Solução
+Eu havia adicionado em `PublishDialog.tsx` um helper `getPublicOrigin()` que reescreve `*.lovableproject.com` para `id-preview--*.lovable.app`. O **flow-appoint não faz isso** — usa apenas `window.location.origin`. Como o flow-appoint funciona, essa reescrita virou ruído.
 
-### 1. Corrigir host na URL pública (`PublishDialog.tsx`)
-Criar helper `getPublicOrigin()` que:
-- Se `hostname` termina em `.lovableproject.com` (preview interno do editor) → mapeia para `https://id-preview--<projectId>.lovable.app`.
-- Caso contrário usa `window.location.origin` (já é o domínio correto: `id-preview--*.lovable.app`, `*.lovable.app` publicado, ou domínio customizado).
+Também adicionei em `App.tsx` o `UnknownRouteHandler` que tenta sanitizar URLs absolutas coladas. É essa lógica que causa a tela "Redirecionando… Corrigindo a URL aberta no preview" (imagem 1) — ela tenta redirecionar mas está acontecendo dentro do contexto onde o deep link nunca vai resolver de qualquer forma (iframe interno).
 
-Aplicar tanto no campo "URL Pública" exibido, no `copyUrl`, quanto no `openPreview`.
+## Plano de Correção
 
-### 2. Trocar navegação SPA por nova aba no botão ↗
-Em vez de `navigate(getPublicPath())`, usar `window.open(getPublicUrl(), '_blank', 'noopener')`. Motivo: dentro do in-app browser do iOS o SPA navigate perdia contexto; abrindo em nova aba o navegador resolve o deep link via fallback SPA da hospedagem Lovable, que serve `index.html` corretamente.
+### Passo 1 — Publicar o app
+Usar `publish_settings--update_visibility` para tornar o app público. Isso libera o domínio `https://<projeto>.lovable.app` com SPA fallback funcional, igual ao flow-appoint. **Sem isso nenhum link deep funciona fora do editor**.
 
-### 3. Melhorar feedback de erro em `PublicFlowPage`
-- Mostrar slug/publicId tentados na mensagem de erro.
-- Adicionar `console.warn` com payload bruto retornado pelo RPC.
-- Botão "Tentar novamente" simples.
-- Garantir contraste do texto (usar `text-foreground` no título em vez de só `muted`).
+### Passo 2 — Simplificar `PublishDialog.tsx` (igual flow-appoint)
+- Remover o helper `getPublicOrigin()` e voltar a usar `window.location.origin` direto.
+- Manter `window.open(url, '_blank')` no botão de abrir.
+- Resultado: o link copiado vai usar exatamente o domínio onde o usuário está visualizando o app (preview, published ou custom).
 
-### 4. Validação prática (sem mudar código)
-Antes de testar de novo, confirmar no Supabase:
-- A função `get_public_flow` foi aplicada (Section 12 do `docs/supabase-setup.sql`).
-- A linha em `chatbot_flows` do bot tem: `is_published=true`, `is_active=true`, `public_id='teste-de-bot001-01'`, `published_containers` não vazio.
-- A linha em `profiles` do dono tem `slug='teste02'` (lowercase).
+### Passo 3 — Remover o `UnknownRouteHandler` "redirecionador"
+- Substituir por uma página 404 simples (igual ao `NotFound.tsx` do flow-appoint), sem tentar reescrever URLs absolutas.
+- A "URL absoluta colada" só acontecia porque o preview do Lovable interpreta a colagem como path relativo. Quando o app estiver publicado, o usuário cola direto no navegador e isso deixa de ser problema.
 
-## Arquivos modificados
+### Passo 4 — Manter o debug útil em `PublicFlowPage`
+- Manter as mensagens com slug/publicId e o botão "Tentar novamente" para diagnóstico futuro.
 
-- `src/components/chatbot/PublishDialog.tsx` — helper `getPublicOrigin()`, `openPreview` usa `window.open`, remove `useNavigate`/`getPublicPath`.
-- `src/pages/public/flow/page.tsx` — melhorar tela de erro (mostrar slug/publicId, contraste), log do RPC.
+## Arquivos afetados
 
-## Detalhes técnicos
+- `src/components/chatbot/PublishDialog.tsx` — remover `getPublicOrigin`, voltar para `window.location.origin`.
+- `src/App.tsx` — substituir `UnknownRouteHandler` por um 404 simples.
+- Publish settings — mudar `is_published` para `true` com visibilidade pública.
 
-```ts
-// PublishDialog.tsx
-function getPublicOrigin(): string {
-  const { hostname, origin } = window.location;
-  // Preview interno do editor: <projectId>.lovableproject.com
-  // Mapeia para o host servido fora do editor: id-preview--<projectId>.lovable.app
-  const m = hostname.match(/^([0-9a-f-]+)\.lovableproject\.com$/i);
-  if (m) return `https://id-preview--${m[1]}.lovable.app`;
-  return origin;
-}
+## Como testar depois da correção
 
-const getPublicUrl = () =>
-  `${getPublicOrigin()}/${resolvedSlug}/flow/${publicId}`;
+1. Abrir o **link publicado** `https://<projeto>.lovable.app` no navegador.
+2. Logar, abrir o bot, publicar.
+3. Copiar o link da URL pública (será `https://<projeto>.lovable.app/teste02/flow/teste-de-bot001-01`).
+4. Abrir esse link em qualquer navegador → deve carregar o bot direto, sem 404 e sem tela branca.
 
-const openPreview = () => {
-  if (!slugReady) { toast.error('…'); return; }
-  window.open(getPublicUrl(), '_blank', 'noopener,noreferrer');
-};
-```
+## Observação importante
 
-```tsx
-// PublicFlowPage – ramo de erro
-<div className="flex-1 flex items-center justify-center flex-col gap-3 px-6 text-center">
-  <p className="text-lg font-semibold text-foreground">Bot não encontrado</p>
-  <p className="text-sm text-muted-foreground">{error}</p>
-  <p className="text-xs text-muted-foreground/70">
-    slug: <code>{slug}</code> · id: <code>{publicId}</code>
-  </p>
-  <Button variant="outline" size="sm" onClick={() => location.reload()}>
-    Tentar novamente
-  </Button>
-</div>
-```
-
-## Resultado esperado
-
-- Botão ↗ no diálogo Publicar abre o bot em nova aba com URL `https://id-preview--<id>.lovable.app/<slug>/flow/<publicId>` que funciona tanto dentro quanto fora do preview Lovable.
-- Se ainda houver erro de "não encontrado", a tela mostra slug + publicId tentados e o que checar.
-- Link copiado pode ser compartilhado fora do Lovable e abre o bot publicado.
+Tornar o app público significa que **qualquer pessoa com o link da home (`/`) verá a landing page** e poderá tentar criar conta. Isso é o comportamento esperado para um SaaS. Se você quiser um nível extra de proteção (ex.: convite-only para signup), isso seria uma feature separada — não bloqueia a publicação.
