@@ -56,6 +56,7 @@ export function PublishDialog({
   const [copied, setCopied] = useState(false);
   const [validationError, setValidationError] = useState<string | null>(null);
   const [showUnpublishConfirm, setShowUnpublishConfirm] = useState(false);
+  const [resolvedSlug, setResolvedSlug] = useState<string>(companySlug);
 
   useEffect(() => {
     if (currentPublicId) {
@@ -63,9 +64,36 @@ export function PublishDialog({
     }
   }, [currentPublicId]);
 
+  // Garante que temos o slug real do dono (caso o profile ainda não tenha carregado).
+  useEffect(() => {
+    let cancelled = false;
+    async function ensureSlug() {
+      if (companySlug && companySlug !== 'user') {
+        setResolvedSlug(companySlug);
+        return;
+      }
+      if (!companyId) return;
+      const { data, error } = await supabaseClient
+        .from('profiles')
+        .select('slug')
+        .eq('id', companyId)
+        .maybeSingle();
+      if (cancelled) return;
+      if (error) {
+        console.error('[PublishDialog] erro buscando slug:', error);
+        return;
+      }
+      if (data?.slug) setResolvedSlug(data.slug);
+    }
+    ensureSlug();
+    return () => {
+      cancelled = true;
+    };
+  }, [companyId, companySlug]);
+
   const getPublicUrl = () => {
     const baseUrl = window.location.origin;
-    return `${baseUrl}/${companySlug}/flow/${publicId}`;
+    return `${baseUrl}/${resolvedSlug}/flow/${publicId}`;
   };
 
   const validatePublicId = (value: string) => {
