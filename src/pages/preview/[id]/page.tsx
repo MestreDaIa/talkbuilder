@@ -1,13 +1,14 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import { ArrowLeft, Loader2 } from "lucide-react";
 import { TestPanel } from "@/components/chatbot/TestPanel";
 import { VariablesProvider } from "@/context/VariablesContext";
 import { Button } from "@/components/ui/button";
 import { ensureFlow, getFlowByWorkspaceItem, type ChatbotFlowRow } from "@/lib/flowsApi";
-import { useWorkspace } from "@/context/WorkspaceContext";
 import { getSupabase } from "@/lib/supabaseClient";
 import type { Container, Edge } from "@/types/chatbot";
+
+type BotMeta = { id: string; title: string; emoji: string | null };
 
 const STORAGE_PREFIX = "bot_flow_";
 
