@@ -91,13 +91,12 @@ export function PublishDialog({
     };
   }, [companyId, companySlug]);
 
-  // Usa o origin atual do navegador. Quando o app está publicado em
-  // <projeto>.lovable.app (ou domínio custom), o link copiado já fica
-  // acessível diretamente. No preview do editor, o link só funciona
-  // se aberto pelo botão (que abre em nova aba e usa o fallback SPA).
+  // Usa a raiz do app com query string para evitar depender de deep links
+  // do servidor publicado. Assim o navegador sempre carrega a SPA primeiro.
   const getPublicUrl = () => {
     const baseUrl = typeof window !== 'undefined' ? window.location.origin : '';
-    return `${baseUrl}/${resolvedSlug}/flow/${publicId}`;
+    const params = new URLSearchParams({ publicSlug: resolvedSlug, publicId });
+    return `${baseUrl}/?${params.toString()}`;
   };
 
   const validatePublicId = (value: string) => {
@@ -222,9 +221,6 @@ export function PublishDialog({
       toast.error('Defina um slug em Configurações antes de compartilhar.');
       return;
     }
-    // Abrir em nova aba garante que o navegador resolve o deep link
-    // pelo fallback SPA da hospedagem Lovable, em vez de depender do
-    // roteador interno do iframe do editor.
     window.open(getPublicUrl(), '_blank', 'noopener,noreferrer');
   };
 
