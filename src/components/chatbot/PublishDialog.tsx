@@ -1,5 +1,4 @@
 import React, { useState, useEffect } from 'react';
-import { useNavigate } from 'react-router-dom';
 import { Globe, Copy, Check, Send, XCircle, ExternalLink, AlertTriangle } from 'lucide-react';
 import {
   Dialog,
@@ -51,7 +50,6 @@ export function PublishDialog({
   edges,
   onPublishSuccess,
 }: PublishDialogProps) {
-  const navigate = useNavigate();
   const [publicId, setPublicId] = useState(currentPublicId || '');
   const [isPublishing, setIsPublishing] = useState(false);
   const [isUnpublishing, setIsUnpublishing] = useState(false);
@@ -93,12 +91,20 @@ export function PublishDialog({
     };
   }, [companyId, companySlug]);
 
-  const getPublicUrl = () => {
-    const baseUrl = window.location.origin;
-    return `${baseUrl}/${resolvedSlug}/flow/${publicId}`;
+  // Resolve o origin público correto:
+  // - Dentro do iframe do editor Lovable, hostname é "<id>.lovableproject.com"
+  //   (não responde a deep links de SPA fora do contexto do editor).
+  // - Fora do editor, é "id-preview--<id>.lovable.app" (preview compartilhável)
+  //   ou o domínio publicado/customizado — nesses casos usamos como está.
+  const getPublicOrigin = () => {
+    if (typeof window === 'undefined') return '';
+    const { hostname, origin } = window.location;
+    const m = hostname.match(/^([0-9a-f-]+)\.lovableproject\.com$/i);
+    if (m) return `https://id-preview--${m[1]}.lovable.app`;
+    return origin;
   };
 
-  const getPublicPath = () => `/${resolvedSlug}/flow/${publicId}`;
+  const getPublicUrl = () => `${getPublicOrigin()}/${resolvedSlug}/flow/${publicId}`;
 
   const validatePublicId = (value: string) => {
     if (!value) {
@@ -222,8 +228,10 @@ export function PublishDialog({
       toast.error('Defina um slug em Configurações antes de compartilhar.');
       return;
     }
-    onOpenChange(false);
-    navigate(getPublicPath());
+    // Abrir em nova aba garante que o navegador resolve o deep link
+    // pelo fallback SPA da hospedagem Lovable, em vez de depender do
+    // roteador interno do iframe do editor.
+    window.open(getPublicUrl(), '_blank', 'noopener,noreferrer');
   };
 
   return (

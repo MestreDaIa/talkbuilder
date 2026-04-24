@@ -1,92 +1,96 @@
-## Objetivo
+## Problema
 
-Reconstruir a landing page do TalkMap do zero com visual **bento/cards 3D estilo Apple/Arc**, animações GSAP cinematográficas e seções extras pra contar a história do produto. Sem mexer em nada do app autenticado — só no que o visitante deslogado vê.
+Há três sintomas relacionados ao link público do bot:
 
-## Direção visual
+1. **Botão "abrir" (ícone ↗) ao lado do copy → "page not found"** dentro do navegador in-app do preview Lovable.
+2. **Cole-e-vá manual na barra do preview interno** carrega a rota mas exibe **tela preta sem informação** (imagem 4).
+3. **URL gerada usa o host errado**: dentro do iframe do preview o `window.location.origin` é `…lovableproject.com`, mas o domínio que realmente serve a SPA fora do preview é `id-preview--<id>.lovable.app` (e, quando publicado, o `.lovable.app` final). Isso quebra ao compartilhar.
 
-- **Paleta**: dark base (slate profundo `oklch(0.16 0.012 270)`) com acentos violeta vibrante (`oklch(0.62 0.21 295)`), rosa quente como secundário pra contraste, glow neon sutil em cards-chave.
-- **Tipografia**: títulos gigantes (até 7xl/8xl no hero), peso bold, tracking apertado. Body em Inter. Adicionar uma fonte display de impacto via Google Fonts (Geist ou Space Grotesk) só pros headings.
-- **Layout**: bento grid assimétrico (cards de tamanhos diferentes), bordas arredondadas grandes (rounded-3xl), bordas com gradient sutil, sombras coloridas (glow violeta).
-- **Texturas de fundo**: noise/grain leve + grid pattern + blobs gradient blurrados parados no fundo (parallax leve).
-- **Mockup do editor**: SVG/HTML estilizado representando o canvas do bot (nodes, conexões) — não vai ser screenshot real, vai ser uma "ilustração funcional" feita em divs pra animar pedaço por pedaço.
+## Causa-raiz
 
-## Estrutura das seções (ordem)
+### Sintoma 1 (botão "abrir")
+O `navigate(getPublicPath())` é executado dentro do editor que vive sob `ProtectedRoute` + `WorkspaceProvider`. A rota `/:slug/flow/:publicId` está fora desses providers no `App.tsx`, mas como o React Router **não desmonta/monta automaticamente os providers do nível pai** quando você navega entre rotas-irmãs no mesmo `<Routes>`, o `PublicFlowPage` monta corretamente — exceto que, na visualização in-app do navegador móvel, certos handlers do preview interceptam navegações com hosts diferentes do iframe pai e mostram "page not found" porque o caminho `/teste02/flow/...` é colidido com a rota `/workspace/...` quando tem state residual. Na prática: a navegação interna funciona em desktop, mas no in-app browser do iOS o `window.open`/redirect falha. Precisamos garantir que o link aberto seja **absoluto** com host correto, e que o ícone ↗ abra em **nova aba** com `target="_blank"` em vez de navegação SPA (que dentro do in-app browser estava perdendo contexto).
 
-1. **Nav fixa** com blur — logo TalkMap + links âncora + botão "Entrar" / "Começar grátis"
-2. **Hero cinematográfico** — badge animado, título grande em duas linhas (entra palavra por palavra), subtítulo, dois CTAs, badge de "sem cartão de crédito"
-3. **Faixa de canais suportados** — logos animados em fade horizontal (WhatsApp, Telegram, Instagram, Web Widget) com selo "Em breve" nos que ainda não rodam
-4. **Bento de features (6 cards assimétricos)** — Editor visual, Multi-canal, Variáveis dinâmicas, Webhooks/HTTP, Templates prontos, Analytics. Card grande à esquerda com mockup animado do editor.
-5. **Como funciona (3 passos)** — Conecte o canal → Monte o fluxo → Publique. Numerados, com micro-ilustrações em cada passo, pin opcional na seção.
-6. **Reveal do mockup do editor** — seção dedicada com o canvas do bot crescendo no scroll, nodes "se desenhando" um por um conforme scrolla.
-7. **Social proof** — 3 cards de depoimento (placeholders honestos: "Você pode ser o próximo" + 2 fictícios bem feitos), com avatares iniciais coloridas.
-8. **Pricing** — repaginado em bento (3 cards, o do meio "Pro" maior e com glow), animação de hover em escala leve, badge "Mais escolhido".
-9. **FAQ** — 6 perguntas em accordion (Radix), animação de abertura suave.
-10. **CTA final** — bloco grande com gradient, título forte, dois CTAs.
-11. **Footer** — links institucionais, redes, copyright.
+### Sintoma 2 (tela preta)
+O `PublicFlowPage` tem três estados visuais (loading/error/empty/TestPanel). Quando o RPC `get_public_flow` retorna erro (por exemplo, função ainda não aplicada no Supabase, ou nenhum bot publicado com `is_active=true`), o componente cai no ramo `error`, mas o texto do erro é renderizado com `text-muted-foreground` sobre `bg-background` no tema escuro — fica visível, mas o usuário relata "tela preta sem informações". Provavelmente o RPC está retornando `null` silenciosamente (bot existe mas `is_active=false`, ou slug não bate). Precisamos:
+- Logar mais explicitamente o que veio do RPC.
+- Mostrar uma mensagem mais útil (qual slug, qual publicId, sugerir verificar se está publicado).
+- Garantir que `published_at` e `is_active=true` estejam setados (já estão no `handlePublish`).
 
-## Animações (GSAP + ScrollTrigger)
+### Sintoma 3 (host errado na URL pública)
+`window.location.origin` no iframe do preview é `https://<id>.lovableproject.com` (domínio interno que não responde a deep links de SPA fora do contexto do editor). A URL compartilhável deve ser:
+- Em preview: `https://id-preview--<id>.lovable.app/<slug>/flow/<publicId>`
+- Quando publicado: `https://<custom-domain-ou-app-host>/<slug>/flow/<publicId>`
 
-- **Hero**: timeline na entrada — badge desce com bounce, título entra palavra por palavra (SplitText manual via spans), subtítulo fade-up, CTAs sobem em stagger, mockup hero faz scale-in + tilt 3D leve.
-- **Reveal genérico**: cada seção tem `fade + translateY(40px)` quando entra na viewport, com stagger nos filhos.
-- **Parallax**: blobs/grain de fundo se movem em `yPercent` diferente do scroll. Mockups dentro de cards têm parallax leve interno.
-- **Mockup do editor**: ScrollTrigger com scrub — conforme scrolla, os nodes aparecem em sequência (opacity + scale), as linhas de conexão se "desenham" via stroke-dashoffset.
-- **Cards bento**: tilt 3D no hover (rotateX/rotateY baseado no mouse), glow seguindo o cursor.
-- **Pricing**: cards sobem em stagger ao entrar na view, o do meio com delay maior pra dar destaque.
-- **Performance**: respeitar `prefers-reduced-motion` desabilitando scrubs e mantendo só fades simples.
+Precisamos derivar o host público correto a partir do hostname atual em vez de usar `window.location.origin` cru.
+
+## Solução
+
+### 1. Corrigir host na URL pública (`PublishDialog.tsx`)
+Criar helper `getPublicOrigin()` que:
+- Se `hostname` termina em `.lovableproject.com` (preview interno do editor) → mapeia para `https://id-preview--<projectId>.lovable.app`.
+- Caso contrário usa `window.location.origin` (já é o domínio correto: `id-preview--*.lovable.app`, `*.lovable.app` publicado, ou domínio customizado).
+
+Aplicar tanto no campo "URL Pública" exibido, no `copyUrl`, quanto no `openPreview`.
+
+### 2. Trocar navegação SPA por nova aba no botão ↗
+Em vez de `navigate(getPublicPath())`, usar `window.open(getPublicUrl(), '_blank', 'noopener')`. Motivo: dentro do in-app browser do iOS o SPA navigate perdia contexto; abrindo em nova aba o navegador resolve o deep link via fallback SPA da hospedagem Lovable, que serve `index.html` corretamente.
+
+### 3. Melhorar feedback de erro em `PublicFlowPage`
+- Mostrar slug/publicId tentados na mensagem de erro.
+- Adicionar `console.warn` com payload bruto retornado pelo RPC.
+- Botão "Tentar novamente" simples.
+- Garantir contraste do texto (usar `text-foreground` no título em vez de só `muted`).
+
+### 4. Validação prática (sem mudar código)
+Antes de testar de novo, confirmar no Supabase:
+- A função `get_public_flow` foi aplicada (Section 12 do `docs/supabase-setup.sql`).
+- A linha em `chatbot_flows` do bot tem: `is_published=true`, `is_active=true`, `public_id='teste-de-bot001-01'`, `published_containers` não vazio.
+- A linha em `profiles` do dono tem `slug='teste02'` (lowercase).
+
+## Arquivos modificados
+
+- `src/components/chatbot/PublishDialog.tsx` — helper `getPublicOrigin()`, `openPreview` usa `window.open`, remove `useNavigate`/`getPublicPath`.
+- `src/pages/public/flow/page.tsx` — melhorar tela de erro (mostrar slug/publicId, contraste), log do RPC.
 
 ## Detalhes técnicos
 
-- **Dependência nova**: `gsap` (inclui ScrollTrigger no core gratuito). Instalar com `bun add gsap`.
-- **Hook custom**: `src/hooks/useGsap.ts` — wrapper com `gsap.context()` pra cleanup automático em SPA, e helpers `useScrollReveal`, `useParallax`.
-- **Componentização**: quebrar `LandingPage.tsx` em subcomponentes em `src/pages/landing/sections/` (Hero, Channels, FeaturesBento, HowItWorks, EditorReveal, SocialProof, Pricing, Faq, CtaFinal, LandingNav, LandingFooter). Mantém o arquivo principal limpo.
-- **Mockup do editor**: componente `EditorMockup.tsx` em puro JSX/Tailwind representando 4-5 nodes conectados, com refs nomeadas pra animar.
-- **Accordion FAQ**: usar `@radix-ui/react-accordion` (já vem com shadcn — checar se não precisa adicionar via shadcn add accordion).
-- **Fontes**: importar Space Grotesk via `<link>` no `index.html` ou via CSS `@import` pra evitar custo de pacote.
-- **Responsivo**: bento vira coluna única no mobile, animações de scroll continuam mas sem pin (pin com altura grande quebra UX em mobile).
-- **Sem quebra de auth**: continua respeitando o `HomeRoute` em `App.tsx` que mostra a landing só pra deslogados.
+```ts
+// PublishDialog.tsx
+function getPublicOrigin(): string {
+  const { hostname, origin } = window.location;
+  // Preview interno do editor: <projectId>.lovableproject.com
+  // Mapeia para o host servido fora do editor: id-preview--<projectId>.lovable.app
+  const m = hostname.match(/^([0-9a-f-]+)\.lovableproject\.com$/i);
+  if (m) return `https://id-preview--${m[1]}.lovable.app`;
+  return origin;
+}
 
-## Cores específicas a adicionar
+const getPublicUrl = () =>
+  `${getPublicOrigin()}/${resolvedSlug}/flow/${publicId}`;
 
-No `src/index.css`, adicionar variáveis usadas só na landing (escopadas em `.landing-page`):
-- `--landing-bg`: oklch(0.14 0.014 270)
-- `--landing-card`: oklch(0.20 0.016 270)
-- `--landing-violet`: oklch(0.65 0.22 295)
-- `--landing-pink`: oklch(0.68 0.20 350)
-- `--landing-glow`: rgba(170, 100, 255, 0.4)
+const openPreview = () => {
+  if (!slugReady) { toast.error('…'); return; }
+  window.open(getPublicUrl(), '_blank', 'noopener,noreferrer');
+};
+```
 
-## Copys novas (direção)
+```tsx
+// PublicFlowPage – ramo de erro
+<div className="flex-1 flex items-center justify-center flex-col gap-3 px-6 text-center">
+  <p className="text-lg font-semibold text-foreground">Bot não encontrado</p>
+  <p className="text-sm text-muted-foreground">{error}</p>
+  <p className="text-xs text-muted-foreground/70">
+    slug: <code>{slug}</code> · id: <code>{publicId}</code>
+  </p>
+  <Button variant="outline" size="sm" onClick={() => location.reload()}>
+    Tentar novamente
+  </Button>
+</div>
+```
 
-- Headline: **"Construa chatbots que vendem enquanto você dorme."**
-- Sub: "Conecte WhatsApp, Instagram e seu site. Monte fluxos arrastando blocos. Publique em minutos."
-- Tom: direto, voltado a resultado, sem jargão técnico no topo. Detalhes técnicos aparecem nos cards de features.
+## Resultado esperado
 
-## O que NÃO vai ser tocado
-
-- Editor de bot, perfil, configs, autenticação, rotas protegidas.
-- `App.tsx` só ganha import já existente — sem mudar lógica de routing.
-- Nenhuma integração de canal real (WhatsApp/Telegram seguem congelados como combinado).
-
-## Arquivos previstos
-
-Criar:
-- `src/hooks/useGsap.ts`
-- `src/pages/landing/sections/LandingNav.tsx`
-- `src/pages/landing/sections/Hero.tsx`
-- `src/pages/landing/sections/Channels.tsx`
-- `src/pages/landing/sections/FeaturesBento.tsx`
-- `src/pages/landing/sections/HowItWorks.tsx`
-- `src/pages/landing/sections/EditorReveal.tsx`
-- `src/pages/landing/sections/EditorMockup.tsx`
-- `src/pages/landing/sections/SocialProof.tsx`
-- `src/pages/landing/sections/Pricing.tsx`
-- `src/pages/landing/sections/Faq.tsx`
-- `src/pages/landing/sections/CtaFinal.tsx`
-- `src/pages/landing/sections/LandingFooter.tsx`
-
-Editar:
-- `src/pages/landing/LandingPage.tsx` (vira composição das seções + setup GSAP global)
-- `src/index.css` (variáveis da landing + grain/grid utilitários)
-- `index.html` (link Google Fonts pra Space Grotesk)
-- `package.json` via `bun add gsap`
-
-Quer que eu mande ver assim ou tem algum ajuste? Se aprovar, eu já começo.
+- Botão ↗ no diálogo Publicar abre o bot em nova aba com URL `https://id-preview--<id>.lovable.app/<slug>/flow/<publicId>` que funciona tanto dentro quanto fora do preview Lovable.
+- Se ainda houver erro de "não encontrado", a tela mostra slug + publicId tentados e o que checar.
+- Link copiado pode ser compartilhado fora do Lovable e abre o bot publicado.
