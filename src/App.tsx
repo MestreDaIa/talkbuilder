@@ -1,7 +1,8 @@
 
 import './App.css'
 
-import { Routes, Route } from "react-router-dom";
+import { useEffect } from 'react';
+import { Routes, Route, useLocation } from "react-router-dom";
 
 import BotPage from "./pages/workspace/bot/[id]/page";
 import FolderPage from "./pages/workspace/folder/[id]/page";
@@ -29,6 +30,43 @@ function HomeRoute() {
     <Layout>
       <WorkspaceMain />
     </Layout>
+  );
+}
+
+function UnknownRouteHandler() {
+  const location = useLocation();
+
+  useEffect(() => {
+    const rawPath = decodeURIComponent(location.pathname);
+    if (!rawPath.startsWith('/http://') && !rawPath.startsWith('/https://')) return;
+
+    try {
+      const parsedUrl = new URL(rawPath.slice(1));
+      const sanitizedPath = `${parsedUrl.pathname}${parsedUrl.search}${parsedUrl.hash}`;
+
+      if (sanitizedPath && sanitizedPath !== `${location.pathname}${location.search}${location.hash}`) {
+        window.location.replace(sanitizedPath);
+      }
+    } catch (error) {
+      console.error('[App] Não foi possível sanitizar a URL colada no preview:', error);
+    }
+  }, [location.hash, location.pathname, location.search]);
+
+  const looksLikeAbsoluteUrl = location.pathname.startsWith('/http://') || location.pathname.startsWith('/https://');
+
+  return (
+    <div className="flex min-h-screen items-center justify-center bg-background px-6 text-center text-foreground">
+      <div className="space-y-3">
+        <h1 className="text-xl font-semibold">
+          {looksLikeAbsoluteUrl ? 'Redirecionando...' : 'Página não encontrada'}
+        </h1>
+        <p className="text-sm text-muted-foreground">
+          {looksLikeAbsoluteUrl
+            ? 'Corrigindo a URL aberta no preview.'
+            : 'A rota que você abriu não existe neste app.'}
+        </p>
+      </div>
+    </div>
   );
 }
 
@@ -86,6 +124,8 @@ function App() {
           </ProtectedRoute>
         }
       />
+
+      <Route path="*" element={<UnknownRouteHandler />} />
     </Routes>
   );
 }
