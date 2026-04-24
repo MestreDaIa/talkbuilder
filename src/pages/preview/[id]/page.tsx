@@ -32,8 +32,7 @@ export default function PreviewPage() {
   const params = useParams();
   const navigate = useNavigate();
   const botId = (params.id as string) ?? "";
-  const { items } = useWorkspace();
-  const bot = useMemo(() => items.find((i) => i.id === botId && i.type === "bot"), [items, botId]);
+  const [bot, setBot] = useState<BotMeta | null>(null);
 
   const [flow, setFlow] = useState<ChatbotFlowRow | null>(null);
   const [containers, setContainers] = useState<Container[]>([]);
