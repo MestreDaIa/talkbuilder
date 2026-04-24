@@ -219,23 +219,17 @@ export default function BotPage() {
     setIsEditingName(false);
     if (!newName || newName === (flow?.name ?? bot?.title)) return;
 
-    // Atualiza otimisticamente o workspace
+    // setItems já propaga title pro Supabase via WorkspaceContext
     setItems((prev) => prev.map((it) => (it.id === botId ? { ...it, title: newName } : it)));
 
-    const supabase = getSupabase();
-    if (!supabase) return;
-
-    try {
-      // Workspace item title
-      await supabase.from("workspace_items").update({ title: newName }).eq("id", botId);
-      // Flow name (se existir)
-      if (flow) {
+    if (flow) {
+      try {
         const updated = await updateFlowMeta(flow.id, { name: newName });
         setFlow(updated);
+      } catch (err: any) {
+        console.error(err);
+        toast.error("Não consegui sincronizar nome do flow: " + (err.message ?? "erro"));
       }
-    } catch (err: any) {
-      console.error(err);
-      toast.error("Não consegui renomear: " + (err.message ?? "erro"));
     }
   };
 
