@@ -328,3 +328,113 @@ create policy "company_logos_user_delete"
     bucket_id = 'company-logos'
     and (storage.foldername(name))[1] = auth.uid()::text
   );
+
+-- =============================================================================
+-- 12) CHATBOT FLOWS — fluxo do bot, com versão rascunho e versão publicada
+-- =============================================================================
+-- Cada workspace_item do tipo 'bot' tem (no máximo) um chatbot_flow correspondente.
+-- draft_*  -> última versão salva (sempre que o usuário clica "Salvar")
+-- published_* -> versão atualmente pública (snapshot tirado no "Publicar")
+-- public_id é único POR usuário (não global), permitindo URLs amigáveis.
+-- =============================================================================
+create table if not exists public.chatbot_flows (
+  id                  uuid primary key default gen_random_uuid(),
+  user_id             uuid not null references auth.users(id) on delete cascade,
+  workspace_item_id   uuid not null unique references public.workspace_items(id) on delete cascade,
+  name                text not null default 'Novo bot',
+  description         text,
+  settings            jsonb not null default '{}'::jsonb,
+  -- versão em edição
+  draft_containers    jsonb not null default '[]'::jsonb,
+  draft_edges         jsonb not null default '[]'::jsonb,
+  draft_updated_at    timestamptz not null default now(),
+  -- versão publicada (snapshot)
+  published_containers jsonb,
+  published_edges     jsonb,
+  published_at        timestamptz,
+  -- publicação
+  public_id           text,
+  is_published        boolean not null default false,
+  is_active           boolean not null default false,
+  created_at          timestamptz not null default now(),
+  updated_at          timestamptz not null default now(),
+  constraint chatbot_flows_public_id_format
+    check (public_id is null or public_id ~ '^[a-z0-9](?:[a-z0-9-]{1,60}[a-z0-9])?$')
+);
+
+-- public_id único por usuário (escopo: usuário, não global)
+create unique index if not exists chatbot_flows_user_public_id_uniq
+  on public.chatbot_flows (user_id, public_id)
+  where public_id is not null;
+
+create index if not exists chatbot_flows_user_idx       on public.chatbot_flows (user_id);
+create index if not exists chatbot_flows_published_idx  on public.chatbot_flows (is_published) where is_published;
+
+alter table public.chatbot_flows enable row level security;
+
+-- SELECT: dono OU qualquer um (anon/authenticated) se publicado e ativo
+drop policy if exists "chatbot_flows_select_own" on public.chatbot_flows;
+create policy "chatbot_flows_select_own"
+  on public.chatbot_flows for select
+  to authenticated
+  using (auth.uid() = user_id);
+
+drop policy if exists "chatbot_flows_select_public" on public.chatbot_flows;
+create policy "chatbot_flows_select_public"
+  on public.chatbot_flows for select
+  to anon, authenticated
+  using (is_published = true and is_active = true and public_id is not null);
+
+drop policy if exists "chatbot_flows_insert_own" on public.chatbot_flows;
+create policy "chatbot_flows_insert_own"
+  on public.chatbot_flows for insert
+  to authenticated
+  with check (auth.uid() = user_id);
+
+drop policy if exists "chatbot_flows_update_own" on public.chatbot_flows;
+create policy "chatbot_flows_update_own"
+  on public.chatbot_flows for update
+  to authenticated
+  using (auth.uid() = user_id)
+  with check (auth.uid() = user_id);
+
+drop policy if exists "chatbot_flows_delete_own" on public.chatbot_flows;
+create policy "chatbot_flows_delete_own"
+  on public.chatbot_flows for delete
+  to authenticated
+  using (auth.uid() = user_id);
+
+drop trigger if exists chatbot_flows_updated_at on public.chatbot_flows;
+create trigger chatbot_flows_updated_at
+  before update on public.chatbot_flows
+  for each row execute function public.handle_updated_at();
+
+-- Lookup público por slug do dono + public_id (sem expor user_id)
+create or replace function public.get_public_flow(p_slug text, p_public_id text)
+returns table (
+  id uuid,
+  name text,
+  description text,
+  settings jsonb,
+  containers jsonb,
+  edges jsonb,
+  owner_slug text
+) language sql stable security definer set search_path = public as $$
+  select f.id,
+         f.name,
+         f.description,
+         f.settings,
+         coalesce(f.published_containers, '[]'::jsonb) as containers,
+         coalesce(f.published_edges, '[]'::jsonb)      as edges,
+         p.slug as owner_slug
+    from public.chatbot_flows f
+    join public.profiles p on p.id = f.user_id
+   where p.slug = lower(p_slug)
+     and f.public_id = p_public_id
+     and f.is_published = true
+     and f.is_active = true
+   limit 1;
+$$;
+
+grant execute on function public.get_public_flow(text, text) to anon, authenticated;
+
