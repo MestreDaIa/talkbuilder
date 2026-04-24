@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import {
   ArrowLeft,
@@ -8,78 +8,85 @@ import {
   Eye,
   Save,
   Send,
+  Check,
+  Loader2,
 } from "lucide-react";
 import { CanvasEditor } from "@/components/chatbot/CanvasEditor";
 import { NodesSidebar } from "@/components/chatbot/NodesSidebar";
 import { TestPanel } from "@/components/chatbot/TestPanel";
+import { BotSettingsDialog } from "@/components/chatbot/BotSettingsDialog";
+import { PublishDialog } from "@/components/chatbot/PublishDialog";
 import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
 import { useWorkspace } from "@/context/WorkspaceContext";
+import { useAuth } from "@/context/AuthContext";
 import { VariablesProvider } from "@/context/VariablesContext";
+import {
+  ensureFlow,
+  saveDraft,
+  updateFlowMeta,
+  deriveStatus,
+  type ChatbotFlowRow,
+  type FlowStatus,
+} from "@/lib/flowsApi";
+import { getSupabase } from "@/lib/supabaseClient";
 import type { Container, Edge, Node, NodeType } from "@/types/chatbot";
 import { toast } from "sonner";
 
 const STORAGE_PREFIX = "bot_flow_";
 
-interface StoredFlow {
-  containers: Container[];
-  edges: Edge[];
-}
-
-function loadFlow(botId: string): StoredFlow {
+/** Cache local — fallback enquanto o flow não carrega ou Supabase está offline. */
+function loadLocal(botId: string): { containers: Container[]; edges: Edge[] } {
   if (typeof window === "undefined") return { containers: [], edges: [] };
   try {
     const raw = window.localStorage.getItem(`${STORAGE_PREFIX}${botId}`);
     if (!raw) return { containers: [], edges: [] };
-    const parsed = JSON.parse(raw) as Partial<StoredFlow>;
-    return {
-      containers: parsed.containers ?? [],
-      edges: parsed.edges ?? [],
-    };
+    const parsed = JSON.parse(raw);
+    return { containers: parsed.containers ?? [], edges: parsed.edges ?? [] };
   } catch {
     return { containers: [], edges: [] };
   }
 }
 
-function saveFlow(botId: string, flow: StoredFlow) {
+function saveLocal(botId: string, data: { containers: Container[]; edges: Edge[] }) {
   if (typeof window === "undefined") return;
-  window.localStorage.setItem(
-    `${STORAGE_PREFIX}${botId}`,
-    JSON.stringify(flow)
-  );
+  window.localStorage.setItem(`${STORAGE_PREFIX}${botId}`, JSON.stringify(data));
+}
+
+function statusLabel(status: FlowStatus): { text: string; className: string } {
+  switch (status) {
+    case "published":
+      return { text: "PUBLICADO", className: "bg-emerald-500/15 text-emerald-400 border-emerald-500/30" };
+    case "draft_changes":
+      return { text: "RASCUNHO • PUBLICADO", className: "bg-amber-500/15 text-amber-400 border-amber-500/30" };
+    default:
+      return { text: "RASCUNHO", className: "bg-muted text-muted-foreground border-border" };
+  }
 }
 
 export default function BotPage() {
   const params = useParams();
   const navigate = useNavigate();
   const botId = (params.id as string) ?? "default";
-  const { items } = useWorkspace();
+  const { items, setItems } = useWorkspace();
+  const { profile } = useAuth();
 
-  const bot = useMemo(
-    () => items.find((i) => i.id === botId && i.type === "bot"),
-    [items, botId]
-  );
+  const bot = useMemo(() => items.find((i) => i.id === botId && i.type === "bot"), [items, botId]);
 
+  const [flow, setFlow] = useState<ChatbotFlowRow | null>(null);
   const [containers, setContainers] = useState<Container[]>([]);
   const [edges, setEdges] = useState<Edge[]>([]);
   const [hydrated, setHydrated] = useState(false);
-  const [getCenter, setGetCenter] = useState<
-    (() => { x: number; y: number }) | null
-  >(null);
+  const [isSaving, setIsSaving] = useState(false);
+  const [isEditingName, setIsEditingName] = useState(false);
+  const [nameDraft, setNameDraft] = useState("");
+  const [showSettings, setShowSettings] = useState(false);
+  const [showPublish, setShowPublish] = useState(false);
+  const [getCenter, setGetCenter] = useState<(() => { x: number; y: number }) | null>(null);
   const [testContainer, setTestContainer] = useState<Container | null>(null);
+  const lastSavedAtRef = useRef<number>(0);
 
-  useEffect(() => {
-    const flow = loadFlow(botId);
-    setContainers(flow.containers);
-    setEdges(flow.edges);
-    setHydrated(true);
-  }, [botId]);
-
-  useEffect(() => {
-    if (!hydrated) return;
-    saveFlow(botId, { containers, edges });
-  }, [botId, containers, edges, hydrated]);
-
-  // Force dark theme variables while inside the bot editor (so Radix portals inherit too)
+  // Dark theme global enquanto edita
   useEffect(() => {
     const root = document.documentElement;
     const hadDark = root.classList.contains("dark");
@@ -88,6 +95,52 @@ export default function BotPage() {
       if (!hadDark) root.classList.remove("dark");
     };
   }, []);
+
+  // Carrega flow do Supabase + fallback local
+  useEffect(() => {
+    let cancelled = false;
+    async function load() {
+      // Sempre hidrata cache local primeiro pra não piscar tela vazia
+      const local = loadLocal(botId);
+      setContainers(local.containers);
+      setEdges(local.edges);
+
+      const supabase = getSupabase();
+      if (!supabase || !bot) {
+        setHydrated(true);
+        return;
+      }
+      try {
+        const row = await ensureFlow(botId, bot.title || "Novo bot");
+        if (cancelled) return;
+        setFlow(row);
+        // Se o servidor tem dados mais recentes, prefere ele
+        if (row.draft_containers?.length || row.draft_edges?.length) {
+          setContainers(row.draft_containers);
+          setEdges(row.draft_edges);
+        }
+      } catch (err) {
+        console.error("Erro carregando flow:", err);
+      } finally {
+        if (!cancelled) setHydrated(true);
+      }
+    }
+    load();
+    return () => {
+      cancelled = true;
+    };
+  }, [botId, bot]);
+
+  // Persiste cache local em toda alteração
+  useEffect(() => {
+    if (!hydrated) return;
+    saveLocal(botId, { containers, edges });
+  }, [botId, containers, edges, hydrated]);
+
+  const status: FlowStatus = useMemo(() => {
+    if (!flow) return "draft";
+    return deriveStatus(flow);
+  }, [flow]);
 
   const handleAddBlock = () => {
     const position = getCenter
@@ -108,15 +161,10 @@ export default function BotPage() {
       type,
       config: {},
     };
-
     setContainers((prev) => {
       const basePosition = getCenter ? getCenter() : { x: 300, y: 200 };
-      // Offset cada novo container para não sobrepor os existentes
       const offset = prev.length * 40;
-      const position = {
-        x: basePosition.x + offset,
-        y: basePosition.y + offset,
-      };
+      const position = { x: basePosition.x + offset, y: basePosition.y + offset };
       const newContainer: Container = {
         id: `container-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`,
         nodes: [newNode],
@@ -127,83 +175,212 @@ export default function BotPage() {
     toast.success("Node adicionado!");
   };
 
-  const handleSave = () => {
-    saveFlow(botId, { containers, edges });
-    toast.success("Fluxo salvo!");
+  const handleSave = async () => {
+    if (!flow) {
+      // sem Supabase — só salva local
+      saveLocal(botId, { containers, edges });
+      toast.success("Fluxo salvo localmente");
+      return;
+    }
+    setIsSaving(true);
+    try {
+      const updated = await saveDraft(flow.id, containers, edges);
+      setFlow(updated);
+      lastSavedAtRef.current = Date.now();
+      toast.success("Fluxo salvo!");
+    } catch (err: any) {
+      console.error(err);
+      toast.error("Erro ao salvar: " + (err.message ?? "tente novamente"));
+    } finally {
+      setIsSaving(false);
+    }
   };
+
+  const handleTest = () => {
+    const first = containers[0];
+    if (!first) {
+      toast.error("Adicione pelo menos um bloco para testar");
+      return;
+    }
+    setTestContainer(first);
+  };
+
+  const handlePreview = () => {
+    navigate(`/preview/${botId}`);
+  };
+
+  const startNameEdit = () => {
+    setNameDraft(flow?.name ?? bot?.title ?? "");
+    setIsEditingName(true);
+  };
+
+  const commitName = async () => {
+    const newName = nameDraft.trim();
+    setIsEditingName(false);
+    if (!newName || newName === (flow?.name ?? bot?.title)) return;
+
+    // Atualiza otimisticamente o workspace
+    setItems((prev) => prev.map((it) => (it.id === botId ? { ...it, title: newName } : it)));
+
+    const supabase = getSupabase();
+    if (!supabase) return;
+
+    try {
+      // Workspace item title
+      await supabase.from("workspace_items").update({ title: newName }).eq("id", botId);
+      // Flow name (se existir)
+      if (flow) {
+        const updated = await updateFlowMeta(flow.id, { name: newName });
+        setFlow(updated);
+      }
+    } catch (err: any) {
+      console.error(err);
+      toast.error("Não consegui renomear: " + (err.message ?? "erro"));
+    }
+  };
+
+  const handleSettingsUpdate = (newSettings: Record<string, any>) => {
+    if (flow) setFlow({ ...flow, settings: newSettings });
+  };
+
+  const handlePublishSuccess = (publicId: string, isPublished: boolean) => {
+    if (!flow) return;
+    setFlow({
+      ...flow,
+      public_id: publicId || null,
+      is_published: isPublished,
+      is_active: isPublished,
+      published_at: isPublished ? new Date().toISOString() : flow.published_at,
+      published_containers: isPublished ? containers : flow.published_containers,
+      published_edges: isPublished ? edges : flow.published_edges,
+    });
+  };
+
+  const lbl = statusLabel(status);
+  const displayName = flow?.name ?? bot?.title ?? `Bot: ${botId}`;
 
   return (
     <VariablesProvider>
-    <div className="bot-editor fixed inset-0 flex flex-col bg-background z-50 text-foreground">
-      {/* Header customizado do editor */}
-      <header className="flex items-center gap-2 px-3 py-2 bg-card border-b border-border text-foreground shadow-sm">
-        <Button
-          variant="ghost"
-          size="sm"
-          onClick={() => navigate(-1)}
-          className="gap-1"
-        >
-          <ArrowLeft className="w-4 h-4" /> Voltar
-        </Button>
+      <div className="bot-editor fixed inset-0 flex flex-col bg-background z-50 text-foreground">
+        {/* Header */}
+        <header className="flex items-center gap-2 px-3 py-2 bg-card border-b border-border text-foreground shadow-sm">
+          <Button variant="ghost" size="sm" onClick={() => navigate(-1)} className="gap-1" title="Voltar">
+            <ArrowLeft className="w-4 h-4" /> Voltar
+          </Button>
 
-        <div className="h-6 w-px bg-border mx-1" />
+          <div className="h-6 w-px bg-border mx-1" />
 
-        <div className="flex items-center gap-2 mr-2">
-          {bot?.emoji && <span className="text-base">{bot.emoji}</span>}
-          <span className="text-sm font-semibold truncate max-w-[180px]">
-            {bot?.title ?? `Bot: ${botId}`}
-          </span>
-          <span className="text-[10px] uppercase tracking-wide bg-muted text-muted-foreground rounded px-2 py-0.5 border border-border">
-            Rascunho
-          </span>
+          <div className="flex items-center gap-2 mr-2 min-w-0">
+            {bot?.emoji && <span className="text-base shrink-0">{bot.emoji}</span>}
+
+            {isEditingName ? (
+              <Input
+                autoFocus
+                value={nameDraft}
+                onChange={(e) => setNameDraft(e.target.value)}
+                onBlur={commitName}
+                onKeyDown={(e) => {
+                  if (e.key === "Enter") commitName();
+                  if (e.key === "Escape") setIsEditingName(false);
+                }}
+                className="h-7 text-sm font-semibold w-[200px]"
+              />
+            ) : (
+              <button
+                type="button"
+                onClick={startNameEdit}
+                className="text-sm font-semibold truncate max-w-[180px] hover:underline underline-offset-4 decoration-dotted decoration-muted-foreground"
+                title="Clique para renomear"
+              >
+                {displayName}
+              </button>
+            )}
+
+            <span
+              className={`text-[10px] uppercase tracking-wide rounded px-2 py-0.5 border whitespace-nowrap ${lbl.className}`}
+            >
+              {lbl.text}
+            </span>
+          </div>
+
+          <div className="flex-1" />
+
+          <Button variant="ghost" size="sm" className="gap-1" onClick={() => setShowSettings(true)}>
+            <Settings className="w-4 h-4" /> <span className="hidden sm:inline">Configurações</span>
+          </Button>
+          <Button variant="ghost" size="sm" className="gap-1" onClick={handleAddBlock}>
+            <Plus className="w-4 h-4" /> <span className="hidden sm:inline">Bloco</span>
+          </Button>
+          <Button variant="ghost" size="sm" className="gap-1" onClick={handleTest}>
+            <Play className="w-4 h-4" /> <span className="hidden sm:inline">Testar</span>
+          </Button>
+          <Button variant="ghost" size="sm" className="gap-1" onClick={handlePreview}>
+            <Eye className="w-4 h-4" /> <span className="hidden sm:inline">Visualizar</span>
+          </Button>
+          <Button variant="ghost" size="sm" className="gap-1" onClick={handleSave} disabled={isSaving}>
+            {isSaving ? <Loader2 className="w-4 h-4 animate-spin" /> : <Save className="w-4 h-4" />}
+            <span className="hidden sm:inline">Salvar</span>
+          </Button>
+
+          <Button size="sm" className="gap-1 ml-1" onClick={() => setShowPublish(true)}>
+            {status === "published" ? <Check className="w-4 h-4" /> : <Send className="w-4 h-4" />}
+            <span className="hidden sm:inline">{status === "draft" ? "Publicar" : "Atualizar"}</span>
+          </Button>
+        </header>
+
+        {/* Sidebar + canvas */}
+        <div className="flex-1 flex w-full overflow-hidden">
+          <NodesSidebar onAddNode={handleAddNode} />
+          <div className="flex-1 h-full">
+            <CanvasEditor
+              containers={containers}
+              onContainersChange={setContainers}
+              edges={edges}
+              onEdgesChange={setEdges}
+              onTest={(container) => setTestContainer(container)}
+              onGetCenterPosition={(getter) => setGetCenter(() => getter)}
+            />
+          </div>
         </div>
 
-        <div className="flex-1" />
+        {/* Test panel */}
+        <TestPanel
+          isOpen={testContainer !== null}
+          onClose={() => setTestContainer(null)}
+          startContainer={testContainer}
+          allContainers={containers}
+          edges={edges}
+        />
 
-        <Button variant="ghost" size="sm" className="gap-1" onClick={() => toast.info("Configurações em breve")}>
-          <Settings className="w-4 h-4" /> Configurações
-        </Button>
-        <Button variant="ghost" size="sm" className="gap-1" onClick={handleAddBlock}>
-          <Plus className="w-4 h-4" /> Bloco
-        </Button>
-        <Button variant="ghost" size="sm" className="gap-1" onClick={() => toast.info("Teste em breve")}>
-          <Play className="w-4 h-4" /> Testar
-        </Button>
-        <Button variant="ghost" size="sm" className="gap-1" onClick={() => toast.info("Visualizar em breve")}>
-          <Eye className="w-4 h-4" /> Visualizar
-        </Button>
-        <Button variant="ghost" size="sm" className="gap-1" onClick={handleSave}>
-          <Save className="w-4 h-4" /> Salvar
-        </Button>
-
-        <Button size="sm" className="gap-1 ml-1" onClick={() => toast.info("Publicação em breve")}>
-          <Send className="w-4 h-4" />
-        </Button>
-      </header>
-
-      {/* Sidebar de nodes + canvas */}
-      <div className="flex-1 flex w-full overflow-hidden">
-        <NodesSidebar onAddNode={handleAddNode} />
-        <div className="flex-1 h-full">
-          <CanvasEditor
-            containers={containers}
-            onContainersChange={setContainers}
-            edges={edges}
-            onEdgesChange={setEdges}
-            onTest={(container) => setTestContainer(container)}
-            onGetCenterPosition={(getter) => setGetCenter(() => getter)}
+        {/* Settings */}
+        {flow && (
+          <BotSettingsDialog
+            open={showSettings}
+            onOpenChange={setShowSettings}
+            flowId={flow.id}
+            flowName={flow.name}
+            flowDescription={flow.description}
+            settings={flow.settings ?? {}}
+            onUpdate={handleSettingsUpdate}
           />
-        </div>
-      </div>
+        )}
 
-      <TestPanel
-        isOpen={testContainer !== null}
-        onClose={() => setTestContainer(null)}
-        startContainer={testContainer}
-        allContainers={containers}
-        edges={edges}
-      />
-    </div>
+        {/* Publish */}
+        {flow && (
+          <PublishDialog
+            open={showPublish}
+            onOpenChange={setShowPublish}
+            flowId={flow.id}
+            currentPublicId={flow.public_id}
+            isPublished={flow.is_published}
+            companyId={flow.user_id}
+            companySlug={profile?.slug ?? "user"}
+            containers={containers}
+            edges={edges}
+            onPublishSuccess={handlePublishSuccess}
+          />
+        )}
+      </div>
     </VariablesProvider>
   );
 }
