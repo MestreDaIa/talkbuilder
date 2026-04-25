@@ -5,6 +5,7 @@ import { TestPanel } from "@/components/chatbot/TestPanel";
 import { VariablesProvider } from "@/context/VariablesContext";
 import { Button } from "@/components/ui/button";
 import { getPublicFlow, type PublicFlowResult } from "@/lib/flowsApi";
+import { getPublicFlowFromHash } from "@/lib/publicFlowRoute";
 import type { Container, Edge } from "@/types/chatbot";
 
 /**
@@ -16,8 +17,9 @@ export default function PublicFlowPage() {
   const params = useParams();
   const location = useLocation();
   const searchParams = new URLSearchParams(location.search);
-  const slug = ((params.slug as string) ?? searchParams.get("publicSlug") ?? "").trim();
-  const publicId = ((params.publicId as string) ?? searchParams.get("publicId") ?? "").trim();
+  const publicFlowFromHash = getPublicFlowFromHash(location.hash);
+  const slug = ((params.slug as string) ?? searchParams.get("publicSlug") ?? publicFlowFromHash?.slug ?? "").trim();
+  const publicId = ((params.publicId as string) ?? searchParams.get("publicId") ?? publicFlowFromHash?.publicId ?? "").trim();
 
   const [data, setData] = useState<PublicFlowResult | null>(null);
   const [loading, setLoading] = useState(true);

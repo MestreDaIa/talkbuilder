@@ -22,6 +22,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { supabaseClient } from '@/lib/supabaseClient';
+import { buildPublicFlowHashUrl } from '@/lib/publicFlowRoute';
 import { toast } from 'sonner';
 import { Container, Edge } from '@/types/chatbot';
 
@@ -91,12 +92,9 @@ export function PublishDialog({
     };
   }, [companyId, companySlug]);
 
-  // Usa a raiz do app com query string para evitar depender de deep links
-  // do servidor publicado. Assim o navegador sempre carrega a SPA primeiro.
   const getPublicUrl = () => {
     const baseUrl = typeof window !== 'undefined' ? window.location.origin : '';
-    const params = new URLSearchParams({ publicSlug: resolvedSlug, publicId });
-    return `${baseUrl}/?${params.toString()}`;
+    return buildPublicFlowHashUrl(baseUrl, resolvedSlug, publicId);
   };
 
   const validatePublicId = (value: string) => {

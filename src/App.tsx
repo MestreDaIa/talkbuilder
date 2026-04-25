@@ -18,6 +18,7 @@ import Layout from "./components/layout";
 import WorkspaceMain from './components/Main';
 import ProtectedRoute from './components/ProtectedRoute';
 import { useAuth } from './context/AuthContext';
+import { getPublicFlowFromHash } from './lib/publicFlowRoute';
 
 function HomeRoute() {
   const location = useLocation();
@@ -25,8 +26,9 @@ function HomeRoute() {
   const searchParams = new URLSearchParams(location.search);
   const publicSlug = searchParams.get('publicSlug');
   const publicId = searchParams.get('publicId');
+  const publicFlowFromHash = getPublicFlowFromHash(location.hash);
 
-  if (publicSlug && publicId) return <PublicFlowPage />;
+  if ((publicSlug && publicId) || publicFlowFromHash) return <PublicFlowPage />;
   if (loading) return null;
   // Sem Supabase configurado OU sem login → mostra landing pública
   if (!isConfigured || !user) return <LandingPage />;
