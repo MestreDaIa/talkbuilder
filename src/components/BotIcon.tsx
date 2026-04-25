@@ -238,17 +238,20 @@ export default function BotIcon({
 					style={style}
 					className={`${isDragging ? "bg-green-400/80 rounded-lg" : ""} ${isOver ? "" : ""}`}
 				>
-					<Card className="group hover:border-green-400 p-2 flex flex-col bg-[rgb(70,1,92)] gap-0 w-28 max-h-32 h-32 rounded-lg border border-white shadow-[3px_3px_5px_rgba(0,0,0,0.5)]">
-						<div
-							{...listeners}
-							{...attributes}
-							className="cursor-grab active:cursor-grabbing w-full h-full flex flex-col justify-between "
-						>
+					<Card
+						className={`group p-2 flex flex-col bg-[rgb(70,1,92)] gap-0 w-28 max-h-32 h-32 rounded-lg border shadow-[3px_3px_5px_rgba(0,0,0,0.5)] transition-colors ${
+							isPublished
+								? "border-white hover:border-green-400"
+								: "border-red-400/80 hover:border-red-300"
+						}`}
+					>
+						<div className="w-full h-full flex flex-col justify-between">
 							<CardHeader className=" p-0 flex flex-row items-center h-fit space-y-0">
 								<button
 									type="button"
 									onClick={handleTogglePublish}
 									onPointerDown={(e) => e.stopPropagation()}
+									onMouseDown={(e) => e.stopPropagation()}
 									disabled={toggling || !flow}
 									title={
 										!flow
@@ -274,6 +277,7 @@ export default function BotIcon({
 										asChild
 										onClick={(e) => e.stopPropagation()}
 										onPointerDown={(e) => e.stopPropagation()}
+										onMouseDown={(e) => e.stopPropagation()}
 										className=" flex items-center justify-center p-0 "
 									>
 										<SquareMenuIcon className="w-5 h-5 hover:cursor-pointer text-white" />
@@ -318,9 +322,16 @@ export default function BotIcon({
 								</DropdownMenu.Root>
 							</CardHeader>
 
-							<CardContent className=" w-full flex-col items-center justify-center p-0 m-0 flex flex-1">
+							<CardContent
+								{...listeners}
+								{...attributes}
+								className="cursor-grab active:cursor-grabbing w-full flex-col items-center justify-center p-0 m-0 flex flex-1"
+								title={!isPublished ? "Bot despublicado — rota pública desativada" : undefined}
+							>
 								<span className="text-2xl ">{emojiIcon || "🤖"}</span>
-								<span className="text-sm text-center text-gray-400">{title}</span>
+								<span className={`text-sm text-center ${isPublished ? "text-gray-400" : "text-red-300"}`}>
+									{title}
+								</span>
 							</CardContent>
 						</div>
 					</Card>
