@@ -255,13 +255,35 @@ export default function BotPage() {
   const displayName = flow?.name ?? bot?.title ?? `Bot: ${botId}`;
   const slug = profile?.slug;
 
-  const handleBack = () => {
-    const parentId = bot?.parentId ?? null;
-    if (parentId) {
-      navigate(folderRoute(slug, parentId));
-    } else {
-      navigate(workspaceRoot(slug));
+  const handleBack = async () => {
+    // 1) Persiste rascunho pendente antes de sair (best-effort, sem travar UX).
+    try {
+      saveLocal(botId, { containers, edges });
+      if (flow) {
+        // Fire-and-forget: não bloqueia a navegação, mas garante que a próxima
+        // hidratação do editor já encontre o estado mais novo.
+        void saveDraft(flow.id, containers, edges).catch((err) =>
+          console.warn("[BotPage] saveDraft on back failed:", err),
+        );
+      }
+    } catch (err) {
+      console.warn("[BotPage] flush on back failed:", err);
     }
+
+    // 2) Limpa estado local do editor pra evitar reuso entre bots ao voltar.
+    setFlow(null);
+    setContainers([]);
+    setEdges([]);
+    setHydrated(false);
+    setTestContainer(null);
+    setShowSettings(false);
+    setShowPublish(false);
+
+    // 3) Navega para o destino real (replace evita histórico duplicado e
+    // garante remontagem limpa da página de destino).
+    const parentId = bot?.parentId ?? null;
+    const target = parentId ? folderRoute(slug, parentId) : workspaceRoot(slug);
+    navigate(target, { replace: true });
   };
 
   return (
