@@ -371,7 +371,10 @@ export default function AddOptionToolbar({ onAddFolder, onAddBot }: Props) {
 						<Button variant="outline" onClick={() => setShowImportModal(false)}>
 							Cancelar
 						</Button>
-						<Button onClick={handleConfirmImport} disabled={!importData || importing}>
+						<Button
+							onClick={handleConfirmImport}
+							disabled={!importData || importing || !canAddBot}
+						>
 							<Upload className="w-4 h-4 mr-2" />
 							{importing ? "Importando..." : "Importar"}
 						</Button>
