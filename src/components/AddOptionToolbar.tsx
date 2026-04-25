@@ -5,6 +5,8 @@ import { Plus, Lock, Crown, Sparkles } from "lucide-react"
 import { useState } from "react"
 import { useNavigate } from "react-router-dom"
 import { usePlan, PLAN_LABELS } from "../context/PlanContext"
+import { useAuth } from "../context/AuthContext"
+import { configsRoute } from "../lib/workspaceRoutes"
 import {
 	Dialog,
 	DialogContent,
@@ -24,6 +26,8 @@ export default function AddOptionToolbar({ onAddFolder, onAddBot }: Props) {
 	const { canAddBot, limits, botsUsed, currentPlan } = usePlan()
 	const [showUpgradeModal, setShowUpgradeModal] = useState(false)
 	const navigate = useNavigate()
+	const { profile } = useAuth()
+	const slug = profile?.slug
 
 	const limitLabel = Number.isFinite(limits.bots) ? limits.bots : "ilimitados"
 
@@ -128,7 +132,7 @@ export default function AddOptionToolbar({ onAddFolder, onAddBot }: Props) {
 							className="w-full sm:w-auto bg-gradient-to-r from-cyan-500 to-blue-600 text-white hover:opacity-90"
 							onClick={() => {
 								setShowUpgradeModal(false)
-								navigate("/workspace/configs")
+								navigate(configsRoute(slug))
 							}}
 						>
 							<Crown className="w-4 h-4 mr-2" />

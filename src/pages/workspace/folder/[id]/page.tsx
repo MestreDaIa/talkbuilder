@@ -4,6 +4,8 @@ import { useNavigate, useParams } from "react-router-dom";
 import { useState } from "react";
 import { useDroppable } from "@dnd-kit/core";
 import { useWorkspace } from "../../../../context/WorkspaceContext";
+import { useAuth } from "../../../../context/AuthContext";
+import { folderRoute, botRoute } from "../../../../lib/workspaceRoutes";
 import FolderIcon from "../../../../components/FolderIcon";
 import BotIcon from "../../../../components/BotIcon";
 
@@ -12,6 +14,8 @@ export default function FolderPage() {
 	const router = useNavigate();
 	const params = useParams();
 	const folderId = params.id as string;
+	const { profile } = useAuth();
+	const slug = profile?.slug;
 
 	const { items } = useWorkspace();
 	const [currentBotId, setCurrentBotId] = useState<string | null>(null);
@@ -49,7 +53,7 @@ export default function FolderPage() {
 									title={item.title}
 									description={item.description}
 									onCLick={() => {
-										router(`/workspace/folder/${item.id}`);
+										router(folderRoute(slug, item.id));
 									}}
 								/>
 							) : (
@@ -57,7 +61,7 @@ export default function FolderPage() {
 									id={item.id}
 									onClick={() => {
 										setCurrentBotId(item.id);
-										router(`/workspace/bot/${item.id}`);
+										router(botRoute(slug, item.id));
 									}}
 									title={item.title}
 									emojiIcon={item.emoji ?? "🤖"}

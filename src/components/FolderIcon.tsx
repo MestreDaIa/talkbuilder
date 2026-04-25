@@ -7,6 +7,8 @@ import React, { useState, useCallback } from "react";
 import { Trash2, FolderPen, SquareMenuIcon } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import { Card, CardContent, CardHeader } from "./ui/card";
+import { useAuth } from "../context/AuthContext";
+import { folderRoute } from "../lib/workspaceRoutes";
 
 
 interface FolderIconProps {
@@ -26,12 +28,12 @@ function FolderIconComponent({
 	const [optionBot, setOptionBot] = useState<"Excluir" | "Editar">("Editar");
 	
 	const router = useNavigate();
+	const { profile } = useAuth();
+	const slug = profile?.slug;
 
 	const onClick = useCallback(() => {
-		router(`/workspace/folder/${id}`);
-		// setCurrentFolderId(id);
-	// }, [router, id, setCurrentFolderId]);
-	}, [router, id]);
+		router(folderRoute(slug, id));
+	}, [router, id, slug]);
 
 
 	// 🔥 DRAG (somente no container externo)

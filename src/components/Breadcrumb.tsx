@@ -1,20 +1,18 @@
 import { ArrowLeft } from "lucide-react";
 import { useLocation, useNavigate } from "react-router-dom";
 import { useWorkspace } from "../context/WorkspaceContext";
+import { useAuth } from "../context/AuthContext";
+import { folderRoute, folderIdFromPath, workspaceRoot } from "../lib/workspaceRoutes";
 import type { WorkspaceItemType } from "../types/workspace/workspaceTypes";
 
 export default function Breadcrumb() {
   const { items } = useWorkspace();
   const router = useNavigate();
   const { pathname } = useLocation();
+  const { profile } = useAuth();
+  const slug = profile?.slug;
 
-  // Deriva o folderId direto do pathname (Breadcrumb fica fora das <Route>s específicas)
-  function getFolderIdFromPath(): string | undefined {
-    const match = pathname.match(/\/workspace\/folder\/([^/]+)/);
-    return match?.[1];
-  }
-
-  const folderId = getFolderIdFromPath();
+  const folderId = folderIdFromPath(pathname);
 
   function buildPath() {
     if (!folderId) return [];
@@ -41,10 +39,10 @@ export default function Breadcrumb() {
     const current = items.find((i) => i.id === folderId);
     const parentId = current?.parentId;
     if (!parentId) {
-      router(`/`);
+      router(workspaceRoot(slug));
       return;
     }
-    return router(`/workspace/folder/${parentId}`);
+    return router(folderRoute(slug, parentId));
   }
 
   return (
@@ -58,7 +56,7 @@ export default function Breadcrumb() {
         <div
           className="flex items-start justify-center relative text-gray-500 font-semibold cursor-pointer"
           key={folder.id}
-          onClick={() => router(`/workspace/folder/${folder.id}`)}
+          onClick={() => router(folderRoute(slug, folder.id))}
         >
           <p
             className={`flex items-center mr-2 ml-2 justify-center ${

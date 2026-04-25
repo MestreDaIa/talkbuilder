@@ -5,6 +5,8 @@ import { useWorkspace } from "../context/WorkspaceContext";
 import { ChevronDown, ChevronRight } from "lucide-react";
 import { useDraggable, useDroppable } from "@dnd-kit/core";
 import { useLocation, useNavigate } from "react-router-dom";
+import { useAuth } from "../context/AuthContext";
+import { folderRoute, folderIdFromPath } from "../lib/workspaceRoutes";
 
 export default function FoldersSidebarNavigation() {
 	const { items } = useWorkspace();
@@ -21,12 +23,7 @@ export default function FoldersSidebarNavigation() {
 
 	const { pathname } = useLocation();
 
-	function getCurrentFolderId() {
-		if (!pathname.includes("/folder/")) return null;
-		return pathname.split("/folder/")[1];
-	}
-
-	const currentFolderId = getCurrentFolderId();
+	const currentFolderId = folderIdFromPath(pathname);
 
 	function folderHasSelectedDescendant(folderId: string) {
 		if (!currentFolderId) return false;
@@ -109,6 +106,8 @@ function SidebarItem({
 	hasChildren,
 }: SidebarItemProps) {
 	const router = useNavigate();
+	const { profile } = useAuth();
+	const slug = profile?.slug;
 
 	const {
 		attributes,
@@ -180,7 +179,7 @@ function SidebarItem({
 				style={style}
 				onClick={() => {
 					if (isDragging) return;
-					router(`/workspace/folder/${folder.id}`);
+					router(folderRoute(slug, folder.id));
 				}}
 				className={`flex  items-center gap-2 px-1 py-1 rounded-lg cursor-grab active:cursor-grabbing select-none shadow-[0px_0px_5px_1px] shadow-black ${containerBg} ${
 					isOver ? "ring-2 ring-blue-400" : ""

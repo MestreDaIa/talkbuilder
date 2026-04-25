@@ -1,7 +1,7 @@
 
 import './App.css'
 
-import { Routes, Route } from "react-router-dom";
+import { Routes, Route, Navigate, useParams } from "react-router-dom";
 
 import BotPage from "./pages/workspace/bot/[id]/page";
 import FolderPage from "./pages/workspace/folder/[id]/page";
@@ -18,19 +18,46 @@ import Layout from "./components/layout";
 import WorkspaceMain from './components/Main';
 import ProtectedRoute from './components/ProtectedRoute';
 import { useAuth } from './context/AuthContext';
+import { workspaceRoot } from './lib/workspaceRoutes';
 
+/**
+ * Raiz "/":
+ * - Sem login (ou Supabase não configurado) → mostra landing pública.
+ * - Logado → redireciona para /{slug}/workspace.
+ */
 function HomeRoute() {
-  const { user, loading, isConfigured } = useAuth();
+  const { user, loading, isConfigured, profile } = useAuth();
 
   if (loading) return null;
-  // Sem Supabase configurado OU sem login → mostra landing pública
   if (!isConfigured || !user) return <LandingPage />;
-  // Logado → workspace dentro do layout
-  return (
-    <Layout>
-      <WorkspaceMain />
-    </Layout>
-  );
+  // Logado: redireciona pro workspace pessoal
+  return <Navigate to={workspaceRoot(profile?.slug)} replace />;
+}
+
+/**
+ * Login/Signup: se já estiver logado, manda direto pro workspace.
+ */
+function AuthRoute({ children }: { children: React.ReactNode }) {
+  const { user, loading, profile } = useAuth();
+  if (loading) return null;
+  if (user) return <Navigate to={workspaceRoot(profile?.slug)} replace />;
+  return <>{children}</>;
+}
+
+/**
+ * Garante que o slug da URL bate com o slug do usuário logado.
+ * Se não bater, redireciona pro workspace certo.
+ */
+function SlugGuard({ children }: { children: React.ReactNode }) {
+  const { profile, loading } = useAuth();
+  const { slug } = useParams();
+  if (loading) return null;
+  // Se ainda não temos profile, deixa renderizar (evita flash de redirect)
+  if (!profile?.slug) return <>{children}</>;
+  if (slug && slug !== profile.slug) {
+    return <Navigate to={workspaceRoot(profile.slug)} replace />;
+  }
+  return <>{children}</>;
 }
 
 function NotFoundPage() {
@@ -52,44 +79,72 @@ function NotFoundPage() {
 function App() {
   return (
     <Routes>
-      {/* Rotas públicas (sem layout do workspace) */}
+      {/* Landing pública */}
       <Route path="/" element={<HomeRoute />} />
-      <Route path="/login" element={<LoginPage />} />
-      <Route path="/signup" element={<SignupPage />} />
 
-      {/* Rota pública do bot publicado */}
+      {/* Auth */}
+      <Route path="/login" element={<AuthRoute><LoginPage /></AuthRoute>} />
+      <Route path="/signup" element={<AuthRoute><SignupPage /></AuthRoute>} />
+
+      {/* Bot público publicado: /:slug/flow/:publicId */}
       <Route path="/:slug/flow/:publicId" element={<PublicFlowPage />} />
 
-      {/* Rotas protegidas (com layout do workspace) */}
+      {/* Workspace raiz do usuário: /:slug/workspace */}
       <Route
-        path="/workspace/bot/:id"
+        path="/:slug/workspace"
         element={
           <ProtectedRoute>
-            <Layout><BotPage /></Layout>
+            <SlugGuard>
+              <Layout><WorkspaceMain /></Layout>
+            </SlugGuard>
           </ProtectedRoute>
         }
       />
+
+      {/* Pasta: /:slug/workspace/folder/:id */}
       <Route
-        path="/workspace/folder/:id"
+        path="/:slug/workspace/folder/:id"
         element={
           <ProtectedRoute>
-            <Layout><FolderPage /></Layout>
+            <SlugGuard>
+              <Layout><FolderPage /></Layout>
+            </SlugGuard>
           </ProtectedRoute>
         }
       />
+
+      {/* Editor do bot: /:slug/workspace/bot/:id */}
       <Route
-        path="/workspace/configs"
+        path="/:slug/workspace/bot/:id"
         element={
           <ProtectedRoute>
-            <Layout><ConfigPage /></Layout>
+            <SlugGuard>
+              <Layout><BotPage /></Layout>
+            </SlugGuard>
           </ProtectedRoute>
         }
       />
+
+      {/* Configs: /:slug/workspace/configs */}
       <Route
-        path="/workspace/perfil"
+        path="/:slug/workspace/configs"
         element={
           <ProtectedRoute>
-            <Layout><PerfilPage /></Layout>
+            <SlugGuard>
+              <Layout><ConfigPage /></Layout>
+            </SlugGuard>
+          </ProtectedRoute>
+        }
+      />
+
+      {/* Perfil: /:slug/workspace/perfil */}
+      <Route
+        path="/:slug/workspace/perfil"
+        element={
+          <ProtectedRoute>
+            <SlugGuard>
+              <Layout><PerfilPage /></Layout>
+            </SlugGuard>
           </ProtectedRoute>
         }
       />
@@ -104,9 +159,22 @@ function App() {
         }
       />
 
+      {/* Compatibilidade: rotas antigas /workspace/... → redireciona pro novo formato */}
+      <Route path="/workspace/*" element={<LegacyWorkspaceRedirect />} />
+
       <Route path="*" element={<NotFoundPage />} />
     </Routes>
   );
+}
+
+/** Redireciona links antigos /workspace/... para /:slug/workspace/... */
+function LegacyWorkspaceRedirect() {
+  const { profile, loading } = useAuth();
+  if (loading) return null;
+  const slug = profile?.slug ?? "u";
+  // Pega o resto do path depois de /workspace
+  const rest = window.location.pathname.replace(/^\/workspace/, "");
+  return <Navigate to={`/${slug}/workspace${rest}`} replace />;
 }
 
 export default App;

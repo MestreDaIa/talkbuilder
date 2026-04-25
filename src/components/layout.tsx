@@ -20,6 +20,7 @@ import AddOptionToolbar from "./AddOptionToolbar";
 import Breadcrumb from "./Breadcrumb";
 import Header from "./Header";
 import { Toaster } from "./ui/toaster";
+import { folderIdFromPath } from "../lib/workspaceRoutes";
 
 export default function WorkspaceLayout({
 	children,
@@ -41,13 +42,12 @@ export default function WorkspaceLayout({
 		
 			const { pathname } = useLocation();
 
-			const isBotEditor = pathname.startsWith("/workspace/bot/");
+			const isBotEditor = /\/workspace\/bot\//.test(pathname);
 
-			const showBreadcrumb =
-				!isBotEditor &&
-				(pathname === "/" ||
-					pathname === "/workspace" ||
-					pathname.startsWith("/workspace/folder/"));
+			const isWorkspaceRoot = /^\/[^/]+\/workspace\/?$/.test(pathname) || pathname === "/";
+			const isFolderRoute = /\/workspace\/folder\//.test(pathname);
+
+			const showBreadcrumb = !isBotEditor && (isWorkspaceRoot || isFolderRoute);
 
 			const showToolbar = showBreadcrumb;
 		
@@ -60,10 +60,7 @@ export default function WorkspaceLayout({
 			const [botName, setBotName] = useState("");
 			const [botDescription, setBotDescription] = useState("");
 		
-			function getCurrentFolderId() {
-				if (!pathname.includes("/folder/")) return null;
-				return pathname.split("/folder/")[1];
-			}
+			const currentFolderId = folderIdFromPath(pathname);
 		
 			const defaultFolderEmoji = "📁";
 			const defaultBotEmoji = "🤖";
@@ -74,7 +71,6 @@ export default function WorkspaceLayout({
 			const [folderEmoji, setFolderEmoji] = useState<string>(defaultFolderEmoji);
 			const [botEmoji, setBotEmoji] = useState<string>(defaultBotEmoji);
 		
-			const currentFolderId = getCurrentFolderId();
 		
 			function createFolder() {
 				setItems((prev) => [

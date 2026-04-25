@@ -3,11 +3,13 @@ import * as DropdownMenu from "@radix-ui/react-dropdown-menu";
 import { useNavigate } from "react-router-dom";
 import { useEmbed } from "../context/EmbedContext";
 import { useAuth } from "../context/AuthContext";
+import { configsRoute, perfilRoute, workspaceRoot } from "../lib/workspaceRoutes";
 
 export default function Header() {
   const navigate = useNavigate();
   const { flags } = useEmbed();
   const { user, profile, signOut } = useAuth();
+  const slug = profile?.slug;
 
   async function handleLogout() {
     await signOut();
@@ -18,7 +20,7 @@ export default function Header() {
     <div className="relative top-0 left-0 w-full bg-gray-800 text-white flex items-center justify-between py-2 px-4 sm:px-9 z-[99] gap-3">
       <span
         className="cursor-pointer text-sm font-medium tracking-wide shrink-0"
-        onClick={() => navigate("/")}
+        onClick={() => navigate(workspaceRoot(slug))}
       >
         WORKSPACE
       </span>
@@ -39,14 +41,14 @@ export default function Header() {
             {flags.showProfile && (
               <DropdownMenu.Item
                 className="select-none outline-none cursor-pointer px-3 py-1.5 rounded-md data-[highlighted]:bg-gray-100 data-[highlighted]:text-green-500"
-                onClick={() => navigate("/workspace/perfil")}
+                onClick={() => navigate(perfilRoute(slug))}
               >
                 PERFIL
               </DropdownMenu.Item>
             )}
             <DropdownMenu.Item
               className="select-none outline-none cursor-pointer px-3 py-1.5 rounded-md data-[highlighted]:bg-gray-100 data-[highlighted]:text-green-500"
-              onClick={() => navigate("/workspace/configs")}
+              onClick={() => navigate(configsRoute(slug))}
             >
               CONFIGURAÇÕES
             </DropdownMenu.Item>

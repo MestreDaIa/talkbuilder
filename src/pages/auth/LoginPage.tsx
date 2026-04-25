@@ -29,6 +29,8 @@ export default function LoginPage() {
 	const [password, setPassword] = useState("");
 	const [submitting, setSubmitting] = useState(false);
 
+	// Se vier de uma rota protegida (ProtectedRoute setou state.from), volta pra ela.
+	// Caso contrário, manda pra "/" e o HomeRoute redireciona pro workspace do slug.
 	const redirectTo =
 		(location.state as { from?: string } | null)?.from ?? "/";
 
@@ -46,7 +48,7 @@ export default function LoginPage() {
 
 		setSubmitting(true);
 		const supabase = getSupabase()!;
-		const { error } = await supabase.auth.signInWithPassword({
+		const { data, error } = await supabase.auth.signInWithPassword({
 			email: parsed.data.email,
 			password: parsed.data.password,
 		});
@@ -61,8 +63,19 @@ export default function LoginPage() {
 			return;
 		}
 
+		// Busca slug do profile pra montar a URL do workspace
+		let target = redirectTo;
+		if (target === "/" && data.user) {
+			const { data: prof } = await supabase
+				.from("profiles")
+				.select("slug")
+				.eq("id", data.user.id)
+				.maybeSingle();
+			if (prof?.slug) target = `/${prof.slug}/workspace`;
+		}
+
 		toast({ title: "Bem-vindo de volta!" });
-		navigate(redirectTo, { replace: true });
+		navigate(target, { replace: true });
 	}
 
 	return (

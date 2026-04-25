@@ -13,6 +13,7 @@ import {
 
 
 import { useLocation, } from "react-router-dom";
+import { folderIdFromPath } from "../lib/workspaceRoutes";
 
 export default function DnDProvider({
 	children,
@@ -21,13 +22,8 @@ export default function DnDProvider({
 }) {
 	const { setItems } = useWorkspace();
 	const { pathname } = useLocation();
-	
-	function getCurrentFolderId() {
-		if (!pathname.includes("/folder/")) return null;
-		return pathname.split("/folder/")[1];
-	}
 
-	const currentFolderId = getCurrentFolderId();
+	const currentFolderId = folderIdFromPath(pathname);
 
 	const sensors = useSensors(
 		useSensor(PointerSensor, {
