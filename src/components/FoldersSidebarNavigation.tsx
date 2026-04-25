@@ -7,6 +7,7 @@ import { useDraggable, useDroppable } from "@dnd-kit/core";
 import { useLocation, useNavigate } from "react-router-dom";
 import { useAuth } from "../context/AuthContext";
 import { folderRoute, folderIdFromPath } from "../lib/workspaceRoutes";
+import { sortByIndex } from "../lib/workspaceOrder";
 
 export default function FoldersSidebarNavigation() {
 	const { items } = useWorkspace();
@@ -52,8 +53,7 @@ export default function FoldersSidebarNavigation() {
 	if (!hasSidebarContent) return null;
 
 	function renderTree(parentId: string | null, level = 0) {
-		return items
-			.filter((i) => i.parentId === parentId && i.type)
+		return sortByIndex(items.filter((i) => i.parentId === parentId && i.type))
 			.map((folder) => (
 				<SidebarItem
 					key={folder.id}
