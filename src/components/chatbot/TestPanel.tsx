@@ -219,12 +219,29 @@ const AudioPlayer = ({ src, autoPlay }: AudioPlayerProps) => {
   );
 };
 
+export interface TestPanelTheme {
+  primaryColor?: string;
+  backgroundColor?: string;
+  textColor?: string;
+  fontFamily?: string;
+}
+
 interface TestPanelProps {
   isOpen: boolean;
   onClose: () => void;
   startContainer: Container | null;
   allContainers: Container[];
   edges?: Edge[];
+  /** Custom header title. Defaults to "Teste do Fluxo". */
+  headerTitle?: string;
+  /** Optional subtitle below the title (e.g. bot description). */
+  headerSubtitle?: string | null;
+  /** Hide the close (X) button — useful for public/embedded views. */
+  hideClose?: boolean;
+  /** Render as full screen instead of a side panel. */
+  fullScreen?: boolean;
+  /** Visual theme overrides coming from bot settings. */
+  theme?: TestPanelTheme;
 }
 
 interface Message {
