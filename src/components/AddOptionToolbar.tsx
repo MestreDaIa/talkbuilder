@@ -297,6 +297,37 @@ export default function AddOptionToolbar({ onAddFolder, onAddBot }: Props) {
 						</DialogDescription>
 					</DialogHeader>
 
+					{/* Plan usage */}
+					<div className="rounded-lg border border-gray-200 bg-gray-50 p-3 flex items-center justify-between">
+						<div className="flex items-center gap-2">
+							<Sparkles className="w-4 h-4 text-cyan-600" />
+							<div>
+								<p className="text-xs font-medium text-gray-700">
+									Plano {PLAN_LABELS[currentPlan]}
+								</p>
+								<p className="text-[11px] text-gray-500">
+									Bots usados / limite
+								</p>
+							</div>
+						</div>
+						<span
+							className={`text-sm font-bold ${
+								canAddBot ? "text-gray-800" : "text-red-600"
+							}`}
+						>
+							{botsUsed}/{String(limitLabel)}
+						</span>
+					</div>
+
+					{!canAddBot && (
+						<div className="bg-red-50 border border-red-200 rounded-lg p-2 flex items-center gap-2">
+							<AlertCircle className="w-4 h-4 text-red-600" />
+							<p className="text-xs text-red-700">
+								Limite atingido. Faça upgrade para importar mais bots.
+							</p>
+						</div>
+					)}
+
 					<div className="space-y-3 py-2">
 						<div className="space-y-1.5">
 							<Label>Arquivo JSON</Label>
