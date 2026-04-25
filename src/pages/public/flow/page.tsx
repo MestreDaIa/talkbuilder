@@ -1,11 +1,10 @@
 import { useEffect, useState } from "react";
-import { useLocation, useParams } from "react-router-dom";
+import { useParams } from "react-router-dom";
 import { Loader2, RefreshCw } from "lucide-react";
 import { TestPanel } from "@/components/chatbot/TestPanel";
 import { VariablesProvider } from "@/context/VariablesContext";
 import { Button } from "@/components/ui/button";
 import { getPublicFlow, type PublicFlowResult } from "@/lib/flowsApi";
-import { getPublicFlowFromHash } from "@/lib/publicFlowRoute";
 import type { Container, Edge } from "@/types/chatbot";
 
 /**
@@ -15,11 +14,8 @@ import type { Container, Edge } from "@/types/chatbot";
  */
 export default function PublicFlowPage() {
   const params = useParams();
-  const location = useLocation();
-  const searchParams = new URLSearchParams(location.search);
-  const publicFlowFromHash = getPublicFlowFromHash(location.hash);
-  const slug = ((params.slug as string) ?? searchParams.get("publicSlug") ?? publicFlowFromHash?.slug ?? "").trim();
-  const publicId = ((params.publicId as string) ?? searchParams.get("publicId") ?? publicFlowFromHash?.publicId ?? "").trim();
+  const slug = ((params.slug as string) ?? "").trim();
+  const publicId = ((params.publicId as string) ?? "").trim();
 
   const [data, setData] = useState<PublicFlowResult | null>(null);
   const [loading, setLoading] = useState(true);

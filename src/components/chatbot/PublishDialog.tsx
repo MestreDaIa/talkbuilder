@@ -22,7 +22,6 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { supabaseClient } from '@/lib/supabaseClient';
-import { buildPublicFlowHashUrl } from '@/lib/publicFlowRoute';
 import { toast } from 'sonner';
 import { Container, Edge } from '@/types/chatbot';
 
@@ -94,7 +93,7 @@ export function PublishDialog({
 
   const getPublicUrl = () => {
     const baseUrl = typeof window !== 'undefined' ? window.location.origin : '';
-    return buildPublicFlowHashUrl(baseUrl, resolvedSlug, publicId);
+    return `${baseUrl}/${encodeURIComponent(resolvedSlug)}/flow/${encodeURIComponent(publicId)}`;
   };
 
   const validatePublicId = (value: string) => {

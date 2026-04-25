@@ -1,7 +1,7 @@
 
 import './App.css'
 
-import { Routes, Route, useLocation } from "react-router-dom";
+import { Routes, Route } from "react-router-dom";
 
 import BotPage from "./pages/workspace/bot/[id]/page";
 import FolderPage from "./pages/workspace/folder/[id]/page";
@@ -18,17 +18,10 @@ import Layout from "./components/layout";
 import WorkspaceMain from './components/Main';
 import ProtectedRoute from './components/ProtectedRoute';
 import { useAuth } from './context/AuthContext';
-import { getPublicFlowFromHash } from './lib/publicFlowRoute';
 
 function HomeRoute() {
-  const location = useLocation();
   const { user, loading, isConfigured } = useAuth();
-  const searchParams = new URLSearchParams(location.search);
-  const publicSlug = searchParams.get('publicSlug');
-  const publicId = searchParams.get('publicId');
-  const publicFlowFromHash = getPublicFlowFromHash(location.hash);
 
-  if ((publicSlug && publicId) || publicFlowFromHash) return <PublicFlowPage />;
   if (loading) return null;
   // Sem Supabase configurado OU sem login → mostra landing pública
   if (!isConfigured || !user) return <LandingPage />;

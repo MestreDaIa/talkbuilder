@@ -1,57 +1,73 @@
-## Diagnóstico
+## Diagnóstico (descoberta importante)
 
-Comparei o seu projeto com o **flow-appoint** (que funciona). O código de roteamento é praticamente idêntico:
+Comparei lado-a-lado seu projeto com o **flow-appoint**:
 
-- Ambos usam `BrowserRouter` + React Router DOM.
-- Ambos registram a rota `/:slug/flow/:publicId` apontando para a página pública do bot.
-- Ambos geram a URL pública no formato `${origin}/${slug}/flow/${publicId}`.
+| Item | flow-appoint | talkbuilder (este projeto) |
+|---|---|---|
+| Stack | Vite + React + react-router-dom | **Idêntico** |
+| `BrowserRouter` montado | sim | sim |
+| Config Vite | padrão | padrão |
+| `vite.config.ts` | padrão SPA | padrão SPA |
+| Rota `/:slug/flow/:publicId` | existe no `<Routes>` | existe no `<Routes>` |
 
-A diferença não está no código. Está em **dois pontos de infraestrutura**:
+**Os dois projetos são SPAs Vite praticamente idênticos.** Não há diferença de código que justifique um funcionar e o outro não.
 
-### 1. Seu projeto NÃO está publicado
+Testei via `curl` direto nos domínios publicados:
 
-Verifiquei o status: `is_published: false`. O flow-appoint está em `https://flow-appoint.lovable.app`. Isso explica a tela **"Not Found" preta no navegador (imagem 2)**:
+```text
+GET https://flow-appoint.lovable.app/teste02/flow/atendimento-personalizado
+→ 200 OK  (x-deployment-id presente)  ✅ SPA fallback OK
 
-- Quando você cola `https://a74b5844-...lovableproject.com/teste02/flow/...` no navegador, esse domínio é o do **iframe interno do editor Lovable**, que **só responde a requests vindos de dentro do editor**. Acessado de fora, devolve "Not Found" puro do servidor — não chega nem a carregar o React.
-- O domínio `id-preview--<id>.lovable.app` (preview estático) só existe enquanto o preview estático está ativo, e às vezes precisa de um build novo para reagir a deep links. Por isso ora aparece "Not Found", ora aparece a tela.
-- Quando o app está **publicado**, o domínio fica `https://<seu-app>.lovable.app` (ou domínio custom) e o SPA fallback funciona corretamente para qualquer deep link.
+GET https://talkbuilder.lovable.app/teste02/flow/teste-de-bot001-01
+→ 404      (sem x-deployment-id)        ❌ SPA fallback NÃO está rodando
 
-### 2. A lógica de "mapear host do editor para preview público" está atrapalhando
+GET https://talkbuilder.lovable.app/
+→ 200 OK  (x-deployment-id presente)   ✅ root carrega
 
-Eu havia adicionado em `PublishDialog.tsx` um helper `getPublicOrigin()` que reescreve `*.lovableproject.com` para `id-preview--*.lovable.app`. O **flow-appoint não faz isso** — usa apenas `window.location.origin`. Como o flow-appoint funciona, essa reescrita virou ruído.
+GET https://talkbuilder.lovable.app/qualquer-rota-aleatoria-xyz
+→ 404      (sem x-deployment-id)        ❌ qualquer caminho não-root falha
+```
 
-Também adicionei em `App.tsx` o `UnknownRouteHandler` que tenta sanitizar URLs absolutas coladas. É essa lógica que causa a tela "Redirecionando… Corrigindo a URL aberta no preview" (imagem 1) — ela tenta redirecionar mas está acontecendo dentro do contexto onde o deep link nunca vai resolver de qualquer forma (iframe interno).
+**Conclusão:** o SPA fallback do hosting da Lovable está quebrado **especificamente neste deployment** do `talkbuilder.lovable.app`. Qualquer rota diferente de `/` retorna 404 do Cloudflare antes de chegar no app. Por isso a única solução que funcionou foi o hash (`#`) — porque o hash nunca é enviado ao servidor.
 
-## Plano de Correção
+Isso **não pode ser resolvido apenas por código**, porque a requisição nem chega ao JavaScript. É preciso forçar uma nova publicação para regenerar o deployment com o fallback funcionando — exatamente como funciona no flow-appoint.
 
-### Passo 1 — Publicar o app
-Usar `publish_settings--update_visibility` para tornar o app público. Isso libera o domínio `https://<projeto>.lovable.app` com SPA fallback funcional, igual ao flow-appoint. **Sem isso nenhum link deep funciona fora do editor**.
+## Plano
 
-### Passo 2 — Simplificar `PublishDialog.tsx` (igual flow-appoint)
-- Remover o helper `getPublicOrigin()` e voltar a usar `window.location.origin` direto.
-- Manter `window.open(url, '_blank')` no botão de abrir.
-- Resultado: o link copiado vai usar exatamente o domínio onde o usuário está visualizando o app (preview, published ou custom).
+### 1. Reverter o workaround do hash e voltar à URL limpa
+Voltar a gerar links no formato igual ao flow-appoint:
 
-### Passo 3 — Remover o `UnknownRouteHandler` "redirecionador"
-- Substituir por uma página 404 simples (igual ao `NotFound.tsx` do flow-appoint), sem tentar reescrever URLs absolutas.
-- A "URL absoluta colada" só acontecia porque o preview do Lovable interpreta a colagem como path relativo. Quando o app estiver publicado, o usuário cola direto no navegador e isso deixa de ser problema.
+```text
+https://talkbuilder.lovable.app/teste02/flow/teste-de-bot001-01
+```
 
-### Passo 4 — Manter o debug útil em `PublicFlowPage`
-- Manter as mensagens com slug/publicId e o botão "Tentar novamente" para diagnóstico futuro.
+Arquivos a alterar:
+- `src/components/chatbot/PublishDialog.tsx` → `getPublicUrl()` retorna `${baseUrl}/${slug}/flow/${publicId}` (sem `#`, sem query).
+- `src/App.tsx` → remover a detecção de `publicSlug`/`publicId` por query e por hash em `HomeRoute`. A rota `/:slug/flow/:publicId` já existe no `<Routes>` e basta.
+- `src/pages/public/flow/page.tsx` → remover o parsing de hash/query, voltar a usar apenas `useParams()`.
+- `src/lib/publicFlowRoute.ts` → deletar (não é mais necessário).
 
-## Arquivos afetados
+### 2. Forçar novo deployment para reparar o SPA fallback
+Depois de reverter o código, fazer uma pequena mudança "no-op" (ex: comentário em `index.html` ou pequeno ajuste de CSS) para garantir que o build gere um artefato novo, e então pedir para você clicar em **Publicar → Atualizar** novamente. O novo deployment substituirá o atual (que está com o fallback quebrado) por um deployment novo que vai se comportar como o flow-appoint.
 
-- `src/components/chatbot/PublishDialog.tsx` — remover `getPublicOrigin`, voltar para `window.location.origin`.
-- `src/App.tsx` — substituir `UnknownRouteHandler` por um 404 simples.
-- Publish settings — mudar `is_published` para `true` com visibilidade pública.
+### 3. Validar via `curl` após sua republicação
+Assim que você publicar, eu rodo:
+```bash
+curl -I https://talkbuilder.lovable.app/teste02/flow/teste-de-bot001-01
+```
+Esperado: `HTTP 200` com header `x-deployment-id`. Se ainda vier 404, o problema é do lado da Lovable (hosting) e abrimos um chamado em vez de seguir tentando workarounds.
 
-## Como testar depois da correção
+### 4. Plano B (caso a republicação NÃO conserte o fallback)
+Se mesmo após uma nova publicação o `curl` continuar retornando 404 para rotas profundas, isso é um bug de infraestrutura da Lovable neste projeto específico. Nesse caso eu mantenho o workaround do hash (que já está funcionando) e te oriento a abrir um ticket no suporte da Lovable mencionando:
+- Projeto ID: `a74b5844-8bce-4e28-911e-ab440ae4c4a7`
+- Domínio: `talkbuilder.lovable.app`
+- Sintoma: SPA fallback não retorna `index.html` em rotas profundas; apenas `/` responde 200.
 
-1. Abrir o **link publicado** `https://<projeto>.lovable.app` no navegador.
-2. Logar, abrir o bot, publicar.
-3. Copiar o link da URL pública (será `https://<projeto>.lovable.app/teste02/flow/teste-de-bot001-01`).
-4. Abrir esse link em qualquer navegador → deve carregar o bot direto, sem 404 e sem tela branca.
+## Por que isso vai funcionar
 
-## Observação importante
+O hosting da Lovable tem SPA fallback automático (documentado). O flow-appoint comprova isso na prática — mesma stack, mesma estrutura, URL idêntica funcionando. Republicar regenera o deployment e tem alta probabilidade de restaurar o comportamento padrão do hosting.
 
-Tornar o app público significa que **qualquer pessoa com o link da home (`/`) verá a landing page** e poderá tentar criar conta. Isso é o comportamento esperado para um SaaS. Se você quiser um nível extra de proteção (ex.: convite-only para signup), isso seria uma feature separada — não bloqueia a publicação.
+## Detalhes técnicos
+
+- A rota já está corretamente declarada como `<Route path="/:slug/flow/:publicId" element={<PublicFlowPage />} />` em `src/App.tsx` linha 68 — não precisa mexer nela.
+- Removendo o suporte a hash, links antigos compartilhados no formato `/#/...` deixarão de funcionar. Como a feature é nova e poucos links foram distribuídos, o impacto é mínimo. Posso opcionalmente manter um shim no `HomeRoute` que detecta hash antigo e redireciona para a URL limpa — me avise se quiser.
