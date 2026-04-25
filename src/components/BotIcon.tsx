@@ -130,42 +130,62 @@ export default function BotIcon({
 		setEditOpen(true);
 	}, [title, emojiIcon, description]);
 
+	const doPublish = useCallback(async () => {
+		if (!flow || toggling) return;
+		setToggling(true);
+		try {
+			if (!flow.public_id) {
+				toast.error(
+					"Este bot ainda não tem ID público. Abra o editor e publique a primeira vez.",
+				);
+				return;
+			}
+			const updated = await publishFlow(
+				flow.id,
+				flow.public_id,
+				flow.draft_containers ?? [],
+				flow.draft_edges ?? [],
+			);
+			setFlow(updated);
+			setIsPublished(true);
+			toast.success("Bot publicado");
+		} catch (err: any) {
+			console.error("[BotIcon] publish", err);
+			toast.error(err?.message || "Erro ao publicar");
+		} finally {
+			setToggling(false);
+		}
+	}, [flow, toggling]);
+
+	const doUnpublish = useCallback(async () => {
+		if (!flow || toggling) return;
+		setToggling(true);
+		try {
+			const updated = await unpublishFlow(flow.id);
+			setFlow(updated);
+			setIsPublished(false);
+			toast.success("Bot despublicado");
+		} catch (err: any) {
+			console.error("[BotIcon] unpublish", err);
+			toast.error(err?.message || "Erro ao despublicar");
+		} finally {
+			setToggling(false);
+			setConfirmUnpublish(false);
+		}
+	}, [flow, toggling]);
+
 	const handleTogglePublish = useCallback(
-		async (e: React.MouseEvent | React.PointerEvent) => {
+		(e: React.MouseEvent | React.PointerEvent) => {
 			e.stopPropagation();
+			e.preventDefault();
 			if (!flow || toggling) return;
-			setToggling(true);
-			try {
-				if (isPublished) {
-					const updated = await unpublishFlow(flow.id);
-					setFlow(updated);
-					setIsPublished(false);
-					toast.success("Bot despublicado");
-				} else {
-					if (!flow.public_id) {
-						toast.error(
-							"Este bot ainda não tem ID público. Abra o editor e publique a primeira vez.",
-						);
-						return;
-					}
-					const updated = await publishFlow(
-						flow.id,
-						flow.public_id,
-						flow.draft_containers ?? [],
-						flow.draft_edges ?? [],
-					);
-					setFlow(updated);
-					setIsPublished(true);
-					toast.success("Bot publicado");
-				}
-			} catch (err: any) {
-				console.error("[BotIcon] toggle publish", err);
-				toast.error(err?.message || "Erro ao alterar status");
-			} finally {
-				setToggling(false);
+			if (isPublished) {
+				setConfirmUnpublish(true);
+			} else {
+				void doPublish();
 			}
 		},
-		[flow, isPublished, toggling],
+		[flow, isPublished, toggling, doPublish],
 	);
 
 	const handleExport = useCallback(() => {
