@@ -73,6 +73,11 @@ export default function PublicFlowPage() {
   const containers: Container[] = data?.containers ?? [];
   const edges: Edge[] = data?.edges ?? [];
   const startContainer = containers[0] ?? null;
+  const settingsAny = (data?.settings as any) ?? {};
+  const theme = settingsAny.theme ?? {};
+  const meta = settingsAny.metadata ?? {};
+  const headerTitle = meta.title || data?.name || "Bot";
+  const headerSubtitle = meta.description || data?.description || null;
 
   return (
     <VariablesProvider>
@@ -106,6 +111,11 @@ export default function PublicFlowPage() {
             startContainer={startContainer}
             allContainers={containers}
             edges={edges}
+            headerTitle={headerTitle}
+            headerSubtitle={headerSubtitle}
+            hideClose
+            fullScreen
+            theme={theme}
           />
         )}
       </div>
