@@ -359,6 +359,33 @@ export default function BotIcon({
 				</AlertDialogContent>
 			</AlertDialog>
 
+			{/* Confirm unpublish */}
+			<AlertDialog open={confirmUnpublish} onOpenChange={setConfirmUnpublish}>
+				<AlertDialogContent>
+					<AlertDialogHeader>
+						<AlertDialogTitle>Despublicar "{title}"?</AlertDialogTitle>
+						<AlertDialogDescription>
+							Ao despublicar, a rota pública do bot deixa de funcionar imediatamente
+							e qualquer link compartilhado retornará erro até que você publique novamente.
+							Você pode publicar de volta a qualquer momento.
+						</AlertDialogDescription>
+					</AlertDialogHeader>
+					<AlertDialogFooter>
+						<AlertDialogCancel disabled={toggling}>Cancelar</AlertDialogCancel>
+						<AlertDialogAction
+							onClick={(e) => {
+								e.preventDefault();
+								void doUnpublish();
+							}}
+							disabled={toggling}
+							className="bg-red-600 hover:bg-red-700"
+						>
+							{toggling ? "Despublicando..." : "Despublicar"}
+						</AlertDialogAction>
+					</AlertDialogFooter>
+				</AlertDialogContent>
+			</AlertDialog>
+
 			{/* Edit dialog */}
 			<Dialog open={editOpen} onOpenChange={setEditOpen}>
 				<DialogContent className="sm:max-w-md">
