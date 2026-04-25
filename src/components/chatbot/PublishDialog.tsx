@@ -93,7 +93,11 @@ export function PublishDialog({
 
   const getPublicUrl = () => {
     const baseUrl = typeof window !== 'undefined' ? window.location.origin : '';
-    return `${baseUrl}/${encodeURIComponent(resolvedSlug)}/flow/${encodeURIComponent(publicId)}`;
+    // TEMP: hash router — enquanto o SPA fallback do hosting não estiver ok,
+    // geramos URLs com `/#/` para garantir que deep links sempre carreguem.
+    // Para voltar a URLs limpas, remova o `/#` abaixo e troque HashRouter
+    // por BrowserRouter em src/main.tsx.
+    return `${baseUrl}/#/${encodeURIComponent(resolvedSlug)}/flow/${encodeURIComponent(publicId)}`;
   };
 
   const validatePublicId = (value: string) => {
