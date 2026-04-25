@@ -6,7 +6,7 @@ import { ChevronDown, ChevronRight } from "lucide-react";
 import { useDraggable, useDroppable } from "@dnd-kit/core";
 import { useLocation, useNavigate } from "react-router-dom";
 import { useAuth } from "../context/AuthContext";
-import { folderRoute, folderIdFromPath } from "../lib/workspaceRoutes";
+import { folderRoute, botRoute, folderIdFromPath } from "../lib/workspaceRoutes";
 import { sortByIndex } from "../lib/workspaceOrder";
 
 export default function FoldersSidebarNavigation() {
@@ -173,13 +173,17 @@ function SidebarItem({
 			className={` rounded-md ${isOver ? "bg-blue-400/50 relative" : ""}`}
 		>
 			<div
-				ref={setDragRef}
+			ref={setDragRef}
 				{...listeners}
 				{...attributes}
 				style={style}
 				onClick={() => {
 					if (isDragging) return;
-					router(folderRoute(slug, folder.id));
+					if (folder.type === "bot") {
+						router(botRoute(slug, folder.id));
+					} else {
+						router(folderRoute(slug, folder.id));
+					}
 				}}
 				className={`flex  items-center gap-2 px-1 py-1 rounded-lg cursor-grab active:cursor-grabbing select-none shadow-[0px_0px_5px_1px] shadow-black ${containerBg} ${
 					isOver ? "ring-2 ring-blue-400" : ""
