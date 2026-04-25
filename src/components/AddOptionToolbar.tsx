@@ -10,6 +10,7 @@ import { useWorkspace } from "../context/WorkspaceContext"
 import { configsRoute, folderIdFromPath } from "../lib/workspaceRoutes"
 import { useLocation } from "react-router-dom"
 import { getSupabase } from "../lib/supabaseClient"
+import { nextIndexFor } from "../lib/workspaceOrder"
 import { toast } from "sonner"
 import {
 	Dialog,
@@ -51,7 +52,7 @@ export default function AddOptionToolbar({ onAddFolder, onAddBot }: Props) {
 	const fileInputRef = useRef<HTMLInputElement>(null)
 	const navigate = useNavigate()
 	const { profile, user } = useAuth()
-	const { setItems } = useWorkspace()
+	const { setItems, items } = useWorkspace()
 	const { pathname } = useLocation()
 	const slug = profile?.slug
 
