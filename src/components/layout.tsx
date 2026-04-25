@@ -71,7 +71,6 @@ export default function WorkspaceLayout({
 			const [folderEmoji, setFolderEmoji] = useState<string>(defaultFolderEmoji);
 			const [botEmoji, setBotEmoji] = useState<string>(defaultBotEmoji);
 		
-			const currentFolderId = getCurrentFolderId();
 		
 			function createFolder() {
 				setItems((prev) => [
