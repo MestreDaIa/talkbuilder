@@ -21,6 +21,7 @@ import { Input } from "@/components/ui/input";
 import { useWorkspace } from "@/context/WorkspaceContext";
 import { useAuth } from "@/context/AuthContext";
 import { VariablesProvider } from "@/context/VariablesContext";
+import { folderRoute, workspaceRoot } from "@/lib/workspaceRoutes";
 import {
   ensureFlow,
   saveDraft,
@@ -252,13 +253,23 @@ export default function BotPage() {
 
   const lbl = statusLabel(status);
   const displayName = flow?.name ?? bot?.title ?? `Bot: ${botId}`;
+  const slug = profile?.slug;
+
+  const handleBack = () => {
+    const parentId = bot?.parentId ?? null;
+    if (parentId) {
+      navigate(folderRoute(slug, parentId));
+    } else {
+      navigate(workspaceRoot(slug));
+    }
+  };
 
   return (
     <VariablesProvider>
       <div className="bot-editor fixed inset-0 flex flex-col bg-background z-50 text-foreground">
         {/* Header */}
         <header className="flex items-center gap-2 px-3 py-2 bg-card border-b border-border text-foreground shadow-sm">
-          <Button variant="ghost" size="sm" onClick={() => navigate(-1)} className="gap-1" title="Voltar">
+          <Button variant="ghost" size="sm" onClick={handleBack} className="gap-1" title="Voltar">
             <ArrowLeft className="w-4 h-4" /> Voltar
           </Button>
 
