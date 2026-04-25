@@ -881,17 +881,40 @@ export const TestPanel = ({
 
   if (!isOpen) return null;
 
+  // CSS variables derived from the bot's theme settings (applied to the
+  // root container so it cascades to messages, header gradient, etc.)
+  const themeStyle: React.CSSProperties = {};
+  if (theme?.primaryColor) {
+    (themeStyle as any)["--bot-flow"] = theme.primaryColor;
+    (themeStyle as any)["--user-msg-bg"] = theme.primaryColor;
+    (themeStyle as any)["--user-msg-fg"] = "#ffffff";
+  }
+  if (theme?.backgroundColor) themeStyle.background = theme.backgroundColor;
+  if (theme?.textColor) themeStyle.color = theme.textColor;
+  if (theme?.fontFamily) themeStyle.fontFamily = theme.fontFamily;
+
+  const containerClass = fullScreen
+    ? "absolute inset-0 h-full w-full bg-card flex flex-col"
+    : "w-80 absolute top-0 right-0 h-full bg-card border-l border-border shadow-2xl flex flex-col";
+
   return (
-    <aside className="w-80 absolute top-0 right-0 h-full bg-card border-l border-border shadow-2xl flex flex-col">
+    <aside className={containerClass} style={themeStyle}>
       <div className="flex flex-col w-full h-full">
-        <div className="h-14 border-b border-border px-3 flex items-center justify-between bg-gradient-to-r from-primary/20 via-card to-card">
-          <div className="flex items-center gap-2">
-            <div className="w-2 h-2 rounded-full animate-pulse" style={{ background: "var(--bot-flow)" }} />
-            <h2 className="font-semibold text-sm text-foreground">Teste do Fluxo</h2>
+        <div className="sticky top-0 z-10 shrink-0 min-h-14 border-b border-border px-3 py-2 flex items-center justify-between bg-gradient-to-r from-primary/20 via-card to-card">
+          <div className="flex items-center gap-2 min-w-0">
+            <div className="w-2 h-2 rounded-full animate-pulse shrink-0" style={{ background: "var(--bot-flow)" }} />
+            <div className="min-w-0">
+              <h2 className="font-semibold text-sm text-foreground truncate">{headerTitle}</h2>
+              {headerSubtitle ? (
+                <p className="text-[11px] leading-tight text-muted-foreground truncate">{headerSubtitle}</p>
+              ) : null}
+            </div>
           </div>
-          <Button variant="ghost" size="icon" onClick={onClose}>
-            <X className="h-5 w-5" />
-          </Button>
+          {!hideClose && (
+            <Button variant="ghost" size="icon" onClick={onClose}>
+              <X className="h-5 w-5" />
+            </Button>
+          )}
         </div>
         <ScrollArea className="flex-1 p-3 bg-background/40">
           <div className="space-y-3">
