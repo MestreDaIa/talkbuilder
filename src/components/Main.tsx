@@ -8,9 +8,13 @@ import BotIcon from "./BotIcon";
 import { useDroppable } from "@dnd-kit/core";
 
 import { useWorkspace } from "../context/WorkspaceContext";
+import { useAuth } from "../context/AuthContext";
+import { botRoute } from "../lib/workspaceRoutes";
 
 export default function WorkspaceMain() {
 	const navigate = useNavigate();
+	const { profile } = useAuth();
+	const slug = profile?.slug;
 
 	const { items, activeId } = useWorkspace();
 
@@ -67,7 +71,7 @@ export default function WorkspaceMain() {
 									description={item.description}
 								onClick={() => {
 									setCurrentBotId(item.id);
-									navigate(`/workspace/bot/${item.id}`);
+									navigate(botRoute(slug, item.id));
 								}}
 								/>
 							)}
