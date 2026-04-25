@@ -10,6 +10,7 @@ import { useDroppable } from "@dnd-kit/core";
 import { useWorkspace } from "../context/WorkspaceContext";
 import { useAuth } from "../context/AuthContext";
 import { botRoute } from "../lib/workspaceRoutes";
+import { sortByIndex } from "../lib/workspaceOrder";
 
 export default function WorkspaceMain() {
 	const navigate = useNavigate();
@@ -22,10 +23,12 @@ export default function WorkspaceMain() {
 	const [currentBotId, setCurrentBotId] = useState<string | null>(null);
 
 	// 🔥 CORREÇÃO REAL AQUI
-	const currentItems = items.filter((item) => {
-		if (item.id === activeId) return true;
-		return item.parentId === currentFolderId;
-	});
+	const currentItems = sortByIndex(
+		items.filter((item) => {
+			if (item.id === activeId) return true;
+			return item.parentId === currentFolderId;
+		}),
+	);
 
 	const { setNodeRef, isOver } = useDroppable({
 		id: "GRID_ROOT_MAIN",

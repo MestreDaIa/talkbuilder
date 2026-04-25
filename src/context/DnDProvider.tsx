@@ -10,10 +10,9 @@ import {
 	useSensors,
 } from "@dnd-kit/core";
 
-
-
-import { useLocation, } from "react-router-dom";
+import { useLocation } from "react-router-dom";
 import { folderIdFromPath } from "../lib/workspaceRoutes";
+import { nextIndexFor, reorderSiblings } from "../lib/workspaceOrder";
 
 export default function DnDProvider({
 	children,
@@ -68,39 +67,52 @@ export default function DnDProvider({
 				return false;
 			}
 
-			let newParentId: string | null = activeItem.parentId;
-
-			// ROOT SIDEBAR
+			// 1) ROOT zones — move pra raiz / pasta atual e coloca no fim
 			if (overIdRaw === "SIDEBAR_ROOT") {
-				newParentId = null;
+				if (activeItem.parentId === null) return prev;
+				const newIndex = nextIndexFor(prev, null);
+				return prev.map((i) =>
+					i.id === draggedId
+						? { ...i, parentId: null, indexItem: newIndex }
+						: i,
+				);
 			}
 
-			// ROOT GRID
-			else if (
+			if (
 				overIdRaw === "GRID_ROOT_MAIN" ||
 				overIdRaw === "GRID_ROOT_FOLDER"
 			) {
-				newParentId = currentFolderId;
+				if (activeItem.parentId === currentFolderId) return prev;
+				const newIndex = nextIndexFor(prev, currentFolderId);
+				return prev.map((i) =>
+					i.id === draggedId
+						? { ...i, parentId: currentFolderId, indexItem: newIndex }
+						: i,
+				);
 			}
 
-			// DROP EM PASTA
-			else {
-				if (!overItem) return prev;
+			// 2) Drop sobre outro item
+			if (!overItem) return prev;
 
-				// ❌ não pode dropar dentro de bot
-				if (overItem.type === "bot") return prev;
-
-				// ❌ evitar loop infinito de hierarquia
-				if (isDescendant(draggedId, overItem.id)) return prev;
-
-				newParentId = overItem.id;
+			// 🔥 REORDENAR irmãos (mesmo parentId)
+			if (overItem.parentId === activeItem.parentId) {
+				return reorderSiblings(
+					prev,
+					activeItem.parentId,
+					draggedId,
+					overItem.id,
+				);
 			}
 
-			// 🔥 evita loop de render
-			if (newParentId === activeItem.parentId) return prev;
+			// 3) Drop sobre uma pasta de outro nível → MOVE pra dentro
+			if (overItem.type === "bot") return prev;
+			if (isDescendant(draggedId, overItem.id)) return prev;
 
+			const newIndex = nextIndexFor(prev, overItem.id);
 			return prev.map((item) =>
-				item.id === draggedId ? { ...item, parentId: newParentId } : item,
+				item.id === draggedId
+					? { ...item, parentId: overItem.id, indexItem: newIndex }
+					: item,
 			);
 		});
 	}

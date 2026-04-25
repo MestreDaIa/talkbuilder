@@ -21,6 +21,7 @@ import Breadcrumb from "./Breadcrumb";
 import Header from "./Header";
 import { Toaster } from "./ui/toaster";
 import { folderIdFromPath } from "../lib/workspaceRoutes";
+import { nextIndexFor } from "../lib/workspaceOrder";
 
 export default function WorkspaceLayout({
 	children,
@@ -78,7 +79,7 @@ export default function WorkspaceLayout({
 					{
 						id: crypto.randomUUID(),
 						type: "folder",
-						indexItem: 0,
+						indexItem: nextIndexFor(prev, currentFolderId),
 						title: folderName,
 						description: folderDescription,
 						emoji: folderEmoji,
@@ -98,7 +99,7 @@ export default function WorkspaceLayout({
 					{
 						id: crypto.randomUUID(),
 						type: "bot",
-						indexItem: 0,
+						indexItem: nextIndexFor(prev, currentFolderId),
 						emoji: botEmoji,
 						title: botName,
 						description: botDescription,

@@ -8,6 +8,7 @@ import { useAuth } from "../../../../context/AuthContext";
 import { folderRoute, botRoute } from "../../../../lib/workspaceRoutes";
 import FolderIcon from "../../../../components/FolderIcon";
 import BotIcon from "../../../../components/BotIcon";
+import { sortByIndex } from "../../../../lib/workspaceOrder";
 
 
 export default function FolderPage() {
@@ -20,7 +21,9 @@ export default function FolderPage() {
 	const { items } = useWorkspace();
 	const [currentBotId, setCurrentBotId] = useState<string | null>(null);
 
-	const currentItems = items.filter((item) => item.parentId === folderId);
+	const currentItems = sortByIndex(
+		items.filter((item) => item.parentId === folderId),
+	);
 
 	// 🔥 ROOT DA GRID (IMPORTANTE)
 	const { setNodeRef, isOver } = useDroppable({
