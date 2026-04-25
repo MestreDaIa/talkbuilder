@@ -24,6 +24,7 @@ import { Label } from '@/components/ui/label';
 import { supabaseClient } from '@/lib/supabaseClient';
 import { toast } from 'sonner';
 import { Container, Edge } from '@/types/chatbot';
+import { EmbedSnippets } from './EmbedSnippets';
 
 interface PublishDialogProps {
   open: boolean;
