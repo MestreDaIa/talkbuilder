@@ -438,3 +438,34 @@ $$;
 
 grant execute on function public.get_public_flow(text, text) to anon, authenticated;
 
+
+
+-- ============================================================
+-- API Keys (para integração Flow-Appoint ↔ builder-flow-api)
+-- Usado pelo endpoint POST /api/keys/validate (a ser criado no
+-- backend próprio). Armazene SEMPRE o hash, nunca a chave.
+-- ============================================================
+create table if not exists public.api_keys (
+  id uuid primary key default gen_random_uuid(),
+  user_id uuid references auth.users(id) on delete cascade not null,
+  workspace_slug text not null,
+  key_hash text not null unique,
+  name text,
+  is_active boolean not null default true,
+  created_at timestamptz not null default now(),
+  last_used_at timestamptz
+);
+
+alter table public.api_keys enable row level security;
+
+create policy "users select own api keys"
+  on public.api_keys for select
+  using (auth.uid() = user_id);
+
+create policy "users insert own api keys"
+  on public.api_keys for insert
+  with check (auth.uid() = user_id);
+
+create policy "users delete own api keys"
+  on public.api_keys for delete
+  using (auth.uid() = user_id);

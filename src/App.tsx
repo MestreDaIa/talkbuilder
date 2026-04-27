@@ -17,20 +17,26 @@ import PublicFlowPage from "./pages/public/flow/page";
 import Layout from "./components/layout";
 import WorkspaceMain from './components/Main';
 import ProtectedRoute from './components/ProtectedRoute';
+import EmbedErrorScreen from './components/EmbedErrorScreen';
 import { useAuth } from './context/AuthContext';
+import { useEmbed } from './context/EmbedContext';
 import { workspaceRoot } from './lib/workspaceRoutes';
 
 /**
  * Raiz "/":
+ * - Em modo embedded → vai direto pro workspace do slug recebido no JWT.
  * - Sem login (ou Supabase não configurado) → mostra landing pública.
  * - Logado → redireciona para /{slug}/workspace.
  */
 function HomeRoute() {
   const { user, loading, isConfigured, profile } = useAuth();
+  const { mode, session } = useEmbed();
 
   if (loading) return null;
+  if (mode === "embedded" && session?.workspaceSlug) {
+    return <Navigate to={workspaceRoot(session.workspaceSlug)} replace />;
+  }
   if (!isConfigured || !user) return <LandingPage />;
-  // Logado: redireciona pro workspace pessoal
   return <Navigate to={workspaceRoot(profile?.slug)} replace />;
 }
 
@@ -48,11 +54,22 @@ function AuthRoute({ children }: { children: React.ReactNode }) {
  * Garante que o slug da URL bate com o slug do usuário logado.
  * Se não bater, redireciona pro workspace certo.
  */
+/**
+ * Garante que o slug da URL bate com o slug do usuário logado
+ * (em modo embedded, com o slug recebido no JWT).
+ */
 function SlugGuard({ children }: { children: React.ReactNode }) {
   const { profile, loading } = useAuth();
+  const { mode, session } = useEmbed();
   const { slug } = useParams();
   if (loading) return null;
-  // Se ainda não temos profile, deixa renderizar (evita flash de redirect)
+  // Embedded: trava no workspace_slug do JWT
+  if (mode === "embedded" && session?.workspaceSlug) {
+    if (slug && slug !== session.workspaceSlug) {
+      return <Navigate to={workspaceRoot(session.workspaceSlug)} replace />;
+    }
+    return <>{children}</>;
+  }
   if (!profile?.slug) return <>{children}</>;
   if (slug && slug !== profile.slug) {
     return <Navigate to={workspaceRoot(profile.slug)} replace />;
@@ -78,7 +95,9 @@ function NotFoundPage() {
 
 function App() {
   return (
-    <Routes>
+    <>
+      <EmbedErrorScreen />
+      <Routes>
       {/* Landing pública */}
       <Route path="/" element={<HomeRoute />} />
 
@@ -164,6 +183,7 @@ function App() {
 
       <Route path="*" element={<NotFoundPage />} />
     </Routes>
+    </>
   );
 }
 

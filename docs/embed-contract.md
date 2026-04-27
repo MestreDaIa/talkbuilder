@@ -192,3 +192,52 @@ liberar algo específico (ex: mostrar banner de limites mesmo em embed).
 | Builder embedded   | `https://app.talkmap.com.br/embed` (em iframe) |
 | Chat público       | `https://chat.talkmap.com.br/{slug}/{bot-slug}` |
 | Chat público (BookingFy) | `https://bookingfy.com.br/{slug}/chat/{bot-slug}` |
+
+---
+
+## 9. Flow-Appoint (host adicional)
+
+Mesma arquitetura do BookingFy, com claims diferentes:
+
+```json
+{
+  "iss": "flow-appoint",
+  "aud": "builder-flow-api",
+  "company_id": "<uuid>",
+  "workspace_slug": "<string>",
+  "user_email": "<string>",
+  "exp": 1234567890
+}
+```
+
+### URL do iframe
+```
+https://app.talkmap.com.br/#embed_token=<JWT>&host=flow-appoint
+```
+(O parâmetro `host` é opcional — se omitido, o builder assume `flow-appoint`.)
+
+### Origens postMessage permitidas
+- `https://flow-appoint.lovable.app`
+- `https://*.lovable.app` (previews)
+
+### Validação atual (LIMITAÇÃO)
+Este projeto roda em Vite + HashRouter, **sem servidor próprio**. A
+assinatura HS256 do JWT NÃO é verificada — apenas issuer/audience/exp são
+checados no client (`src/context/EmbedContext.tsx`).
+
+Para validação real, suba um backend (Node/Edge Function) e:
+
+1. Configure `VITE_BACKEND_URL` apontando pra ele.
+2. Implemente `POST {VITE_BACKEND_URL}/api/embed/validate` que verifica
+   o JWT com `EMBED_SHARED_SECRET` (HS256) e devolve a sessão.
+3. `src/lib/embedValidation.ts` já tem o cliente pronto — chame
+   `validateEmbedTokenRemote(token)` no `EmbedProvider` antes de aceitar
+   a sessão.
+
+O secret `EMBED_SHARED_SECRET` já está cadastrado neste projeto (Lovable
+Cloud), pronto pra ser injetado no backend quando ele existir.
+
+### Endpoint `/api/keys/validate` (também requer backend)
+
+Tabela já modelada em `docs/supabase-setup.sql` (seção API Keys).
+Cliente em `src/lib/apiKeysClient.ts`.

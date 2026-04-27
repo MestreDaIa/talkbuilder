@@ -48,7 +48,9 @@ export default function WorkspaceLayout({
 			const isWorkspaceRoot = /^\/[^/]+\/workspace\/?$/.test(pathname) || pathname === "/";
 			const isFolderRoute = /\/workspace\/folder\//.test(pathname);
 
-			const showBreadcrumb = !isBotEditor && (isWorkspaceRoot || isFolderRoute);
+			// No modo embedded, escondemos a navegação institucional (breadcrumb com seletor
+			// de workspace e header) e mostramos só a área de trabalho dos flows.
+			const showBreadcrumb = mode !== "embedded" && !isBotEditor && (isWorkspaceRoot || isFolderRoute);
 
 			const showToolbar = showBreadcrumb;
 		
