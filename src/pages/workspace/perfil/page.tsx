@@ -50,6 +50,7 @@ function formatMemberSince(iso: string | undefined) {
 
 export default function UserProfile() {
 	const { user, refreshProfile } = useAuth();
+	const { mode, host, session } = useEmbed();
 	const { toast } = useToast();
 	const fileInputRef = useRef<HTMLInputElement>(null);
 
