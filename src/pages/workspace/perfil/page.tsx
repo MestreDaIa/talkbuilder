@@ -316,7 +316,13 @@ export default function UserProfile() {
 								)}
 								<div className="flex rounded-full h-6 bg-[#cdffd2] px-6 py-2 items-center justify-center">
 									<span className="text-gray-700">
-										{PLAN_LABEL[data.plan ?? "starter"] ?? "Plano Starter"}
+										{mode === "embedded"
+											? session?.plan
+												? PLAN_LABEL[session.plan] ?? `Plano ${session.plan}`
+												: host === "flow-appoint"
+													? "Plano gerenciado pelo Flow-Appoint"
+													: "Plano gerenciado pelo host"
+											: PLAN_LABEL[data.plan ?? "starter"] ?? "Plano Starter"}
 									</span>
 								</div>
 							</div>
