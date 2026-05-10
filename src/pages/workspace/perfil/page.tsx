@@ -17,6 +17,7 @@ import {
 import { useEffect, useMemo, useRef, useState } from "react";
 import { getSupabase } from "../../../lib/supabaseClient";
 import { useAuth } from "../../../context/AuthContext";
+import { useEmbed } from "../../../context/EmbedContext";
 import { useToast } from "../../../hooks/use-toast";
 import { getInitials } from "../../../lib/initials";
 
