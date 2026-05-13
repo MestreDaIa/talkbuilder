@@ -31,7 +31,7 @@ export const PLAN_LIMITS: Record<EffectiveTier, PlanLimits> = {
 export const PLAN_LABELS = RESOLVER_LABELS;
 
 type PlanContextType = {
-	currentPlan: PlanId;
+	currentPlan: EffectiveTier;
 	setCurrentPlan: (plan: PlanId) => void;
 	limits: PlanLimits;
 	resolvedLimits: ResolvedLimits;
