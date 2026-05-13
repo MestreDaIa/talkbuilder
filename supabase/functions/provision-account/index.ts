@@ -376,6 +376,23 @@ Deno.serve(async (req) => {
     );
   }
 
+  // Idempotência também para os campos de embed: se a empresa do flow-appoint
+  // mudou de plano antes deste retry, mantemos o mais recente recebido.
+  if (data.company_id) {
+    const { error: embedErr } = await admin
+      .from("profiles")
+      .update({
+        embed_source: "flow-appoint",
+        embed_company_id: data.company_id,
+        embed_plan_tier: data.plan ?? "starter",
+        embed_plan_synced_at: new Date().toISOString(),
+      })
+      .eq("id", existingId);
+    if (embedErr) {
+      console.warn("[provision-account] update embed_* (existente) falhou:", embedErr);
+    }
+  }
+
   return json(
     200,
     {
