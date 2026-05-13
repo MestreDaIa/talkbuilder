@@ -50,15 +50,20 @@ function formatMemberSince(iso: string | undefined) {
 }
 
 export default function UserProfile() {
-	const { user, refreshProfile } = useAuth();
+	const { user, profile, refreshProfile } = useAuth();
 	const { mode, host, session } = useEmbed();
 	const userMeta = (user?.user_metadata ?? {}) as Record<string, any>;
+	// Fonte única de verdade do plano efetivo do workspace.
+	const resolvedPlan = useMemo(() => resolveEffectivePlan(profile), [profile]);
 	const isFlowAppointManaged =
-		mode === "embedded"
-			? host === "flow-appoint"
-			: userMeta.source === "flow-appoint";
-	const externalPlan: string | undefined =
-		mode === "embedded" ? session?.plan : userMeta.plan;
+		resolvedPlan.managedBy === "flow-appoint" ||
+		(mode === "embedded" && host === "flow-appoint") ||
+		userMeta.source === "flow-appoint";
+	const planLabel =
+		RESOLVER_LABELS[resolvedPlan.tier] ??
+		(mode === "embedded" && session?.plan
+			? RESOLVER_LABELS[session.plan as keyof typeof RESOLVER_LABELS]
+			: "Starter");
 	const { toast } = useToast();
 	const fileInputRef = useRef<HTMLInputElement>(null);
 
