@@ -297,6 +297,23 @@ Deno.serve(async (req) => {
   });
 
   if (!createErr && created?.user) {
+    // Marca o profile como gerenciado pelo Flow-Appoint (quando aplicável).
+    // O trigger handle_new_user já criou a row em profiles; aqui só
+    // anotamos as colunas de embed para sync-embed-plan funcionar depois.
+    if (data.company_id) {
+      const { error: embedErr } = await admin
+        .from("profiles")
+        .update({
+          embed_source: "flow-appoint",
+          embed_company_id: data.company_id,
+          embed_plan_tier: data.plan ?? "starter",
+          embed_plan_synced_at: new Date().toISOString(),
+        })
+        .eq("id", created.user.id);
+      if (embedErr) {
+        console.warn("[provision-account] update embed_* falhou:", embedErr);
+      }
+    }
     return json(
       200,
       {
