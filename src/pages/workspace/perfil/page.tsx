@@ -328,18 +328,27 @@ export default function UserProfile() {
 									</span>
 								)}
 								<div className="flex flex-col items-center gap-1">
-									<div className="flex rounded-full h-6 bg-[#cdffd2] px-6 py-2 items-center justify-center">
-										<span className="text-gray-700">
-											{isFlowAppointManaged
-												? externalPlan
-													? PLAN_LABEL[externalPlan] ?? `Plano ${externalPlan}`
-													: "Plano gerenciado pelo Flow-Appoint"
-												: PLAN_LABEL[data.plan ?? "starter"] ?? "Plano Starter"}
-										</span>
+									<div
+										className={
+											"flex rounded-full h-6 px-6 py-2 items-center justify-center " +
+											(resolvedPlan.isSuspended
+												? "bg-red-100"
+												: "bg-[#cdffd2]")
+										}
+									>
+										<span className="text-gray-700">Plano {planLabel}</span>
 									</div>
 									{isFlowAppointManaged && (
 										<span className="text-[11px] text-gray-500">
 											Gerenciado pelo Flow-Appoint
+											{resolvedPlan.syncedAt
+												? ` · sync ${new Date(resolvedPlan.syncedAt).toLocaleString("pt-BR")}`
+												: ""}
+										</span>
+									)}
+									{resolvedPlan.isSuspended && (
+										<span className="text-[11px] text-red-600">
+											Workspace suspenso pelo Flow-Appoint
 										</span>
 									)}
 								</div>
