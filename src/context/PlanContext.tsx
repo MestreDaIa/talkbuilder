@@ -11,16 +11,17 @@ import {
 	type PlanLimits as ResolvedLimits,
 } from "../lib/planResolver";
 
-export type PlanId = EffectiveTier;
+// PlanId histórico (3 tiers vendáveis no standalone). Em embedded o tier
+// efetivo pode ainda ser "suspended" — use EffectiveTier para esse caso.
+export type PlanId = "starter" | "pro" | "business";
+export type { EffectiveTier } from "../lib/planResolver";
 
 export type PlanLimits = {
 	bots: number;
 	messages: number;
 };
 
-// Mantém shape antigo para callers existentes (bots/messages),
-// mas a fonte real é planResolver.PLAN_LIMITS.
-export const PLAN_LIMITS: Record<PlanId, PlanLimits> = {
+export const PLAN_LIMITS: Record<EffectiveTier, PlanLimits> = {
 	starter:   { bots: RESOLVER_LIMITS.starter.bots,   messages: RESOLVER_LIMITS.starter.messagesPerMonth },
 	pro:       { bots: RESOLVER_LIMITS.pro.bots,       messages: RESOLVER_LIMITS.pro.messagesPerMonth },
 	business:  { bots: RESOLVER_LIMITS.business.bots,  messages: RESOLVER_LIMITS.business.messagesPerMonth },
