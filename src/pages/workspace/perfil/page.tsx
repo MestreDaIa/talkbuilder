@@ -20,6 +20,7 @@ import { useAuth } from "../../../context/AuthContext";
 import { useEmbed } from "../../../context/EmbedContext";
 import { useToast } from "../../../hooks/use-toast";
 import { getInitials } from "../../../lib/initials";
+import { resolveEffectivePlan, PLAN_LABELS as RESOLVER_LABELS } from "../../../lib/planResolver";
 
 type ProfileExtra = {
 	display_name: string | null;
@@ -49,15 +50,20 @@ function formatMemberSince(iso: string | undefined) {
 }
 
 export default function UserProfile() {
-	const { user, refreshProfile } = useAuth();
+	const { user, profile, refreshProfile } = useAuth();
 	const { mode, host, session } = useEmbed();
 	const userMeta = (user?.user_metadata ?? {}) as Record<string, any>;
+	// Fonte única de verdade do plano efetivo do workspace.
+	const resolvedPlan = useMemo(() => resolveEffectivePlan(profile), [profile]);
 	const isFlowAppointManaged =
-		mode === "embedded"
-			? host === "flow-appoint"
-			: userMeta.source === "flow-appoint";
-	const externalPlan: string | undefined =
-		mode === "embedded" ? session?.plan : userMeta.plan;
+		resolvedPlan.managedBy === "flow-appoint" ||
+		(mode === "embedded" && host === "flow-appoint") ||
+		userMeta.source === "flow-appoint";
+	const planLabel =
+		RESOLVER_LABELS[resolvedPlan.tier] ??
+		(mode === "embedded" && session?.plan
+			? RESOLVER_LABELS[session.plan as keyof typeof RESOLVER_LABELS]
+			: "Starter");
 	const { toast } = useToast();
 	const fileInputRef = useRef<HTMLInputElement>(null);
 
@@ -322,18 +328,27 @@ export default function UserProfile() {
 									</span>
 								)}
 								<div className="flex flex-col items-center gap-1">
-									<div className="flex rounded-full h-6 bg-[#cdffd2] px-6 py-2 items-center justify-center">
-										<span className="text-gray-700">
-											{isFlowAppointManaged
-												? externalPlan
-													? PLAN_LABEL[externalPlan] ?? `Plano ${externalPlan}`
-													: "Plano gerenciado pelo Flow-Appoint"
-												: PLAN_LABEL[data.plan ?? "starter"] ?? "Plano Starter"}
-										</span>
+									<div
+										className={
+											"flex rounded-full h-6 px-6 py-2 items-center justify-center " +
+											(resolvedPlan.isSuspended
+												? "bg-red-100"
+												: "bg-[#cdffd2]")
+										}
+									>
+										<span className="text-gray-700">Plano {planLabel}</span>
 									</div>
 									{isFlowAppointManaged && (
 										<span className="text-[11px] text-gray-500">
 											Gerenciado pelo Flow-Appoint
+											{resolvedPlan.syncedAt
+												? ` · sync ${new Date(resolvedPlan.syncedAt).toLocaleString("pt-BR")}`
+												: ""}
+										</span>
+									)}
+									{resolvedPlan.isSuspended && (
+										<span className="text-[11px] text-red-600">
+											Workspace suspenso pelo Flow-Appoint
 										</span>
 									)}
 								</div>

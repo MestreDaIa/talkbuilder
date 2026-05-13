@@ -19,15 +19,17 @@ import PaymentPlan from "./tabsListUI/PaymentPlan";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "../../../components/ui/tabs";
 import { useEmbed } from "../../../context/EmbedContext";
 import { useAuth } from "../../../context/AuthContext";
+import { resolveEffectivePlan } from "../../../lib/planResolver";
 
 export default function ConfigurationWorkspace() {
 	const { flags, mode, host } = useEmbed();
-	const { user } = useAuth();
+	const { user, profile } = useAuth();
 	const userMeta = (user?.user_metadata ?? {}) as Record<string, any>;
+	const resolved = resolveEffectivePlan(profile);
 	const isFlowAppointManaged =
-		mode === "embedded"
-			? host === "flow-appoint"
-			: userMeta.source === "flow-appoint";
+		resolved.managedBy === "flow-appoint" ||
+		(mode === "embedded" && host === "flow-appoint") ||
+		userMeta.source === "flow-appoint";
 	const showBilling = flags.showBilling && !isFlowAppointManaged;
 	const defaultTab = "workspace";
 	return (

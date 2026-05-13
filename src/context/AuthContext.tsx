@@ -18,6 +18,10 @@ export type Profile = {
 	display_name: string | null;
 	avatar_url: string | null;
 	plan: PlanId;
+	embed_source: string | null;
+	embed_company_id: string | null;
+	embed_plan_tier: string | null;
+	embed_plan_synced_at: string | null;
 };
 
 type AuthContextType = {
@@ -79,7 +83,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 		if (!supabase) return;
 		const { data, error } = await supabase
 			.from("profiles")
-			.select("id, slug, display_name, avatar_url, plan")
+			.select("id, slug, display_name, avatar_url, plan, embed_source, embed_company_id, embed_plan_tier, embed_plan_synced_at")
 			.eq("id", userId)
 			.maybeSingle();
 		if (error) {

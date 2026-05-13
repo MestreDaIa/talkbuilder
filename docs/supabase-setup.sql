@@ -469,3 +469,35 @@ create policy "users insert own api keys"
 create policy "users delete own api keys"
   on public.api_keys for delete
   using (auth.uid() = user_id);
+
+
+-- =============================================================================
+-- 13) EMBED PLAN — sincronização de plano com Flow-Appoint (host externo)
+-- =============================================================================
+-- Quando o workspace foi criado via embed (Flow-Appoint), a fonte de verdade
+-- do plano é o host. O builder apenas armazena o último tier sincronizado.
+--   embed_source       : "flow-appoint" | null (null = standalone)
+--   embed_company_id   : id da empresa no host
+--   embed_plan_tier    : "starter" | "pro" | "business" | "suspended"
+--   embed_plan_synced_at: timestamp do último push recebido
+-- =============================================================================
+alter table public.profiles add column if not exists embed_source        text;
+alter table public.profiles add column if not exists embed_company_id    text;
+alter table public.profiles add column if not exists embed_plan_tier     text;
+alter table public.profiles add column if not exists embed_plan_synced_at timestamptz;
+
+-- index para lookup rápido em sync-embed-plan
+create index if not exists profiles_embed_lookup_idx
+  on public.profiles (embed_source, embed_company_id)
+  where embed_source is not null;
+
+-- check tier válido (inclui 'suspended' como kill switch reversível)
+do $$
+begin
+  if not exists (
+    select 1 from pg_constraint where conname = 'profiles_embed_plan_tier_check'
+  ) then
+    alter table public.profiles add constraint profiles_embed_plan_tier_check
+      check (embed_plan_tier is null or embed_plan_tier in ('starter','pro','business','suspended'));
+  end if;
+end$$;
