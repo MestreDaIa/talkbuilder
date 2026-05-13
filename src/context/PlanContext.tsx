@@ -59,7 +59,7 @@ export function PlanProvider({ children }: { children: React.ReactNode }) {
 	useEffect(() => {
 		try {
 			const raw = localStorage.getItem(STORAGE_KEY);
-			if (raw === "starter" || raw === "pro" || raw === "business" || raw === "suspended") {
+			if (raw === "starter" || raw === "pro" || raw === "business") {
 				setOverridePlan(raw);
 			}
 		} catch (e) {
