@@ -113,10 +113,10 @@ Deno.serve(async (req) => {
     auth: { autoRefreshToken: false, persistSession: false },
   });
 
-  // Localiza por (embed_source, embed_company_id)
-  const { data: rows, error: selErr } = await admin
+  // 1) Localiza por (embed_source, embed_company_id)
+  let { data: rows, error: selErr } = await admin
     .from("profiles")
-    .select("id, slug, embed_plan_tier")
+    .select("id, slug, embed_plan_tier, embed_company_id")
     .eq("embed_source", data.source)
     .eq("embed_company_id", data.company_id);
 
@@ -124,6 +124,48 @@ Deno.serve(async (req) => {
     console.error("[sync-embed-plan] select falhou:", selErr);
     return json(500, { ok: false, error: selErr.message }, origin);
   }
+
+  // 2) Fallback por slug — para contas provisionadas antes das colunas
+  // embed_* existirem. Faz backfill de embed_source/embed_company_id.
+  let backfilled = false;
+  if (!rows || rows.length === 0) {
+    const { data: bySlug, error: slugErr } = await admin
+      .from("profiles")
+      .select("id, slug, embed_plan_tier, embed_company_id, embed_source")
+      .eq("slug", data.slug);
+    if (slugErr) {
+      console.error("[sync-embed-plan] select por slug falhou:", slugErr);
+      return json(500, { ok: false, error: slugErr.message }, origin);
+    }
+    if (bySlug && bySlug.length > 0) {
+      // Conflito: outra empresa do flow-appoint já está vinculada a este slug
+      const conflict = bySlug.find(
+        (r) =>
+          r.embed_source === "flow-appoint" &&
+          r.embed_company_id &&
+          r.embed_company_id !== data.company_id,
+      );
+      if (conflict) {
+        console.error("[sync-embed-plan] slug já vinculado a outra company_id", {
+          slug: data.slug,
+          existing: conflict.embed_company_id,
+          incoming: data.company_id,
+        });
+        return json(409, {
+          ok: false,
+          error: "Slug já vinculado a outra empresa do flow-appoint",
+        }, origin);
+      }
+      rows = bySlug;
+      backfilled = true;
+      console.log("[sync-embed-plan] backfill via slug", {
+        slug: data.slug,
+        company_id: data.company_id,
+        ids: bySlug.map((r) => r.id),
+      });
+    }
+  }
+
   if (!rows || rows.length === 0) {
     console.warn(
       "[sync-embed-plan] workspace não encontrado",
@@ -131,18 +173,24 @@ Deno.serve(async (req) => {
     );
     return json(404, {
       ok: false,
-      error: "Workspace não provisionado ainda — provavelmente provision-account não rodou. Retentar.",
+      error: "Workspace não encontrado por company_id nem por slug. Provisione a conta primeiro.",
     }, origin);
+  }
+
+  const ids = rows.map((r) => r.id);
+  const updatePayload: Record<string, unknown> = {
+    embed_plan_tier: data.tier,
+    embed_plan_synced_at: new Date().toISOString(),
+  };
+  if (backfilled) {
+    updatePayload.embed_source = data.source;
+    updatePayload.embed_company_id = data.company_id;
   }
 
   const { error: updErr, count } = await admin
     .from("profiles")
-    .update({
-      embed_plan_tier: data.tier,
-      embed_plan_synced_at: new Date().toISOString(),
-    }, { count: "exact" })
-    .eq("embed_source", data.source)
-    .eq("embed_company_id", data.company_id);
+    .update(updatePayload, { count: "exact" })
+    .in("id", ids);
 
   if (updErr) {
     console.error("[sync-embed-plan] update falhou:", updErr);
