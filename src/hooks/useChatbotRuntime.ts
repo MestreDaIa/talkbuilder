@@ -28,7 +28,7 @@ export function useChatbotRuntime(flowId?: string) {
   const [buttons, setButtons] = useState<ChatButton[]>([]);
   const [sessionId, setSessionId] = useState<string | null>(null);
   const runtimeStateRef = useRef<RuntimeState | null>(null);
-  const waitTimerRef = useRef<NodeJS.Timeout | null>(null);
+  const waitTimerRef = useRef<number | null>(null);
   
   const contactId = useRef<string>(localStorage.getItem("chat_contact_id") || (() => {
     const id = `web-${Math.random().toString(36).slice(2, 11)}`;
