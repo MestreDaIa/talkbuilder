@@ -409,5 +409,3 @@ export default function BotPage() {
     </VariablesProvider>
   );
 }
-
-export default BotPage;
