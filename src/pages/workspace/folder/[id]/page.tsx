@@ -5,7 +5,7 @@ import { useState } from "react";
 import { useDroppable } from "@dnd-kit/core";
 import { useWorkspace } from "../../../../context/WorkspaceContext";
 import { useAuth } from "../../../../context/AuthContext";
-import { folderRoute, botRoute } from "../../../../lib/workspaceRoutes";
+import { folderRoute, botRoute, rememberBotBackRoute } from "../../../../lib/workspaceRoutes";
 import FolderIcon from "../../../../components/FolderIcon";
 import BotIcon from "../../../../components/BotIcon";
 import { sortByIndex } from "../../../../lib/workspaceOrder";
@@ -64,6 +64,7 @@ export default function FolderPage() {
 									id={item.id}
 									onClick={() => {
 										setCurrentBotId(item.id);
+										rememberBotBackRoute(item.id, folderRoute(slug, folderId));
 										router(botRoute(slug, item.id));
 									}}
 									title={item.title}
