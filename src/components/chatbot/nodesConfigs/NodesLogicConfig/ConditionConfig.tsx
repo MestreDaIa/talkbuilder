@@ -104,21 +104,6 @@ const ComparisonItem = ({
 
   return (
     <div className="space-y-3 p-3 bg-card border rounded-lg">
-      {showLogicalOperator && logicalOperator && onLogicalOperatorChange && (
-        <div className="flex justify-center -mt-6 mb-2">
-          <Select value={logicalOperator} onValueChange={(v) => onLogicalOperatorChange(v as "AND" | "OR")}>
-            <SelectTrigger className="w-20 h-7 text-xs">
-              <SelectValue />
-            </SelectTrigger>
-            <SelectContent>
-              {logicalOperators.map(op => (
-                <SelectItem key={op.value} value={op.value}>{op.label}</SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-        </div>
-      )}
-      
       <div className="flex items-start gap-2">
         <div className="flex-1 space-y-3">
           {/* Variable selector */}
@@ -315,15 +300,31 @@ export const ConditionConfig = ({ config, setConfig }: ConditionConfigProps) => 
           
           <div className="space-y-2">
             {condition.comparisons.map((comparison, compIdx) => (
-              <ComparisonItem
-                key={comparison.id}
-                comparison={comparison}
-                onUpdate={(updates) => updateComparison(condition.id, comparison.id, updates)}
-                onDelete={() => deleteComparison(condition.id, comparison.id)}
-                showLogicalOperator={compIdx > 0}
-                logicalOperator={condition.logicalOperator}
-                onLogicalOperatorChange={(op) => updateCondition(condition.id, { logicalOperator: op })}
-              />
+              <div key={comparison.id} className="space-y-2">
+                {compIdx > 0 && (
+                  <div className="flex justify-center py-1">
+                    <Select
+                      value={condition.logicalOperator}
+                      onValueChange={(v) => updateCondition(condition.id, { logicalOperator: v as "AND" | "OR" })}
+                    >
+                      <SelectTrigger className="w-20 h-7 text-xs">
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {logicalOperators.map(op => (
+                          <SelectItem key={op.value} value={op.value}>{op.label}</SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                )}
+                <ComparisonItem
+                  comparison={comparison}
+                  onUpdate={(updates) => updateComparison(condition.id, comparison.id, updates)}
+                  onDelete={() => deleteComparison(condition.id, comparison.id)}
+                  showLogicalOperator={false}
+                />
+              </div>
             ))}
             
             <Button
