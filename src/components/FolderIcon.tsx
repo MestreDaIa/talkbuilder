@@ -83,7 +83,8 @@ function FolderIconComponent({
 	const handleSaveEdit = useCallback(async () => {
 		const newTitle = editTitle.trim() || "Sem título";
 		const newEmoji = editEmoji.trim() || "📁";
-		const newDescription = editDescription ?? "";
+		const newDescription = editDescription?.trim() || "";
+
 		setItems((prev) =>
 			prev.map((i) =>
 				i.id === id
@@ -91,14 +92,6 @@ function FolderIconComponent({
 					: i,
 			),
 		);
-		const supabase = getSupabase();
-		if (supabase) {
-			const { error } = await supabase
-				.from("workspace_items")
-				.update({ title: newTitle, emoji: newEmoji, description: newDescription })
-				.eq("id", id);
-			if (error) console.error("[FolderIcon] update error", error);
-		}
 		setEditOpen(false);
 	}, [editTitle, editEmoji, editDescription, id, setItems]);
 

@@ -114,8 +114,10 @@ export default function BotIcon({
 		if (!id) return;
 		const newTitle = editTitle.trim() || "Sem título";
 		const newEmoji = editEmoji.trim() || "🤖";
-		const newDescription = editDescription ?? "";
-		// Optimistic local update
+		const newDescription = editDescription?.trim() || "";
+
+		// O WorkspaceContext já cuida da persistência no Supabase via diff algorithm
+		// Basta atualizar o estado local.
 		setItems((prev) =>
 			prev.map((i) =>
 				i.id === id
@@ -123,18 +125,6 @@ export default function BotIcon({
 					: i,
 			),
 		);
-		// Garantir persistência no banco (evita race do diff no contexto)
-		const supabase = getSupabase();
-		if (supabase) {
-			const { error } = await supabase
-				.from("workspace_items")
-				.update({ title: newTitle, emoji: newEmoji, description: newDescription })
-				.eq("id", id);
-			if (error) {
-				console.error("[BotIcon] update error", error);
-				toast.error("Erro ao salvar alterações");
-			}
-		}
 		setEditOpen(false);
 	}, [editTitle, editEmoji, editDescription, id, setItems]);
 
