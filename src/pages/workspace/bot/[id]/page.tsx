@@ -256,12 +256,10 @@ export default function BotPage() {
   const slug = (params.slug as string | undefined) ?? profile?.slug;
 
   const handleBack = async () => {
-    // 1) Persiste rascunho pendente antes de sair (best-effort, sem travar UX).
+    // 1) Persiste rascunho pendente antes de sair.
     try {
       saveLocal(botId, { containers, edges });
       if (flow) {
-        // Fire-and-forget: não bloqueia a navegação, mas garante que a próxima
-        // hidratação do editor já encontre o estado mais novo.
         void saveDraft(flow.id, containers, edges).catch((err) =>
           console.warn("[BotPage] saveDraft on back failed:", err),
         );
@@ -270,14 +268,16 @@ export default function BotPage() {
       console.warn("[BotPage] flush on back failed:", err);
     }
 
-    // 2) Navega para o workspace Main usando window.location pra forçar
-    // remontagem completa, garantindo que o overlay fixed inset-0 do editor
-    // saia do DOM mesmo se o React Router não desmontar a rota.
-    const target = workspaceRoot(slug);
+    // 2) Determina o destino (pasta pai ou workspace main).
+    const parentId = bot?.parentId;
+    const target = parentId ? folderRoute(slug, parentId) : workspaceRoot(slug);
+
+    // 3) Navega usando window.location.href para garantir a desmontagem completa
+    // de todo o componente e seus overlays fixos, forçando o recarregamento da SPA.
     if (typeof window !== "undefined") {
-      window.location.assign(target);
+      window.location.href = target;
     } else {
-      navigate(target, { replace: true });
+      navigate(target);
     }
   };
 
