@@ -3,23 +3,24 @@ import userEvent from "@testing-library/user-event";
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import { BrowserRouter } from "react-router-dom";
 import BotPage from "../pages/workspace/bot/[id]/page";
-import { AuthProvider } from "../context/AuthContext";
-import { WorkspaceProvider } from "../context/WorkspaceContext";
 
-// Mocks necessários
+// Mocks simples para isolar o componente
 vi.mock("../context/AuthContext", () => ({
-  AuthProvider: ({ children }: { children: React.ReactNode }) => <div>{children}</div>,
-  useAuth: () => ({ user: { id: "test-user" }, profile: { slug: "test-slug" } }),
+  useAuth: () => ({ profile: { slug: "test-slug" } }),
+  AuthProvider: ({ children }: any) => children,
 }));
 
 vi.mock("../context/WorkspaceContext", () => ({
-  WorkspaceProvider: ({ children }: { children: React.ReactNode }) => <div>{children}</div>,
   useWorkspace: () => ({ 
     items: [{ id: "test-bot", title: "Test Bot", parentId: "folder-123", type: "bot" }],
-    folders: [],
-    loading: false,
     setItems: vi.fn(),
   }),
+  WorkspaceProvider: ({ children }: any) => children,
+}));
+
+// Evitar renderizar o CanvasEditor que causa problemas no JSDOM/ReactFlow
+vi.mock("../components/chatbot/CanvasEditor", () => ({
+  CanvasEditor: () => <div data-testid="canvas-editor" />,
 }));
 
 const mockNavigate = vi.fn();
@@ -32,27 +33,20 @@ vi.mock("react-router-dom", async () => {
   };
 });
 
-// Mock do Supabase
-vi.mock("../lib/supabaseClient", () => {
-  const mockFrom = {
-    select: vi.fn().mockReturnThis(),
-    eq: vi.fn().mockReturnThis(),
-    single: vi.fn().mockResolvedValue({ data: { id: "test-bot", name: "Test Bot" }, error: null }),
-    maybeSingle: vi.fn().mockResolvedValue({ data: { id: "test-bot", name: "Test Bot" }, error: null }),
-  };
-  return {
-    getSupabase: () => ({
-      from: () => mockFrom,
+vi.mock("../lib/supabaseClient", () => ({
+  getSupabase: () => ({
+    from: () => ({
+      select: () => ({
+        eq: () => ({
+          maybeSingle: () => Promise.resolve({ data: { id: "test-bot" }, error: null }),
+        }),
+      }),
     }),
-  };
-});
+  }),
+}));
 
 describe("BotPage Navigation", () => {
-  beforeEach(() => {
-    vi.clearAllMocks();
-  });
-
-  it("should navigate to workspace root when Back button is clicked, even if it has a parent folder", async () => {
+  it("should navigate to workspace root when Back button is clicked", async () => {
     render(
       <BrowserRouter>
         <BotPage />
@@ -62,7 +56,6 @@ describe("BotPage Navigation", () => {
     const backButton = await screen.findByTitle("Voltar");
     await userEvent.click(backButton);
 
-    // Deve navegar para o root, não para a pasta folder-123
     expect(mockNavigate).toHaveBeenCalledWith("/test-slug/workspace", { replace: true });
   });
 });
