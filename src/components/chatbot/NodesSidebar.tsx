@@ -62,7 +62,6 @@ const nodeTypes: {
   { type: "condition", label: "Condição", icon: <Filter className="h-5 w-5" />, category: "logic" },
   { type: "script", label: "Script", icon: <Code className="h-5 w-5" />, category: "logic" },
   { type: "wait", label: "Aguardar", icon: <Hourglass className="h-5 w-5" />, category: "logic" },
-  { type: "await", label: "Aguardar", icon: <Hourglass className="h-5 w-5" />, category: "logic" },
 ];
 
 const getCategoryStyle = (category: string): React.CSSProperties => {
@@ -75,11 +74,6 @@ const getCategoryStyle = (category: string): React.CSSProperties => {
 
 export const NodesSidebar = ({ onAddNode }: NodesSidebarProps) => {
   const [collapsed, setCollapsed] = useState(false);
-  
-  // Debug to verify node list in console
-  useEffect(() => {
-    console.log("NodesSidebar mounted. Current node types:", nodeTypes.map(n => n.type));
-  }, []);
 
   const categories = Array.from(new Set(nodeTypes.map((node) => node.category)));
 
