@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { 
   MessageSquare, 
   Hash, 
@@ -74,6 +74,12 @@ const getCategoryStyle = (category: string): React.CSSProperties => {
 
 export const NodesSidebar = ({ onAddNode }: NodesSidebarProps) => {
   const [collapsed, setCollapsed] = useState(false);
+  
+  // Debug to verify node list in console
+  useEffect(() => {
+    console.log("NodesSidebar mounted. Current node types:", nodeTypes.map(n => n.type));
+  }, []);
+
   const categories = Array.from(new Set(nodeTypes.map((node) => node.category)));
 
   return (
