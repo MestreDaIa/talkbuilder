@@ -253,7 +253,7 @@ export default function BotPage() {
 
   const lbl = statusLabel(status);
   const displayName = flow?.name ?? bot?.title ?? `Bot: ${botId}`;
-  const slug = profile?.slug;
+  const slug = (params.slug as string | undefined) ?? profile?.slug;
 
   const handleBack = async () => {
     // 1) Persiste rascunho pendente antes de sair (best-effort, sem travar UX).
@@ -270,10 +270,15 @@ export default function BotPage() {
       console.warn("[BotPage] flush on back failed:", err);
     }
 
-    // 2) Sempre volta para o workspace Main (raiz), independente da pasta de origem.
-    // O estado do editor (setFlow, setContainers, etc) é limpo naturalmente na desmontagem do componente
-    // ao navegar para uma nova rota, mas mantemos o rascunho salvo acima.
-    navigate(workspaceRoot(slug), { replace: true });
+    // 2) Navega para o workspace Main usando window.location pra forçar
+    // remontagem completa, garantindo que o overlay fixed inset-0 do editor
+    // saia do DOM mesmo se o React Router não desmontar a rota.
+    const target = workspaceRoot(slug);
+    if (typeof window !== "undefined") {
+      window.location.assign(target);
+    } else {
+      navigate(target, { replace: true });
+    }
   };
 
   return (
