@@ -218,6 +218,7 @@ const ComparisonItem = ({
 
         {/* Delete button */}
         <Button
+          type="button"
           variant="ghost"
           size="icon"
           className="h-9 w-9 text-muted-foreground hover:text-destructive"
@@ -318,6 +319,7 @@ export const ConditionConfig = ({ config, setConfig }: ConditionConfigProps) => 
             ))}
             
             <Button
+              type="button"
               variant="default"
               className="w-full bg-primary hover:bg-primary/90"
               onClick={() => addComparison(condition.id)}
@@ -331,6 +333,7 @@ export const ConditionConfig = ({ config, setConfig }: ConditionConfigProps) => 
 
       {conditions.length > 0 && conditions[0].comparisons.length > 0 && (
         <Button
+          type="button"
           variant="outline"
           className="w-full"
           onClick={addCondition}
