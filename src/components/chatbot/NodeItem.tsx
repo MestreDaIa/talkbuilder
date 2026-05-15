@@ -59,6 +59,7 @@ const nodeIcons: Record<NodeType, React.ReactNode> = {
   "script": <Code className="h-4 w-4" />,
   "condition": <Filter className="h-4 w-4" />,
   "wait": <Hourglass className="h-4 w-4" />,
+  "await": <Hourglass className="h-4 w-4" />,
 };
 
 const nodeColors: Record<NodeType, string> = {
@@ -89,6 +90,7 @@ const nodeColors: Record<NodeType, string> = {
   "script": "bg-purple-100 border-purple-300 text-purple-700",
   "condition": "bg-purple-100 border-purple-300 text-purple-700",
   "wait": "bg-purple-100 border-purple-300 text-purple-700",
+  "await": "bg-purple-100 border-purple-300 text-purple-700",
 };
 
 const nodeLabels: Record<NodeType, string> = {
@@ -119,6 +121,7 @@ const nodeLabels: Record<NodeType, string> = {
   "script": "Executar Script",
   "condition": "Condição",
   "wait": "Aguardar",
+  "await": "Aguardar",
 };
 
 export const NodeItem = ({ node, onClick }: NodeItemProps) => {

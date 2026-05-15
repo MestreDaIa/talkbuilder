@@ -341,8 +341,11 @@ function runFlow(execution: any, containers: any[], edges: any[], input: any) {
     const { node, container } = info;
     const cfg = node.config || {};
     const nodeType = (node.type || "").toLowerCase();
+    
+    // Check for "wait" or "await" type and ensure we capture it for processing
+    const isWaitNode = nodeType === "wait" || nodeType === "await";
 
-    switch (nodeType) {
+    switch (isWaitNode ? "wait" : nodeType) {
       case "start":
         break;
       case "bubble-text":
@@ -408,10 +411,10 @@ function runFlow(execution: any, containers: any[], edges: any[], input: any) {
           value: b.value,
         }));
         break;
-      case "wait":
-      case "await": {
+      case "wait": {
+        wait_ms = parseWaitMs(cfg);
+        // Important: Stop execution HERE and advance current_node_id to the next one
         currentNodeId = nextFromNode(node.id, container);
-        wait_ms = currentNodeId ? parseWaitMs(cfg) : 0;
         break;
       }
       case "set-variable":
