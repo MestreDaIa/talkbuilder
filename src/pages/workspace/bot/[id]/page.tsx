@@ -279,11 +279,8 @@ export default function BotPage() {
     setShowSettings(false);
     setShowPublish(false);
 
-    // 3) Navega para o destino real (replace evita histórico duplicado e
-    // garante remontagem limpa da página de destino).
-    const parentId = bot?.parentId ?? null;
-    const target = parentId ? folderRoute(slug, parentId) : workspaceRoot(slug);
-    navigate(target, { replace: true });
+    // 3) Sempre volta para o workspace Main (raiz), independente da pasta de origem.
+    navigate(workspaceRoot(slug), { replace: true });
   };
 
   return (
