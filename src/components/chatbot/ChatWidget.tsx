@@ -185,7 +185,7 @@ export const ChatWidget = ({
         body: JSON.stringify({
           action: "message",
           flow_id: flowId,
-          contact_id: localStorage.getItem("chat_contact_id"),
+          contact_id: getContactId(),
           channel: "webchat",
           payload: { message: msgToSend, button_id: buttonId, runtime_state: runtimeStateRef.current },
         }),
@@ -194,14 +194,11 @@ export const ChatWidget = ({
       if (!response.ok) throw new Error("Falha ao enviar mensagem");
 
       const data = await response.json();
-      runtimeStateRef.current = data.runtime_state || runtimeStateRef.current;
-      setMessages(prev => [...prev, ...(data.messages || [])]);
-      setWaitingFor(data.waiting_for);
-      setButtons(data.buttons || []);
+      applyRuntimeData(data);
     } catch (err: any) {
       setError(err.message || "Erro ao enviar mensagem");
     } finally {
-      setIsLoading(false);
+      if (!waitTimerRef.current) setIsLoading(false);
     }
   };
 
@@ -221,6 +218,7 @@ export const ChatWidget = ({
     setWaitingFor(null);
     setButtons([]);
     runtimeStateRef.current = null;
+    clearWaitTimer();
     setError(null);
   };
 
