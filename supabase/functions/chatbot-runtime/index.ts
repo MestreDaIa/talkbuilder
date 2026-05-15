@@ -188,8 +188,20 @@ function runFlow(execution: any, containers: any[], edges: any[], input: any) {
     return c?.nodes?.[0]?.id ?? null;
   };
 
+  const normalizeHandle = (value?: string | null) => {
+    if (!value) return "";
+    const raw = String(value);
+    const buttonMatch = raw.match(/-btn-(.+)$/);
+    if (buttonMatch?.[1]) return buttonMatch[1];
+    if (raw.endsWith("-default")) return "default";
+    return raw;
+  };
+
   const nextFromNode = (nodeId: string, container: any, handle?: string): string | null => {
-    let edge = edges.find((e: any) => e.source === nodeId && handle && e.sourceHandle === handle);
+    const wantedHandle = normalizeHandle(handle);
+    let edge = edges.find((e: any) => e.source === nodeId && wantedHandle && normalizeHandle(e.sourceHandle) === wantedHandle);
+    if (!edge && wantedHandle) edge = edges.find((e: any) => e.source === nodeId && normalizeHandle(e.sourceHandle) === "default");
+    if (!edge) edge = edges.find((e: any) => e.source === nodeId && !e.sourceHandle);
     if (!edge) edge = edges.find((e: any) => e.source === nodeId);
     if (edge) {
       // edge target may be a node id OR a container id
@@ -207,8 +219,26 @@ function runFlow(execution: any, containers: any[], edges: any[], input: any) {
     return null;
   };
 
+  const firstText = (...values: any[]) => {
+    const value = values.find((v) => typeof v === "string" && v.trim() !== "");
+    return value ? String(value) : "";
+  };
+
+  const decodeText = (text: string) =>
+    String(text || "")
+      .replace(/<br\s*\/?>/gi, "\n")
+      .replace(/<\/p>\s*<p[^>]*>/gi, "\n")
+      .replace(/<[^>]+>/g, "")
+      .replace(/&nbsp;/g, " ")
+      .replace(/&amp;/g, "&")
+      .replace(/&lt;/g, "<")
+      .replace(/&gt;/g, ">")
+      .replace(/&quot;/g, '"')
+      .replace(/&#39;/g, "'")
+      .trim();
+
   const replaceVars = (text: string) =>
-    !text ? text : text.replace(/{{(.*?)}}/g, (_, k) => variables[k.trim()] ?? `{{${k}}}`);
+    !text ? text : decodeText(text).replace(/{{(.*?)}}/g, (_, k) => variables[k.trim()] ?? `{{${k}}}`);
 
   // If we were waiting and got input -> capture and advance
   if (execution.waiting_for_input && input && currentNodeId) {
