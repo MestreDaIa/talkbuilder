@@ -122,7 +122,8 @@ const nodeLabels: Record<NodeType, string> = {
 };
 
 export const NodeItem = ({ node, onClick }: NodeItemProps) => {
-  const effectiveType = String(node.type).toLowerCase() === "await" ? "wait" : node.type;
+  const normalizedType = String(node.type).toLowerCase();
+  const effectiveType = normalizedType === "wait" || normalizedType === "await" ? "wait" : node.type;
 
   const handleDragStart = useCallback((e: React.DragEvent) => {
     e.stopPropagation();
