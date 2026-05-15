@@ -8,6 +8,7 @@ import { useNavigate } from "react-router-dom";
 import { Card, CardContent, CardHeader } from "./ui/card";
 import { useAuth } from "../context/AuthContext";
 import { useWorkspace } from "../context/WorkspaceContext";
+import { getSupabase } from "../lib/supabaseClient";
 import { folderRoute } from "../lib/workspaceRoutes";
 import {
 	AlertDialog,
