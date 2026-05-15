@@ -142,11 +142,7 @@ export const TestPanel = ({
   const scrollRef = useRef<HTMLDivElement>(null);
 
   const getRuntimeUrl = () => {
-    try {
-      return getEdgeFunctionUrl('chatbot-runtime');
-    } catch {
-      return `${process.env.NEXT_PUBLIC_SUPABASE_URL}/functions/v1/chatbot-runtime`;
-    }
+    return "https://fwoescubnnagdvwasbjl.functions.supabase.co/chatbot-runtime";
   };
 
   useEffect(() => {
