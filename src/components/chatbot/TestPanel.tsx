@@ -228,15 +228,36 @@ export const TestPanel = ({
         }),
       });
       const data = await response.json();
-      runtimeStateRef.current = data.runtime_state || null;
-      setMessages(data.messages || []);
-      setWaitingForInput(data.waiting_for === "text");
-      setWaitingForButton(data.waiting_for === "buttons");
-      setActiveButtons(data.buttons || []);
+      applyRuntimeData(data, true);
     } catch (err) {
       console.error("Test Runtime error:", err);
     } finally {
-      setIsLoading(false);
+      if (!waitTimerRef.current) setIsLoading(false);
+    }
+  };
+
+  const continueRuntime = async () => {
+    if (!flowId) return;
+    setIsLoading(true);
+
+    try {
+      const response = await fetch(getRuntimeUrl(), {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          action: "message",
+          flow_id: flowId,
+          contact_id: contactIdRef.current,
+          channel: "webchat",
+          payload: { runtime_state: runtimeStateRef.current },
+        }),
+      });
+      const data = await response.json();
+      applyRuntimeData(data);
+    } catch (err) {
+      console.error("Test Runtime continue error:", err);
+    } finally {
+      if (!waitTimerRef.current) setIsLoading(false);
     }
   };
 
@@ -264,15 +285,11 @@ export const TestPanel = ({
         }),
       });
       const data = await response.json();
-      runtimeStateRef.current = data.runtime_state || runtimeStateRef.current;
-      setMessages(prev => [...prev, ...(data.messages || [])]);
-      setWaitingForInput(data.waiting_for === "text");
-      setWaitingForButton(data.waiting_for === "buttons");
-      setActiveButtons(data.buttons || []);
+      applyRuntimeData(data);
     } catch (err) {
       console.error("Test Runtime message error:", err);
     } finally {
-      setIsLoading(false);
+      if (!waitTimerRef.current) setIsLoading(false);
     }
   };
 
