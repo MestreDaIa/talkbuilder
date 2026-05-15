@@ -188,8 +188,20 @@ function runFlow(execution: any, containers: any[], edges: any[], input: any) {
     return c?.nodes?.[0]?.id ?? null;
   };
 
+  const normalizeHandle = (value?: string | null) => {
+    if (!value) return "";
+    const raw = String(value);
+    const buttonMatch = raw.match(/-btn-(.+)$/);
+    if (buttonMatch?.[1]) return buttonMatch[1];
+    if (raw.endsWith("-default")) return "default";
+    return raw;
+  };
+
   const nextFromNode = (nodeId: string, container: any, handle?: string): string | null => {
-    let edge = edges.find((e: any) => e.source === nodeId && handle && e.sourceHandle === handle);
+    const wantedHandle = normalizeHandle(handle);
+    let edge = edges.find((e: any) => e.source === nodeId && wantedHandle && normalizeHandle(e.sourceHandle) === wantedHandle);
+    if (!edge && wantedHandle) edge = edges.find((e: any) => e.source === nodeId && normalizeHandle(e.sourceHandle) === "default");
+    if (!edge) edge = edges.find((e: any) => e.source === nodeId && !e.sourceHandle);
     if (!edge) edge = edges.find((e: any) => e.source === nodeId);
     if (edge) {
       // edge target may be a node id OR a container id
@@ -207,8 +219,26 @@ function runFlow(execution: any, containers: any[], edges: any[], input: any) {
     return null;
   };
 
+  const firstText = (...values: any[]) => {
+    const value = values.find((v) => typeof v === "string" && v.trim() !== "");
+    return value ? String(value) : "";
+  };
+
+  const decodeText = (text: string) =>
+    String(text || "")
+      .replace(/<br\s*\/?>/gi, "\n")
+      .replace(/<\/p>\s*<p[^>]*>/gi, "\n")
+      .replace(/<[^>]+>/g, "")
+      .replace(/&nbsp;/g, " ")
+      .replace(/&amp;/g, "&")
+      .replace(/&lt;/g, "<")
+      .replace(/&gt;/g, ">")
+      .replace(/&quot;/g, '"')
+      .replace(/&#39;/g, "'")
+      .trim();
+
   const replaceVars = (text: string) =>
-    !text ? text : text.replace(/{{(.*?)}}/g, (_, k) => variables[k.trim()] ?? `{{${k}}}`);
+    !text ? text : decodeText(text).replace(/{{(.*?)}}/g, (_, k) => variables[k.trim()] ?? `{{${k}}}`);
 
   // If we were waiting and got input -> capture and advance
   if (execution.waiting_for_input && input && currentNodeId) {
@@ -256,26 +286,31 @@ function runFlow(execution: any, containers: any[], edges: any[], input: any) {
       case "start":
         break;
       case "bubble-text":
-        messages.push({
-          id: crypto.randomUUID(),
-          type: "bot",
-          content: replaceVars(cfg.content || cfg.text || ""),
-        });
+      case "bubble-number": {
+        const content = replaceVars(firstText(cfg.message, cfg.content, cfg.text, cfg.number, cfg.value));
+        if (content) {
+          messages.push({
+            id: crypto.randomUUID(),
+            type: "bot",
+            content,
+          });
+        }
         break;
+      }
       case "bubble-image":
         messages.push({
           id: crypto.randomUUID(),
           type: "bot",
-          content: cfg.url || cfg.src || "",
+          content: firstText(cfg.ImageURL, cfg.imageUrl, cfg.url, cfg.src),
           isImage: true,
-          alt: cfg.alt,
+          alt: firstText(cfg.ImageAlt, cfg.alt),
         });
         break;
       case "bubble-video":
         messages.push({
           id: crypto.randomUUID(),
           type: "bot",
-          content: cfg.url || "",
+          content: firstText(cfg.VideoURL, cfg.videoUrl, cfg.url, cfg.src),
           isVideo: true,
         });
         break;
@@ -283,16 +318,17 @@ function runFlow(execution: any, containers: any[], edges: any[], input: any) {
         messages.push({
           id: crypto.randomUUID(),
           type: "bot",
-          content: cfg.url || "",
+          content: firstText(cfg.AudioURL, cfg.audioUrl, cfg.url, cfg.src),
           isAudio: true,
-          autoplay: cfg.autoplay,
+          autoplay: cfg.AudioAutoplay ?? cfg.autoplay,
         });
         break;
       case "bubble-file":
+      case "bubble-document":
         messages.push({
           id: crypto.randomUUID(),
           type: "bot",
-          content: cfg.url || cfg.name || "",
+          content: firstText(cfg.FileURL, cfg.fileUrl, cfg.url, cfg.FileName, cfg.name),
           isFile: true,
         });
         break;
@@ -301,6 +337,7 @@ function runFlow(execution: any, containers: any[], edges: any[], input: any) {
       case "input-number":
       case "input-phone":
       case "input-website":
+      case "input-webSite":
         waiting_for = "text";
         break;
       case "input-buttons":
