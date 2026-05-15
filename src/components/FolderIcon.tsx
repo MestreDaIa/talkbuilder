@@ -80,16 +80,25 @@ function FolderIconComponent({
 		setConfirmDelete(false);
 	}, [id, items, setItems]);
 
-	const handleSaveEdit = useCallback(() => {
+	const handleSaveEdit = useCallback(async () => {
 		const newTitle = editTitle.trim() || "Sem título";
 		const newEmoji = editEmoji.trim() || "📁";
+		const newDescription = editDescription ?? "";
 		setItems((prev) =>
 			prev.map((i) =>
 				i.id === id
-					? { ...i, title: newTitle, emoji: newEmoji, description: editDescription }
+					? { ...i, title: newTitle, emoji: newEmoji, description: newDescription }
 					: i,
 			),
 		);
+		const supabase = getSupabase();
+		if (supabase) {
+			const { error } = await supabase
+				.from("workspace_items")
+				.update({ title: newTitle, emoji: newEmoji, description: newDescription })
+				.eq("id", id);
+			if (error) console.error("[FolderIcon] update error", error);
+		}
 		setEditOpen(false);
 	}, [editTitle, editEmoji, editDescription, id, setItems]);
 
