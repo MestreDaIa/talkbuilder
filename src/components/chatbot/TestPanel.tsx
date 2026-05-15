@@ -24,6 +24,7 @@ interface RuntimeState {
   current_node_id: string | null;
   variables: Record<string, any>;
   waiting_for_input: boolean;
+  pending_wait_node_id?: string | null;
 }
 
 interface AudioPlayerProps {
@@ -129,6 +130,9 @@ interface TestPanelProps {
 export const TestPanel = ({
   isOpen,
   onClose,
+  startContainer,
+  allContainers,
+  edges = [],
   headerTitle = "Teste do Fluxo",
   headerSubtitle,
   hideClose = false,
