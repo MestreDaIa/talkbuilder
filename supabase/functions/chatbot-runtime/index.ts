@@ -338,7 +338,6 @@ function runFlow(execution: any, containers: any[], edges: any[], input: any) {
     steps++;
     const info = findNode(currentNodeId);
     if (!info) {
-      // Maybe it's a container id
       const first = firstNodeOfContainer(currentNodeId);
       if (first) {
         currentNodeId = first;
@@ -349,22 +348,23 @@ function runFlow(execution: any, containers: any[], edges: any[], input: any) {
     const { node, container } = info;
     const cfg = node.config || {};
     const nodeType = (node.type || "").toLowerCase();
-    
-    // Check for "wait" or "await" type and ensure we capture it for processing
     const isWaitNode = nodeType === "wait" || nodeType === "await";
 
-    switch (isWaitNode ? "wait" : nodeType) {
+    if (isWaitNode) {
+      wait_ms = parseWaitMs(cfg);
+      currentNodeId = nextFromNode(node.id, container);
+      // STOP IMMEDIATELY when a wait node is found
+      break;
+    }
+
+    switch (nodeType) {
       case "start":
         break;
       case "bubble-text":
       case "bubble-number": {
         const content = replaceVars(firstText(cfg.message, cfg.content, cfg.text, cfg.number, cfg.value));
         if (content) {
-          messages.push({
-            id: crypto.randomUUID(),
-            type: "bot",
-            content,
-          });
+          messages.push({ id: crypto.randomUUID(), type: "bot", content });
         }
         break;
       }
@@ -419,26 +419,13 @@ function runFlow(execution: any, containers: any[], edges: any[], input: any) {
           value: b.value,
         }));
         break;
-      case "wait": {
-        wait_ms = parseWaitMs(cfg);
-        // Advance the ID for the NEXT execution
-        currentNodeId = nextFromNode(node.id, container);
-        break;
-      }
       case "set-variable":
         if (cfg.variableName) variables[cfg.variableName] = replaceVars(cfg.value || "");
-        break;
-      default:
-        // unknown node -> skip
         break;
     }
 
     if (waiting_for) break;
-    // CRITICAL: if wait_ms is set, we MUST stop and return to client
-    if (wait_ms > 0) break;
-
     currentNodeId = nextFromNode(node.id, container);
-  }
   }
 
   return {
