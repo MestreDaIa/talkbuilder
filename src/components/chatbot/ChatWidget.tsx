@@ -89,11 +89,16 @@ export const ChatWidget = ({
   const scheduleRuntimeContinue = (waitMs: unknown) => {
     const delay = Number(waitMs);
     if (!Number.isFinite(delay) || delay <= 0) return false;
+    
+    console.log(`[ChatWidget] Scheduling wait for ${delay}ms`);
     clearWaitTimer();
-    waitTimerRef.current = setTimeout(() => {
+    
+    waitTimerRef.current = window.setTimeout(() => {
+      console.log("[ChatWidget] Wait finished, continuing...");
       waitTimerRef.current = null;
       continueRuntime();
     }, delay);
+    
     return true;
   };
 

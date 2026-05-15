@@ -50,11 +50,17 @@ export function useChatbotRuntime(flowId?: string) {
   const scheduleRuntimeContinue = (waitMs: unknown) => {
     const delay = Number(waitMs);
     if (!Number.isFinite(delay) || delay <= 0) return false;
+    
+    console.log(`[Runtime] Scheduling wait for ${delay}ms`);
     clearWaitTimer();
-    waitTimerRef.current = setTimeout(() => {
+    
+    // Use window.setTimeout for better browser reliability
+    waitTimerRef.current = window.setTimeout(() => {
+      console.log("[Runtime] Wait finished, continuing...");
       waitTimerRef.current = null;
       continueRuntime();
     }, delay);
+    
     return true;
   };
 
