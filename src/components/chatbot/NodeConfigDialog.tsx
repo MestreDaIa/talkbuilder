@@ -32,10 +32,11 @@ export const NodeConfigDialog = ({ node, open, onClose, onSave, containers = [] 
 
   if (!node) return null;
 
-  const ConfigComponent = nodeConfigComponents[node.type];
+  const normalizedNodeType = String(node.type).toLowerCase() === "await" ? "wait" : String(node.type).toLowerCase();
+  const ConfigComponent = nodeConfigComponents[normalizedNodeType] || nodeConfigComponents[node.type];
 
   // Complex nodes need larger dialog
-  const isComplexNode = ['http-request', 'webhook', 'start'].includes(node.type);
+  const isComplexNode = ['http-request', 'webhook', 'start'].includes(normalizedNodeType);
   const maxWidth = isComplexNode ? 'sm:max-w-2xl' : 'sm:max-w-md';
 
   return (
@@ -46,7 +47,7 @@ export const NodeConfigDialog = ({ node, open, onClose, onSave, containers = [] 
       >
         <DialogHeader className="w-full pt-5 px-5 pb-4 shrink-0 bg-gradient-to-br from-primary/20 via-card to-card border-b border-border">
           <DialogTitle className="w-full text-center text-foreground uppercase tracking-wider text-sm font-semibold">
-            {node.type}
+            {normalizedNodeType === "wait" ? "Aguardar" : node.type}
           </DialogTitle>
         </DialogHeader>
         <div className="flex-1 overflow-y-auto min-h-0 bg-card text-foreground">
