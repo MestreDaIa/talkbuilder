@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { 
   MessageSquare, 
   Hash, 
@@ -74,6 +74,12 @@ const getCategoryStyle = (category: string): React.CSSProperties => {
 
 export const NodesSidebar = ({ onAddNode }: NodesSidebarProps) => {
   const [collapsed, setCollapsed] = useState(false);
+  
+  // Debug to verify node list in console
+  useEffect(() => {
+    console.log("NodesSidebar mounted. Current node types:", nodeTypes.map(n => n.type));
+  }, []);
+
   const categories = Array.from(new Set(nodeTypes.map((node) => node.category)));
 
   return (
@@ -92,14 +98,14 @@ export const NodesSidebar = ({ onAddNode }: NodesSidebarProps) => {
       <div className="flex overflow-hidden h-full">
         <div className={`${!collapsed ? "flex flex-col gap-3" : "flex flex-col gap-0"} gap-3 w-full h-full overflow-y-auto`}>
           {categories.map((category) => (
-            <div key={category} className="flex flex-col gap-2 py-3 px-1 w-full justify-start">
+            <div key={category} className="flex flex-col gap-2 py-3 px-1 w-full justify-start border-b border-border/50 last:border-0">
               <h4
                 className={`${!collapsed ? "hidden" : "flex flex-col"} text-left text-[11px] font-semibold uppercase tracking-wider text-muted-foreground px-1`}
               >
                 {category}
               </h4>
               <div
-                className={`${collapsed ? "grid grid-cols-2 gap-1.5" : "flex flex-col gap-2"} flex justify-center items-center w-full`}
+                className={`${collapsed ? "grid grid-cols-2 gap-1.5" : "flex flex-col gap-2"} flex justify-center items-center w-full px-1`}
               >
                 {nodeTypes
                   .filter((node) => node.category === category)
