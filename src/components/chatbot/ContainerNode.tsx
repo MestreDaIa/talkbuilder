@@ -149,7 +149,7 @@ export const ContainerNode = memo(({ data }: NodeProps<ContainerNodeData>) => {
           <Handle type="target" position={Position.Top} className="!bg-green-600 !w-4 !h-4 -top-2" />
         )}
 
-        <div className="flex items-center justify-between mb-4 rounded-md nodrag">
+        <div className="flex items-center justify-between mb-4 rounded-md nodrag pointer-events-auto">
           {isEditingContainerNameNode ? (
             <input
               type="text"
@@ -157,11 +157,20 @@ export const ContainerNode = memo(({ data }: NodeProps<ContainerNodeData>) => {
               autoFocus
               onChange={(e) => setNameContainerNode(e.target.value)}
               onBlur={() => setIsEditingContainerNameNode(false)}
+              onPointerDown={(e) => e.stopPropagation()}
               placeholder='Renomear Bloco'
               className=" rounded-md p-1.5 pl-2 placeholder:text-black focus:bg-gray-100/5 text-sm w-full focus:outline-none bg-gray-100/5 text-violet-800"
             />
           ) : (
-            <h3 onClick={() => setIsEditingContainerNameNode(true)} className="rounded-md p-1.5 w-full pl-2 border border-border/40 text-sm text-foreground px-0.5">{nameContainerNode || <span className='text-muted-foreground italic'>{`Bloco #${container.id.slice(-6)}`}</span>}</h3>
+            <h3 
+              onClick={(e) => {
+                e.stopPropagation();
+                setIsEditingContainerNameNode(true);
+              }} 
+              className="rounded-md p-1.5 w-full pl-2 border border-border/40 text-sm text-foreground px-0.5 cursor-text"
+            >
+              {nameContainerNode || <span className='text-muted-foreground italic'>{`Bloco #${container.id.slice(-6)}`}</span>}
+            </h3>
           )}
 
           <div ref={menuRef} className="relative ml-2 shrink-0 nodrag nopan">
@@ -219,7 +228,7 @@ export const ContainerNode = memo(({ data }: NodeProps<ContainerNodeData>) => {
           </div>
         </div>
 
-        <div ref={nodesListRef} className="space-y-2 nodrag nopan">
+        <div ref={nodesListRef} className="space-y-2 nodrag nopan pointer-events-auto">
           {container.nodes.length === 0 ? (
             isDragOver ? <InsertPreview /> : (
               <div className="text-xs text-muted-foreground text-center py-8 border-2 border-dashed rounded-lg">
@@ -229,7 +238,7 @@ export const ContainerNode = memo(({ data }: NodeProps<ContainerNodeData>) => {
           ) : (
             <>
               {container.nodes.map((node, idx) => (
-                <div key={node.id}>
+                <div key={node.id} className="pointer-events-auto">
                   {isDragOver && insertIndex === idx && <InsertPreview />}
                   <div data-node-index={idx}>
                     {node.type === 'input-buttons' ? (
