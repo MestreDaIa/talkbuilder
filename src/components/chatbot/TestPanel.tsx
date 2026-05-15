@@ -7,6 +7,7 @@ import { ScrollArea } from "../../components/ui/scroll-area";
 import { Checkbox } from "../../components/ui/checkbox";
 import { getEdgeFunctionUrl } from "@/lib/supabaseHelpers";
 import { renderTextSegments } from "@/lib/textParser";
+import { richHtmlFor, richToPlainText } from "@/lib/richText";
 
 interface Message {
   id: string;
@@ -16,6 +17,7 @@ interface Message {
   isImage?: boolean;
   isFile?: boolean;
   isAudio?: boolean;
+  isHtml?: boolean;
   alt?: string;
   autoplay?: boolean;
 }
@@ -219,7 +221,7 @@ export const TestPanel = ({
     let waitMs = 0;
     let steps = 0;
     const firstText = (...values: any[]) => String(values.find((v) => typeof v === "string" && v.trim()) || "");
-    const cleanText = (text: string) => String(text || "").replace(/<br\s*\/?>/gi, "\n").replace(/<[^>]+>/g, "").replace(/&nbsp;/g, " ").replace(/&amp;/g, "&").trim();
+    const cleanText = (text: string) => richToPlainText(text);
     const replaceVars = (text: string) => cleanText(text).replace(/{{(.*?)}}/g, (_, key) => variables[key.trim()] ?? `{{${key}}}`);
     const parseWaitMs = (cfg: any) => {
       const amount = Math.max(1, Number(cfg.waitTime ?? cfg.duration ?? cfg.seconds ?? 5) || 5);
@@ -256,8 +258,11 @@ export const TestPanel = ({
       }
 
       if (nodeType === "bubble-text" || nodeType === "bubble-number") {
-        const content = replaceVars(firstText(cfg.message, cfg.content, cfg.text, cfg.number, cfg.value));
-        if (content) nextMessages.push({ id: crypto.randomUUID(), type: "bot", content });
+        const rawValue = firstText(cfg.message, cfg.content, cfg.text, cfg.number, cfg.value);
+        if (rawValue) {
+          const html = richHtmlFor(rawValue, { variables });
+          nextMessages.push({ id: crypto.randomUUID(), type: "bot", content: html, isHtml: true });
+        }
       } else if (nodeType === "bubble-image") {
         nextMessages.push({ id: crypto.randomUUID(), type: "bot", content: firstText(cfg.ImageURL, cfg.imageUrl, cfg.url, cfg.src), isImage: true, alt: firstText(cfg.ImageAlt, cfg.alt) });
       } else if (nodeType === "bubble-video") {
@@ -411,6 +416,7 @@ export const TestPanel = ({
                    : message.isVideo ? <video src={message.content} controls className="max-w-full rounded" />
                    : message.isAudio ? <div className="flex items-center gap-2"><Headphones className="h-4 w-4 shrink-0" /><AudioPlayer src={message.content} autoPlay={message.autoplay} /></div>
                    : message.isFile ? <div className="flex items-center gap-2"><FileText className="h-4 w-4 shrink-0" /><span className="truncate max-w-[180px]">{message.content}</span></div>
+                   : message.isHtml ? <div className="rich-bubble whitespace-pre-wrap break-words" dangerouslySetInnerHTML={{ __html: message.content }} />
                    : renderTextSegments(message.content)}
                 </div>
               </div>

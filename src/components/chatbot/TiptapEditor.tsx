@@ -15,48 +15,28 @@ interface TiptapEditorProps {
   placeholder?: string;
 }
 
-// Convert internal format to HTML for editor
+// Convert stored value to HTML for editor.
+// New values are stored as HTML (Tiptap output). Legacy values may be plain
+// text with {{var}} and [text](url) tokens — convert those for backward compat.
 const parseValueToHTML = (value: string): string => {
   if (!value) return '';
-  
-  // Convert {{variable}} to span tags
+
+  if (/<[a-z][\s\S]*>/i.test(value)) {
+    return value;
+  }
+
+  // Legacy plain-text path
   let html = value.replace(
     /\{\{(\w+)\}\}/g,
     '<span data-variable="$1" class="variable-tag" style="background-color: hsl(var(--primary) / 0.2); color: hsl(var(--primary)); padding: 2px 6px; border-radius: 4px; font-size: 0.875em;">{{$1}}</span>'
   );
-  
-  // Convert [text](url) to anchor tags
+
   html = html.replace(
     /\[([^\]]+)\]\(([^)]+)\)/g,
     '<a href="$2" target="_blank" rel="noopener noreferrer">$1</a>'
   );
-  
-  return html;
-};
 
-// Convert HTML back to internal format
-const convertHTMLToText = (html: string): string => {
-  if (!html) return '';
-  
-  // Convert span variable tags back to {{variable}}
-  let text = html.replace(
-    /<span[^>]*data-variable="([^"]+)"[^>]*>[^<]*<\/span>/g,
-    '{{$1}}'
-  );
-  
-  // Convert anchor tags to [text](url)
-  text = text.replace(
-    /<a[^>]*href="([^"]+)"[^>]*>([^<]*)<\/a>/g,
-    '[$2]($1)'
-  );
-  
-  // Remove remaining HTML tags
-  text = text.replace(/<[^>]+>/g, '');
-  
-  // Decode HTML entities
-  const textarea = document.createElement('textarea');
-  textarea.innerHTML = text;
-  return textarea.value;
+  return html;
 };
 
 export const TiptapEditor = ({ value, onChange }: TiptapEditorProps) => {
@@ -90,13 +70,13 @@ export const TiptapEditor = ({ value, onChange }: TiptapEditorProps) => {
     },
     onUpdate: ({ editor }) => {
       const html = editor.getHTML();
-      const text = convertHTMLToText(html);
-      onChange(text);
+      // Treat empty Tiptap document as empty string
+      onChange(html === '<p></p>' ? '' : html);
     },
   });
 
   useEffect(() => {
-    if (editor && value !== convertHTMLToText(editor.getHTML())) {
+    if (editor && value !== editor.getHTML()) {
       editor.commands.setContent(parseValueToHTML(value));
     }
   }, [value, editor]);

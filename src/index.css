@@ -417,3 +417,30 @@ code {
   --ring: oklch(0.62 0.21 295);
   color: var(--foreground);
 }
+/* Rich bubble text formatting (preserves Tiptap output) */
+.rich-bubble p,
+.rich-bubble-preview p {
+  margin: 0;
+}
+.rich-bubble p + p,
+.rich-bubble-preview p + p {
+  margin-top: 0.25rem;
+}
+.rich-bubble strong,
+.rich-bubble b,
+.rich-bubble-preview strong,
+.rich-bubble-preview b {
+  font-weight: 700;
+}
+.rich-bubble em,
+.rich-bubble-preview em {
+  font-style: italic;
+}
+.rich-bubble u,
+.rich-bubble-preview u {
+  text-decoration: underline;
+}
+.rich-bubble s,
+.rich-bubble-preview s {
+  text-decoration: line-through;
+}

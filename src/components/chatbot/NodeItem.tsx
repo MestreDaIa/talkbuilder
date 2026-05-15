@@ -24,6 +24,7 @@ import {
 } from "lucide-react";
 import { Node, NodeType } from "@/types/chatbot";
 import { renderTextSegments } from "@/lib/textParser";
+import { RichText } from "@/lib/richText";
 import { cn } from "@/lib/utils";
 
 interface NodeItemProps {
@@ -257,12 +258,13 @@ export const NodeItem = ({ node, onClick }: NodeItemProps) => {
             </div>
           ) : (
             messageValue && (
-              <p className="text-xs text-black text-left max-w-[180px] h-auto leading-relaxed text-wrap py-0">
-                {renderTextSegments(messageValue as string, {
-                  variableClassName: "bg-orange-400 px-1 py-0.5 text-white rounded",
-                  linkClassName: "text-blue-600 underline hover:text-blue-800"
-                })}
-              </p>
+              <RichText
+                as="p"
+                className="text-xs text-black text-left max-w-[180px] h-auto leading-relaxed text-wrap py-0 whitespace-pre-wrap break-words rich-bubble-preview"
+                value={messageValue as string}
+                variableClassName="bg-orange-400 px-1 py-0.5 text-white rounded"
+                linkClassName="text-blue-600 underline hover:text-blue-800"
+              />
             )
           )}
         </div>
