@@ -294,7 +294,7 @@ export const ChatWidget = ({
               className={`flex ${message.type === "bot" ? "justify-start" : "justify-end"}`}
             >
               <div
-                className={`max-w-[80%] px-4 py-2 rounded-2xl text-sm ${
+                className={`max-w-[80%] px-4 py-2 rounded-2xl text-sm text-left ${
                   message.type === "bot"
                     ? "bg-muted text-foreground rounded-bl-md"
                     : "text-white rounded-br-md"

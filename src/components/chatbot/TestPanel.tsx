@@ -390,7 +390,7 @@ export const TestPanel = ({
           <div className="space-y-3">
             {messages.map((message) => (
               <div key={message.id} className={`flex ${message.type === "bot" ? "justify-start" : "justify-end"}`}>
-                <div className={`max-w-[85%] px-3 py-2 rounded-2xl text-sm shadow-md ${message.type === "bot" ? "rounded-bl-sm bg-muted" : "rounded-br-sm text-white"}`}
+                <div className={`max-w-[85%] px-3 py-2 rounded-2xl text-sm shadow-md text-left ${message.type === "bot" ? "rounded-bl-sm bg-muted" : "rounded-br-sm text-white"}`}
                   style={message.type === "user" ? { background: "var(--user-msg-bg)", color: "var(--user-msg-fg)" } : undefined}>
                   {message.isImage ? <img src={message.content} alt={message.alt} className="max-w-full rounded" />
                    : message.isVideo ? <video src={message.content} controls className="max-w-full rounded" />
