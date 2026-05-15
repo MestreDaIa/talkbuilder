@@ -377,6 +377,7 @@ export default function BotPage() {
           startContainer={testContainer}
           allContainers={containers}
           edges={edges}
+          flowId={flow?.id}
         />
 
         {/* Settings */}
