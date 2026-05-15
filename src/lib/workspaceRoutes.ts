@@ -23,6 +23,21 @@ export function botRoute(slug: string | null | undefined, botId: string) {
 	return `/${slug || FALLBACK_SLUG}/workspace/bot/${botId}`;
 }
 
+export function rememberBotBackRoute(botId: string, route: string) {
+	if (typeof window === "undefined") return;
+	window.sessionStorage.setItem(`bot_back_route_${botId}`, route);
+}
+
+export function rememberedBotBackRoute(botId: string) {
+	if (typeof window === "undefined") return null;
+	return window.sessionStorage.getItem(`bot_back_route_${botId}`);
+}
+
+export function browserHrefForRoute(route: string) {
+	if (typeof window === "undefined") return `#${route}`;
+	return `${window.location.origin}${window.location.pathname}${window.location.search}#${route}`;
+}
+
 export function configsRoute(slug: string | null | undefined) {
 	return `/${slug || FALLBACK_SLUG}/workspace/configs`;
 }
