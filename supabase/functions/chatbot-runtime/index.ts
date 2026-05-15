@@ -346,13 +346,23 @@ function runFlow(execution: any, containers: any[], edges: any[], input: any) {
     const { node, container } = info;
     const cfg = node.config || {};
     const nodeType = (node.type || "").toLowerCase();
-    const isWaitNode = nodeType === "wait" || nodeType === "await";
 
-    if (isWaitNode) {
-      wait_ms = parseWaitMs(cfg);
-      currentNodeId = nextFromNode(node.id, container);
-      // STOP IMMEDIATELY when a wait node is found
-      break;
+    // Check if node is a wait node (Aguardar)
+    if (nodeType === "wait" || nodeType === "await") {
+      // If we JUST started this node (not continuing from timer)
+      if (!execution.is_waiting_time) {
+        wait_ms = parseWaitMs(cfg);
+        // Save the current node as the one to "return to" or just advanced?
+        // Actually, we advance the pointer to the NEXT node so when timer ends, 
+        // continueRuntime starts from the correct place.
+        currentNodeId = nextFromNode(node.id, container);
+        break; // STOP loop immediately
+      } else {
+        // We are CONTINUING after a timer. Reset flag and move to next node.
+        execution.is_waiting_time = false;
+        currentNodeId = nextFromNode(node.id, container);
+        continue;
+      }
     }
 
     switch (nodeType) {
