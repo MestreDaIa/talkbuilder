@@ -258,13 +258,15 @@ export const NodeItem = ({ node, onClick }: NodeItemProps) => {
             </div>
           ) : (
             messageValue && (
-              <RichText
-                as="p"
-                className="text-xs text-black text-left max-w-[180px] h-auto leading-relaxed text-wrap py-0 whitespace-pre-wrap break-words rich-bubble-preview"
-                value={messageValue as string}
-                variableClassName="bg-orange-400 px-1 py-0.5 text-white rounded"
-                linkClassName="text-blue-600 underline hover:text-blue-800"
-              />
+              <div className="mt-1 max-h-[120px] overflow-y-auto scrollbar-thin scrollbar-thumb-gray-300 scrollbar-track-transparent pr-1">
+                <RichText
+                  as="p"
+                  className="text-xs text-black text-left max-w-[180px] h-auto leading-relaxed text-wrap py-0 whitespace-pre-wrap break-words rich-bubble-preview"
+                  value={messageValue as string}
+                  variableClassName="bg-orange-400 px-1 py-0.5 text-white rounded"
+                  linkClassName="text-blue-600 underline hover:text-blue-800"
+                />
+              </div>
             )
           )}
         </div>
