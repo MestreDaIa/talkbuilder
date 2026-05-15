@@ -12,6 +12,12 @@ interface ChatButton {
   label: string;
 }
 
+interface RuntimeState {
+  current_node_id: string | null;
+  variables: Record<string, any>;
+  waiting_for_input: boolean;
+}
+
 const RUNTIME_URL = "https://fwoescubnnagdvwasbjl.functions.supabase.co/chatbot-runtime";
 
 export function useChatbotRuntime(flowId?: string) {
@@ -21,6 +27,7 @@ export function useChatbotRuntime(flowId?: string) {
   const [waitingFor, setWaitingFor] = useState<string | null>(null);
   const [buttons, setButtons] = useState<ChatButton[]>([]);
   const [sessionId, setSessionId] = useState<string | null>(null);
+  const runtimeStateRef = useRef<RuntimeState | null>(null);
   
   const contactId = useRef<string>(localStorage.getItem("chat_contact_id") || (() => {
     const id = `web-${Math.random().toString(36).slice(2, 11)}`;
@@ -47,6 +54,7 @@ export function useChatbotRuntime(flowId?: string) {
       if (data.error) throw new Error(data.error);
       
       setSessionId(data.session_id);
+      runtimeStateRef.current = data.runtime_state || null;
       setMessages(data.messages || []);
       setWaitingFor(data.waiting_for);
       setButtons(data.buttons || []);
@@ -74,12 +82,13 @@ export function useChatbotRuntime(flowId?: string) {
           flow_id: flowId,
           contact_id: contactId.current,
           channel: "webchat",
-          payload: { message, button_id: buttonId },
+          payload: { message, button_id: buttonId, runtime_state: runtimeStateRef.current },
         }),
       });
       const data = await response.json();
       if (data.error) throw new Error(data.error);
 
+      runtimeStateRef.current = data.runtime_state || runtimeStateRef.current;
       setMessages(prev => [...prev, ...(data.messages || [])]);
       setWaitingFor(data.waiting_for);
       setButtons(data.buttons || []);
