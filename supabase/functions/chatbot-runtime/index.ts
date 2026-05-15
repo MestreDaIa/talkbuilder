@@ -353,10 +353,8 @@ function runFlow(execution: any, containers: any[], edges: any[], input: any) {
       // If we JUST started this node (not continuing from timer)
       if (!execution.is_waiting_time) {
         wait_ms = parseWaitMs(cfg);
-        // Save the current node as the one to "return to" or just advanced?
-        // Actually, we advance the pointer to the NEXT node so when timer ends, 
-        // continueRuntime starts from the correct place.
-        currentNodeId = nextFromNode(node.id, container);
+        // Do NOT advance currentNodeId yet. Keep it on the wait node.
+        // When the timer finishes, the client calls back and we'll see is_waiting_time=true.
         break; // STOP loop immediately
       } else {
         // We are CONTINUING after a timer. Reset flag and move to next node.
