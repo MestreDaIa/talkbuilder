@@ -189,6 +189,7 @@ function normalizeClientState(state: any) {
     current_node_id: typeof state?.current_node_id === "string" ? state.current_node_id : null,
     variables: state?.variables && typeof state.variables === "object" ? state.variables : {},
     waiting_for_input: !!state?.waiting_for_input,
+    is_waiting_time: !!state?.is_waiting_time, // Restore the wait timer flag
   };
 }
 
