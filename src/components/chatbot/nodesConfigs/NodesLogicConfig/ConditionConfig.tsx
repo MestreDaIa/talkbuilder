@@ -52,6 +52,12 @@ const logicalOperators = [
   { value: "OR", label: "OU" },
 ];
 
+const createConditionId = () =>
+  `condition-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
+
+const createComparisonId = () =>
+  `comparison-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
+
 const ComparisonItem = ({
   comparison,
   onUpdate,
@@ -205,6 +211,7 @@ const ComparisonItem = ({
                 className="h-9 text-sm pr-10"
               />
               <Button
+                type="button"
                 variant="ghost"
                 size="icon"
                 className="absolute right-1 top-1/2 -translate-y-1/2 h-7 w-7"
@@ -218,6 +225,7 @@ const ComparisonItem = ({
 
         {/* Delete button */}
         <Button
+          type="button"
           variant="ghost"
           size="icon"
           className="h-9 w-9 text-muted-foreground hover:text-destructive"
@@ -231,9 +239,10 @@ const ComparisonItem = ({
 };
 
 export const ConditionConfig = ({ config, setConfig }: ConditionConfigProps) => {
-  const conditions: ConditionGroup[] = config.conditions || [
-    { id: crypto.randomUUID(), comparisons: [], logicalOperator: "AND" }
-  ];
+  const [defaultConditionId] = useState(createConditionId);
+  const conditions: ConditionGroup[] = config.conditions?.length
+    ? config.conditions
+    : [{ id: defaultConditionId, comparisons: [], logicalOperator: "AND" }];
 
   const updateCondition = (conditionId: string, updates: Partial<ConditionGroup>) => {
     const newConditions = conditions.map(c => 
@@ -244,7 +253,7 @@ export const ConditionConfig = ({ config, setConfig }: ConditionConfigProps) => 
 
   const addCondition = () => {
     const newCondition: ConditionGroup = {
-      id: crypto.randomUUID(),
+      id: createConditionId(),
       comparisons: [],
       logicalOperator: "AND",
     };
@@ -261,7 +270,7 @@ export const ConditionConfig = ({ config, setConfig }: ConditionConfigProps) => 
     if (!condition) return;
     
     const newComparison: ConditionComparison = {
-      id: crypto.randomUUID(),
+      id: createComparisonId(),
       variableName: "",
       operator: "equals",
       value: "",
@@ -318,6 +327,7 @@ export const ConditionConfig = ({ config, setConfig }: ConditionConfigProps) => 
             ))}
             
             <Button
+              type="button"
               variant="default"
               className="w-full bg-primary hover:bg-primary/90"
               onClick={() => addComparison(condition.id)}
@@ -331,6 +341,7 @@ export const ConditionConfig = ({ config, setConfig }: ConditionConfigProps) => 
 
       {conditions.length > 0 && conditions[0].comparisons.length > 0 && (
         <Button
+          type="button"
           variant="outline"
           className="w-full"
           onClick={addCondition}
