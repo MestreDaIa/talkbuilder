@@ -221,7 +221,7 @@ export const TestPanel = ({
     let waitMs = 0;
     let steps = 0;
     const firstText = (...values: any[]) => String(values.find((v) => typeof v === "string" && v.trim()) || "");
-    const cleanText = (text: string) => String(text || "").replace(/<br\s*\/?>/gi, "\n").replace(/<[^>]+>/g, "").replace(/&nbsp;/g, " ").replace(/&amp;/g, "&").trim();
+    const cleanText = (text: string) => richToPlainText(text);
     const replaceVars = (text: string) => cleanText(text).replace(/{{(.*?)}}/g, (_, key) => variables[key.trim()] ?? `{{${key}}}`);
     const parseWaitMs = (cfg: any) => {
       const amount = Math.max(1, Number(cfg.waitTime ?? cfg.duration ?? cfg.seconds ?? 5) || 5);
