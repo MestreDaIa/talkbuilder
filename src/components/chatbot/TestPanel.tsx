@@ -175,7 +175,15 @@ export const TestPanel = ({
     return null;
   };
 
-  const nextFromNode = (nodeId: string, containerId: string, handle?: string | null) => {
+  const resolveTarget = (target: string): string | null => {
+    if (!target) return null;
+    if (findNode(target)) return target;
+    const first = firstNodeOfContainer(target);
+    if (first) return first;
+    return null;
+  };
+
+  const nextFromNode = (nodeId: string, containerId: string, handle?: string | null): string | null => {
     const normalizeHandle = (value?: string | null) => {
       if (!value) return "";
       const raw = String(value);
@@ -185,13 +193,20 @@ export const TestPanel = ({
       return raw;
     };
     const wantedHandle = normalizeHandle(handle);
-    let edge = edges.find((e) => e.source === nodeId && wantedHandle && normalizeHandle(e.sourceHandle) === wantedHandle);
-    if (!edge && wantedHandle) edge = edges.find((e) => e.source === nodeId && normalizeHandle(e.sourceHandle) === "default");
-    if (!edge) edge = edges.find((e) => e.source === nodeId && !e.sourceHandle);
-    if (!edge) edge = edges.find((e) => e.source === nodeId);
-    if (edge) return findNode(edge.target) ? edge.target : (firstNodeOfContainer(edge.target) || edge.target);
-    const containerEdge = edges.find((e) => e.source === containerId);
-    if (containerEdge) return findNode(containerEdge.target) ? containerEdge.target : firstNodeOfContainer(containerEdge.target);
+    // Only consider edges whose target still exists in the current graph.
+    const validEdges = edges.filter((e) => resolveTarget(e.target) !== null);
+    const fromNode = validEdges.filter((e) => e.source === nodeId);
+
+    let edge = wantedHandle
+      ? fromNode.find((e) => normalizeHandle(e.sourceHandle) === wantedHandle)
+      : undefined;
+    if (!edge && wantedHandle) edge = fromNode.find((e) => normalizeHandle(e.sourceHandle) === "default");
+    if (!edge) edge = fromNode.find((e) => !e.sourceHandle);
+    if (!edge) edge = fromNode[0];
+    if (edge) return resolveTarget(edge.target);
+
+    const containerEdge = validEdges.find((e) => e.source === containerId);
+    if (containerEdge) return resolveTarget(containerEdge.target);
     return null;
   };
 
