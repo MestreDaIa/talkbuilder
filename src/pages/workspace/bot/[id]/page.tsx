@@ -21,7 +21,7 @@ import { Input } from "@/components/ui/input";
 import { useWorkspace } from "@/context/WorkspaceContext";
 import { useAuth } from "@/context/AuthContext";
 import { VariablesProvider } from "@/context/VariablesContext";
-import { browserHrefForRoute, folderRoute, rememberedBotBackRoute, workspaceRoot } from "@/lib/workspaceRoutes";
+import { folderRoute, hardReloadToRoute, rememberedBotBackRoute, workspaceRoot } from "@/lib/workspaceRoutes";
 import {
   ensureFlow,
   saveDraft,
@@ -284,12 +284,10 @@ export default function BotPage() {
 
     console.log("[BotPage] Back clicked. Target:", target, "Remembered:", remembered, "ParentId:", parentId);
 
-    // 3) Navega usando window.location.href para garantir a desmontagem completa
-    // de todo o componente e seus overlays fixos, forçando o recarregamento da SPA.
+    // 3) Troca a rota e recarrega a SPA. Só mudar o hash/URL não estava desmontando
+    // o overlay fixed do editor no site publicado.
     if (typeof window !== "undefined") {
-      const fullUrl = browserHrefForRoute(target);
-      console.log("[BotPage] Redirecting to:", fullUrl);
-      window.location.href = fullUrl;
+      hardReloadToRoute(target);
     } else {
       navigate(target);
     }
