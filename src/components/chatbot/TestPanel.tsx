@@ -308,16 +308,6 @@ export const TestPanel = ({
     clearWaitTimer();
     waitTimerRef.current = window.setTimeout(() => {
       waitTimerRef.current = null;
-      if (runtimeStateRef.current?.pending_wait_node_id) {
-        const waitNodeInfo = findNode(runtimeStateRef.current.pending_wait_node_id);
-        runtimeStateRef.current = {
-          ...runtimeStateRef.current,
-          current_node_id: waitNodeInfo
-            ? nextFromNode(waitNodeInfo.node.id, waitNodeInfo.container.id)
-            : runtimeStateRef.current.current_node_id,
-          pending_wait_node_id: null,
-        };
-      }
       continueRuntime();
     }, delay);
     return true;
@@ -327,9 +317,7 @@ export const TestPanel = ({
     const incomingState = data.runtime_state || runtimeStateRef.current;
     const waitMs = Number(data.wait_ms);
     const hasActiveWait = Number.isFinite(waitMs) && waitMs > 0;
-    runtimeStateRef.current = hasActiveWait
-      ? { ...(incomingState || {}), pending_wait_node_id: incomingState?.current_node_id ?? null }
-      : incomingState;
+    runtimeStateRef.current = incomingState;
     if (replaceMessages) setMessages(data.messages || []);
     else if (!hasActiveWait || (data.messages || []).length > 0) setMessages(prev => [...prev, ...(data.messages || [])]);
     setWaitingForInput(data.waiting_for === "text");
