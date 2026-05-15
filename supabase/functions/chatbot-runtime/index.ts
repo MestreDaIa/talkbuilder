@@ -5,8 +5,6 @@ const corsHeaders = {
   "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
 };
 
-// ... keep existing code
-
 interface RuntimeRequest {
   action: "start" | "message";
   flow_id: string; // public_id or UUID
@@ -104,7 +102,6 @@ async function getOrCreateSession(supabase: any, flow: any, contact_id: string, 
     }).select().single();
     
     if (!error) {
-        // Track usage (billing)
         await supabase.rpc("increment_usage_counter", { w_id: flow.user_id, field: "conversations_started" });
     }
     return { data, error };
@@ -162,17 +159,13 @@ async function runFlow(supabase: any, session: any, execution: any, containers: 
     return text.replace(/{{(.*?)\}}/g, (_, key) => variables[key.trim()] || `{{${key}}}`);
   };
 
-  // 1. Handle Input if we were waiting
   if (execution.waiting_for_input && input) {
     const lastNodeInfo = findNode(currentNodeId);
     if (lastNodeInfo?.node.type.startsWith("input-")) {
       const varName = lastNodeInfo.node.config?.variableName || lastNodeInfo.node.config?.saveVariable;
       if (varName) variables[varName] = input.message || input.button_id;
       
-      // Find edge from current node with specific handle if button
       let nextEdge = edges.find(e => e.source === currentNodeId && e.sourceHandle === input.button_id);
-      
-      // If no specific handle edge, find any edge from node
       if (!nextEdge) {
           nextEdge = edges.find(e => e.source === currentNodeId);
       }
@@ -180,22 +173,19 @@ async function runFlow(supabase: any, session: any, execution: any, containers: 
       if (nextEdge) {
         currentNodeId = nextEdge.target;
       } else {
-        // Try container-level edge
         const cEdge = edges.find(e => e.source === lastNodeInfo.container.id);
         if (cEdge) {
             const targetId = cEdge.target;
-            // Target could be a node or another container
             const targetNode = findNode(targetId);
             if (targetNode) currentNodeId = targetId;
             else currentNodeId = findNodeInContainer(containers, targetId);
         } else {
-            currentNodeId = null; // Flow ends
+            currentNodeId = null;
         }
       }
     }
   }
 
-  // 2. Initial Start if fresh
   if (!currentNodeId && !execution.waiting_for_input) {
     const startContainer = containers.find(c => c.nodes.some((n: any) => n.type === "start"));
     if (!startContainer) throw new Error("Nó de início não encontrado");
@@ -203,13 +193,11 @@ async function runFlow(supabase: any, session: any, execution: any, containers: 
     currentNodeId = startNode.id;
   }
 
-  // 3. Execution Loop
   let steps = 0;
   while (currentNodeId && steps < 50) {
     steps++;
     const info = findNode(currentNodeId);
     if (!info) {
-        // Check if currentNodeId is actually a container ID
         const targetContainerNodeId = findNodeInContainer(containers, currentNodeId);
         if (targetContainerNodeId) {
             currentNodeId = targetContainerNodeId;
@@ -220,7 +208,6 @@ async function runFlow(supabase: any, session: any, execution: any, containers: 
     
     const { node, container } = info;
 
-    // Process Node
     switch (node.type) {
       case "bubble-text":
         messages.push({ 
@@ -249,21 +236,15 @@ async function runFlow(supabase: any, session: any, execution: any, containers: 
         break;
 
       case "start":
-        // Just a passthrough
         break;
-        
-      default:
-        console.log(`[Runtime] Unhandled node type: ${node.type}`);
     }
 
     if (waiting_for) break;
 
-    // Find Next Node
     let nextEdge = edges.find(e => e.source === node.id);
     if (nextEdge) {
       currentNodeId = nextEdge.target;
     } else {
-      // End of container, check container edge
       const cEdge = edges.find(e => e.source === container.id);
       if (cEdge) {
           currentNodeId = cEdge.target;
@@ -273,7 +254,6 @@ async function runFlow(supabase: any, session: any, execution: any, containers: 
     }
   }
 
-  // Update Execution State
   await supabase.from("flow_executions").update({
     current_node_id: currentNodeId,
     variables,
