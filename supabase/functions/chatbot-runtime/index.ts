@@ -26,6 +26,8 @@ Deno.serve(async (req) => {
     const body: RuntimeRequest = await req.json();
     const { action, flow_id: flowRef, contact_id, channel, payload } = body;
 
+    console.log(`[Runtime] Action: ${action}, Flow: ${flowRef}, Contact: ${contact_id}, Channel: ${channel}`);
+
     // 1. Resolve Flow
     const { data: flow, error: flowErr } = await resolveFlow(supabase, flowRef, body.workspace_id);
     if (flowErr || !flow) throw new Error("Flow não encontrado");
@@ -98,7 +100,10 @@ async function getOrCreateSession(supabase: any, flow: any, contact_id: string, 
       contact_id,
       channel_id: channel
     }).select().single();
-    if (!error) await supabase.rpc("increment_usage_counter", { w_id: flow.user_id, field: "conversations_started" });
+    
+    if (!error) {
+        await supabase.rpc("increment_usage_counter", { w_id: flow.user_id, field: "conversations_started" });
+    }
     return { data, error };
   }
   
@@ -136,7 +141,6 @@ async function runFlow(supabase: any, session: any, execution: any, containers: 
   let waiting_for: string | null = null;
   let buttons: any[] = [];
 
-  // Helper to find node by ID across containers
   const findNode = (id: string) => {
     for (const c of containers) {
       const n = c.nodes.find((node: any) => node.id === id);
@@ -145,63 +149,111 @@ async function runFlow(supabase: any, session: any, execution: any, containers: 
     return null;
   };
 
-  // If starting fresh
-  if (!currentNodeId) {
+  const findNodeInContainer = (containers: any[], containerId: string) => {
+    const c = containers.find(cont => cont.id === containerId);
+    return c?.nodes[0]?.id;
+  };
+
+  const replaceVariables = (text: string) => {
+    if (!text) return text;
+    return text.replace(/{{(.*?)\}}/g, (_, key) => variables[key.trim()] || `{{${key}}}`);
+  };
+
+  if (execution.waiting_for_input && input) {
+    const lastNodeInfo = findNode(currentNodeId);
+    if (lastNodeInfo?.node.type.startsWith("input-")) {
+      const varName = lastNodeInfo.node.config?.variableName || lastNodeInfo.node.config?.saveVariable;
+      if (varName) variables[varName] = input.message || input.button_id;
+      
+      let nextEdge = edges.find(e => e.source === currentNodeId && e.sourceHandle === input.button_id);
+      if (!nextEdge) {
+          nextEdge = edges.find(e => e.source === currentNodeId);
+      }
+
+      if (nextEdge) {
+        currentNodeId = nextEdge.target;
+      } else {
+        const cEdge = edges.find(e => e.source === lastNodeInfo.container.id);
+        if (cEdge) {
+            const targetId = cEdge.target;
+            const targetNode = findNode(targetId);
+            if (targetNode) currentNodeId = targetId;
+            else currentNodeId = findNodeInContainer(containers, targetId);
+        } else {
+            currentNodeId = null;
+        }
+      }
+    }
+  }
+
+  if (!currentNodeId && !execution.waiting_for_input) {
     const startContainer = containers.find(c => c.nodes.some((n: any) => n.type === "start"));
     if (!startContainer) throw new Error("Nó de início não encontrado");
     const startNode = startContainer.nodes.find((n: any) => n.type === "start");
     currentNodeId = startNode.id;
   }
 
-  // If we were waiting for input, process it
-  if (execution.waiting_for_input && input) {
-    const lastNodeInfo = findNode(currentNodeId);
-    if (lastNodeInfo?.node.type.startsWith("input-")) {
-      const varName = lastNodeInfo.node.config?.variableName;
-      if (varName) variables[varName] = input.message || input.button_id;
-      
-      // Find next node from input node
-      const edge = edges.find(e => e.source === currentNodeId && (!e.sourceHandle || e.sourceHandle === input.button_id));
-      if (edge) currentNodeId = edge.target;
-      else {
-        // Fallback to container edge
-        const cEdge = edges.find(e => e.source === lastNodeInfo.container.id);
-        if (cEdge) currentNodeId = findNodeInContainer(containers, cEdge.target);
-      }
-    }
-  }
-
-  // Execution Loop
   let steps = 0;
   while (currentNodeId && steps < 50) {
     steps++;
     const info = findNode(currentNodeId);
-    if (!info) break;
-    const { node, container } = info;
-
-    if (node.type === "bubble-text") {
-      messages.push({ id: crypto.randomUUID(), type: "bot", content: node.config?.content });
-    } else if (node.type === "input-text") {
-      waiting_for = "text";
-      break;
-    } else if (node.type === "input-buttons") {
-      waiting_for = "buttons";
-      buttons = node.config?.buttons || [];
-      break;
+    if (!info) {
+        const targetContainerNodeId = findNodeInContainer(containers, currentNodeId);
+        if (targetContainerNodeId) {
+            currentNodeId = targetContainerNodeId;
+            continue;
+        }
+        break;
     }
     
-    // Move to next node
-    const edge = edges.find(e => e.source === node.id);
-    if (edge) currentNodeId = edge.target;
-    else {
-      // End of container, check container edge
+    const { node, container } = info;
+
+    switch (node.type) {
+      case "bubble-text":
+        messages.push({ 
+          id: crypto.randomUUID(), 
+          type: "bot", 
+          content: replaceVariables(node.config?.content) 
+        });
+        break;
+      
+      case "bubble-image":
+        messages.push({ 
+          id: crypto.randomUUID(), 
+          type: "bot", 
+          content: node.config?.url,
+          isImage: true 
+        });
+        break;
+
+      case "input-text":
+        waiting_for = "text";
+        break;
+
+      case "input-buttons":
+        waiting_for = "buttons";
+        buttons = node.config?.buttons || [];
+        break;
+
+      case "start":
+        break;
+    }
+
+    if (waiting_for) break;
+
+    let nextEdge = edges.find(e => e.source === node.id);
+    if (nextEdge) {
+      currentNodeId = nextEdge.target;
+    } else {
       const cEdge = edges.find(e => e.source === container.id);
-      if (cEdge) currentNodeId = findNodeInContainer(containers, cEdge.target);
-      else break;
+      if (cEdge) {
+          currentNodeId = cEdge.target;
+      } else {
+          currentNodeId = null;
+      }
     }
   }
 
-  // Update Execution State
   await supabase.from("flow_executions").update({
     current_node_id: currentNodeId,
     variables,
@@ -210,9 +262,4 @@ async function runFlow(supabase: any, session: any, execution: any, containers: 
   }).eq("id", execution.id);
 
   return { messages, waiting_for, buttons };
-}
-
-function findNodeInContainer(containers: any[], containerId: string) {
-  const c = containers.find(cont => cont.id === containerId);
-  return c?.nodes[0]?.id;
 }

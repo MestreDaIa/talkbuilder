@@ -44,12 +44,7 @@ export const ChatWidget = ({
   const scrollRef = useRef<HTMLDivElement>(null);
 
   const getRuntimeUrl = () => {
-    try {
-      return getEdgeFunctionUrl('chatbot-runtime');
-    } catch {
-      const url = process.env.NEXT_PUBLIC_SUPABASE_URL || '';
-      return `${url}/functions/v1/chatbot-runtime`;
-    }
+    return "https://fwoescubnnagdvwasbjl.functions.supabase.co/chatbot-runtime";
   };
 
   // Scroll to bottom when messages change
