@@ -128,13 +128,11 @@ Deno.serve(async (req: Request) => {
 
     const memoryKey = `${flow.id}:${channel}:${contact_id}`;
     const clientState = payload?.runtime_state || body?.runtime_state || readMemoryState(memoryKey);
+
     if (!execution) {
-      // Fallback para ambientes onde as tabelas de runtime ainda não existem.
-      // Primeiro tenta o estado em memória do próprio Edge Function; se o isolate
-      // reiniciar, usa o estado devolvido pelo cliente novo. Assim clientes antigos
-      // também param de reiniciar o fluxo a cada mensagem.
       execution = normalizeClientState(clientState);
-    } else if (action !== "start" && !execution.current_node_id && clientState?.current_node_id) {
+    } else if (action !== "start" && clientState?.current_node_id) {
+      // Use state from client if it exists and we're not starting fresh
       execution = { ...execution, ...normalizeClientState(clientState), id: execution.id };
     }
 

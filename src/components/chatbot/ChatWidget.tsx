@@ -49,7 +49,7 @@ export const ChatWidget = ({
   const [error, setError] = useState<string | null>(null);
   const scrollRef = useRef<HTMLDivElement>(null);
   const runtimeStateRef = useRef<RuntimeState | null>(null);
-  const waitTimerRef = useRef<number | null>(null);
+  const waitTimerRef = useRef<NodeJS.Timeout | null>(null);
 
   const getRuntimeUrl = () => {
     return "https://fwoescubnnagdvwasbjl.functions.supabase.co/chatbot-runtime";
@@ -90,7 +90,7 @@ export const ChatWidget = ({
     const delay = Number(waitMs);
     if (!Number.isFinite(delay) || delay <= 0) return false;
     clearWaitTimer();
-    waitTimerRef.current = window.setTimeout(() => {
+    waitTimerRef.current = setTimeout(() => {
       waitTimerRef.current = null;
       continueRuntime();
     }, delay);
