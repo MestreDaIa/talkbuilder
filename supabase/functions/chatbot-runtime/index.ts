@@ -300,7 +300,7 @@ function runFlow(execution: any, containers: any[], edges: any[], input: any) {
     return Math.round(safeTime * multiplier);
   };
 
-  // If we were waiting and got input -> capture and advance
+  // Handle input and advance
   if (input && (input.message !== undefined || input.button_id !== undefined) && currentNodeId) {
     const info = findNode(currentNodeId);
     if (info) {
@@ -309,12 +309,9 @@ function runFlow(execution: any, containers: any[], edges: any[], input: any) {
       const value = input.message ?? input.button_id;
       if (varName && value !== undefined) variables[varName] = value;
       
-      // CRITICAL: Advance ONLY if we were waiting for user input (text/buttons)
-      // AND NOT if we were in a "wait" node (timer).
-      const nodeType = (info.node.type || "").toLowerCase();
-      const isInputNode = nodeType.startsWith("input-");
-      
-      if (execution.waiting_for_input && isInputNode) {
+      // ONLY advance if we were waiting for user input (text/buttons)
+      // AND NOT if we were in a timer (is_waiting_time).
+      if (execution.waiting_for_input && !execution.is_waiting_time) {
         currentNodeId = nextFromNode(info.node.id, info.container, input.button_id);
       }
     }
