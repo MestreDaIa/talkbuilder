@@ -1,5 +1,5 @@
 import { useState, useMemo, useEffect } from "react";
-import { NodeConfig, ConditionComparison, ConditionGroup } from "@/types/chatbot";
+import { NodeConfig, ConditionComparison, ConditionGroup, Container, Node } from "@/types/chatbot";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Button } from "@/components/ui/button";
