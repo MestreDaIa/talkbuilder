@@ -195,6 +195,78 @@ export const TestPanel = ({
     return null;
   };
 
+  const runLocalFlow = (state: RuntimeState | null, input?: { message?: string; button_id?: string }) => {
+    let currentNodeId = state?.current_node_id || startContainer?.nodes?.[0]?.id || null;
+    const variables = { ...(state?.variables || {}) };
+    const nextMessages: Message[] = [];
+    let waitingFor: "text" | "buttons" | null = null;
+    let nextButtons: ButtonConfig[] = [];
+    let waitMs = 0;
+    let steps = 0;
+    const firstText = (...values: any[]) => String(values.find((v) => typeof v === "string" && v.trim()) || "");
+    const cleanText = (text: string) => String(text || "").replace(/<br\s*\/?>/gi, "\n").replace(/<[^>]+>/g, "").replace(/&nbsp;/g, " ").replace(/&amp;/g, "&").trim();
+    const replaceVars = (text: string) => cleanText(text).replace(/{{(.*?)}}/g, (_, key) => variables[key.trim()] ?? `{{${key}}}`);
+    const parseWaitMs = (cfg: any) => {
+      const amount = Math.max(1, Number(cfg.waitTime ?? cfg.duration ?? cfg.seconds ?? 5) || 5);
+      const unit = String(cfg.timeUnit ?? cfg.unit ?? "seconds").toLowerCase();
+      return amount * (unit.startsWith("hour") || unit.startsWith("hora") ? 3600000 : unit.startsWith("minute") || unit.startsWith("minuto") ? 60000 : 1000);
+    };
+
+    if (state?.waiting_for_input && input && currentNodeId) {
+      const current = findNode(currentNodeId);
+      if (current) {
+        const varName = current.node.config?.variableName || current.node.config?.saveVariable;
+        const value = input.message ?? input.button_id;
+        if (varName && value !== undefined) variables[varName] = value;
+        currentNodeId = nextFromNode(current.node.id, current.container.id, input.button_id);
+      }
+    }
+
+    while (currentNodeId && steps++ < 100) {
+      const found = findNode(currentNodeId);
+      if (!found) {
+        currentNodeId = firstNodeOfContainer(currentNodeId);
+        if (currentNodeId) continue;
+        break;
+      }
+
+      const { node, container } = found;
+      const cfg = node.config || {};
+      const nodeType = String(node.type || "").toLowerCase();
+
+      if (nodeType === "wait" || nodeType === "await") {
+        waitMs = parseWaitMs(cfg);
+        currentNodeId = nextFromNode(node.id, container.id);
+        break;
+      }
+
+      if (nodeType === "bubble-text" || nodeType === "bubble-number") {
+        const content = replaceVars(firstText(cfg.message, cfg.content, cfg.text, cfg.number, cfg.value));
+        if (content) nextMessages.push({ id: crypto.randomUUID(), type: "bot", content });
+      } else if (nodeType === "bubble-image") {
+        nextMessages.push({ id: crypto.randomUUID(), type: "bot", content: firstText(cfg.ImageURL, cfg.imageUrl, cfg.url, cfg.src), isImage: true, alt: firstText(cfg.ImageAlt, cfg.alt) });
+      } else if (nodeType === "bubble-video") {
+        nextMessages.push({ id: crypto.randomUUID(), type: "bot", content: firstText(cfg.VideoURL, cfg.videoUrl, cfg.url, cfg.src), isVideo: true });
+      } else if (nodeType === "bubble-audio") {
+        nextMessages.push({ id: crypto.randomUUID(), type: "bot", content: firstText(cfg.AudioURL, cfg.audioUrl, cfg.url, cfg.src), isAudio: true, autoplay: cfg.AudioAutoplay ?? cfg.autoplay });
+      } else if (nodeType === "bubble-document" || nodeType === "bubble-file") {
+        nextMessages.push({ id: crypto.randomUUID(), type: "bot", content: firstText(cfg.FileURL, cfg.fileUrl, cfg.url, cfg.FileName, cfg.name), isFile: true });
+      } else if (nodeType.startsWith("input-") && nodeType !== "input-buttons") {
+        waitingFor = "text";
+      } else if (nodeType === "input-buttons") {
+        waitingFor = "buttons";
+        nextButtons = cfg.buttons || [];
+      } else if (nodeType === "set-variable" && cfg.variableName) {
+        variables[cfg.variableName] = replaceVars(cfg.value || "");
+      }
+
+      if (waitingFor) break;
+      currentNodeId = nextFromNode(node.id, container.id);
+    }
+
+    return { messages: nextMessages, wait_ms: waitMs, waiting_for: waitingFor, buttons: nextButtons, runtime_state: { current_node_id: currentNodeId, variables, waiting_for_input: !!waitingFor } };
+  };
+
   useEffect(() => {
     if (!isOpen || !flowId) {
       clearWaitTimer();
