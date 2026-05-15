@@ -122,6 +122,8 @@ const nodeLabels: Record<NodeType, string> = {
 };
 
 export const NodeItem = ({ node, onClick }: NodeItemProps) => {
+  const effectiveType = String(node.type).toLowerCase() === "await" ? "wait" : node.type;
+
   const handleDragStart = useCallback((e: React.DragEvent) => {
     e.stopPropagation();
     e.dataTransfer.setData('nodeId', node.id);
@@ -150,7 +152,7 @@ export const NodeItem = ({ node, onClick }: NodeItemProps) => {
   const hasButtonsPreview = false; // Handled by ButtonGroupNodeItem now
   const hasSetVariablePreview = node.type === "set-variable" && node.config.variableName;
   const hasScriptPreview = node.type === "script" && node.config.code;
-  const hasWaitPreview = node.type === "wait" && node.config.waitTime;
+  const hasWaitPreview = effectiveType === "wait" && node.config.waitTime;
 
   return (
     <div
@@ -160,7 +162,7 @@ export const NodeItem = ({ node, onClick }: NodeItemProps) => {
       }}
       className={cn(
         "nodrag nopan",
-        nodeColors[node.type],
+        nodeColors[effectiveType],
         "rounded-lg p-0 cursor-pointer transition-all duration-200 select-none border relative overflow-hidden group  border-border/60"
       )}
     >
@@ -177,9 +179,9 @@ export const NodeItem = ({ node, onClick }: NodeItemProps) => {
       </div>
 
       <div className="flex items-center justify-center gap-2 pr-8 rounded-md px-1 min-h-[40px]">
-        {nodeIcons[node.type]}
+        {nodeIcons[effectiveType]}
         <div className="flex-1 min-w-0 flex py-1 px-1 overflow-hidden max-w-[90%] flex-col gap-1">
-          <p className="text-xs font-semibold text-left w-full">{nodeLabels[node.type]}</p>
+          <p className="text-xs font-semibold text-left w-full">{nodeLabels[effectiveType]}</p>
 
           {hasVideoPreview ? (
             <div className="mt-2">
