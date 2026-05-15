@@ -352,16 +352,20 @@ function runFlow(execution: any, containers: any[], edges: any[], input: any) {
 
     // Check if node is a wait node (Aguardar)
     if (nodeType === "wait" || nodeType === "await") {
-      // If we JUST started this node (not continuing from timer)
+      // If we are NOT already in a waiting state for THIS SPECIFIC execution call
       if (!execution.is_waiting_time) {
         wait_ms = parseWaitMs(cfg);
-        // Do NOT advance currentNodeId yet. Keep it on the wait node.
-        // When the timer finishes, the client calls back and we'll see is_waiting_time=true.
-        break; // STOP loop immediately
+        // CRITICAL: We DO NOT advance currentNodeId yet. 
+        // We stay on the wait node so that next time we come back, 
+        // we hit the "else" block below.
+        break; 
       } else {
-        // We are CONTINUING after a timer. Reset flag and move to next node.
+        // We are returning from a timer.
+        // Mark waiting as finished for the state, then MOVE TO NEXT node.
         execution.is_waiting_time = false;
         currentNodeId = nextFromNode(node.id, container);
+        // Continue to the next node in the same execution loop 
+        // so messages after the wait are returned now.
         continue;
       }
     }
