@@ -7,6 +7,9 @@ const corsHeaders = {
   "Access-Control-Allow-Methods": "POST, OPTIONS",
 };
 
+const runtimeMemory = new Map<string, { state: any; expiresAt: number }>();
+const MEMORY_TTL_MS = 1000 * 60 * 60 * 6;
+
 Deno.serve(async (req: Request) => {
   if (req.method === "OPTIONS") return new Response(null, { headers: corsHeaders });
 
@@ -123,11 +126,13 @@ Deno.serve(async (req: Request) => {
       } catch {}
     }
 
-    const clientState = payload?.runtime_state || body?.runtime_state || null;
+    const memoryKey = `${flow.id}:${channel}:${contact_id}`;
+    const clientState = payload?.runtime_state || body?.runtime_state || readMemoryState(memoryKey);
     if (!execution) {
       // Fallback para ambientes onde as tabelas de runtime ainda não existem.
-      // O cliente devolve o último estado recebido para a próxima mensagem,
-      // evitando que o fluxo reinicie do primeiro nó a cada interação.
+      // Primeiro tenta o estado em memória do próprio Edge Function; se o isolate
+      // reiniciar, usa o estado devolvido pelo cliente novo. Assim clientes antigos
+      // também param de reiniciar o fluxo a cada mensagem.
       execution = normalizeClientState(clientState);
     } else if (action !== "start" && !execution.current_node_id && clientState?.current_node_id) {
       execution = { ...execution, ...normalizeClientState(clientState), id: execution.id };
@@ -150,16 +155,19 @@ Deno.serve(async (req: Request) => {
       } catch {}
     }
 
+    const runtimeState = {
+      current_node_id: result.next_node_id,
+      variables: result.variables,
+      waiting_for_input: !!result.waiting_for,
+    };
+    writeMemoryState(memoryKey, runtimeState);
+
     return json({
       messages: result.messages,
       waiting_for: result.waiting_for,
       buttons: result.buttons,
       session_id: session?.id ?? null,
-      runtime_state: {
-        current_node_id: result.next_node_id,
-        variables: result.variables,
-        waiting_for_input: !!result.waiting_for,
-      },
+      runtime_state: runtimeState,
       debug: { node: result.next_node_id, steps: result.steps },
     });
   } catch (err: any) {
