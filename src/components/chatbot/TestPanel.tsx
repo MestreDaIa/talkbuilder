@@ -24,6 +24,7 @@ interface RuntimeState {
   current_node_id: string | null;
   variables: Record<string, any>;
   waiting_for_input: boolean;
+  pending_wait_node_id?: string | null;
 }
 
 interface AudioPlayerProps {
@@ -129,6 +130,9 @@ interface TestPanelProps {
 export const TestPanel = ({
   isOpen,
   onClose,
+  startContainer,
+  allContainers,
+  edges = [],
   headerTitle = "Teste do Fluxo",
   headerSubtitle,
   hideClose = false,
@@ -155,6 +159,112 @@ export const TestPanel = ({
 
   const getRuntimeUrl = () => {
     return "https://fwoescubnnagdvwasbjl.functions.supabase.co/chatbot-runtime";
+  };
+
+  const firstNodeOfContainer = (containerId: string) => {
+    const container = allContainers.find((c) => c.id === containerId);
+    return container?.nodes?.[0]?.id ?? null;
+  };
+
+  const findNode = (nodeId: string | null) => {
+    if (!nodeId) return null;
+    for (const container of allContainers) {
+      const node = container.nodes.find((n) => n.id === nodeId);
+      if (node) return { node, container };
+    }
+    return null;
+  };
+
+  const nextFromNode = (nodeId: string, containerId: string, handle?: string | null) => {
+    const normalizeHandle = (value?: string | null) => {
+      if (!value) return "";
+      const raw = String(value);
+      const buttonMatch = raw.match(/-btn-(.+)$/);
+      if (buttonMatch?.[1]) return buttonMatch[1];
+      if (raw.endsWith("-default")) return "default";
+      return raw;
+    };
+    const wantedHandle = normalizeHandle(handle);
+    let edge = edges.find((e) => e.source === nodeId && wantedHandle && normalizeHandle(e.sourceHandle) === wantedHandle);
+    if (!edge && wantedHandle) edge = edges.find((e) => e.source === nodeId && normalizeHandle(e.sourceHandle) === "default");
+    if (!edge) edge = edges.find((e) => e.source === nodeId && !e.sourceHandle);
+    if (!edge) edge = edges.find((e) => e.source === nodeId);
+    if (edge) return findNode(edge.target) ? edge.target : (firstNodeOfContainer(edge.target) || edge.target);
+    const containerEdge = edges.find((e) => e.source === containerId);
+    if (containerEdge) return findNode(containerEdge.target) ? containerEdge.target : firstNodeOfContainer(containerEdge.target);
+    return null;
+  };
+
+  const runLocalFlow = (state: RuntimeState | null, input?: { message?: string; button_id?: string }) => {
+    let currentNodeId = state?.current_node_id || startContainer?.nodes?.[0]?.id || null;
+    const variables = { ...(state?.variables || {}) };
+    const nextMessages: Message[] = [];
+    let waitingFor: "text" | "buttons" | null = null;
+    let nextButtons: ButtonConfig[] = [];
+    let waitMs = 0;
+    let steps = 0;
+    const firstText = (...values: any[]) => String(values.find((v) => typeof v === "string" && v.trim()) || "");
+    const cleanText = (text: string) => String(text || "").replace(/<br\s*\/?>/gi, "\n").replace(/<[^>]+>/g, "").replace(/&nbsp;/g, " ").replace(/&amp;/g, "&").trim();
+    const replaceVars = (text: string) => cleanText(text).replace(/{{(.*?)}}/g, (_, key) => variables[key.trim()] ?? `{{${key}}}`);
+    const parseWaitMs = (cfg: any) => {
+      const amount = Math.max(1, Number(cfg.waitTime ?? cfg.duration ?? cfg.seconds ?? 5) || 5);
+      const unit = String(cfg.timeUnit ?? cfg.unit ?? "seconds").toLowerCase();
+      return amount * (unit.startsWith("hour") || unit.startsWith("hora") ? 3600000 : unit.startsWith("minute") || unit.startsWith("minuto") ? 60000 : 1000);
+    };
+
+    if (state?.waiting_for_input && input && currentNodeId) {
+      const current = findNode(currentNodeId);
+      if (current) {
+        const varName = current.node.config?.variableName || current.node.config?.saveVariable;
+        const value = input.message ?? input.button_id;
+        if (varName && value !== undefined) variables[varName] = value;
+        currentNodeId = nextFromNode(current.node.id, current.container.id, input.button_id);
+      }
+    }
+
+    while (currentNodeId && steps++ < 100) {
+      const found = findNode(currentNodeId);
+      if (!found) {
+        currentNodeId = firstNodeOfContainer(currentNodeId);
+        if (currentNodeId) continue;
+        break;
+      }
+
+      const { node, container } = found;
+      const cfg = node.config || {};
+      const nodeType = String(node.type || "").toLowerCase();
+
+      if (nodeType === "wait" || nodeType === "await") {
+        waitMs = parseWaitMs(cfg);
+        currentNodeId = nextFromNode(node.id, container.id);
+        break;
+      }
+
+      if (nodeType === "bubble-text" || nodeType === "bubble-number") {
+        const content = replaceVars(firstText(cfg.message, cfg.content, cfg.text, cfg.number, cfg.value));
+        if (content) nextMessages.push({ id: crypto.randomUUID(), type: "bot", content });
+      } else if (nodeType === "bubble-image") {
+        nextMessages.push({ id: crypto.randomUUID(), type: "bot", content: firstText(cfg.ImageURL, cfg.imageUrl, cfg.url, cfg.src), isImage: true, alt: firstText(cfg.ImageAlt, cfg.alt) });
+      } else if (nodeType === "bubble-video") {
+        nextMessages.push({ id: crypto.randomUUID(), type: "bot", content: firstText(cfg.VideoURL, cfg.videoUrl, cfg.url, cfg.src), isVideo: true });
+      } else if (nodeType === "bubble-audio") {
+        nextMessages.push({ id: crypto.randomUUID(), type: "bot", content: firstText(cfg.AudioURL, cfg.audioUrl, cfg.url, cfg.src), isAudio: true, autoplay: cfg.AudioAutoplay ?? cfg.autoplay });
+      } else if (nodeType === "bubble-document" || nodeType === "bubble-file") {
+        nextMessages.push({ id: crypto.randomUUID(), type: "bot", content: firstText(cfg.FileURL, cfg.fileUrl, cfg.url, cfg.FileName, cfg.name), isFile: true });
+      } else if (nodeType.startsWith("input-") && nodeType !== "input-buttons") {
+        waitingFor = "text";
+      } else if (nodeType === "input-buttons") {
+        waitingFor = "buttons";
+        nextButtons = cfg.buttons || [];
+      } else if (nodeType === "set-variable" && cfg.variableName) {
+        variables[cfg.variableName] = replaceVars(cfg.value || "");
+      }
+
+      if (waitingFor) break;
+      currentNodeId = nextFromNode(node.id, container.id);
+    }
+
+    return { messages: nextMessages, wait_ms: waitMs, waiting_for: waitingFor, buttons: nextButtons, runtime_state: { current_node_id: currentNodeId, variables, waiting_for_input: !!waitingFor } };
   };
 
   useEffect(() => {
@@ -204,9 +314,12 @@ export const TestPanel = ({
   };
 
   const applyRuntimeData = (data: any, replaceMessages = false) => {
-    runtimeStateRef.current = data.runtime_state || runtimeStateRef.current;
+    const incomingState = data.runtime_state || runtimeStateRef.current;
+    const waitMs = Number(data.wait_ms);
+    const hasActiveWait = Number.isFinite(waitMs) && waitMs > 0;
+    runtimeStateRef.current = incomingState;
     if (replaceMessages) setMessages(data.messages || []);
-    else setMessages(prev => [...prev, ...(data.messages || [])]);
+    else if (!hasActiveWait || (data.messages || []).length > 0) setMessages(prev => [...prev, ...(data.messages || [])]);
     setWaitingForInput(data.waiting_for === "text");
     setWaitingForButton(data.waiting_for === "buttons");
     setActiveButtons(data.buttons || []);
@@ -216,49 +329,14 @@ export const TestPanel = ({
   const startRuntimeSession = async () => {
     setIsLoading(true);
     setMessages([]);
-    try {
-      const response = await fetch(getRuntimeUrl(), {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          action: "start",
-          flow_id: flowId,
-          contact_id: contactIdRef.current,
-          channel: "webchat",
-        }),
-      });
-      const data = await response.json();
-      applyRuntimeData(data, true);
-    } catch (err) {
-      console.error("Test Runtime error:", err);
-    } finally {
-      if (!waitTimerRef.current) setIsLoading(false);
-    }
+    applyRuntimeData(runLocalFlow(null), true);
+    if (!waitTimerRef.current) setIsLoading(false);
   };
 
   const continueRuntime = async () => {
-    if (!flowId) return;
     setIsLoading(true);
-
-    try {
-      const response = await fetch(getRuntimeUrl(), {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          action: "message",
-          flow_id: flowId,
-          contact_id: contactIdRef.current,
-          channel: "webchat",
-          payload: { runtime_state: runtimeStateRef.current },
-        }),
-      });
-      const data = await response.json();
-      applyRuntimeData(data);
-    } catch (err) {
-      console.error("Test Runtime continue error:", err);
-    } finally {
-      if (!waitTimerRef.current) setIsLoading(false);
-    }
+    applyRuntimeData(runLocalFlow(runtimeStateRef.current));
+    if (!waitTimerRef.current) setIsLoading(false);
   };
 
   const sendMessage = async (message?: string, buttonId?: string) => {
@@ -272,25 +350,8 @@ export const TestPanel = ({
     setIsLoading(true);
     setCurrentInput("");
 
-    try {
-      const response = await fetch(getRuntimeUrl(), {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          action: "message",
-          flow_id: flowId,
-          contact_id: contactIdRef.current,
-          channel: "webchat",
-          payload: { message: msgToSend, button_id: buttonId, runtime_state: runtimeStateRef.current },
-        }),
-      });
-      const data = await response.json();
-      applyRuntimeData(data);
-    } catch (err) {
-      console.error("Test Runtime message error:", err);
-    } finally {
-      if (!waitTimerRef.current) setIsLoading(false);
-    }
+    applyRuntimeData(runLocalFlow(runtimeStateRef.current, { message: msgToSend, button_id: buttonId }));
+    if (!waitTimerRef.current) setIsLoading(false);
   };
 
   const handleButtonClick = (button: ButtonConfig) => sendMessage(undefined, button.id);
