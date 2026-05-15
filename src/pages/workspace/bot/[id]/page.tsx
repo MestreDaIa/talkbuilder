@@ -270,16 +270,9 @@ export default function BotPage() {
       console.warn("[BotPage] flush on back failed:", err);
     }
 
-    // 2) Limpa estado local do editor pra evitar reuso entre bots ao voltar.
-    setFlow(null);
-    setContainers([]);
-    setEdges([]);
-    setHydrated(false);
-    setTestContainer(null);
-    setShowSettings(false);
-    setShowPublish(false);
-
-    // 3) Sempre volta para o workspace Main (raiz), independente da pasta de origem.
+    // 2) Sempre volta para o workspace Main (raiz), independente da pasta de origem.
+    // O estado do editor (setFlow, setContainers, etc) é limpo naturalmente na desmontagem do componente
+    // ao navegar para uma nova rota, mas mantemos o rascunho salvo acima.
     navigate(workspaceRoot(slug), { replace: true });
   };
 
