@@ -119,11 +119,15 @@ function SidebarItem({
 		id: `sidebar-${folder.id}`,
 		data: {
 			originalId: folder.id,
+			itemType: folder.type,
 		},
 	});
 
 	const { setNodeRef: setDropRef, isOver } = useDroppable({
-		id: folder.id,
+		id: `drop-sidebar-${folder.id}`,
+		data: {
+			originalId: folder.id,
+		},
 	});
 
 	const style: CSSProperties = {

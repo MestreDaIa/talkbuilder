@@ -45,8 +45,9 @@ export default function DnDProvider({
 		if (!active?.data?.current || !over?.id) return;
 
 		const draggedId = active.data.current.originalId as string;
+		const overData = over.data.current;
 		const overIdRaw = over.id as string;
-		const overId = cleanId(overIdRaw);
+		const overId = overData?.originalId || cleanId(overIdRaw);
 
 		if (draggedId === overId) return;
 

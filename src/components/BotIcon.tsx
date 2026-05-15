@@ -100,7 +100,7 @@ export default function BotIcon({
 		transform,
 	} = useDraggable({
 		id: `grid-${id}`,
-		data: { zone: "GRID", itemType: "folder", originalId: id },
+		data: { zone: "GRID", itemType: "bot", originalId: id },
 	});
 
 	const handleConfirmDelete = useCallback(() => {
