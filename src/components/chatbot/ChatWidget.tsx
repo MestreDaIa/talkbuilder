@@ -49,7 +49,7 @@ export const ChatWidget = ({
   const [error, setError] = useState<string | null>(null);
   const scrollRef = useRef<HTMLDivElement>(null);
   const runtimeStateRef = useRef<RuntimeState | null>(null);
-  const waitTimerRef = useRef<number | null>(null);
+  const waitTimerRef = useRef<NodeJS.Timeout | null>(null);
 
   const getRuntimeUrl = () => {
     return "https://fwoescubnnagdvwasbjl.functions.supabase.co/chatbot-runtime";
