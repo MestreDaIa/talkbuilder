@@ -25,7 +25,8 @@ export type NodeType =
   | "set-variable"
   | "script"
   | "condition"
-  | "wait";
+  | "wait"
+  | "await";
 
 export interface NodeConfig {
   [key: string]: any;
