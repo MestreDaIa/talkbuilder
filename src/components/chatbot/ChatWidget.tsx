@@ -20,6 +20,12 @@ interface ChatButton {
   value?: string;
 }
 
+interface RuntimeState {
+  current_node_id: string | null;
+  variables: Record<string, any>;
+  waiting_for_input: boolean;
+}
+
 interface ChatWidgetProps {
   flowId?: string;
   companyId: string;
@@ -42,6 +48,7 @@ export const ChatWidget = ({
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const scrollRef = useRef<HTMLDivElement>(null);
+  const runtimeStateRef = useRef<RuntimeState | null>(null);
 
   const getRuntimeUrl = () => {
     return "https://fwoescubnnagdvwasbjl.functions.supabase.co/chatbot-runtime";
@@ -90,6 +97,7 @@ export const ChatWidget = ({
 
       const data = await response.json();
       setSessionId(data.session_id);
+      runtimeStateRef.current = data.runtime_state || null;
       setMessages(data.messages || []);
       setWaitingFor(data.waiting_for);
       setButtons(data.buttons || []);
@@ -120,13 +128,14 @@ export const ChatWidget = ({
           flow_id: flowId,
           contact_id: localStorage.getItem("chat_contact_id"),
           channel: "webchat",
-          payload: { message: msgToSend, button_id: buttonId },
+          payload: { message: msgToSend, button_id: buttonId, runtime_state: runtimeStateRef.current },
         }),
       });
 
       if (!response.ok) throw new Error("Falha ao enviar mensagem");
 
       const data = await response.json();
+      runtimeStateRef.current = data.runtime_state || runtimeStateRef.current;
       setMessages(prev => [...prev, ...(data.messages || [])]);
       setWaitingFor(data.waiting_for);
       setButtons(data.buttons || []);
@@ -152,6 +161,7 @@ export const ChatWidget = ({
     setMessages([]);
     setWaitingFor(null);
     setButtons([]);
+    runtimeStateRef.current = null;
     setError(null);
   };
 
