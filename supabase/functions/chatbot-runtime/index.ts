@@ -123,9 +123,14 @@ Deno.serve(async (req: Request) => {
       } catch {}
     }
 
+    const clientState = payload?.runtime_state || body?.runtime_state || null;
     if (!execution) {
-      // Fallback in-memory execution (no persistence)
-      execution = { id: null, current_node_id: null, variables: {}, waiting_for_input: false };
+      // Fallback para ambientes onde as tabelas de runtime ainda não existem.
+      // O cliente devolve o último estado recebido para a próxima mensagem,
+      // evitando que o fluxo reinicie do primeiro nó a cada interação.
+      execution = normalizeClientState(clientState);
+    } else if (action !== "start" && !execution.current_node_id && clientState?.current_node_id) {
+      execution = { ...execution, ...normalizeClientState(clientState), id: execution.id };
     }
 
     const result = runFlow(execution, containers, edges, payload);
@@ -150,6 +155,11 @@ Deno.serve(async (req: Request) => {
       waiting_for: result.waiting_for,
       buttons: result.buttons,
       session_id: session?.id ?? null,
+      runtime_state: {
+        current_node_id: result.next_node_id,
+        variables: result.variables,
+        waiting_for_input: !!result.waiting_for,
+      },
       debug: { node: result.next_node_id, steps: result.steps },
     });
   } catch (err: any) {
@@ -163,6 +173,15 @@ function json(data: any, status = 200) {
     status,
     headers: { ...corsHeaders, "Content-Type": "application/json" },
   });
+}
+
+function normalizeClientState(state: any) {
+  return {
+    id: null,
+    current_node_id: typeof state?.current_node_id === "string" ? state.current_node_id : null,
+    variables: state?.variables && typeof state.variables === "object" ? state.variables : {},
+    waiting_for_input: !!state?.waiting_for_input,
+  };
 }
 
 function runFlow(execution: any, containers: any[], edges: any[], input: any) {
