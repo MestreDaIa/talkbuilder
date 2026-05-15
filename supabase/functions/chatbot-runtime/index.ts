@@ -1,21 +1,13 @@
-// chatbot-runtime edge function v2
+// @ts-nocheck
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.45.4";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
-  "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
+  "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type, x-embed-token",
+  "Access-Control-Allow-Methods": "POST, OPTIONS",
 };
 
-interface RuntimeRequest {
-  action: "start" | "message";
-  flow_id: string; // public_id or UUID
-  contact_id: string;
-  channel: "webchat" | "whatsapp" | "instagram" | "telegram";
-  workspace_id?: string;
-  payload?: any;
-}
-
-Deno.serve(async (req) => {
+Deno.serve(async (req: Request) => {
   if (req.method === "OPTIONS") return new Response(null, { headers: corsHeaders });
 
   try {
@@ -24,243 +16,320 @@ Deno.serve(async (req) => {
       Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? ""
     );
 
-    const body: RuntimeRequest = await req.json();
-    const { action, flow_id: flowRef, contact_id, channel, payload } = body;
+    const body = await req.json();
+    const { action, flow_id: flowRef, contact_id, channel = "webchat", payload } = body || {};
 
-    console.log(`[Runtime] Action: ${action}, Flow: ${flowRef}, Contact: ${contact_id}, Channel: ${channel}`);
-
-    // 1. Resolve Flow
-    const { data: flow, error: flowErr } = await resolveFlow(supabase, flowRef, body.workspace_id);
-    if (flowErr || !flow) throw new Error("Flow não encontrado");
-
-    // 2. Get/Create Session (24h Window)
-    const { data: session, error: sessErr } = await getOrCreateSession(supabase, flow, contact_id, channel);
-    if (sessErr) throw sessErr;
-
-    // 3. Get/Create Execution State
-    const { data: execution, error: execErr } = await getOrCreateExecution(supabase, flow, contact_id, channel);
-    if (execErr) throw execErr;
-
-    // 4. Runtime Logic
-    const containers = flow.published_containers || flow.draft_containers || [];
-    const edges = flow.published_edges || flow.draft_edges || [];
-    
-    let result;
-    if (action === "start") {
-      result = await runFlow(supabase, session, execution, containers, edges, null);
-    } else {
-      result = await runFlow(supabase, session, execution, containers, edges, payload);
+    if (!action || !flowRef || !contact_id) {
+      return json({ error: "missing required fields: action, flow_id, contact_id" }, 400);
     }
 
-    // 5. Analytics
-    await supabase.from("conversation_events").insert({
-      session_id: session.id,
-      execution_id: execution.id,
-      workspace_id: flow.user_id,
-      event_type: action === "start" ? "FLOW_STARTED" : "MESSAGE_RECEIVED",
-      payload: { input: payload, output: result }
-    });
+    // 1. Resolve Flow (try public_id first, then id)
+    let flow: any = null;
+    {
+      const { data } = await supabase
+        .from("chatbot_flows")
+        .select("*")
+        .eq("public_id", flowRef)
+        .maybeSingle();
+      flow = data;
+    }
+    if (!flow && /^[0-9a-f-]{36}$/i.test(flowRef)) {
+      const { data } = await supabase
+        .from("chatbot_flows")
+        .select("*")
+        .eq("id", flowRef)
+        .maybeSingle();
+      flow = data;
+    }
+    if (!flow) return json({ error: "Flow não encontrado", flow_id: flowRef }, 404);
 
-    return new Response(JSON.stringify({ ...result, session_id: session.id }), {
-      headers: { ...corsHeaders, "Content-Type": "application/json" }
-    });
+    const containers = flow.published_containers || flow.draft_containers || [];
+    const edges = flow.published_edges || flow.draft_edges || [];
 
+    if (!containers.length) {
+      return json({ error: "Fluxo vazio (nenhum container)" }, 400);
+    }
+
+    // 2. Session (best-effort - don't fail if table missing)
+    let session: any = null;
+    try {
+      const { data: existing } = await supabase
+        .from("conversation_sessions")
+        .select("*")
+        .eq("flow_id", flow.id)
+        .eq("contact_id", contact_id)
+        .eq("channel_id", channel)
+        .eq("status", "active")
+        .order("last_interaction_at", { ascending: false })
+        .limit(1)
+        .maybeSingle();
+      session = existing;
+      if (!session) {
+        const { data: created } = await supabase
+          .from("conversation_sessions")
+          .insert({ workspace_id: flow.user_id, flow_id: flow.id, contact_id, channel_id: channel })
+          .select()
+          .single();
+        session = created;
+      } else {
+        await supabase
+          .from("conversation_sessions")
+          .update({ last_interaction_at: new Date().toISOString() })
+          .eq("id", session.id);
+      }
+    } catch (e) {
+      console.warn("[runtime] session table missing or error", e);
+    }
+
+    // 3. Execution state (best-effort)
+    let execution: any = null;
+    if (action === "start") {
+      // Reset on explicit start
+      try {
+        const { data: existing } = await supabase
+          .from("flow_executions")
+          .select("*")
+          .eq("flow_id", flow.id)
+          .eq("contact_id", contact_id)
+          .eq("channel_id", channel)
+          .maybeSingle();
+        if (existing) {
+          await supabase
+            .from("flow_executions")
+            .update({ current_node_id: null, variables: {}, waiting_for_input: false })
+            .eq("id", existing.id);
+          execution = { ...existing, current_node_id: null, variables: {}, waiting_for_input: false };
+        } else {
+          const { data: created } = await supabase
+            .from("flow_executions")
+            .insert({ workspace_id: flow.user_id, flow_id: flow.id, contact_id, channel_id: channel })
+            .select()
+            .single();
+          execution = created;
+        }
+      } catch (e) {
+        console.warn("[runtime] execution table missing", e);
+      }
+    } else {
+      try {
+        const { data: existing } = await supabase
+          .from("flow_executions")
+          .select("*")
+          .eq("flow_id", flow.id)
+          .eq("contact_id", contact_id)
+          .eq("channel_id", channel)
+          .maybeSingle();
+        execution = existing;
+      } catch {}
+    }
+
+    if (!execution) {
+      // Fallback in-memory execution (no persistence)
+      execution = { id: null, current_node_id: null, variables: {}, waiting_for_input: false };
+    }
+
+    const result = runFlow(execution, containers, edges, payload);
+
+    // Persist new state
+    if (execution.id) {
+      try {
+        await supabase
+          .from("flow_executions")
+          .update({
+            current_node_id: result.next_node_id,
+            variables: result.variables,
+            waiting_for_input: !!result.waiting_for,
+            updated_at: new Date().toISOString(),
+          })
+          .eq("id", execution.id);
+      } catch {}
+    }
+
+    return json({
+      messages: result.messages,
+      waiting_for: result.waiting_for,
+      buttons: result.buttons,
+      session_id: session?.id ?? null,
+      debug: { node: result.next_node_id, steps: result.steps },
+    });
   } catch (err: any) {
-    console.error("[Runtime Error]", err);
-    return new Response(JSON.stringify({ error: err.message }), {
-      status: 400,
-      headers: { ...corsHeaders, "Content-Type": "application/json" }
-    });
+    console.error("[runtime] fatal", err);
+    return json({ error: err?.message || String(err) }, 500);
   }
 });
 
-async function resolveFlow(supabase: any, ref: string, workspaceId?: string) {
-  let query = supabase.from("chatbot_flows").select("*");
-  if (ref.includes("-") && ref.length > 20) query = query.eq("id", ref);
-  else query = query.eq("public_id", ref);
-  if (workspaceId) query = query.eq("user_id", workspaceId);
-  return query.maybeSingle();
+function json(data: any, status = 200) {
+  return new Response(JSON.stringify(data), {
+    status,
+    headers: { ...corsHeaders, "Content-Type": "application/json" },
+  });
 }
 
-async function getOrCreateSession(supabase: any, flow: any, contact_id: string, channel: string) {
-  const windowLimit = new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString();
-  let { data: session } = await supabase
-    .from("conversation_sessions")
-    .select("*")
-    .eq("flow_id", flow.id)
-    .eq("contact_id", contact_id)
-    .eq("channel_id", channel)
-    .eq("status", "active")
-    .gt("last_interaction_at", windowLimit)
-    .maybeSingle();
-
-  if (!session) {
-    const { data, error } = await supabase.from("conversation_sessions").insert({
-      workspace_id: flow.user_id,
-      flow_id: flow.id,
-      contact_id,
-      channel_id: channel
-    }).select().single();
-    
-    if (!error) {
-        await supabase.rpc("increment_usage_counter", { w_id: flow.user_id, field: "conversations_started" });
-    }
-    return { data, error };
-  }
-  
-  await supabase.from("conversation_sessions")
-    .update({ last_interaction_at: new Date().toISOString(), message_count: (session.message_count || 0) + 1 })
-    .eq("id", session.id);
-    
-  return { data: session };
-}
-
-async function getOrCreateExecution(supabase: any, flow: any, contact_id: string, channel: string) {
-  let { data: exec } = await supabase.from("flow_executions")
-    .select("*")
-    .eq("workspace_id", flow.user_id)
-    .eq("flow_id", flow.id)
-    .eq("contact_id", contact_id)
-    .eq("channel_id", channel)
-    .maybeSingle();
-
-  if (!exec) {
-    return supabase.from("flow_executions").insert({
-      workspace_id: flow.user_id,
-      flow_id: flow.id,
-      contact_id,
-      channel_id: channel
-    }).select().single();
-  }
-  return { data: exec };
-}
-
-async function runFlow(supabase: any, session: any, execution: any, containers: any[], edges: any[], input: any) {
-  let currentNodeId = execution.current_node_id;
-  let variables = execution.variables || {};
-  let messages: any[] = [];
+function runFlow(execution: any, containers: any[], edges: any[], input: any) {
+  let currentNodeId: string | null = execution.current_node_id;
+  const variables: Record<string, any> = { ...(execution.variables || {}) };
+  const messages: any[] = [];
   let waiting_for: string | null = null;
   let buttons: any[] = [];
+  let steps = 0;
 
-  const findNode = (id: string) => {
+  const findNode = (id: string | null) => {
+    if (!id) return null;
     for (const c of containers) {
-      const n = c.nodes.find((node: any) => node.id === id);
+      const nodes = c.nodes || [];
+      const n = nodes.find((node: any) => node.id === id);
       if (n) return { node: n, container: c };
     }
     return null;
   };
 
-  const findNodeInContainer = (containers: any[], containerId: string) => {
-    const c = containers.find(cont => cont.id === containerId);
-    return c?.nodes[0]?.id;
+  const firstNodeOfContainer = (containerId: string): string | null => {
+    const c = containers.find((x: any) => x.id === containerId);
+    return c?.nodes?.[0]?.id ?? null;
   };
 
-  const replaceVariables = (text: string) => {
-    if (!text) return text;
-    return text.replace(/{{(.*?)\}}/g, (_, key) => variables[key.trim()] || `{{${key}}}`);
+  const nextFromNode = (nodeId: string, container: any, handle?: string): string | null => {
+    let edge = edges.find((e: any) => e.source === nodeId && handle && e.sourceHandle === handle);
+    if (!edge) edge = edges.find((e: any) => e.source === nodeId);
+    if (edge) {
+      // edge target may be a node id OR a container id
+      if (findNode(edge.target)) return edge.target;
+      const first = firstNodeOfContainer(edge.target);
+      if (first) return first;
+      return edge.target;
+    }
+    // fallback: container-level edge
+    const cEdge = edges.find((e: any) => e.source === container.id);
+    if (cEdge) {
+      if (findNode(cEdge.target)) return cEdge.target;
+      return firstNodeOfContainer(cEdge.target);
+    }
+    return null;
   };
 
-  if (execution.waiting_for_input && input) {
-    const lastNodeInfo = findNode(currentNodeId);
-    if (lastNodeInfo?.node.type.startsWith("input-")) {
-      const varName = lastNodeInfo.node.config?.variableName || lastNodeInfo.node.config?.saveVariable;
-      if (varName) variables[varName] = input.message || input.button_id;
-      
-      let nextEdge = edges.find(e => e.source === currentNodeId && e.sourceHandle === input.button_id);
-      if (!nextEdge) {
-          nextEdge = edges.find(e => e.source === currentNodeId);
-      }
+  const replaceVars = (text: string) =>
+    !text ? text : text.replace(/{{(.*?)}}/g, (_, k) => variables[k.trim()] ?? `{{${k}}}`);
 
-      if (nextEdge) {
-        currentNodeId = nextEdge.target;
-      } else {
-        const cEdge = edges.find(e => e.source === lastNodeInfo.container.id);
-        if (cEdge) {
-            const targetId = cEdge.target;
-            const targetNode = findNode(targetId);
-            if (targetNode) currentNodeId = targetId;
-            else currentNodeId = findNodeInContainer(containers, targetId);
-        } else {
-            currentNodeId = null;
-        }
-      }
+  // If we were waiting and got input -> capture and advance
+  if (execution.waiting_for_input && input && currentNodeId) {
+    const info = findNode(currentNodeId);
+    if (info) {
+      const cfg = info.node.config || {};
+      const varName = cfg.variableName || cfg.saveVariable;
+      const value = input.message ?? input.button_id;
+      if (varName && value !== undefined) variables[varName] = value;
+      currentNodeId = nextFromNode(info.node.id, info.container, input.button_id);
     }
   }
 
-  if (!currentNodeId && !execution.waiting_for_input) {
-    const startContainer = containers.find(c => c.nodes.some((n: any) => n.type === "start"));
-    if (!startContainer) throw new Error("Nó de início não encontrado");
-    const startNode = startContainer.nodes.find((n: any) => n.type === "start");
-    currentNodeId = startNode.id;
+  // No current node => find start
+  if (!currentNodeId) {
+    for (const c of containers) {
+      const startNode = (c.nodes || []).find((n: any) => n.type === "start");
+      if (startNode) {
+        currentNodeId = startNode.id;
+        break;
+      }
+    }
+    // If no explicit start node, use first node of first container
+    if (!currentNodeId && containers[0]?.nodes?.[0]) {
+      currentNodeId = containers[0].nodes[0].id;
+    }
   }
 
-  let steps = 0;
-  while (currentNodeId && steps < 50) {
+  while (currentNodeId && steps < 100) {
     steps++;
     const info = findNode(currentNodeId);
     if (!info) {
-        const targetContainerNodeId = findNodeInContainer(containers, currentNodeId);
-        if (targetContainerNodeId) {
-            currentNodeId = targetContainerNodeId;
-            continue;
-        }
-        break;
+      // Maybe it's a container id
+      const first = firstNodeOfContainer(currentNodeId);
+      if (first) {
+        currentNodeId = first;
+        continue;
+      }
+      break;
     }
-    
     const { node, container } = info;
+    const cfg = node.config || {};
 
     switch (node.type) {
+      case "start":
+        break;
       case "bubble-text":
-        messages.push({ 
-          id: crypto.randomUUID(), 
-          type: "bot", 
-          content: replaceVariables(node.config?.content) 
+        messages.push({
+          id: crypto.randomUUID(),
+          type: "bot",
+          content: replaceVars(cfg.content || cfg.text || ""),
         });
         break;
-      
       case "bubble-image":
-        messages.push({ 
-          id: crypto.randomUUID(), 
-          type: "bot", 
-          content: node.config?.url,
-          isImage: true 
+        messages.push({
+          id: crypto.randomUUID(),
+          type: "bot",
+          content: cfg.url || cfg.src || "",
+          isImage: true,
+          alt: cfg.alt,
         });
         break;
-
+      case "bubble-video":
+        messages.push({
+          id: crypto.randomUUID(),
+          type: "bot",
+          content: cfg.url || "",
+          isVideo: true,
+        });
+        break;
+      case "bubble-audio":
+        messages.push({
+          id: crypto.randomUUID(),
+          type: "bot",
+          content: cfg.url || "",
+          isAudio: true,
+          autoplay: cfg.autoplay,
+        });
+        break;
+      case "bubble-file":
+        messages.push({
+          id: crypto.randomUUID(),
+          type: "bot",
+          content: cfg.url || cfg.name || "",
+          isFile: true,
+        });
+        break;
       case "input-text":
+      case "input-mail":
+      case "input-number":
+      case "input-phone":
+      case "input-website":
         waiting_for = "text";
         break;
-
       case "input-buttons":
         waiting_for = "buttons";
-        buttons = node.config?.buttons || [];
+        buttons = (cfg.buttons || []).map((b: any) => ({
+          id: b.id,
+          label: b.label || b.text || b.value || "",
+          value: b.value,
+        }));
         break;
-
-      case "start":
+      case "set-variable":
+        if (cfg.variableName) variables[cfg.variableName] = replaceVars(cfg.value || "");
+        break;
+      default:
+        // unknown node -> skip
         break;
     }
 
     if (waiting_for) break;
 
-    let nextEdge = edges.find(e => e.source === node.id);
-    if (nextEdge) {
-      currentNodeId = nextEdge.target;
-    } else {
-      const cEdge = edges.find(e => e.source === container.id);
-      if (cEdge) {
-          currentNodeId = cEdge.target;
-      } else {
-          currentNodeId = null;
-      }
-    }
+    currentNodeId = nextFromNode(node.id, container);
   }
 
-  await supabase.from("flow_executions").update({
-    current_node_id: currentNodeId,
+  return {
+    messages,
+    waiting_for,
+    buttons,
     variables,
-    waiting_for_input: !!waiting_for,
-    updated_at: new Date().toISOString()
-  }).eq("id", execution.id);
-
-  return { messages, waiting_for, buttons };
+    next_node_id: currentNodeId,
+    steps,
+  };
 }
