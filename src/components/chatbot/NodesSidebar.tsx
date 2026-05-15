@@ -20,6 +20,7 @@ import {
   Play,
   Webhook,
   Send,
+  Hourglass,
 } from "lucide-react";
 import { NodeType } from "@/types/chatbot";
 import { Button } from "@/components/ui/button";
@@ -60,6 +61,7 @@ const nodeTypes: {
   { type: "set-variable", label: "Variável", icon: <Variable className="h-5 w-5" />, category: "logic" },
   { type: "condition", label: "Condição", icon: <Filter className="h-5 w-5" />, category: "logic" },
   { type: "script", label: "Script", icon: <Code className="h-5 w-5" />, category: "logic" },
+  { type: "wait", label: "Aguardar", icon: <Hourglass className="h-5 w-5" />, category: "logic" },
 ];
 
 const getCategoryStyle = (category: string): React.CSSProperties => {

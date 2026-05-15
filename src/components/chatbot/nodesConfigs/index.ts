@@ -13,6 +13,7 @@ import { InputWebSiteConfig } from "./NodesInputsConfig/InputWebSiteConfig";
 import { SetVariableConfig } from "./NodesLogicConfig/SetVariableConfig";
 import { ScriptConfig } from "./NodesLogicConfig/ScriptConfig";
 import { ConditionConfig } from "./NodesLogicConfig/ConditionConfig";
+import { WaitConfig } from "./NodesLogicConfig/WaitConfig";
 import { StartConfig, WebhookConfig, HttpRequestConfig } from "./NodesFlowConfig";
 
 export const nodeConfigComponents: Record<string, React.FC<any>> = {
@@ -42,4 +43,5 @@ export const nodeConfigComponents: Record<string, React.FC<any>> = {
   "set-variable": SetVariableConfig,
   "script": ScriptConfig,
   "condition": ConditionConfig,
+  "wait": WaitConfig,
 };

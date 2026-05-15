@@ -24,7 +24,8 @@ export type NodeType =
   // logic
   | "set-variable"
   | "script"
-  | "condition";
+  | "condition"
+  | "wait";
 
 export interface NodeConfig {
   [key: string]: any;
