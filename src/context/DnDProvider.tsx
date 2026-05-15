@@ -95,7 +95,19 @@ export default function DnDProvider({
 			// 2) Drop sobre outro item
 			if (!overItem) return prev;
 
-			// 🔥 REORDENAR irmãos (mesmo parentId)
+			// 🔥 REGRA: Se o item que está por baixo é uma PASTA, o comportamento padrão é MOVER PARA DENTRO.
+			if (overItem.type === "folder") {
+				if (isDescendant(draggedId, overItem.id)) return prev;
+
+				const newIndex = nextIndexFor(prev, overItem.id);
+				return prev.map((item) =>
+					item.id === draggedId
+						? { ...item, parentId: overItem.id, indexItem: newIndex }
+						: item,
+				);
+			}
+
+			// Se soltar em cima de um BOT, o comportamento é reordenar (trocar de posição) se forem irmãos
 			if (overItem.parentId === activeItem.parentId) {
 				return reorderSiblings(
 					prev,
@@ -104,17 +116,6 @@ export default function DnDProvider({
 					overItem.id,
 				);
 			}
-
-			// 3) Drop sobre uma pasta de outro nível → MOVE pra dentro
-			if (overItem.type === "bot") return prev;
-			if (isDescendant(draggedId, overItem.id)) return prev;
-
-			const newIndex = nextIndexFor(prev, overItem.id);
-			return prev.map((item) =>
-				item.id === draggedId
-					? { ...item, parentId: overItem.id, indexItem: newIndex }
-					: item,
-			);
 		});
 	}
 
