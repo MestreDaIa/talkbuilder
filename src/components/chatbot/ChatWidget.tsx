@@ -116,7 +116,6 @@ export const ChatWidget = ({
     setError(null);
 
     try {
-      let keepLoadingForWait = false;
       const response = await fetch(getRuntimeUrl(), {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -132,7 +131,7 @@ export const ChatWidget = ({
 
       const data = await response.json();
       setSessionId(data.session_id);
-      keepLoadingForWait = applyRuntimeData(data, true);
+      applyRuntimeData(data, true);
     } catch (err: any) {
       setError(err.message || "Erro ao conectar com o chatbot");
     } finally {
