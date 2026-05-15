@@ -39,6 +39,12 @@ export function browserHrefForRoute(route: string) {
 	return `${window.location.origin}${window.location.pathname}${window.location.search}#${route}`;
 }
 
+export function hardReloadToRoute(route: string) {
+	if (typeof window === "undefined") return;
+	window.history.replaceState(null, "", browserHrefForRoute(route));
+	window.location.reload();
+}
+
 export function configsRoute(slug: string | null | undefined) {
 	return `/${slug || FALLBACK_SLUG}/workspace/configs`;
 }
