@@ -187,7 +187,14 @@ function FolderIconComponent({
 
 							<CardContent className="flex flex-col items-center justify-center p-0 flex-1">
 								<span className="text-3xl">{emojiIcon || "📁"}</span>
-								<span className="text-sm text-center text-gray-700">{title}</span>
+								<div className="flex flex-col items-center gap-0">
+									<span className="text-sm font-medium text-center text-gray-700 line-clamp-1">{title}</span>
+									{description && (
+										<span className="text-[10px] text-gray-500 text-center line-clamp-1 opacity-80 px-1">
+											{description}
+										</span>
+									)}
+								</div>
 							</CardContent>
 						</div>
 					</Card>

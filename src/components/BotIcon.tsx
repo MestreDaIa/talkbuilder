@@ -334,9 +334,16 @@ export default function BotIcon({
 								title={!isPublished ? "Bot despublicado — rota pública desativada" : undefined}
 							>
 								<span className="text-2xl ">{emojiIcon || "🤖"}</span>
-								<span className={`text-sm text-center ${isPublished ? "text-gray-400" : "text-red-300"}`}>
-									{title}
-								</span>
+								<div className="flex flex-col items-center gap-0">
+									<span className={`text-sm font-medium text-center line-clamp-1 ${isPublished ? "text-white" : "text-red-300"}`}>
+										{title}
+									</span>
+									{description && (
+										<span className="text-[10px] text-gray-300 text-center line-clamp-1 opacity-80 px-1">
+											{description}
+										</span>
+									)}
+								</div>
 							</CardContent>
 						</div>
 					</Card>
