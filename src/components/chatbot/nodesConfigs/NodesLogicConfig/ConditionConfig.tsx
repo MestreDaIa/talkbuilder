@@ -11,8 +11,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { useVariables } from "@/context/VariablesContext";
-import { Check, ChevronsUpDown, Plus, Trash2, User } from "lucide-react";
-import { cn } from "@/lib/utils";
+import { Plus, Search, Trash2, User } from "lucide-react";
 
 interface ConditionConfigProps {
   config: NodeConfig;
@@ -44,6 +43,20 @@ const createConditionId = () =>
 
 const createComparisonId = () =>
   `comparison-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
+
+const getNodeVariableNames = (containers: Container[]) => {
+  const names = new Set<string>();
+  containers.forEach((container) => {
+    container.nodes.forEach((node: Node) => {
+      [node.config?.saveVariable, node.config?.variableName, node.config?.responseVariable]
+        .filter((value): value is string => typeof value === "string")
+        .map((value) => value.trim())
+        .filter(Boolean)
+        .forEach((value) => names.add(value));
+    });
+  });
+  return Array.from(names);
+};
 
 const ComparisonItem = ({
   comparison,
