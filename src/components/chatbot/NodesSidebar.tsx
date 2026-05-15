@@ -99,7 +99,7 @@ export const NodesSidebar = ({ onAddNode }: NodesSidebarProps) => {
                 {category}
               </h4>
               <div
-                className={`${collapsed ? "grid grid-cols-2 gap-1.5" : "flex flex-col gap-2"} flex justify-center items-center w-full`}
+                className={`${collapsed ? "grid grid-cols-2 gap-1.5" : "flex flex-col gap-2"} flex justify-center items-center w-full px-1`}
               >
                 {nodeTypes
                   .filter((node) => node.category === category)
