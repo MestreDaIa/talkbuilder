@@ -76,20 +76,22 @@ export const ChatWidget = ({
     setError(null);
 
     try {
-      const response = await fetch(`${getRuntimeUrl()}/start`, {
+      const response = await fetch(getRuntimeUrl(), {
         method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
+        headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
+          action: "start",
           flow_id: flowId,
-          company_id: companyId,
+          contact_id: localStorage.getItem("chat_contact_id") || (() => {
+            const id = `web-${Math.random().toString(36).slice(2, 11)}`;
+            localStorage.setItem("chat_contact_id", id);
+            return id;
+          })(),
+          channel: "webchat",
         }),
       });
 
-      if (!response.ok) {
-        throw new Error("Falha ao iniciar sessão");
-      }
+      if (!response.ok) throw new Error("Falha ao iniciar sessão");
 
       const data = await response.json();
       setSessionId(data.session_id);
@@ -97,7 +99,6 @@ export const ChatWidget = ({
       setWaitingFor(data.waiting_for);
       setButtons(data.buttons || []);
     } catch (err: any) {
-      console.error("Error starting session:", err);
       setError(err.message || "Erro ao conectar com o chatbot");
     } finally {
       setIsLoading(false);
@@ -105,37 +106,36 @@ export const ChatWidget = ({
   };
 
   const sendMessage = async (message?: string, buttonId?: string) => {
-    if (!sessionId) return;
-
     const msgToSend = message || input;
     if (!msgToSend && !buttonId) return;
+
+    if (msgToSend) {
+      setMessages(prev => [...prev, { id: `u-${Date.now()}`, type: "user", content: msgToSend }]);
+    }
 
     setIsLoading(true);
     setInput("");
 
     try {
-      const response = await fetch(`${getRuntimeUrl()}/message`, {
+      const response = await fetch(getRuntimeUrl(), {
         method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
+        headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          session_id: sessionId,
-          message: msgToSend,
-          button_id: buttonId,
+          action: "message",
+          flow_id: flowId,
+          contact_id: localStorage.getItem("chat_contact_id"),
+          channel: "webchat",
+          payload: { message: msgToSend, button_id: buttonId },
         }),
       });
 
-      if (!response.ok) {
-        throw new Error("Falha ao enviar mensagem");
-      }
+      if (!response.ok) throw new Error("Falha ao enviar mensagem");
 
       const data = await response.json();
-      setMessages(data.messages || []);
+      setMessages(prev => [...prev, ...(data.messages || [])]);
       setWaitingFor(data.waiting_for);
       setButtons(data.buttons || []);
     } catch (err: any) {
-      console.error("Error sending message:", err);
       setError(err.message || "Erro ao enviar mensagem");
     } finally {
       setIsLoading(false);
