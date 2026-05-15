@@ -149,6 +149,7 @@ export const TestPanel = ({
   const runtimeStateRef = useRef<RuntimeState | null>(null);
   const hasStartedRef = useRef(false);
   const startedFlowRef = useRef<string | null>(null);
+  const waitTimerRef = useRef<number | null>(null);
 
   const contactIdRef = useRef<string>(`test-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`);
 
@@ -158,6 +159,7 @@ export const TestPanel = ({
 
   useEffect(() => {
     if (!isOpen || !flowId) {
+      clearWaitTimer();
       hasStartedRef.current = false;
       runtimeStateRef.current = null;
       startedFlowRef.current = null;
@@ -174,10 +176,42 @@ export const TestPanel = ({
   }, [isOpen, flowId]);
 
   useEffect(() => {
+    return () => clearWaitTimer();
+  }, []);
+
+  useEffect(() => {
     if (scrollRef.current) {
       scrollRef.current.scrollTop = scrollRef.current.scrollHeight;
     }
   }, [messages]);
+
+  const clearWaitTimer = () => {
+    if (waitTimerRef.current !== null) {
+      window.clearTimeout(waitTimerRef.current);
+      waitTimerRef.current = null;
+    }
+  };
+
+  const scheduleRuntimeContinue = (waitMs: unknown) => {
+    const delay = Number(waitMs);
+    if (!Number.isFinite(delay) || delay <= 0) return false;
+    clearWaitTimer();
+    waitTimerRef.current = window.setTimeout(() => {
+      waitTimerRef.current = null;
+      continueRuntime();
+    }, delay);
+    return true;
+  };
+
+  const applyRuntimeData = (data: any, replaceMessages = false) => {
+    runtimeStateRef.current = data.runtime_state || runtimeStateRef.current;
+    if (replaceMessages) setMessages(data.messages || []);
+    else setMessages(prev => [...prev, ...(data.messages || [])]);
+    setWaitingForInput(data.waiting_for === "text");
+    setWaitingForButton(data.waiting_for === "buttons");
+    setActiveButtons(data.buttons || []);
+    return scheduleRuntimeContinue(data.wait_ms);
+  };
 
   const startRuntimeSession = async () => {
     setIsLoading(true);
