@@ -308,8 +308,12 @@ function runFlow(execution: any, containers: any[], edges: any[], input: any) {
       const value = input.message ?? input.button_id;
       if (varName && value !== undefined) variables[varName] = value;
       
-      // Only advance if we were actually waiting for input at this node
-      if (execution.waiting_for_input && !execution.is_waiting_time) {
+      // CRITICAL: Advance ONLY if we were waiting for user input (text/buttons)
+      // AND NOT if we were in a "wait" node (timer).
+      const nodeType = (info.node.type || "").toLowerCase();
+      const isInputNode = nodeType.startsWith("input-");
+      
+      if (execution.waiting_for_input && isInputNode) {
         currentNodeId = nextFromNode(info.node.id, info.container, input.button_id);
       }
     }
@@ -430,9 +434,11 @@ function runFlow(execution: any, containers: any[], edges: any[], input: any) {
     }
 
     if (waiting_for) break;
+    // CRITICAL: if wait_ms is set, we MUST stop and return to client
     if (wait_ms > 0) break;
 
     currentNodeId = nextFromNode(node.id, container);
+  }
   }
 
   return {
