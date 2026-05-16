@@ -534,8 +534,8 @@ const CanvasContent = ({
         {showMultiSelectMenu && (
           <Panel position="top-left" style={{ 
             position: 'absolute',
-            left: showMultiSelectMenu.x,
-            top: showMultiSelectMenu.y,
+            left: reactFlowInstance.flowToScreenPosition(reactFlowInstance.screenToFlowPosition({ x: showMultiSelectMenu.x, y: showMultiSelectMenu.y })).x,
+            top: reactFlowInstance.flowToScreenPosition(reactFlowInstance.screenToFlowPosition({ x: showMultiSelectMenu.x, y: showMultiSelectMenu.y })).y,
             transform: 'translate(-50%, -120%)',
             zIndex: 1000
           }}>
