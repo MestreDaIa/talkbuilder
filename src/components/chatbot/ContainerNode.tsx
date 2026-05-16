@@ -140,7 +140,7 @@ export const ContainerNode = memo(({ data }: NodeProps<ContainerNodeData>) => {
       )}
     >
       <div
-        className="bg-card p-4 rounded-lg"
+        className="bg-card p-4 pr-6 rounded-lg"
         onDragOver={handleDragOver}
         onDragLeave={handleDragLeave}
         onDrop={handleDrop}
