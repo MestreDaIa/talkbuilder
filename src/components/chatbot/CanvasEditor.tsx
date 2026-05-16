@@ -139,6 +139,16 @@ const CanvasContent = ({
     }
   }, [findNodeInContainers]);
 
+  const handleRenameContainer = useCallback((containerId: string, nameContainer?: string) => {
+    const updatedContainers = containersRef.current.map(container =>
+      container.id === containerId
+        ? { ...container, nameContainer }
+        : container
+    );
+
+    onContainersChange(updatedContainers);
+  }, [onContainersChange]);
+
   const handleDuplicate = useCallback((containerId: string) => {
     const containerToDuplicate = containers.find(c => c.id === containerId);
     if (!containerToDuplicate) return;
