@@ -503,6 +503,16 @@ export default function BotPage() {
               onGetCenterPosition={(getter) => setGetCenter(() => getter)}
             />
           </div>
+          
+          {flow?.id && (
+            <ChatWidget 
+              flowId={flow.id} 
+              companyId={profile?.id || ""} 
+              companyName={flow.name}
+              primaryColor={flow.settings?.theme?.primaryColor}
+              themeSettings={flow.settings?.theme}
+            />
+          )}
         </div>
 
         {/* Test panel */}
