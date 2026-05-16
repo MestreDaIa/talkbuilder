@@ -11,6 +11,7 @@ import { cn } from "@/lib/utils";
 interface ContainerNodeData {
   container: Container;
   onNodeClick: (nodeId: string) => void;
+  onRenameContainer?: (containerId: string, nameContainer?: string) => void;
   onButtonClick?: (nodeId: string, buttonId: string) => void;
   onConditionClick?: (nodeId: string, conditionId: string) => void;
   onAddButton?: (nodeId: string, label: string) => void;
@@ -34,6 +35,7 @@ export const ContainerNode = memo(({ data }: NodeProps<ContainerNodeData>) => {
   const {
     container,
     onNodeClick,
+    onRenameContainer,
     onButtonClick,
     onConditionClick,
     onAddButton,
@@ -51,7 +53,21 @@ export const ContainerNode = memo(({ data }: NodeProps<ContainerNodeData>) => {
   const menuRef = useRef<HTMLDivElement>(null);
 
   const [isEditingContainerNameNode, setIsEditingContainerNameNode] = useState(false);
-  const [nameContainerNode, setNameContainerNode] = useState(container.nameContainer || `BLOCO #${container.id.slice(-6)}`);
+  const fallbackContainerName = `BLOCO #${container.id.slice(-6)}`;
+  const [nameContainerNode, setNameContainerNode] = useState(container.nameContainer || fallbackContainerName);
+
+  useEffect(() => {
+    if (!isEditingContainerNameNode) {
+      setNameContainerNode(container.nameContainer || fallbackContainerName);
+    }
+  }, [container.nameContainer, fallbackContainerName, isEditingContainerNameNode]);
+
+  const commitContainerName = () => {
+    const normalizedName = nameContainerNode.trim();
+    setNameContainerNode(normalizedName || fallbackContainerName);
+    setIsEditingContainerNameNode(false);
+    onRenameContainer?.(container.id, normalizedName || undefined);
+  };
 
   useEffect(() => {
     const handlePointerDown = (event: PointerEvent) => {
@@ -157,7 +173,16 @@ export const ContainerNode = memo(({ data }: NodeProps<ContainerNodeData>) => {
               value={nameContainerNode}
               autoFocus
               onChange={(e) => setNameContainerNode(e.target.value)}
-              onBlur={() => setIsEditingContainerNameNode(false)}
+              onBlur={commitContainerName}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter') {
+                  e.currentTarget.blur();
+                }
+                if (e.key === 'Escape') {
+                  setNameContainerNode(container.nameContainer || fallbackContainerName);
+                  setIsEditingContainerNameNode(false);
+                }
+              }}
               onPointerDown={(e) => e.stopPropagation()}
               placeholder='Renomear Bloco'
               className="rounded-md p-1.5 pl-2 placeholder:text-black focus:bg-gray-100/5 text-sm w-full focus:outline-none bg-gray-100/5 text-violet-800 text-left"
