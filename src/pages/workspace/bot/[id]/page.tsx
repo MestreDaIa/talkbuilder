@@ -148,7 +148,7 @@ export default function BotPage() {
   // Ajustamos o offset vertical para que o bloco apareça um pouco mais acima
   // do centro exato, melhorando a percepção visual de centralização.
   const CONTAINER_HALF_W = 150;
-  const CONTAINER_OFFSET_Y = 160; // Ajuste para subir um pouco mais na viewport
+  const CONTAINER_OFFSET_Y = 180; // Ajuste para que o bloco apareça mais acima do centro visual
 
   const getCenteredPosition = () => {
     const base = getCenter ? getCenter() : { x: 300, y: 200 };
