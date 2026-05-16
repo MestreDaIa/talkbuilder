@@ -419,9 +419,11 @@ const CanvasContent = ({
       setSelectionBox({ start: pos, end: pos });
       setIsSelectionActive(true);
       setShowMultiSelectMenu(null);
+      setAccumulatedSelectedIds(new Set());
     } else {
       // Left click on pane clears selection
       setSelectedContainerIds([]);
+      setAccumulatedSelectedIds(new Set());
       setShowMultiSelectMenu(null);
     }
   }, []);
@@ -429,7 +431,44 @@ const CanvasContent = ({
   const onPaneMouseMove = useCallback((event: React.MouseEvent) => {
     if (isSelectionActive && selectionBox) {
       const pos = getRelativePos(event);
-      setSelectionBox({ ...selectionBox, end: pos });
+      const newSelectionBox = { ...selectionBox, end: pos };
+      setSelectionBox(newSelectionBox);
+
+      // Perform real-time selection to accumulate nodes
+      const rect = (event.currentTarget as HTMLElement)
+        .closest('.react-flow')
+        ?.getBoundingClientRect();
+      
+      if (rect) {
+        const startFlow = reactFlowInstance.screenToFlowPosition({
+          x: newSelectionBox.start.x + rect.left,
+          y: newSelectionBox.start.y + rect.top,
+        });
+        const endFlow = reactFlowInstance.screenToFlowPosition({
+          x: pos.x + rect.left,
+          y: pos.y + rect.top,
+        });
+
+        const minX = Math.min(startFlow.x, endFlow.x);
+        const maxX = Math.max(startFlow.x, endFlow.x);
+        const minY = Math.min(startFlow.y, endFlow.y);
+        const maxY = Math.max(startFlow.y, endFlow.y);
+
+        const nodesInBox = nodes.filter((node) => {
+          const { x, y } = node.position;
+          const nodeWidth = 305;
+          const nodeHeight = 200;
+          return x < maxX && x + nodeWidth > minX && y < maxY && y + nodeHeight > minY;
+        });
+
+        if (nodesInBox.length > 0) {
+          setAccumulatedSelectedIds(prev => {
+            const next = new Set(prev);
+            nodesInBox.forEach(node => next.add(node.id));
+            return next;
+          });
+        }
+      }
 
       // Auto-scroll when near edges
       const flowBounds = document.querySelector('.react-flow')?.getBoundingClientRect();
@@ -451,7 +490,7 @@ const CanvasContent = ({
         }
       }
     }
-  }, [isSelectionActive, selectionBox, reactFlowInstance]);
+  }, [isSelectionActive, selectionBox, reactFlowInstance, nodes]);
 
   const onPaneMouseUp = useCallback((event: React.MouseEvent) => {
     if (isSelectionActive && selectionBox) {
