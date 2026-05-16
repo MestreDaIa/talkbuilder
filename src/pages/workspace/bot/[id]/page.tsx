@@ -151,9 +151,16 @@ export default function BotPage() {
       return;
     }
 
-    // Adiciona ao histórico apenas se for diferente do estado atual no histórico
+    const nextHistory = history.slice(0, historyIndex + 1);
+    const currentState = { containers, edges };
+    
+    // Inicializa histórico se vazio
+    if (nextHistory.length === 0) {
+      nextHistory.push(JSON.parse(JSON.stringify(currentState)));
+    }
+
+    // Adiciona ao histórico apenas se for diferente do estado atual
     setHistory(prev => {
-      const currentState = { containers, edges };
       const lastState = prev[historyIndex];
       
       if (lastState && JSON.stringify(lastState) === JSON.stringify(currentState)) {
@@ -163,16 +170,37 @@ export default function BotPage() {
       const newHistory = prev.slice(0, historyIndex + 1);
       newHistory.push(JSON.parse(JSON.stringify(currentState)));
       
-      // Limita o histórico (opcional, mas bom pra performance)
       if (newHistory.length > 50) {
-        newHistory.shift();
-      } else {
-        setHistoryIndex(newHistory.length - 1);
+        const sliced = newHistory.slice(-50);
+        setHistoryIndex(sliced.length - 1);
+        return sliced;
       }
       
+      setHistoryIndex(newHistory.length - 1);
       return newHistory;
     });
   }, [botId, containers, edges, hydrated, historyIndex]);
+
+  // Atalhos de teclado
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'z') {
+        if (e.shiftKey) {
+          handleRedo();
+        } else {
+          handleUndo();
+        }
+        e.preventDefault();
+      }
+      if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'y') {
+        handleRedo();
+        e.preventDefault();
+      }
+    };
+
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [handleUndo, handleRedo]);
 
   const handleUndo = useCallback(() => {
     if (historyIndex > 0) {
