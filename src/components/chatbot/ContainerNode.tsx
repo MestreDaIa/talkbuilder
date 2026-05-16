@@ -173,7 +173,16 @@ export const ContainerNode = memo(({ data }: NodeProps<ContainerNodeData>) => {
               value={nameContainerNode}
               autoFocus
               onChange={(e) => setNameContainerNode(e.target.value)}
-              onBlur={() => setIsEditingContainerNameNode(false)}
+              onBlur={commitContainerName}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter') {
+                  e.currentTarget.blur();
+                }
+                if (e.key === 'Escape') {
+                  setNameContainerNode(container.nameContainer || fallbackContainerName);
+                  setIsEditingContainerNameNode(false);
+                }
+              }}
               onPointerDown={(e) => e.stopPropagation()}
               placeholder='Renomear Bloco'
               className="rounded-md p-1.5 pl-2 placeholder:text-black focus:bg-gray-100/5 text-sm w-full focus:outline-none bg-gray-100/5 text-violet-800 text-left"
