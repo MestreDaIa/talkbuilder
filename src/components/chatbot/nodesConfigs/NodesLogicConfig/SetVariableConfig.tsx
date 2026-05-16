@@ -152,14 +152,17 @@ export const SetVariableConfig = ({ config, setConfig }: SetVariableConfigProps)
                       key={varName}
                       value={varName}
                       onSelect={() => handleSelectVariable(varName)}
+                      className="cursor-pointer"
                     >
-                      <Check
-                        className={cn(
-                          "mr-2 h-4 w-4",
-                          selectedVariable === varName ? "opacity-100" : "opacity-0"
-                        )}
-                      />
-                      {varName}
+                      <div className="flex items-center w-full">
+                        <Check
+                          className={cn(
+                            "mr-2 h-4 w-4",
+                            selectedVariable === varName ? "opacity-100" : "opacity-0"
+                          )}
+                        />
+                        {varName}
+                      </div>
                     </CommandItem>
                   ))}
                 </CommandGroup>
