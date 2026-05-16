@@ -392,8 +392,6 @@ const CanvasContent = ({
     }, 0);
   }, [onEdgesChange, onEdgesChangeProp, reactFlowInstance]);
 
-  return (
-    <>
   const handleContextMenu = useCallback((event: React.MouseEvent) => {
     event.preventDefault();
   }, []);
@@ -492,6 +490,7 @@ const CanvasContent = ({
 
   return (
     <>
+
       <ReactFlow
         nodes={nodes.map(n => ({
           ...n,
