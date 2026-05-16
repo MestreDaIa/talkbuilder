@@ -549,7 +549,11 @@ const CanvasContent = ({
             transform: 'translate(-50%, -120%)',
             zIndex: 1000
           }}>
-            <div className="flex items-center gap-1 p-1.5 bg-card border border-border rounded-lg shadow-2xl animate-in fade-in zoom-in duration-200">
+            <div 
+              className="flex items-center gap-1 p-1.5 bg-card border border-border rounded-lg shadow-2xl animate-in fade-in zoom-in duration-200"
+              onMouseDown={(e) => e.stopPropagation()}
+              onPointerDown={(e) => e.stopPropagation()}
+            >
               <div className="px-2 text-xs font-medium text-muted-foreground border-r mr-1">
                 {selectedContainerIds.length} selecionados
               </div>
