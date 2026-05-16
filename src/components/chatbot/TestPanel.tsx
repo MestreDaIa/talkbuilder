@@ -506,8 +506,8 @@ export const TestPanel = ({
               <div key={message.id} className={`flex ${message.type === "bot" ? "justify-start" : "justify-end"}`}>
                 <div className={`max-w-[85%] px-3 py-2 rounded-2xl text-sm shadow-md text-left ${message.type === "bot" ? "rounded-bl-sm" : "rounded-br-sm"}`}
                   style={message.type === "user" 
-                    ? { background: "var(--user-msg-bg)", color: "var(--user-msg-fg)" } 
-                    : { background: "var(--bot-msg-bg)", color: "var(--bot-msg-fg)" }}>
+                    ? { background: theme?.userBubbleColor || "var(--user-msg-bg)", color: "var(--user-msg-fg)" } 
+                    : { background: theme?.botBubbleColor || "var(--bot-msg-bg)", color: "var(--bot-msg-fg)" }}>
                   {message.isImage ? <img src={message.content} alt={message.alt} className="max-w-full rounded" />
                    : message.isVideo ? <video src={message.content} controls className="max-w-full rounded" />
                    : message.isAudio ? <div className="flex items-center gap-2"><Headphones className="h-4 w-4 shrink-0" /><AudioPlayer src={message.content} autoPlay={message.autoplay} /></div>
