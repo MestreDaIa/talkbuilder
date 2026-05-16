@@ -289,6 +289,15 @@ export default function BotPage() {
       const updated = await saveDraft(flow.id, containers, edges);
       setFlow(updated);
       lastSavedAtRef.current = Date.now();
+      
+      // Limpa o histórico após salvar com sucesso para economizar memória
+      const currentState = { 
+        containers: JSON.parse(JSON.stringify(containers)), 
+        edges: JSON.parse(JSON.stringify(edges)) 
+      };
+      setHistory([currentState]);
+      setHistoryIndex(0);
+      
       toast.success("Fluxo salvo!");
     } catch (err: any) {
       console.error(err);
