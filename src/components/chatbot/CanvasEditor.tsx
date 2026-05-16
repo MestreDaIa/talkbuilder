@@ -23,8 +23,15 @@ import { NodeConfigDialog } from "./NodeConfigDialog";
 import { ButtonEdge } from "./ButtonEdge";
 import { SingleButtonConfig } from "./nodesConfigs/NodesInputsConfig/SingleButtonConfig";
 import { toast } from "sonner";
-import { Copy, Trash2, X } from "lucide-react";
+import { Copy, Trash2, X, ChevronDown, Check } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import {
+  Popover,
+  PopoverContent,
+  PopoverTrigger,
+} from "@/components/ui/popover";
+import { Checkbox } from "@/components/ui/checkbox";
+import { ScrollArea } from "@/components/ui/scroll-area";
 
 interface CanvasEditorProps {
   containers: Container[];
