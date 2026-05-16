@@ -159,7 +159,7 @@ export const ContainerNode = memo(({ data }: NodeProps<ContainerNodeData>) => {
               onBlur={() => setIsEditingContainerNameNode(false)}
               onPointerDown={(e) => e.stopPropagation()}
               placeholder='Renomear Bloco'
-              className=" rounded-md p-1.5 pl-2 placeholder:text-black focus:bg-gray-100/5 text-sm w-full focus:outline-none bg-gray-100/5 text-violet-800"
+              className="rounded-md p-1.5 pl-2 placeholder:text-black focus:bg-gray-100/5 text-sm w-full focus:outline-none bg-gray-100/5 text-violet-800 text-left"
             />
           ) : (
             <h3 
@@ -167,9 +167,9 @@ export const ContainerNode = memo(({ data }: NodeProps<ContainerNodeData>) => {
                 e.stopPropagation();
                 setIsEditingContainerNameNode(true);
               }} 
-              className="rounded-md p-1.5 w-full pl-2 border border-border/40 text-sm text-foreground px-0.5 cursor-text"
+              className="rounded-md p-1.5 w-full pl-2 border border-border/40 text-sm text-foreground px-0.5 cursor-text text-left"
             >
-              {nameContainerNode || <span className='text-muted-foreground italic'>{`Bloco #${container.id.slice(-6)}`}</span>}
+              {nameContainerNode || <span className='text-muted-foreground italic text-left'>{`Bloco #${container.id.slice(-6)}`}</span>}
             </h3>
           )}
 
