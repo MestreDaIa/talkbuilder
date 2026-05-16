@@ -86,6 +86,7 @@ const CanvasContent = ({
   const [selectionBox, setSelectionBox] = useState<{ start: { x: number; y: number }; end: { x: number; y: number } } | null>(null);
   const [showMultiSelectMenu, setShowMultiSelectMenu] = useState<{ x: number; y: number } | null>(null);
   const [selectedContainerIds, setSelectedContainerIds] = useState<string[]>([]);
+  const [accumulatedSelectedIds, setAccumulatedSelectedIds] = useState<Set<string>>(new Set());
 
   // Expose viewport center getter
   useEffect(() => {
