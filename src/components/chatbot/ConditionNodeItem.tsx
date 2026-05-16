@@ -83,7 +83,7 @@ export const ConditionNodeItem = ({
       </div>
 
       {/* Conditions list */}
-      <div className="p-2 space-y-1.5 max-h-[150px] overflow-y-auto scrollbar-thin scrollbar-thumb-gray-300 scrollbar-track-transparent">
+      <div className="pl-2 pr-8 py-2 space-y-1.5 max-h-[150px] overflow-y-auto scrollbar-thin scrollbar-thumb-gray-300 scrollbar-track-transparent">
         {conditions.map((condition, idx) => (
           <div
             key={condition.id}
