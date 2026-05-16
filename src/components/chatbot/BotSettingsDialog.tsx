@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { GradientPicker } from './GradientPicker';
-import { Settings, Palette, Type, FileText, Upload, Download, Copy, Image as ImageIcon, MessageCircle, X } from 'lucide-react';
+import { Settings, Palette, Type, FileText, Upload, Download, Copy, Image as ImageIcon, MessageCircle, X, Loader2 } from 'lucide-react';
 import {
   Dialog,
   DialogContent,
@@ -39,6 +39,7 @@ export function BotSettingsDialog({
   const [name, setName] = useState(flowName);
   const [description, setDescription] = useState(flowDescription || '');
   const [theme, setTheme] = useState({
+    avatarUrl: settings.theme?.avatarUrl || '',
     primaryColor: settings.theme?.primaryColor || '#3b82f6',
     backgroundColor: settings.theme?.backgroundColor || '#ffffff',
     backgroundImage: settings.theme?.backgroundImage || '',
@@ -59,11 +60,43 @@ export function BotSettingsDialog({
     favicon: settings.metadata?.favicon || '',
   });
   const [isSaving, setIsSaving] = useState(false);
+  const [isUploading, setIsUploading] = useState(false);
+
+  const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    setIsUploading(true);
+    try {
+      const fileExt = file.name.split('.').pop();
+      const fileName = `${Math.random()}.${fileExt}`;
+      const filePath = `bot-avatars/${fileName}`;
+
+      const { error: uploadError } = await supabaseClient.storage
+        .from('avatars')
+        .upload(filePath, file);
+
+      if (uploadError) throw uploadError;
+
+      const { data: { publicUrl } } = supabaseClient.storage
+        .from('avatars')
+        .getPublicUrl(filePath);
+
+      setTheme({ ...theme, avatarUrl: publicUrl });
+      toast.success('Imagem carregada!');
+    } catch (error) {
+      console.error('Error uploading image:', error);
+      toast.error('Erro ao carregar imagem. Verifique se o bucket "avatars" existe.');
+    } finally {
+      setIsUploading(false);
+    }
+  };
 
   useEffect(() => {
     setName(flowName);
     setDescription(flowDescription || '');
     setTheme({
+      avatarUrl: settings.theme?.avatarUrl || '',
       primaryColor: settings.theme?.primaryColor || '#3b82f6',
       backgroundColor: settings.theme?.backgroundColor || '#ffffff',
       backgroundImage: settings.theme?.backgroundImage || '',
@@ -165,6 +198,55 @@ export function BotSettingsDialog({
                 placeholder="Descreva o objetivo deste bot..."
                 rows={3}
               />
+            </div>
+            <div className="space-y-2">
+              <Label>Imagem do Bot (Avatar)</Label>
+              <div className="flex items-center gap-4">
+                <div className="w-16 h-16 rounded-full bg-muted flex items-center justify-center overflow-hidden border-2 border-dashed border-muted-foreground/20">
+                  {theme.avatarUrl ? (
+                    <img src={theme.avatarUrl} alt="Avatar" className="w-full h-full object-cover" />
+                  ) : (
+                    <ImageIcon className="w-8 h-8 text-muted-foreground" />
+                  )}
+                </div>
+                <div className="flex-1 space-y-2">
+                  <div className="flex gap-2">
+                    <div className="relative flex-1">
+                      <Input
+                        type="file"
+                        accept="image/*"
+                        onChange={handleFileUpload}
+                        className="absolute inset-0 opacity-0 cursor-pointer z-10"
+                        disabled={isUploading}
+                      />
+                      <Button variant="outline" className="w-full" disabled={isUploading}>
+                        {isUploading ? <Loader2 className="w-4 h-4 animate-spin mr-2" /> : <Upload className="w-4 h-4 mr-2" />}
+                        Upload
+                      </Button>
+                    </div>
+                    <div className="flex-[2]">
+                      <Input
+                        placeholder="Ou cole a URL da imagem..."
+                        value={theme.avatarUrl}
+                        onChange={(e) => setTheme({ ...theme, avatarUrl: e.target.value })}
+                      />
+                    </div>
+                    {theme.avatarUrl && (
+                      <Button 
+                        variant="ghost" 
+                        size="icon" 
+                        onClick={() => setTheme({ ...theme, avatarUrl: '' })}
+                        className="text-destructive"
+                      >
+                        <X className="h-4 w-4" />
+                      </Button>
+                    )}
+                  </div>
+                  <p className="text-[10px] text-muted-foreground">
+                    Formatos suportados: JPG, PNG, GIF. Tamanho recomendado: 128x128px.
+                  </p>
+                </div>
+              </div>
             </div>
           </TabsContent>
 
