@@ -208,7 +208,7 @@ export function GradientPicker({ value, onChange, label }: GradientPickerProps) 
                   </div>
                   <Slider
                     value={[point.opacity * 100]}
-                    onValueChange={([val]) => handleUpdatePoint(index, { opacity: val / 100 })}
+                    onValueChange={(val: number[]) => handleUpdatePoint(index, { opacity: val[0] / 100 })}
                     max={100}
                     step={1}
                   />
@@ -221,7 +221,7 @@ export function GradientPicker({ value, onChange, label }: GradientPickerProps) 
                   </div>
                   <Slider
                     value={[point.position]}
-                    onValueChange={([val]) => handleUpdatePoint(index, { position: val })}
+                    onValueChange={(val: number[]) => handleUpdatePoint(index, { position: val[0] })}
                     max={100}
                     step={1}
                   />
@@ -238,9 +238,9 @@ export function GradientPicker({ value, onChange, label }: GradientPickerProps) 
           <div className="flex items-center gap-2">
             <Slider
               value={[angle]}
-              onValueChange={([val]) => {
-                setAngle(val);
-                updateGradient(points, val);
+              onValueChange={(val: number[]) => {
+                setAngle(val[0]);
+                updateGradient(points, val[0]);
               }}
               max={360}
               step={1}
