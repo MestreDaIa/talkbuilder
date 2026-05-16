@@ -521,22 +521,12 @@ const CanvasContent = ({
           <div
             className="absolute border-2 border-primary bg-primary/10 pointer-events-none z-50"
             style={{
-              left: Math.min(
-                reactFlowInstance.flowToScreenPosition(selectionBox.start).x,
-                reactFlowInstance.flowToScreenPosition(selectionBox.end).x
-              ),
-              top: Math.min(
-                reactFlowInstance.flowToScreenPosition(selectionBox.start).y,
-                reactFlowInstance.flowToScreenPosition(selectionBox.end).y
-              ),
-              width: Math.abs(
-                reactFlowInstance.flowToScreenPosition(selectionBox.start).x -
-                reactFlowInstance.flowToScreenPosition(selectionBox.end).x
-              ),
-              height: Math.abs(
-                reactFlowInstance.flowToScreenPosition(selectionBox.start).y -
-                reactFlowInstance.flowToScreenPosition(selectionBox.end).y
-              ),
+              left: Math.min(selectionBox.start.x, selectionBox.end.x),
+              top: Math.min(selectionBox.start.y, selectionBox.end.y),
+              width: Math.abs(selectionBox.start.x - selectionBox.end.x),
+              height: Math.abs(selectionBox.start.y - selectionBox.end.y),
+              transform: `translate(${reactFlowInstance.getViewport().x}px, ${reactFlowInstance.getViewport().y}px) scale(${reactFlowInstance.getViewport().zoom})`,
+              transformOrigin: '0 0'
             }}
           />
         )}
