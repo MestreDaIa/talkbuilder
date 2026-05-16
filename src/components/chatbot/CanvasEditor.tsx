@@ -366,36 +366,21 @@ const CanvasContent = ({
 
   // Sync edge deletions from ReactFlow back to parent
   const handleEdgesChangeWrapper = useCallback((changes: any) => {
-    console.log('Edges changes detected:', changes);
     onEdgesChange(changes);
     
-    // Check if there are removal changes
-    const hasRemoval = changes.some((c: any) => c.type === 'remove');
-    
-    if (hasRemoval && onEdgesChangeProp) {
-      const removedIds = changes
-        .filter((c: any) => c.type === 'remove')
-        .map((c: any) => c.id);
-      
-      console.log('Edges to be removed:', removedIds);
-        
-      setEdges((eds) => {
-        const remainingEdges = eds.filter(e => !removedIds.includes(e.id));
-        console.log('Remaining edges after removal:', remainingEdges);
-        
-        // Use a small delay to ensure parent state is ready
-        setTimeout(() => {
-          onEdgesChangeProp(remainingEdges.map((e: FlowEdge) => ({
-            source: e.source,
-            target: e.target,
-            sourceHandle: e.sourceHandle || undefined
-          })));
-        }, 0);
-        
-        return remainingEdges;
-      });
-    }
-  }, [onEdgesChange, onEdgesChangeProp, setEdges]);
+    // Notify parent whenever edges change
+    // We use a small delay to ensure the state has been updated by useEdgesState
+    setTimeout(() => {
+      const currentEdges = reactFlowInstance.getEdges();
+      if (onEdgesChangeProp) {
+        onEdgesChangeProp(currentEdges.map((e: FlowEdge) => ({
+          source: e.source,
+          target: e.target,
+          sourceHandle: e.sourceHandle || undefined
+        })));
+      }
+    }, 0);
+  }, [onEdgesChange, onEdgesChangeProp, reactFlowInstance]);
 
   return (
     <>

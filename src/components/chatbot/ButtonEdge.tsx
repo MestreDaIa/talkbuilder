@@ -35,7 +35,11 @@ export function ButtonEdge({
     e.preventDefault();
     e.stopPropagation();
     console.log('Edge clicked for deletion:', id);
-    setEdges((eds) => eds.filter((edge) => edge.id !== id));
+    setEdges((eds) => {
+      const filtered = eds.filter((edge) => edge.id !== id);
+      console.log('New edges list after manual filter:', filtered);
+      return filtered;
+    });
   };
 
   return (
