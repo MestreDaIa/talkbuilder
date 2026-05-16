@@ -30,25 +30,20 @@ const operatorLabels: Record<string, string> = {
 
 const getConditionSummary = (condition: ConditionGroup): string => {
   if (!condition.comparisons.length) return "Configure...";
-  
-  const parts = condition.comparisons.map(comp => {
+
+  const parts = condition.comparisons.map((comp) => {
     const op = operatorLabels[comp.operator] || comp.operator;
     if (["is_set", "is_empty"].includes(comp.operator)) {
       return `${comp.variableName} ${op}`;
     }
     return `${comp.variableName} ${op} ${comp.value || "?"}`;
   });
-  
+
   const joiner = condition.logicalOperator === "AND" ? " E " : " OU ";
   return parts.join(joiner);
 };
 
-export const ConditionNodeItem = ({
-  node,
-  onGroupClick,
-  onConditionClick,
-  nodeIndex,
-}: ConditionNodeItemProps) => {
+export const ConditionNodeItem = ({ node, onGroupClick, onConditionClick, nodeIndex }: ConditionNodeItemProps) => {
   const conditions: ConditionGroup[] = node.config.conditions || [];
 
   return (
@@ -85,10 +80,7 @@ export const ConditionNodeItem = ({
       {/* Conditions list */}
       <div className="p-2 space-y-1.5">
         {conditions.map((condition, idx) => (
-          <div
-            key={condition.id}
-            className="group relative flex items-center"
-          >
+          <div key={condition.id} className="group relative flex items-center">
             <div
               onClick={(e) => {
                 e.stopPropagation();
@@ -98,7 +90,7 @@ export const ConditionNodeItem = ({
                 "flex-1 px-3 py-2 bg-white border border-purple-200 rounded-md",
                 "text-xs text-purple-800 font-medium cursor-pointer",
                 "hover:border-purple-400 hover:bg-purple-50 transition-colors",
-                "flex items-center gap-2"
+                "flex items-center gap-2",
               )}
             >
               <span className="text-purple-600 font-semibold">SE</span>
@@ -107,18 +99,14 @@ export const ConditionNodeItem = ({
                   condition.comparisons.map((comp, compIdx) => (
                     <span key={comp.id}>
                       {compIdx > 0 && (
-                        <span className="text-purple-500 mx-1">
-                          {condition.logicalOperator === "AND" ? "E" : "OU"}
-                        </span>
+                        <span className="text-purple-500 mx-1">{condition.logicalOperator === "AND" ? "E" : "OU"}</span>
                       )}
                       <span className="bg-orange-400 text-white px-1 py-0.5 rounded text-[10px]">
                         {comp.variableName || "?"}
                       </span>
                       <span className="mx-1">{operatorLabels[comp.operator]}</span>
                       {!["is_set", "is_empty"].includes(comp.operator) && (
-                        <span className="bg-muted px-1 py-0.5 rounded text-[10px]">
-                          {comp.value || "?"}
-                        </span>
+                        <span className="bg-muted px-1 py-0.5 rounded text-[10px]">{comp.value || "?"}</span>
                       )}
                     </span>
                   ))
@@ -127,17 +115,17 @@ export const ConditionNodeItem = ({
                 )}
               </span>
             </div>
-            
+
             {/* Condition handle - positioned at container edge (half in, half out) */}
             <Handle
               type="source"
               position={Position.Right}
               id={`${node.id}-cond-${condition.id}`}
-              style={{ 
-                position: 'absolute',
+              style={{
+                position: "absolute",
                 right: 0,
-                top: '50%',
-                transform: 'translate(50%, -50%)',
+                top: "50%",
+                transform: "translate(50%, -50%)",
               }}
               className="!bg-purple-500 !w-3 !h-3"
             />
@@ -155,7 +143,7 @@ export const ConditionNodeItem = ({
               "flex-1 px-3 py-2 bg-white border border-dashed border-purple-300 rounded-md",
               "text-xs text-purple-600 font-medium cursor-pointer",
               "hover:border-purple-400 hover:bg-purple-50 transition-colors",
-              "flex items-center justify-center gap-2"
+              "flex items-center justify-center gap-2",
             )}
           >
             <Plus className="h-3 w-3" />
@@ -172,11 +160,11 @@ export const ConditionNodeItem = ({
             type="source"
             position={Position.Right}
             id={`${node.id}-else`}
-            style={{ 
-              position: 'absolute',
-              right: -20%,
-              top: '50%',
-              transform: 'translate(50%, -50%)',
+            style={{
+              position: "absolute",
+              right: "-20%",
+              top: "50%",
+              transform: "translate(50%, -50%)",
             }}
             className="!bg-gray-400 !w-3 !h-3"
           />
