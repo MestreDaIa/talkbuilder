@@ -32,6 +32,16 @@ interface ChatWidgetProps {
   companyId: string;
   companyName?: string;
   primaryColor?: string;
+  themeSettings?: {
+    backgroundColor?: string;
+    backgroundImage?: string;
+    textColor?: string;
+    botBubbleColor?: string;
+    botTextColor?: string;
+    userBubbleColor?: string;
+    userTextColor?: string;
+    fontFamily?: string;
+  };
 }
 
 export const ChatWidget = ({
@@ -39,6 +49,7 @@ export const ChatWidget = ({
   companyId,
   companyName = "Assistente",
   primaryColor = "#3b82f6",
+  themeSettings,
 }: ChatWidgetProps) => {
   const [isOpen, setIsOpen] = useState(false);
   const [messages, setMessages] = useState<Message[]>([]);
@@ -250,7 +261,12 @@ export const ChatWidget = ({
   }
 
   return (
-    <div className="fixed bottom-6 right-6 w-96 h-[500px] bg-background border border-border rounded-2xl shadow-2xl flex flex-col overflow-hidden z-50">
+    <div 
+      className="fixed bottom-6 right-6 w-96 h-[500px] bg-background border border-border rounded-2xl shadow-2xl flex flex-col overflow-hidden z-50"
+      style={{ 
+        fontFamily: themeSettings?.fontFamily || 'inherit',
+      }}
+    >
       {/* Header */}
       <div
         className="p-4 flex items-center justify-between"
@@ -274,7 +290,16 @@ export const ChatWidget = ({
       </div>
 
       {/* Messages */}
-      <ScrollArea className="flex-1 p-4" ref={scrollRef}>
+      <ScrollArea 
+        className="flex-1 p-4" 
+        ref={scrollRef}
+        style={{ 
+          backgroundColor: themeSettings?.backgroundColor || 'transparent',
+          backgroundImage: themeSettings?.backgroundImage ? `url(${themeSettings.backgroundImage})` : 'none',
+          backgroundSize: 'cover',
+          backgroundPosition: 'center'
+        }}
+      >
         <div className="space-y-3">
           {error && (
             <div className="bg-destructive/10 text-destructive p-3 rounded-lg text-sm">
@@ -294,12 +319,16 @@ export const ChatWidget = ({
               className={`flex ${message.type === "bot" ? "justify-start" : "justify-end"}`}
             >
               <div
-                className={`max-w-[80%] px-4 py-2 rounded-2xl text-sm text-left ${
+                className={`max-w-[80%] px-4 py-2 rounded-2xl text-sm text-left shadow-sm ${
                   message.type === "bot"
-                    ? "bg-muted text-foreground rounded-bl-md"
-                    : "text-white rounded-br-md"
+                    ? "rounded-bl-md"
+                    : "rounded-br-md"
                 }`}
-                style={message.type === "user" ? { backgroundColor: primaryColor } : undefined}
+                style={
+                  message.type === "user" 
+                    ? { backgroundColor: themeSettings?.userBubbleColor || primaryColor, color: themeSettings?.userTextColor || '#ffffff' } 
+                    : { backgroundColor: themeSettings?.botBubbleColor || '#f3f4f6', color: themeSettings?.botTextColor || '#1f2937' }
+                }
               >
                 {message.isImage ? (
                   <img src={message.content} alt="Imagem" className="max-w-full rounded" />

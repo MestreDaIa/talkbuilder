@@ -15,6 +15,7 @@ import {
 import { CanvasEditor } from "@/components/chatbot/CanvasEditor";
 import { NodesSidebar } from "@/components/chatbot/NodesSidebar";
 import { TestPanel } from "@/components/chatbot/TestPanel";
+import { ChatWidget } from "@/components/chatbot/ChatWidget";
 import { BotSettingsDialog } from "@/components/chatbot/BotSettingsDialog";
 import { PublishDialog } from "@/components/chatbot/PublishDialog";
 import { Button } from "@/components/ui/button";
@@ -502,6 +503,16 @@ export default function BotPage() {
               onGetCenterPosition={(getter) => setGetCenter(() => getter)}
             />
           </div>
+          
+          {flow?.id && (
+            <ChatWidget 
+              flowId={flow.id} 
+              companyId={profile?.id || ""} 
+              companyName={flow.name}
+              primaryColor={flow.settings?.theme?.primaryColor}
+              themeSettings={flow.settings?.theme}
+            />
+          )}
         </div>
 
         {/* Test panel */}
