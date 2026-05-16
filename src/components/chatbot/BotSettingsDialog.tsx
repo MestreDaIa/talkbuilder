@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Settings, Palette, Type, FileText, Upload, Download, Copy, Image as ImageIcon, MessageCircle } from 'lucide-react';
+import { Settings, Palette, Type, FileText, Upload, Download, Copy, Image as ImageIcon, MessageCircle, X } from 'lucide-react';
 import {
   Dialog,
   DialogContent,
@@ -41,6 +41,10 @@ export function BotSettingsDialog({
     primaryColor: settings.theme?.primaryColor || '#3b82f6',
     backgroundColor: settings.theme?.backgroundColor || '#ffffff',
     backgroundImage: settings.theme?.backgroundImage || '',
+    headerBackgroundColor: settings.theme?.headerBackgroundColor || '',
+    headerTextColor: settings.theme?.headerTextColor || '#ffffff',
+    inputBackgroundColor: settings.theme?.inputBackgroundColor || '#ffffff',
+    inputTextColor: settings.theme?.inputTextColor || '#1f2937',
     textColor: settings.theme?.textColor || '#1f2937',
     botBubbleColor: settings.theme?.botBubbleColor || '#f3f4f6',
     botTextColor: settings.theme?.botTextColor || '#1f2937',
@@ -62,6 +66,10 @@ export function BotSettingsDialog({
       primaryColor: settings.theme?.primaryColor || '#3b82f6',
       backgroundColor: settings.theme?.backgroundColor || '#ffffff',
       backgroundImage: settings.theme?.backgroundImage || '',
+      headerBackgroundColor: settings.theme?.headerBackgroundColor || '',
+      headerTextColor: settings.theme?.headerTextColor || '#ffffff',
+      inputBackgroundColor: settings.theme?.inputBackgroundColor || '#ffffff',
+      inputTextColor: settings.theme?.inputTextColor || '#1f2937',
       textColor: settings.theme?.textColor || '#1f2937',
       botBubbleColor: settings.theme?.botBubbleColor || '#f3f4f6',
       botTextColor: settings.theme?.botTextColor || '#1f2937',
@@ -170,6 +178,10 @@ export function BotSettingsDialog({
                     primaryColor: '#075E54',
                     backgroundColor: '#e5ddd5',
                     backgroundImage: 'https://user-images.githubusercontent.com/15075759/28719144-86dc0f70-73b1-11e7-911d-60d70fcded21.png',
+                    headerBackgroundColor: '#075E54',
+                    headerTextColor: '#ffffff',
+                    inputBackgroundColor: '#ffffff',
+                    inputTextColor: '#111b21',
                     textColor: '#111b21',
                     botBubbleColor: '#ffffff',
                     botTextColor: '#111b21',
@@ -197,6 +209,10 @@ export function BotSettingsDialog({
                     primaryColor: '#0084ff',
                     backgroundColor: '#ffffff',
                     backgroundImage: '',
+                    headerBackgroundColor: '#ffffff',
+                    headerTextColor: '#0084ff',
+                    inputBackgroundColor: '#ffffff',
+                    inputTextColor: '#1c1e21',
                     textColor: '#1c1e21',
                     botBubbleColor: '#f0f2f5',
                     botTextColor: '#1c1e21',
@@ -315,6 +331,76 @@ export function BotSettingsDialog({
                     />
                   </div>
                   <p className="text-[10px] text-muted-foreground">Deixe em branco para usar apenas a cor de fundo.</p>
+                </div>
+              </div>
+
+              <div className="space-y-4">
+                <h4 className="text-sm font-semibold flex items-center gap-2">
+                  <Palette className="w-4 h-4" /> Cabeçalho e Rodapé
+                </h4>
+
+                <div className="grid grid-cols-2 gap-4">
+                  <div className="space-y-2">
+                    <Label className="text-xs">Fundo Header</Label>
+                    <div className="flex gap-1">
+                      <input
+                        type="color"
+                        value={theme.headerBackgroundColor || theme.primaryColor}
+                        onChange={(e) => setTheme({ ...theme, headerBackgroundColor: e.target.value })}
+                        className="w-8 h-8 rounded cursor-pointer border-none"
+                      />
+                      <Button 
+                        variant="ghost" 
+                        size="icon" 
+                        className="h-8 w-8" 
+                        title="Transparente"
+                        onClick={() => setTheme({ ...theme, headerBackgroundColor: 'transparent' })}
+                      >
+                        <X className="h-3 w-3" />
+                      </Button>
+                    </div>
+                  </div>
+                  <div className="space-y-2">
+                    <Label className="text-xs">Texto Header</Label>
+                    <input
+                      type="color"
+                      value={theme.headerTextColor}
+                      onChange={(e) => setTheme({ ...theme, headerTextColor: e.target.value })}
+                      className="w-full h-8 rounded cursor-pointer border-none"
+                    />
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-2 gap-4">
+                  <div className="space-y-2">
+                    <Label className="text-xs">Fundo Input</Label>
+                    <div className="flex gap-1">
+                      <input
+                        type="color"
+                        value={theme.inputBackgroundColor}
+                        onChange={(e) => setTheme({ ...theme, inputBackgroundColor: e.target.value })}
+                        className="w-8 h-8 rounded cursor-pointer border-none"
+                      />
+                      <Button 
+                        variant="ghost" 
+                        size="icon" 
+                        className="h-8 w-8" 
+                        title="Transparente"
+                        onClick={() => setTheme({ ...theme, inputBackgroundColor: 'transparent' })}
+                      >
+                        <X className="h-3 w-3" />
+                      </Button>
+                    </div>
+                  </div>
+                  <div className="space-y-2">
+                    <Label className="text-xs">Texto Input</Label>
+                    <input
+                      type="color"
+                      value={theme.inputTextColor}
+                      onChange={(e) => setTheme({ ...theme, inputTextColor: e.target.value })}
+                      className="w-full h-8 rounded cursor-pointer border-none"
+                    />
+                  </div>
                 </div>
               </div>
 
