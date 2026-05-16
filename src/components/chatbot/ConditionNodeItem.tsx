@@ -152,7 +152,7 @@ export const ConditionNodeItem = ({ node, onGroupClick, onConditionClick, nodeIn
         )}
 
         {/* Else/Default handle */}
-        <div className="relative flex items-center mt-3 pt-0 border-t border-dashed">
+        <div className="relative flex items-center mt-3 py-2 border-t border-dashed">
           <div className="flex-1 px-3 py-1.5 bg-gray-100 border border-gray-200 rounded-md text-xs text-gray-500 font-medium">
             Senão
           </div>
