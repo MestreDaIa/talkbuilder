@@ -189,29 +189,29 @@ export const NodeItem = ({ node, onClick }: NodeItemProps) => {
           <p className="text-xs font-semibold text-left w-full">{nodeLabels[effectiveType]}</p>
 
           {hasVideoPreview ? (
-            <div className="mt-2">
+            <div className="mt-2 max-h-[150px] overflow-hidden">
               <video
                 src={node.config["VideoURL"]}
                 aria-description={node.config["VideoAlt"] || "Preview"}
                 controls
                 autoPlay={false}
-                className="w-full h-auto rounded border max-h-36 object-cover"
+                className="w-full h-auto rounded border max-h-[150px] object-cover"
               />
             </div>
           ) : hasImagePreview ? (
-            <div className="mt-2">
+            <div className="mt-2 max-h-[150px] overflow-hidden">
               <img
                 src={node.config["ImageURL"]}
                 alt={node.config["ImageAlt"] || "Preview"}
-                className="w-full h-auto rounded border max-h-36 object-cover"
+                className="w-full h-auto rounded border max-h-[150px] object-cover"
               />
             </div>
           ) : hasDocumentPreview ? (
-            <div className="mt-2 p-2 bg-muted rounded border">
+            <div className="mt-2 p-2 bg-muted rounded border max-h-[150px] overflow-y-auto">
               <p className="text-xs">{node.config["FileName"] || "Documento anexado"}</p>
             </div>
           ) : hasAudioPreview ? (
-            <div className="mt-2 p-2 bg-muted rounded border flex items-center gap-2">
+            <div className="mt-2 p-2 bg-muted rounded border flex items-center gap-2 max-h-[150px] overflow-hidden">
               <Headphones className="h-4 w-4 text-primary" />
               <audio
                 src={node.config["AudioURL"]}
@@ -221,7 +221,7 @@ export const NodeItem = ({ node, onClick }: NodeItemProps) => {
               />
             </div>
           ) : hasButtonsPreview ? (
-            <div className="mt-2 space-y-1">
+            <div className="mt-2 space-y-1 max-h-[150px] overflow-y-auto scrollbar-thin scrollbar-thumb-gray-300 scrollbar-track-transparent">
               {(node.config.buttons as Array<{ id: string; label: string; saveVariable?: string }>).map((button) => (
                 <div
                   key={button.id}
@@ -232,15 +232,14 @@ export const NodeItem = ({ node, onClick }: NodeItemProps) => {
               ))}
             </div>
           ) : hasSetVariablePreview ? (
-            <div className="mt-2 p-2 bg-purple-50 rounded border border-purple-200">
+            <div className="mt-2 p-2 bg-purple-50 rounded border border-purple-200 max-h-[150px] overflow-y-auto">
               <p className="text-xs font-semibold text-purple-700">
                 {node.config.variableName} = {node.config.value || "(vazio)"}
               </p>
             </div>
           ) : hasScriptPreview ? (
-            <div className="mt-2 p-3 space-y-2 border border-red-600">
+            <div className="mt-2 p-3 space-y-2 border border-red-600 max-h-[150px] overflow-y-auto">
               <div className="flex items-center gap-2">
-                
                 <span className="text-sm font-medium text-purple-700">
                   {node.config.executeOnServer ? 'Vai executar do lado do servidor' : 'Vai executar do lado do cliente'}
                 </span>
@@ -251,14 +250,14 @@ export const NodeItem = ({ node, onClick }: NodeItemProps) => {
               </pre>
             </div>
           ) : hasWaitPreview ? (
-            <div className="mt-2 p-2 bg-purple-50 rounded border border-purple-200">
+            <div className="mt-2 p-2 bg-purple-50 rounded border border-purple-200 max-h-[150px] overflow-y-auto">
               <p className="text-xs font-semibold text-purple-700">
                 Aguardar {node.config.waitTime} {node.config.timeUnit === 'seconds' ? 'segundo(s)' : node.config.timeUnit === 'minutes' ? 'minuto(s)' : 'hora(s)'}
               </p>
             </div>
           ) : (
             messageValue && (
-              <div className="mt-1 max-h-[120px] overflow-y-auto scrollbar-thin scrollbar-thumb-gray-300 scrollbar-track-transparent pr-1">
+              <div className="mt-1 max-h-[150px] overflow-y-auto scrollbar-thin scrollbar-thumb-gray-300 scrollbar-track-transparent pr-1">
                 <RichText
                   as="p"
                   className="text-xs text-black text-left max-w-[180px] h-auto leading-relaxed text-wrap py-0 whitespace-pre-wrap break-words rich-bubble-preview"
