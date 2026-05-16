@@ -521,22 +521,12 @@ const CanvasContent = ({
           <div
             className="absolute border-2 border-primary bg-primary/10 pointer-events-none z-50"
             style={{
-              left: Math.min(
-                reactFlowInstance.flowToScreenPosition(selectionBox.start).x,
-                reactFlowInstance.flowToScreenPosition(selectionBox.end).x
-              ),
-              top: Math.min(
-                reactFlowInstance.flowToScreenPosition(selectionBox.start).y,
-                reactFlowInstance.flowToScreenPosition(selectionBox.end).y
-              ),
-              width: Math.abs(
-                reactFlowInstance.flowToScreenPosition(selectionBox.start).x -
-                reactFlowInstance.flowToScreenPosition(selectionBox.end).x
-              ),
-              height: Math.abs(
-                reactFlowInstance.flowToScreenPosition(selectionBox.start).y -
-                reactFlowInstance.flowToScreenPosition(selectionBox.end).y
-              ),
+              left: Math.min(selectionBox.start.x, selectionBox.end.x),
+              top: Math.min(selectionBox.start.y, selectionBox.end.y),
+              width: Math.abs(selectionBox.start.x - selectionBox.end.x),
+              height: Math.abs(selectionBox.start.y - selectionBox.end.y),
+              transform: `translate(${reactFlowInstance.getViewport().x}px, ${reactFlowInstance.getViewport().y}px) scale(${reactFlowInstance.getViewport().zoom})`,
+              transformOrigin: '0 0'
             }}
           />
         )}
@@ -544,8 +534,8 @@ const CanvasContent = ({
         {showMultiSelectMenu && (
           <Panel position="top-left" style={{ 
             position: 'absolute',
-            left: showMultiSelectMenu.x,
-            top: showMultiSelectMenu.y,
+            left: reactFlowInstance.flowToScreenPosition(reactFlowInstance.screenToFlowPosition({ x: showMultiSelectMenu.x, y: showMultiSelectMenu.y })).x,
+            top: reactFlowInstance.flowToScreenPosition(reactFlowInstance.screenToFlowPosition({ x: showMultiSelectMenu.x, y: showMultiSelectMenu.y })).y,
             transform: 'translate(-50%, -120%)',
             zIndex: 1000
           }}>
