@@ -422,8 +422,28 @@ const CanvasContent = ({
     if (isSelectionActive && selectionBox) {
       const pos = getRelativePos(event);
       setSelectionBox({ ...selectionBox, end: pos });
+
+      // Auto-scroll when near edges
+      const flowBounds = document.querySelector('.react-flow')?.getBoundingClientRect();
+      if (flowBounds) {
+        const threshold = 50;
+        const scrollSpeed = 10;
+        let dx = 0;
+        let dy = 0;
+
+        if (event.clientX < flowBounds.left + threshold) dx = scrollSpeed;
+        else if (event.clientX > flowBounds.right - threshold) dx = -scrollSpeed;
+
+        if (event.clientY < flowBounds.top + threshold) dy = scrollSpeed;
+        else if (event.clientY > flowBounds.bottom - threshold) dy = -scrollSpeed;
+
+        if (dx !== 0 || dy !== 0) {
+          const { x, y, zoom } = reactFlowInstance.getViewport();
+          reactFlowInstance.setViewport({ x: x + dx, y: y + dy, zoom }, { duration: 0 });
+        }
+      }
     }
-  }, [isSelectionActive, selectionBox]);
+  }, [isSelectionActive, selectionBox, reactFlowInstance]);
 
   const onPaneMouseUp = useCallback((event: React.MouseEvent) => {
     if (isSelectionActive && selectionBox) {
@@ -547,13 +567,7 @@ const CanvasContent = ({
         )}
 
         {showMultiSelectMenu && (
-          <Panel position="top-left" style={{ 
-            position: 'absolute',
-            left: reactFlowInstance.flowToScreenPosition(reactFlowInstance.screenToFlowPosition({ x: showMultiSelectMenu.x, y: showMultiSelectMenu.y })).x,
-            top: reactFlowInstance.flowToScreenPosition(reactFlowInstance.screenToFlowPosition({ x: showMultiSelectMenu.x, y: showMultiSelectMenu.y })).y,
-            transform: 'translate(-50%, -120%)',
-            zIndex: 1000
-          }}>
+          <Panel position="top-right" className="m-4">
             <div 
               className="flex items-center gap-1 p-1.5 bg-card border border-border rounded-lg shadow-2xl animate-in fade-in zoom-in duration-200"
               onMouseDown={(e) => e.stopPropagation()}
