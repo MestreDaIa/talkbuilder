@@ -420,12 +420,14 @@ const CanvasContent = ({
       setSelectionBox({ start: pos, end: pos });
       setIsSelectionActive(true);
       setShowMultiSelectMenu(null);
+      setIsListOpen(false);
       setAccumulatedSelectedIds(new Set());
     } else {
       // Left click on pane clears selection
       setSelectedContainerIds([]);
       setAccumulatedSelectedIds(new Set());
       setShowMultiSelectMenu(null);
+      setIsListOpen(false);
     }
   }, []);
 
