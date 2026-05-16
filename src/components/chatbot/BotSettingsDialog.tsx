@@ -243,7 +243,7 @@ export function BotSettingsDialog({
                     )}
                   </div>
                   <p className="text-[10px] text-muted-foreground">
-                    Formatos suportados: JPG, PNG, GIF. Tamanho recomendado: 128x128px.
+                    Formatos suportados: JPG, PNG, SVG. Tamanho recomendado: 128x128px.
                   </p>
                 </div>
               </div>
