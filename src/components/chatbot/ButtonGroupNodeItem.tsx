@@ -76,7 +76,7 @@ export const ButtonGroupNodeItem = ({
   const handleSpacing = 44; // Space between each button handle
 
   return (
-    <div className="relative bg-accent/10 border border-accent/30 rounded-lg overflow-visible" style={{ width: 280 }}>
+    <div className="relative bg-accent/10 border border-accent/30 rounded-lg overflow-visible" style={{ width: 285 }}>
       {/* Header - Click to open group config */}
       <div
         onClick={(e) => {

@@ -52,7 +52,7 @@ export const ConditionNodeItem = ({
   const conditions: ConditionGroup[] = node.config.conditions || [];
 
   return (
-    <div className="relative bg-purple-100 border border-purple-300 rounded-lg overflow-visible" style={{ width: 280 }}>
+    <div className="relative bg-purple-100 border border-purple-300 rounded-lg overflow-visible" style={{ width: 285 }}>
       {/* Header */}
       <div
         onClick={(e) => {
