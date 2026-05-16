@@ -583,6 +583,7 @@ const CanvasContent = ({
               className="flex items-center gap-1 p-1.5 bg-card border border-border rounded-lg shadow-2xl animate-in fade-in zoom-in duration-200"
               onMouseDown={(e) => e.stopPropagation()}
               onPointerDown={(e) => e.stopPropagation()}
+              onClick={(e) => e.stopPropagation()}
             >
               <Popover>
                 <PopoverTrigger asChild>
@@ -609,8 +610,14 @@ const CanvasContent = ({
                               onCheckedChange={(checked) => {
                                 if (checked) {
                                   setSelectedContainerIds(prev => [...prev, id]);
+                                  setAccumulatedSelectedIds(prev => new Set(prev).add(id));
                                 } else {
                                   setSelectedContainerIds(prev => prev.filter(i => i !== id));
+                                  setAccumulatedSelectedIds(prev => {
+                                    const next = new Set(prev);
+                                    next.delete(id);
+                                    return next;
+                                  });
                                 }
                               }}
                             />
