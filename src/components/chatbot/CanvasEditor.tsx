@@ -347,37 +347,46 @@ const CanvasContent = ({
 
   // Update edges from props (including empty array)
   useEffect(() => {
-    const flowEdges = propEdges.map((e, idx) => ({
-      id: `edge-${idx}`,
-      source: e.source,
-      target: e.target,
-      sourceHandle: e.sourceHandle,
-      type: 'buttonedge',
-    }));
-    setEdges(flowEdges);
+    setEdges((currentEdges) => {
+      const flowEdges = propEdges.map((e, idx) => {
+        // Try to keep existing ID if possible to avoid ReactFlow re-rendering
+        const existing = currentEdges.find(ce => ce.source === e.source && ce.target === e.target && ce.sourceHandle === e.sourceHandle);
+        return {
+          id: existing?.id || `edge-${e.source}-${e.target}-${e.sourceHandle || 'default'}-${idx}`,
+          source: e.source,
+          target: e.target,
+          sourceHandle: e.sourceHandle,
+          type: 'buttonedge',
+          selected: existing?.selected || false,
+        };
+      });
+      return flowEdges;
+    });
   }, [propEdges, setEdges]);
 
   // Sync edge deletions from ReactFlow back to parent
   const handleEdgesChangeWrapper = useCallback((changes: any) => {
     onEdgesChange(changes);
     
-    // Check if any edge was removed via 'remove' change
-    const hasRemoval = changes.some((change: any) => change.type === 'remove');
-    
-    if (hasRemoval) {
-      // Use setTimeout to ensure we get the updated edges from ReactFlow state
-      setTimeout(() => {
-        const currentEdges = reactFlowInstance.getEdges();
+    // If edges are removed, notify parent immediately
+    const removedIds = changes
+      .filter((c: any) => c.type === 'remove')
+      .map((c: any) => c.id);
+
+    if (removedIds.length > 0) {
+      setEdges((eds) => {
+        const nextEdges = eds.filter(e => !removedIds.includes(e.id));
         if (onEdgesChangeProp) {
-          onEdgesChangeProp(currentEdges.map((e: FlowEdge) => ({
+          onEdgesChangeProp(nextEdges.map((e: FlowEdge) => ({
             source: e.source,
             target: e.target,
             sourceHandle: e.sourceHandle || undefined
           })));
         }
-      }, 0);
+        return nextEdges;
+      });
     }
-  }, [onEdgesChange, onEdgesChangeProp, reactFlowInstance]);
+  }, [onEdgesChange, onEdgesChangeProp, setEdges]);
 
   return (
     <>
