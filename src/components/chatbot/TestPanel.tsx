@@ -492,7 +492,7 @@ export const TestPanel = ({
             background: theme?.headerBackgroundColor || "bg-gradient-to-r from-primary/20 via-card to-card",
             color: theme?.headerTextColor || "inherit"
           }}>
-          <div className="flex items-center gap-2 min-w-0">
+          <div className="flex items-center gap-3 min-w-0">
             {theme?.avatarUrl ? (
               <img src={theme.avatarUrl} alt="Avatar" className="w-8 h-8 rounded-full object-cover shrink-0" />
             ) : (
