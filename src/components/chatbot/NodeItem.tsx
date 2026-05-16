@@ -177,7 +177,7 @@ export const NodeItem = ({ node, onClick }: NodeItemProps) => {
         onDragStart={handleDragStart}
         onMouseDown={handleDragHandleMouseDown}
         onClick={(e) => e.stopPropagation()}
-        className="nodrag nopan absolute top-1 right-1 p-1 rounded-md bg-muted/80 hover:bg-muted border border-border/50 cursor-grab active:cursor-grabbing transition-all opacity-100 hover:opacity-100 z-10 flex items-center justify-center"
+        className="nodrag nopan absolute top-2 right-2 p-1 rounded-md bg-white/90 hover:bg-white border border-border/50 shadow-sm cursor-grab active:cursor-grabbing transition-all opacity-0 group-hover:opacity-100 z-10 flex items-center justify-center"
         title="Arraste para mover para outro bloco"
       >
         <MoveIcon className="h-3 w-3 text-muted-foreground" />
