@@ -273,17 +273,7 @@ export const ContainerNode = memo(({ data }: NodeProps<ContainerNodeData>) => {
         </div>
 
         {/* Handles para outros tipos de nodes (exceto input-buttons e condition que tem handles internos) */}
-        {container.nodes.map((node) => {
-          if (node.type === 'set-variable') {
-            return (
-              <div key={node.id}>
-                <Handle type="target" position={Position.Left} id={`${node.id}-target`} />
-                <Handle type="source" position={Position.Right} id={`${node.id}-source`} />
-              </div>
-            );
-          }
-          return null;
-        })}
+        {/* Removidos handles específicos de set-variable para usar os handles padrão do container */}
 
         {!hideBottomHandle && (
           <Handle type="source" position={Position.Bottom} className="!bg-green-600 !w-4 !h-4 -bottom-2" />
