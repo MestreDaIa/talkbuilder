@@ -23,8 +23,15 @@ import { NodeConfigDialog } from "./NodeConfigDialog";
 import { ButtonEdge } from "./ButtonEdge";
 import { SingleButtonConfig } from "./nodesConfigs/NodesInputsConfig/SingleButtonConfig";
 import { toast } from "sonner";
-import { Copy, Trash2, X } from "lucide-react";
+import { Copy, Trash2, X, ChevronDown, Check } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import {
+  Popover,
+  PopoverContent,
+  PopoverTrigger,
+} from "@/components/ui/popover";
+import { Checkbox } from "@/components/ui/checkbox";
+import { ScrollArea } from "@/components/ui/scroll-area";
 
 interface CanvasEditorProps {
   containers: Container[];
@@ -79,6 +86,7 @@ const CanvasContent = ({
   const [selectionBox, setSelectionBox] = useState<{ start: { x: number; y: number }; end: { x: number; y: number } } | null>(null);
   const [showMultiSelectMenu, setShowMultiSelectMenu] = useState<{ x: number; y: number } | null>(null);
   const [selectedContainerIds, setSelectedContainerIds] = useState<string[]>([]);
+  const [accumulatedSelectedIds, setAccumulatedSelectedIds] = useState<Set<string>>(new Set());
 
   // Expose viewport center getter
   useEffect(() => {
@@ -411,9 +419,11 @@ const CanvasContent = ({
       setSelectionBox({ start: pos, end: pos });
       setIsSelectionActive(true);
       setShowMultiSelectMenu(null);
+      setAccumulatedSelectedIds(new Set());
     } else {
       // Left click on pane clears selection
       setSelectedContainerIds([]);
+      setAccumulatedSelectedIds(new Set());
       setShowMultiSelectMenu(null);
     }
   }, []);
@@ -421,7 +431,44 @@ const CanvasContent = ({
   const onPaneMouseMove = useCallback((event: React.MouseEvent) => {
     if (isSelectionActive && selectionBox) {
       const pos = getRelativePos(event);
-      setSelectionBox({ ...selectionBox, end: pos });
+      const newSelectionBox = { ...selectionBox, end: pos };
+      setSelectionBox(newSelectionBox);
+
+      // Perform real-time selection to accumulate nodes
+      const rect = (event.currentTarget as HTMLElement)
+        .closest('.react-flow')
+        ?.getBoundingClientRect();
+      
+      if (rect) {
+        const startFlow = reactFlowInstance.screenToFlowPosition({
+          x: newSelectionBox.start.x + rect.left,
+          y: newSelectionBox.start.y + rect.top,
+        });
+        const endFlow = reactFlowInstance.screenToFlowPosition({
+          x: pos.x + rect.left,
+          y: pos.y + rect.top,
+        });
+
+        const minX = Math.min(startFlow.x, endFlow.x);
+        const maxX = Math.max(startFlow.x, endFlow.x);
+        const minY = Math.min(startFlow.y, endFlow.y);
+        const maxY = Math.max(startFlow.y, endFlow.y);
+
+        const nodesInBox = nodes.filter((node) => {
+          const { x, y } = node.position;
+          const nodeWidth = 305;
+          const nodeHeight = 200;
+          return x < maxX && x + nodeWidth > minX && y < maxY && y + nodeHeight > minY;
+        });
+
+        if (nodesInBox.length > 0) {
+          setAccumulatedSelectedIds(prev => {
+            const next = new Set(prev);
+            nodesInBox.forEach(node => next.add(node.id));
+            return next;
+          });
+        }
+      }
 
       // Auto-scroll when near edges
       const flowBounds = document.querySelector('.react-flow')?.getBoundingClientRect();
@@ -443,57 +490,21 @@ const CanvasContent = ({
         }
       }
     }
-  }, [isSelectionActive, selectionBox, reactFlowInstance]);
+  }, [isSelectionActive, selectionBox, reactFlowInstance, nodes]);
 
   const onPaneMouseUp = useCallback((event: React.MouseEvent) => {
     if (isSelectionActive && selectionBox) {
-      const rect = (event.currentTarget as HTMLElement)
-        .closest('.react-flow')
-        ?.getBoundingClientRect();
-      if (!rect) {
-        setIsSelectionActive(false);
-        setSelectionBox(null);
-        return;
-      }
+      const finalSelectedIds = Array.from(accumulatedSelectedIds);
+      setSelectedContainerIds(finalSelectedIds);
 
-      // Convert screen-relative box to flow coordinates for hit-testing
-      const startFlow = reactFlowInstance.screenToFlowPosition({
-        x: selectionBox.start.x + rect.left,
-        y: selectionBox.start.y + rect.top,
-      });
-      const endFlow = reactFlowInstance.screenToFlowPosition({
-        x: selectionBox.end.x + rect.left,
-        y: selectionBox.end.y + rect.top,
-      });
-      const minX = Math.min(startFlow.x, endFlow.x);
-      const maxX = Math.max(startFlow.x, endFlow.x);
-      const minY = Math.min(startFlow.y, endFlow.y);
-      const maxY = Math.max(startFlow.y, endFlow.y);
-
-      const newlySelectedIds = nodes
-        .filter((node) => {
-          const { x, y } = node.position;
-          const nodeWidth = 305;
-          const nodeHeight = 200;
-          return (
-            x < maxX &&
-            x + nodeWidth > minX &&
-            y < maxY &&
-            y + nodeHeight > minY
-          );
-        })
-        .map((node) => node.id);
-
-      setSelectedContainerIds(newlySelectedIds);
-
-      if (newlySelectedIds.length > 0) {
+      if (finalSelectedIds.length > 0) {
         setShowMultiSelectMenu({ x: event.clientX, y: event.clientY });
       }
 
       setIsSelectionActive(false);
       setSelectionBox(null);
     }
-  }, [isSelectionActive, selectionBox, nodes, reactFlowInstance]);
+  }, [isSelectionActive, selectionBox, accumulatedSelectedIds]);
 
   const handleMultiDelete = useCallback(() => {
     if (selectedContainerIds.length === 0) return;
@@ -573,9 +584,52 @@ const CanvasContent = ({
               onMouseDown={(e) => e.stopPropagation()}
               onPointerDown={(e) => e.stopPropagation()}
             >
-              <div className="px-2 text-xs font-medium text-muted-foreground border-r mr-1">
-                {selectedContainerIds.length} selecionados
-              </div>
+              <Popover>
+                <PopoverTrigger asChild>
+                  <Button variant="ghost" size="xs" className="px-2 h-8 gap-1 hover:bg-primary/10">
+                    <span className="text-xs font-medium text-muted-foreground mr-1">
+                      {selectedContainerIds.length} selecionados
+                    </span>
+                    <ChevronDown className="w-3 h-3 opacity-50" />
+                  </Button>
+                </PopoverTrigger>
+                <PopoverContent className="w-64 p-0" align="start">
+                  <div className="p-2 border-b bg-muted/30">
+                    <h4 className="text-xs font-semibold">Blocos Selecionados</h4>
+                  </div>
+                  <ScrollArea className="h-64">
+                    <div className="p-1">
+                      {selectedContainerIds.map((id) => {
+                        const container = containers.find(c => c.id === id);
+                        return (
+                          <div key={id} className="flex items-center gap-2 px-2 py-1.5 hover:bg-muted/50 rounded-sm">
+                            <Checkbox 
+                              id={`select-${id}`}
+                              checked={selectedContainerIds.includes(id)}
+                              onCheckedChange={(checked) => {
+                                if (checked) {
+                                  setSelectedContainerIds(prev => [...prev, id]);
+                                } else {
+                                  setSelectedContainerIds(prev => prev.filter(i => i !== id));
+                                }
+                              }}
+                            />
+                            <label 
+                              htmlFor={`select-${id}`}
+                              className="text-xs truncate flex-1 cursor-pointer"
+                            >
+                              {container?.nameContainer || `Bloco ${id.slice(-4)}`}
+                            </label>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  </ScrollArea>
+                </PopoverContent>
+              </Popover>
+
+              <div className="w-[1px] h-4 bg-border mx-1" />
+
               <Button 
                 variant="ghost" 
                 size="xs" 
@@ -598,7 +652,11 @@ const CanvasContent = ({
                 variant="ghost" 
                 size="icon-xs" 
                 className="h-8 w-8 ml-1"
-                onClick={() => setShowMultiSelectMenu(null)}
+                onClick={() => {
+                  setShowMultiSelectMenu(null);
+                  setSelectedContainerIds([]);
+                  setAccumulatedSelectedIds(new Set());
+                }}
               >
                 <X className="w-3.5 h-3.5" />
               </Button>
