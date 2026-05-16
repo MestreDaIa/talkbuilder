@@ -358,6 +358,7 @@ const CanvasContent = ({
           data: {
             container,
             onNodeClick: handleNodeClick,
+            onRenameContainer: handleRenameContainer,
             onButtonClick: handleButtonClick,
             onAddButton: handleAddButton,
             onUpdateButton: handleUpdateButton,
@@ -624,6 +625,7 @@ const CanvasContent = ({
                       <div className="p-1">
                         {selectedContainerIds.map((id) => {
                           const container = containers.find(c => c.id === id);
+                          const displayName = container?.nameContainer?.trim() || `Bloco ${id.slice(-4)}`;
                           return (
                             <div key={id} className="flex items-center gap-2 px-2 py-1.5 hover:bg-muted/50 rounded-sm">
                               <Checkbox 
@@ -647,8 +649,9 @@ const CanvasContent = ({
                               <label 
                                 htmlFor={`select-${id}`}
                                 className="text-xs truncate flex-1 cursor-pointer select-none"
+                              title={displayName}
                               >
-                                {container?.nameContainer || `Bloco ${id.slice(-4)}`}
+                                {displayName}
                               </label>
                             </div>
                           );
