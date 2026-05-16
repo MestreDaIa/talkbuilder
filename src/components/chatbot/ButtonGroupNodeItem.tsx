@@ -169,7 +169,7 @@ export const ButtonGroupNodeItem = ({
               id={`${node.id}-btn-${button.id}`}
               style={{ 
                 position: 'absolute',
-                right: -16,
+                right: -24,
                 top: '50%',
                 transform: 'translate(50%, -50%)',
               }}
@@ -189,7 +189,7 @@ export const ButtonGroupNodeItem = ({
             id={`${node.id}-default`}
             style={{ 
               position: 'absolute',
-              right: -16,
+              right: -24,
               top: '50%',
               transform: 'translate(50%, -50%)',
             }}
