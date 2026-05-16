@@ -368,18 +368,29 @@ const CanvasContent = ({
   const handleEdgesChangeWrapper = useCallback((changes: any) => {
     onEdgesChange(changes);
     
-    // Notify parent of the change in edges
-    if (onEdgesChangeProp) {
-      setTimeout(() => {
-        const currentEdges = reactFlowInstance.getEdges();
-        onEdgesChangeProp(currentEdges.map((e: FlowEdge) => ({
+    // Check if there are removal changes
+    const hasRemoval = changes.some((c: any) => c.type === 'remove');
+    
+    if (hasRemoval && onEdgesChangeProp) {
+      // Get the IDs of edges that are NOT being removed
+      const removedIds = changes
+        .filter((c: any) => c.type === 'remove')
+        .map((c: any) => c.id);
+        
+      setEdges((eds) => {
+        const remainingEdges = eds.filter(e => !removedIds.includes(e.id));
+        
+        // Sync parent state with remaining edges
+        onEdgesChangeProp(remainingEdges.map((e: FlowEdge) => ({
           source: e.source,
           target: e.target,
           sourceHandle: e.sourceHandle || undefined
         })));
-      }, 0);
+        
+        return remainingEdges;
+      });
     }
-  }, [onEdgesChange, onEdgesChangeProp, reactFlowInstance]);
+  }, [onEdgesChange, onEdgesChangeProp, setEdges]);
 
   return (
     <>
