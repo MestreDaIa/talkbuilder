@@ -35,6 +35,10 @@ interface ChatWidgetProps {
   themeSettings?: {
     backgroundColor?: string;
     backgroundImage?: string;
+    headerBackgroundColor?: string;
+    headerTextColor?: string;
+    inputBackgroundColor?: string;
+    inputTextColor?: string;
     textColor?: string;
     botBubbleColor?: string;
     botTextColor?: string;
@@ -270,22 +274,25 @@ export const ChatWidget = ({
       {/* Header */}
       <div
         className="p-4 flex items-center justify-between"
-        style={{ backgroundColor: primaryColor }}
+        style={{ 
+          backgroundColor: themeSettings?.headerBackgroundColor || primaryColor,
+          color: themeSettings?.headerTextColor || '#ffffff'
+        }}
       >
         <div className="flex items-center gap-3">
           <div className="w-10 h-10 rounded-full bg-white/20 flex items-center justify-center">
             <MessageCircle className="w-5 h-5 text-white" />
           </div>
           <div>
-            <h3 className="font-semibold text-white">{companyName}</h3>
-            <p className="text-xs text-white/70">Assistente virtual</p>
+            <h3 className="font-semibold" style={{ color: themeSettings?.headerTextColor || '#ffffff' }}>{companyName}</h3>
+            <p className="text-xs opacity-70" style={{ color: themeSettings?.headerTextColor || '#ffffff' }}>Assistente virtual</p>
           </div>
         </div>
         <button
           onClick={() => setIsOpen(false)}
           className="w-8 h-8 rounded-full bg-white/20 flex items-center justify-center hover:bg-white/30 transition-colors"
         >
-          <X className="w-4 h-4 text-white" />
+          <X className="w-4 h-4" style={{ color: themeSettings?.headerTextColor || '#ffffff' }} />
         </button>
       </div>
 
@@ -375,7 +382,7 @@ export const ChatWidget = ({
 
       {/* Input */}
       {waitingFor && waitingFor !== "buttons" && (
-        <div className="p-3 border-t border-border">
+        <div className="p-3 border-t border-border" style={{ backgroundColor: themeSettings?.inputBackgroundColor || 'transparent' }}>
           <div className="flex gap-2">
             <Input
               value={input}
@@ -383,7 +390,11 @@ export const ChatWidget = ({
               onKeyPress={handleKeyPress}
               placeholder="Digite sua mensagem..."
               disabled={isLoading}
-              className="flex-1 rounded-full"
+              className="flex-1 rounded-full bg-white/10"
+              style={{ 
+                color: themeSettings?.inputTextColor || themeSettings?.textColor || '#1f2937',
+                backgroundColor: themeSettings?.inputBackgroundColor !== 'transparent' ? 'rgba(255,255,255,0.05)' : undefined
+              }}
             />
             <Button
               size="icon"
