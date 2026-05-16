@@ -169,7 +169,7 @@ export const ButtonGroupNodeItem = ({
               id={`${node.id}-btn-${button.id}`}
               style={{ 
                 position: 'absolute',
-                right: 0,
+                right: -16,
                 top: '50%',
                 transform: 'translate(50%, -50%)',
               }}
