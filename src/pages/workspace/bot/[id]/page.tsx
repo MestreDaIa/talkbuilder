@@ -145,14 +145,21 @@ export default function BotPage() {
   }, [flow]);
 
   // Centraliza um novo bloco no centro do viewport atual do canvas.
-  // Ajustamos o offset vertical para que o bloco apareça um pouco mais acima
-  // do centro exato, melhorando a percepção visual de centralização.
-  const CONTAINER_HALF_W = 150;
-  const CONTAINER_HALF_H = 100; // Altura aproximada do bloco para centralização real
-
   const getCenteredPosition = () => {
     const base = getCenter ? getCenter() : { x: 300, y: 200 };
-    return { x: base.x - CONTAINER_HALF_W, y: base.y - CONTAINER_HALF_H };
+    
+    // Tenta obter as dimensões reais do container se houver algum no DOM, 
+    // caso contrário usa valores padrão baseados no CSS (max-w-[305px])
+    const containerElement = document.querySelector('.react-flow__node-container');
+    const rect = containerElement?.getBoundingClientRect();
+    
+    const width = rect?.width || 305;
+    const height = rect?.height || 150;
+
+    return { 
+      x: base.x - (width / 2), 
+      y: base.y - (height / 2) 
+    };
   };
 
   const handleAddBlock = () => {
