@@ -109,7 +109,12 @@ const AudioPlayer = ({ src, autoPlay }: AudioPlayerProps) => {
 export interface TestPanelTheme {
   primaryColor?: string;
   backgroundColor?: string;
+  backgroundImage?: string;
   textColor?: string;
+  botBubbleColor?: string;
+  botTextColor?: string;
+  userBubbleColor?: string;
+  userTextColor?: string;
   fontFamily?: string;
 }
 
@@ -444,10 +449,29 @@ export const TestPanel = ({
   const themeStyle: React.CSSProperties = {};
   if (theme?.primaryColor) {
     (themeStyle as any)["--bot-flow"] = theme.primaryColor;
-    (themeStyle as any)["--user-msg-bg"] = theme.primaryColor;
-    (themeStyle as any)["--user-msg-fg"] = "#ffffff";
   }
-  if (theme?.backgroundColor) themeStyle.background = theme.backgroundColor;
+  
+  if (theme?.userBubbleColor) (themeStyle as any)["--user-msg-bg"] = theme.userBubbleColor;
+  else if (theme?.primaryColor) (themeStyle as any)["--user-msg-bg"] = theme.primaryColor;
+
+  if (theme?.userTextColor) (themeStyle as any)["--user-msg-fg"] = theme.userTextColor;
+  else (themeStyle as any)["--user-msg-fg"] = "#ffffff";
+
+  if (theme?.botBubbleColor) (themeStyle as any)["--bot-msg-bg"] = theme.botBubbleColor;
+  else (themeStyle as any)["--bot-msg-bg"] = "hsl(var(--muted))";
+
+  if (theme?.botTextColor) (themeStyle as any)["--bot-msg-fg"] = theme.botTextColor;
+  else (themeStyle as any)["--bot-msg-fg"] = "hsl(var(--foreground))";
+
+  if (theme?.backgroundColor) themeStyle.backgroundColor = theme.backgroundColor;
+  
+  if (theme?.backgroundImage) {
+    themeStyle.backgroundImage = `url(${theme.backgroundImage})`;
+    themeStyle.backgroundSize = 'cover';
+    themeStyle.backgroundPosition = 'center';
+    themeStyle.backgroundRepeat = 'no-repeat';
+  }
+
   if (theme?.textColor) themeStyle.color = theme.textColor;
   if (theme?.fontFamily) themeStyle.fontFamily = theme.fontFamily;
 
@@ -468,12 +492,14 @@ export const TestPanel = ({
           </div>
           {!hideClose && <Button variant="ghost" size="icon" onClick={onClose}><X className="h-5 w-5" /></Button>}
         </div>
-        <ScrollArea className="flex-1 p-3 bg-background/40" ref={scrollRef}>
+        <ScrollArea className="flex-1 p-3" ref={scrollRef}>
           <div className="space-y-3">
             {messages.map((message) => (
               <div key={message.id} className={`flex ${message.type === "bot" ? "justify-start" : "justify-end"}`}>
-                <div className={`max-w-[85%] px-3 py-2 rounded-2xl text-sm shadow-md text-left ${message.type === "bot" ? "rounded-bl-sm bg-muted" : "rounded-br-sm text-white"}`}
-                  style={message.type === "user" ? { background: "var(--user-msg-bg)", color: "var(--user-msg-fg)" } : undefined}>
+                <div className={`max-w-[85%] px-3 py-2 rounded-2xl text-sm shadow-md text-left ${message.type === "bot" ? "rounded-bl-sm" : "rounded-br-sm"}`}
+                  style={message.type === "user" 
+                    ? { background: "var(--user-msg-bg)", color: "var(--user-msg-fg)" } 
+                    : { background: "var(--bot-msg-bg)", color: "var(--bot-msg-fg)" }}>
                   {message.isImage ? <img src={message.content} alt={message.alt} className="max-w-full rounded" />
                    : message.isVideo ? <video src={message.content} controls className="max-w-full rounded" />
                    : message.isAudio ? <div className="flex items-center gap-2"><Headphones className="h-4 w-4 shrink-0" /><AudioPlayer src={message.content} autoPlay={message.autoplay} /></div>
