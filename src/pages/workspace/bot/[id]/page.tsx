@@ -144,14 +144,23 @@ export default function BotPage() {
     return deriveStatus(flow);
   }, [flow]);
 
+  // Centraliza um novo bloco no centro do viewport atual do canvas.
+  // Largura aproximada do container é ~280px e altura ~160px — descontamos
+  // metade para que o bloco fique visualmente centralizado, e não ancorado
+  // pelo canto superior esquerdo.
+  const CONTAINER_HALF_W = 140;
+  const CONTAINER_HALF_H = 80;
+
+  const getCenteredPosition = () => {
+    const base = getCenter ? getCenter() : { x: 300, y: 200 };
+    return { x: base.x - CONTAINER_HALF_W, y: base.y - CONTAINER_HALF_H };
+  };
+
   const handleAddBlock = () => {
-    const position = getCenter
-      ? getCenter()
-      : { x: 200 + containers.length * 40, y: 160 + containers.length * 40 };
     const newContainer: Container = {
       id: `container-${Date.now()}`,
       nodes: [],
-      position,
+      position: getCenteredPosition(),
     };
     setContainers([...containers, newContainer]);
     toast.success("Bloco adicionado!");
@@ -164,13 +173,10 @@ export default function BotPage() {
       config: {},
     };
     setContainers((prev) => {
-      const basePosition = getCenter ? getCenter() : { x: 300, y: 200 };
-      const offset = prev.length * 40;
-      const position = { x: basePosition.x + offset, y: basePosition.y + offset };
       const newContainer: Container = {
         id: `container-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`,
         nodes: [newNode],
-        position,
+        position: getCenteredPosition(),
       };
       return [...prev, newContainer];
     });
