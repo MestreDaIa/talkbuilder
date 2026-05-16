@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Settings, Palette, Type, FileText, Upload, Download, Copy, Image as ImageIcon, MessageCircle } from 'lucide-react';
+import { Settings, Palette, Type, FileText, Upload, Download, Copy, Image as ImageIcon, MessageCircle, X } from 'lucide-react';
 import {
   Dialog,
   DialogContent,
