@@ -151,18 +151,13 @@ export default function BotPage() {
       return;
     }
 
-    const nextHistory = history.slice(0, historyIndex + 1);
     const currentState = { containers, edges };
     
-    // Inicializa histórico se vazio
-    if (nextHistory.length === 0) {
-      nextHistory.push(JSON.parse(JSON.stringify(currentState)));
-    }
-
     // Adiciona ao histórico apenas se for diferente do estado atual
     setHistory(prev => {
       const lastState = prev[historyIndex];
       
+      // Se já temos um estado no índice atual e é igual ao novo, não faz nada
       if (lastState && JSON.stringify(lastState) === JSON.stringify(currentState)) {
         return prev;
       }
