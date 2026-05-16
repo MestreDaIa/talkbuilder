@@ -151,20 +151,26 @@ export default function BotPage() {
       return;
     }
 
-    const currentState = { containers, edges };
+    const currentState = { 
+      containers: JSON.parse(JSON.stringify(containers)), 
+      edges: JSON.parse(JSON.stringify(edges)) 
+    };
     
-    // Adiciona ao histórico apenas se for diferente do estado atual
+    // Adiciona ao histórico apenas se for diferente do último estado
     setHistory(prev => {
       const lastState = prev[historyIndex];
       
       // Se já temos um estado no índice atual e é igual ao novo, não faz nada
+      // Comparamos stringify para detectar mudanças profundas em nodes/config/posição
       if (lastState && JSON.stringify(lastState) === JSON.stringify(currentState)) {
         return prev;
       }
 
+      // Ao fazer uma nova alteração, o refazer deve ser limpo a partir deste ponto
       const newHistory = prev.slice(0, historyIndex + 1);
-      newHistory.push(JSON.parse(JSON.stringify(currentState)));
+      newHistory.push(currentState);
       
+      // Mantemos um limite de 50 para não sobrecarregar
       if (newHistory.length > 50) {
         const sliced = newHistory.slice(-50);
         setHistoryIndex(sliced.length - 1);
@@ -174,15 +180,15 @@ export default function BotPage() {
       setHistoryIndex(newHistory.length - 1);
       return newHistory;
     });
-  }, [botId, containers, edges, hydrated, historyIndex]);
+  }, [botId, containers, edges, hydrated]); // Removido historyIndex da dependência para evitar loops
 
   const handleUndo = useCallback(() => {
     if (historyIndex > 0) {
       const prevIndex = historyIndex - 1;
       const prevState = history[prevIndex];
       isInternalChangeRef.current = true;
-      setContainers(prevState.containers);
-      setEdges(prevState.edges);
+      setContainers(JSON.parse(JSON.stringify(prevState.containers)));
+      setEdges(JSON.parse(JSON.stringify(prevState.edges)));
       setHistoryIndex(prevIndex);
       toast.info("Desfeito");
     }
@@ -193,8 +199,8 @@ export default function BotPage() {
       const nextIndex = historyIndex + 1;
       const nextState = history[nextIndex];
       isInternalChangeRef.current = true;
-      setContainers(nextState.containers);
-      setEdges(nextState.edges);
+      setContainers(JSON.parse(JSON.stringify(nextState.containers)));
+      setEdges(JSON.parse(JSON.stringify(nextState.edges)));
       setHistoryIndex(nextIndex);
       toast.info("Refeito");
     }
@@ -283,6 +289,15 @@ export default function BotPage() {
       const updated = await saveDraft(flow.id, containers, edges);
       setFlow(updated);
       lastSavedAtRef.current = Date.now();
+      
+      // Limpa o histórico após salvar com sucesso para economizar memória
+      const currentState = { 
+        containers: JSON.parse(JSON.stringify(containers)), 
+        edges: JSON.parse(JSON.stringify(edges)) 
+      };
+      setHistory([currentState]);
+      setHistoryIndex(0);
+      
       toast.success("Fluxo salvo!");
     } catch (err: any) {
       console.error(err);
