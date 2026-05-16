@@ -80,15 +80,12 @@ const CanvasContent = ({
         const reactFlowBounds = document.querySelector('.react-flow')?.getBoundingClientRect();
         if (!reactFlowBounds) return { x: 300, y: 200 };
 
-        const screenCenterX = reactFlowBounds.width / 2;
-        const screenCenterY = reactFlowBounds.height / 2;
-
-        const flowPosition = reactFlowInstance.screenToFlowPosition({
-          x: screenCenterX + reactFlowBounds.left,
-          y: screenCenterY + reactFlowBounds.top
+        const center = reactFlowInstance.screenToFlowPosition({
+          x: reactFlowBounds.left + reactFlowBounds.width / 2,
+          y: reactFlowBounds.top + reactFlowBounds.height / 2
         });
 
-        return flowPosition;
+        return center;
       });
     }
   }, [reactFlowInstance, onGetCenterPosition]);
