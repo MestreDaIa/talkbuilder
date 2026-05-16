@@ -567,13 +567,7 @@ const CanvasContent = ({
         )}
 
         {showMultiSelectMenu && (
-          <Panel position="top-left" style={{ 
-            position: 'absolute',
-            left: reactFlowInstance.flowToScreenPosition(reactFlowInstance.screenToFlowPosition({ x: showMultiSelectMenu.x, y: showMultiSelectMenu.y })).x,
-            top: reactFlowInstance.flowToScreenPosition(reactFlowInstance.screenToFlowPosition({ x: showMultiSelectMenu.x, y: showMultiSelectMenu.y })).y,
-            transform: 'translate(-50%, -120%)',
-            zIndex: 1000
-          }}>
+          <Panel position="top-right" className="m-4">
             <div 
               className="flex items-center gap-1 p-1.5 bg-card border border-border rounded-lg shadow-2xl animate-in fade-in zoom-in duration-200"
               onMouseDown={(e) => e.stopPropagation()}
