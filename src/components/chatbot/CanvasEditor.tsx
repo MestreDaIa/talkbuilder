@@ -396,14 +396,19 @@ const CanvasContent = ({
     event.preventDefault();
   }, []);
 
+  const getRelativePos = (event: React.MouseEvent) => {
+    const rect = (event.currentTarget as HTMLElement)
+      .closest('.react-flow')
+      ?.getBoundingClientRect();
+    if (!rect) return { x: event.clientX, y: event.clientY };
+    return { x: event.clientX - rect.left, y: event.clientY - rect.top };
+  };
+
   const onPaneMouseDown = useCallback((event: React.MouseEvent) => {
     // Right click (button 2) starts selection
     if (event.button === 2) {
-      const position = reactFlowInstance.screenToFlowPosition({
-        x: event.clientX,
-        y: event.clientY,
-      });
-      setSelectionBox({ start: position, end: position });
+      const pos = getRelativePos(event);
+      setSelectionBox({ start: pos, end: pos });
       setIsSelectionActive(true);
       setShowMultiSelectMenu(null);
     } else {
@@ -411,33 +416,45 @@ const CanvasContent = ({
       setSelectedContainerIds([]);
       setShowMultiSelectMenu(null);
     }
-  }, [reactFlowInstance]);
+  }, []);
 
   const onPaneMouseMove = useCallback((event: React.MouseEvent) => {
     if (isSelectionActive && selectionBox) {
-      const position = reactFlowInstance.screenToFlowPosition({
-        x: event.clientX,
-        y: event.clientY,
-      });
-      setSelectionBox({ ...selectionBox, end: position });
+      const pos = getRelativePos(event);
+      setSelectionBox({ ...selectionBox, end: pos });
     }
-  }, [isSelectionActive, selectionBox, reactFlowInstance]);
+  }, [isSelectionActive, selectionBox]);
 
   const onPaneMouseUp = useCallback((event: React.MouseEvent) => {
     if (isSelectionActive && selectionBox) {
-      const { start, end } = selectionBox;
-      const minX = Math.min(start.x, end.x);
-      const maxX = Math.max(start.x, end.x);
-      const minY = Math.min(start.y, end.y);
-      const maxY = Math.max(start.y, end.y);
+      const rect = (event.currentTarget as HTMLElement)
+        .closest('.react-flow')
+        ?.getBoundingClientRect();
+      if (!rect) {
+        setIsSelectionActive(false);
+        setSelectionBox(null);
+        return;
+      }
+
+      // Convert screen-relative box to flow coordinates for hit-testing
+      const startFlow = reactFlowInstance.screenToFlowPosition({
+        x: selectionBox.start.x + rect.left,
+        y: selectionBox.start.y + rect.top,
+      });
+      const endFlow = reactFlowInstance.screenToFlowPosition({
+        x: selectionBox.end.x + rect.left,
+        y: selectionBox.end.y + rect.top,
+      });
+      const minX = Math.min(startFlow.x, endFlow.x);
+      const maxX = Math.max(startFlow.x, endFlow.x);
+      const minY = Math.min(startFlow.y, endFlow.y);
+      const maxY = Math.max(startFlow.y, endFlow.y);
 
       const newlySelectedIds = nodes
         .filter((node) => {
           const { x, y } = node.position;
-          // Rough estimation of node size (max-w-[305px] and dynamic height)
           const nodeWidth = 305;
-          const nodeHeight = 200; 
-          
+          const nodeHeight = 200;
           return (
             x < maxX &&
             x + nodeWidth > minX &&
@@ -448,7 +465,7 @@ const CanvasContent = ({
         .map((node) => node.id);
 
       setSelectedContainerIds(newlySelectedIds);
-      
+
       if (newlySelectedIds.length > 0) {
         setShowMultiSelectMenu({ x: event.clientX, y: event.clientY });
       }
@@ -456,7 +473,7 @@ const CanvasContent = ({
       setIsSelectionActive(false);
       setSelectionBox(null);
     }
-  }, [isSelectionActive, selectionBox, nodes]);
+  }, [isSelectionActive, selectionBox, nodes, reactFlowInstance]);
 
   const handleMultiDelete = useCallback(() => {
     if (selectedContainerIds.length === 0) return;
@@ -525,8 +542,6 @@ const CanvasContent = ({
               top: Math.min(selectionBox.start.y, selectionBox.end.y),
               width: Math.abs(selectionBox.start.x - selectionBox.end.x),
               height: Math.abs(selectionBox.start.y - selectionBox.end.y),
-              transform: `translate(${reactFlowInstance.getViewport().x}px, ${reactFlowInstance.getViewport().y}px) scale(${reactFlowInstance.getViewport().zoom})`,
-              transformOrigin: '0 0'
             }}
           />
         )}
