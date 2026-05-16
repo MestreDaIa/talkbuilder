@@ -625,7 +625,7 @@ const CanvasContent = ({
                       <div className="p-1">
                         {selectedContainerIds.map((id) => {
                           const container = containers.find(c => c.id === id);
-                          const displayName = container?.nameContainer?.trim() || `Bloco ${id.slice(-4)}`;
+                          const displayName = container?.nameContainer?.trim() || `BLOCO #${id.slice(-6)}`;
                           return (
                             <div key={id} className="flex items-center gap-2 px-2 py-1.5 hover:bg-muted/50 rounded-sm">
                               <Checkbox 
