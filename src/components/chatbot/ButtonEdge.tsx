@@ -34,7 +34,8 @@ export function ButtonEdge({
   const onEdgeClick = (e: React.MouseEvent) => {
     e.preventDefault();
     e.stopPropagation();
-    setEdges((edges) => edges.filter((edge) => edge.id !== id));
+    console.log('Edge clicked for deletion:', id);
+    setEdges((eds) => eds.filter((edge) => edge.id !== id));
   };
 
   return (
