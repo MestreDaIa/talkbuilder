@@ -14,6 +14,7 @@ import ReactFlow, {
   NodeDragHandler,
   ReactFlowProvider,
   useReactFlow,
+  Panel,
 } from 'reactflow';
 import 'reactflow/dist/style.css';
 import { Container, Node, NodeConfig, Edge, ButtonConfig } from "@/types/chatbot";
@@ -22,6 +23,8 @@ import { NodeConfigDialog } from "./NodeConfigDialog";
 import { ButtonEdge } from "./ButtonEdge";
 import { SingleButtonConfig } from "./nodesConfigs/NodesInputsConfig/SingleButtonConfig";
 import { toast } from "sonner";
+import { Copy, Trash2, X } from "lucide-react";
+import { Button } from "@/components/ui/button";
 
 interface CanvasEditorProps {
   containers: Container[];
@@ -72,6 +75,10 @@ const CanvasContent = ({
   const [edges, setEdges, onEdgesChange] = useEdgesState([]);
   const containersRef = useRef(containers);
   const reactFlowInstance = useReactFlow();
+  const [isSelectionActive, setIsSelectionActive] = useState(false);
+  const [selectionBox, setSelectionBox] = useState<{ start: { x: number; y: number }; end: { x: number; y: number } } | null>(null);
+  const [showMultiSelectMenu, setShowMultiSelectMenu] = useState<{ x: number; y: number } | null>(null);
+  const [selectedContainerIds, setSelectedContainerIds] = useState<string[]>([]);
 
   // Expose viewport center getter
   useEffect(() => {
@@ -387,8 +394,109 @@ const CanvasContent = ({
 
   return (
     <>
+  const handleContextMenu = useCallback((event: React.MouseEvent) => {
+    event.preventDefault();
+  }, []);
+
+  const onPaneMouseDown = useCallback((event: React.MouseEvent) => {
+    // Right click (button 2) starts selection
+    if (event.button === 2) {
+      const position = reactFlowInstance.screenToFlowPosition({
+        x: event.clientX,
+        y: event.clientY,
+      });
+      setSelectionBox({ start: position, end: position });
+      setIsSelectionActive(true);
+      setShowMultiSelectMenu(null);
+    } else {
+      // Left click on pane clears selection
+      setSelectedContainerIds([]);
+      setShowMultiSelectMenu(null);
+    }
+  }, [reactFlowInstance]);
+
+  const onPaneMouseMove = useCallback((event: React.MouseEvent) => {
+    if (isSelectionActive && selectionBox) {
+      const position = reactFlowInstance.screenToFlowPosition({
+        x: event.clientX,
+        y: event.clientY,
+      });
+      setSelectionBox({ ...selectionBox, end: position });
+    }
+  }, [isSelectionActive, selectionBox, reactFlowInstance]);
+
+  const onPaneMouseUp = useCallback((event: React.MouseEvent) => {
+    if (isSelectionActive && selectionBox) {
+      const { start, end } = selectionBox;
+      const minX = Math.min(start.x, end.x);
+      const maxX = Math.max(start.x, end.x);
+      const minY = Math.min(start.y, end.y);
+      const maxY = Math.max(start.y, end.y);
+
+      const newlySelectedIds = nodes
+        .filter((node) => {
+          const { x, y } = node.position;
+          // Rough estimation of node size (max-w-[305px] and dynamic height)
+          const nodeWidth = 305;
+          const nodeHeight = 200; 
+          
+          return (
+            x < maxX &&
+            x + nodeWidth > minX &&
+            y < maxY &&
+            y + nodeHeight > minY
+          );
+        })
+        .map((node) => node.id);
+
+      setSelectedContainerIds(newlySelectedIds);
+      
+      if (newlySelectedIds.length > 0) {
+        setShowMultiSelectMenu({ x: event.clientX, y: event.clientY });
+      }
+
+      setIsSelectionActive(false);
+      setSelectionBox(null);
+    }
+  }, [isSelectionActive, selectionBox, nodes]);
+
+  const handleMultiDelete = useCallback(() => {
+    if (selectedContainerIds.length === 0) return;
+    const updatedContainers = containers.filter(c => !selectedContainerIds.includes(c.id));
+    onContainersChange(updatedContainers);
+    setSelectedContainerIds([]);
+    setShowMultiSelectMenu(null);
+    toast.success(`${selectedContainerIds.length} blocos excluídos!`);
+  }, [selectedContainerIds, containers, onContainersChange]);
+
+  const handleMultiDuplicate = useCallback(() => {
+    if (selectedContainerIds.length === 0) return;
+    
+    const containersToDuplicate = containers.filter(c => selectedContainerIds.includes(c.id));
+    const newContainers: Container[] = containersToDuplicate.map(c => ({
+      ...c,
+      id: `container-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`,
+      nameContainer: c.nameContainer ? `${c.nameContainer} - cópia` : undefined,
+      position: { x: c.position.x + 50, y: c.position.y + 50 },
+      nodes: c.nodes.map(node => ({
+        ...node,
+        id: `node-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`,
+      }))
+    }));
+
+    onContainersChange([...containers, ...newContainers]);
+    setSelectedContainerIds([]);
+    setShowMultiSelectMenu(null);
+    toast.success(`${newContainers.length} blocos duplicados!`);
+  }, [selectedContainerIds, containers, onContainersChange]);
+
+  return (
+    <>
       <ReactFlow
-        nodes={nodes}
+        nodes={nodes.map(n => ({
+          ...n,
+          selected: selectedContainerIds.includes(n.id)
+        }))}
         edges={edges}
         onNodesChange={handleNodesChangeWrapper}
         onEdgesChange={handleEdgesChangeWrapper}
@@ -400,10 +508,81 @@ const CanvasContent = ({
         proOptions={{ hideAttribution: true }}
         fitView
         className="flex flex-grow h-full"
+        onMouseDown={onPaneMouseDown}
+        onMouseMove={onPaneMouseMove}
+        onMouseUp={onPaneMouseUp}
+        onContextMenu={handleContextMenu}
+        deleteKeyCode={null} // Desabilita delete nativo para evitar conflitos se desejar
       >
         <Background className="bg-cyan-950/80 flex-1 w-full" />
         <Controls position="bottom-left" className="z-10" />
         <MiniMap className="bg-card" />
+
+        {selectionBox && (
+          <div
+            className="absolute border-2 border-primary bg-primary/10 pointer-events-none z-50"
+            style={{
+              left: Math.min(
+                reactFlowInstance.flowToScreenPosition(selectionBox.start).x,
+                reactFlowInstance.flowToScreenPosition(selectionBox.end).x
+              ),
+              top: Math.min(
+                reactFlowInstance.flowToScreenPosition(selectionBox.start).y,
+                reactFlowInstance.flowToScreenPosition(selectionBox.end).y
+              ),
+              width: Math.abs(
+                reactFlowInstance.flowToScreenPosition(selectionBox.start).x -
+                reactFlowInstance.flowToScreenPosition(selectionBox.end).x
+              ),
+              height: Math.abs(
+                reactFlowInstance.flowToScreenPosition(selectionBox.start).y -
+                reactFlowInstance.flowToScreenPosition(selectionBox.end).y
+              ),
+            }}
+          />
+        )}
+
+        {showMultiSelectMenu && (
+          <Panel position="top-left" style={{ 
+            position: 'absolute',
+            left: showMultiSelectMenu.x,
+            top: showMultiSelectMenu.y,
+            transform: 'translate(-50%, -120%)',
+            zIndex: 1000
+          }}>
+            <div className="flex items-center gap-1 p-1.5 bg-card border border-border rounded-lg shadow-2xl animate-in fade-in zoom-in duration-200">
+              <div className="px-2 text-xs font-medium text-muted-foreground border-r mr-1">
+                {selectedContainerIds.length} selecionados
+              </div>
+              <Button 
+                variant="ghost" 
+                size="xs" 
+                className="h-8 gap-1.5 px-2 hover:bg-primary/10 hover:text-primary"
+                onClick={handleMultiDuplicate}
+              >
+                <Copy className="w-3.5 h-3.5" />
+                Duplicar
+              </Button>
+              <Button 
+                variant="ghost" 
+                size="xs" 
+                className="h-8 gap-1.5 px-2 hover:bg-destructive/10 hover:text-destructive"
+                onClick={handleMultiDelete}
+              >
+                <Trash2 className="w-3.5 h-3.5" />
+                Excluir
+              </Button>
+              <Button 
+                variant="ghost" 
+                size="icon-xs" 
+                className="h-8 w-8 ml-1"
+                onClick={() => setShowMultiSelectMenu(null)}
+              >
+                <X className="w-3.5 h-3.5" />
+              </Button>
+            </div>
+          </Panel>
+        )}
       </ReactFlow>
 
       <NodeConfigDialog

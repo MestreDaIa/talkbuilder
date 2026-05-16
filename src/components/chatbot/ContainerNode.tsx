@@ -136,7 +136,8 @@ export const ContainerNode = memo(({ data }: NodeProps<ContainerNodeData>) => {
       className={cn(
         'relative bg-card py-1 px-0 rounded-xl shadow-xl border border-border max-w-[305px] transition-all duration-200',
         'ring-1 ring-primary/10 hover:ring-primary/30',
-        isDragOver && 'ring-2 ring-green-500 border-green-500 bg-green-500/5'
+        isDragOver && 'ring-2 ring-green-500 border-green-500 bg-green-500/5',
+        data.container.id && (data as any).selected && 'ring-2 ring-primary border-primary shadow-primary/20'
       )}
     >
       <div
