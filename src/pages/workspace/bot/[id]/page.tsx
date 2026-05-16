@@ -145,15 +145,14 @@ export default function BotPage() {
   }, [flow]);
 
   // Centraliza um novo bloco no centro do viewport atual do canvas.
-  // Largura aproximada do container é ~280px e altura ~160px — descontamos
-  // metade para que o bloco fique visualmente centralizado, e não ancorado
-  // pelo canto superior esquerdo.
+  // Ajustamos o offset vertical para que o bloco apareça um pouco mais acima
+  // do centro exato, melhorando a percepção visual de centralização.
   const CONTAINER_HALF_W = 140;
-  const CONTAINER_HALF_H = 80;
+  const CONTAINER_OFFSET_Y = 120; // Subindo um pouco mais na viewport
 
   const getCenteredPosition = () => {
     const base = getCenter ? getCenter() : { x: 300, y: 200 };
-    return { x: base.x - CONTAINER_HALF_W, y: base.y - CONTAINER_HALF_H };
+    return { x: base.x - CONTAINER_HALF_W, y: base.y - CONTAINER_OFFSET_Y };
   };
 
   const handleAddBlock = () => {
