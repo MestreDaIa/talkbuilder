@@ -360,6 +360,7 @@ export default function BotPage() {
 
   const lbl = statusLabel(status);
   const displayName = flow?.name ?? bot?.title ?? `Bot: ${botId}`;
+  const botAvatar = (flow?.settings as any)?.theme?.avatarUrl;
   const slug = (params.slug as string | undefined) ?? profile?.slug;
 
   const handleBack = async () => {
@@ -418,7 +419,11 @@ export default function BotPage() {
           <div className="h-6 w-px bg-border mx-1" />
 
           <div className="flex items-center gap-2 mr-2 min-w-0">
-            {bot?.emoji && <span className="text-base shrink-0">{bot.emoji}</span>}
+            {botAvatar ? (
+              <img src={botAvatar} alt="Avatar" className="w-6 h-6 rounded-full object-cover shrink-0" />
+            ) : (
+              bot?.emoji && <span className="text-base shrink-0">{bot.emoji}</span>
+            )}
 
             {isEditingName ? (
               <Input
