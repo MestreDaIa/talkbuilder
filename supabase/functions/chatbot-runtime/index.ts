@@ -499,6 +499,44 @@ function runFlow(execution: any, containers: any[], edges: any[], input: any) {
           }
         }
         break;
+      case "script": {
+        const code = String(cfg.code || "");
+        if (code) {
+          try {
+            const interpolated = code.replace(/{{\s*(.*?)\s*}}/g, (_, key) => {
+              const v = variables[String(key).trim()];
+              return JSON.stringify(v == null ? "" : v);
+            });
+
+            // Context provided to the script
+            const scriptContext = {
+              variables: { ...variables },
+              getVariable: (name: string) => variables[name],
+              setVariable: (name: string, value: any) => { variables[name] = value; },
+            };
+
+            const body = `"use strict";
+              const variables = this.variables;
+              const getVariable = this.getVariable;
+              const setVariable = this.setVariable;
+              ${interpolated}`;
+
+            const fn = new Function(body);
+            const result = fn.call(scriptContext);
+
+            if (cfg.variableName && result !== undefined) {
+              variables[cfg.variableName] = result;
+            }
+
+            if (result && typeof result === "object" && !Array.isArray(result)) {
+              Object.assign(variables, result);
+            }
+          } catch (err) {
+            console.error("[script-node] execution failed:", err);
+          }
+        }
+        break;
+      }
       case "condition": {
         const conditions = cfg.conditions || [];
         const matchedCondition = conditions.find(evaluateCondition);
