@@ -354,7 +354,6 @@ export const TestPanel = ({
             };
 
             // Support legacy {{var}} interpolation
-            // We only replace if it's NOT on the left side of an assignment (simplified check)
             const interpolated = code.replace(/{{\s*(.*?)\s*}}/g, (_, key) => {
               const v = variables[String(key).trim()];
               return JSON.stringify(v == null ? "" : v);
@@ -365,12 +364,22 @@ export const TestPanel = ({
               variables: { ...variables },
               getVariable: getVar,
               setVariable: setVar,
+              window: window,
+              alert: window.alert.bind(window),
+              console: console,
+              fetch: window.fetch.bind(window),
+              setTimeout: window.setTimeout.bind(window),
             };
 
             const body = `"use strict";
               const variables = this.variables;
               const getVariable = this.getVariable;
               const setVariable = this.setVariable;
+              const window = this.window;
+              const alert = this.alert;
+              const console = this.console;
+              const fetch = this.fetch;
+              const setTimeout = this.setTimeout;
               ${interpolated}`;
 
             const fn = new Function(body);
