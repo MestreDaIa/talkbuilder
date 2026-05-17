@@ -1,4 +1,4 @@
-import { useState, useMemo } from "react";
+import { useState, useMemo, useEffect } from "react";
 import { NodeConfig } from "@/types/chatbot";
 import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
@@ -13,13 +13,14 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { useVariables } from "@/context/VariablesContext";
-import { Plus, HelpCircle, Search } from "lucide-react";
+import { Plus, HelpCircle, Search, Braces } from "lucide-react";
 import {
   Tooltip,
   TooltipContent,
   TooltipProvider,
   TooltipTrigger,
 } from "@/components/ui/tooltip";
+import { VariableModal } from "../../VariableModal";
 
 interface SetVariableConfigProps {
   config: NodeConfig;
@@ -31,6 +32,8 @@ type ValueType = "custom" | "expression" | "empty" | "now" | "today" | "yesterda
 export const SetVariableConfig = ({ config, setConfig }: SetVariableConfigProps) => {
   const { getAllVariableNames, addVariable } = useVariables();
   const [searchValue, setSearchValue] = useState("");
+  const [variableModalOpen, setVariableModalOpen] = useState(false);
+  const [previewValue, setPreviewValue] = useState<string>("");
   
   const variableNames = getAllVariableNames();
   
@@ -92,9 +95,79 @@ export const SetVariableConfig = ({ config, setConfig }: SetVariableConfigProps)
     setConfig({ ...config, valueType: type, value: newValue });
   };
 
+  const handleVariableSelect = (variableName: string) => {
+    const textarea = document.getElementById('expression-textarea') as HTMLTextAreaElement;
+    if (!textarea) return;
+
+    const start = textarea.selectionStart;
+    const end = textarea.selectionEnd;
+    const currentVal = config.value || "";
+    const variableRef = `{{${variableName}}}`;
+    const newVal = currentVal.substring(0, start) + variableRef + currentVal.substring(end);
+    
+    setConfig({ ...config, value: newVal });
+    
+    setTimeout(() => {
+      textarea.focus();
+      const newPosition = start + variableRef.length;
+      textarea.setSelectionRange(newPosition, newPosition);
+    }, 0);
+  };
+
+  useEffect(() => {
+    if (valueType === "custom") return;
+
+    if (valueType === "expression") {
+      try {
+        if (!customValue) {
+          setPreviewValue("(vazio)");
+          return;
+        }
+
+        const runScript = (code: string) => {
+          try {
+            const func = new Function("variables", `
+              try {
+                ${code.includes('return') ? code : `return ${code};`}
+              } catch (e) {
+                return "${code}";
+              }
+            `);
+            return func({});
+          } catch (e) {
+            return code;
+          }
+        };
+
+        const result = runScript(customValue);
+        setPreviewValue(String(result));
+      } catch (e) {
+        setPreviewValue(customValue);
+      }
+    } else {
+      switch (valueType) {
+        case "empty": setPreviewValue("(vazio)"); break;
+        case "now": setPreviewValue(new Date().toISOString()); break;
+        case "today": setPreviewValue(new Date().toLocaleDateString('pt-BR')); break;
+        case "yesterday": {
+          const d = new Date();
+          d.setDate(d.getDate() - 1);
+          setPreviewValue(d.toLocaleDateString('pt-BR'));
+          break;
+        }
+        case "tomorrow": {
+          const d = new Date();
+          d.setDate(d.getDate() + 1);
+          setPreviewValue(d.toLocaleDateString('pt-BR'));
+          break;
+        }
+        case "random": setPreviewValue(Math.random().toString(36).substring(2, 8)); break;
+      }
+    }
+  }, [valueType, customValue]);
+
   return (
     <div className="p-4 space-y-5">
-      {/* Variable Search/Create */}
       <div className="space-y-2">
         <Label>Pesquisar ou criar variável:</Label>
         <div className="space-y-2">
@@ -138,7 +211,6 @@ export const SetVariableConfig = ({ config, setConfig }: SetVariableConfigProps)
         </div>
       </div>
 
-      {/* Value Type Dropdown */}
       <div className="space-y-2">
         <Label>Atribuir valor:</Label>
         <Select value={valueType} onValueChange={(v) => handleValueTypeChange(v as ValueType)}>
@@ -158,7 +230,6 @@ export const SetVariableConfig = ({ config, setConfig }: SetVariableConfigProps)
         </Select>
       </div>
 
-      {/* Save in Results Toggle */}
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-2">
           <Label htmlFor="saveInResults">Save in results?</Label>
@@ -180,7 +251,6 @@ export const SetVariableConfig = ({ config, setConfig }: SetVariableConfigProps)
         />
       </div>
 
-      {/* Execute on Client Toggle */}
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-2">
           <Label htmlFor="executeOnClient">Execute on client?</Label>
@@ -202,11 +272,11 @@ export const SetVariableConfig = ({ config, setConfig }: SetVariableConfigProps)
         />
       </div>
 
-      {/* Expression/Simple Value (Default like Typebot) */}
       {valueType === "expression" && (
         <div className="space-y-2">
           <div className="relative">
             <Textarea
+              id="expression-textarea"
               placeholder="Ex: {{n1}} + 5 ou apenas um texto..."
               value={customValue}
               onChange={(e) => setConfig({ ...config, value: e.target.value })}
@@ -217,13 +287,10 @@ export const SetVariableConfig = ({ config, setConfig }: SetVariableConfigProps)
               variant="ghost"
               size="icon"
               className="absolute bottom-2 right-2 h-7 w-7 text-muted-foreground hover:text-foreground"
-              onClick={() => {
-                // We'll use a local state or just handle insertion
-                // Since VariableModal is already used elsewhere, we can trigger it
-              }}
+              onClick={() => setVariableModalOpen(true)}
               title="Inserir variável"
             >
-              <Plus className="h-4 w-4" />
+              <Braces className="h-4 w-4" />
             </Button>
           </div>
           <p className="text-[11px] text-muted-foreground">
@@ -232,7 +299,6 @@ export const SetVariableConfig = ({ config, setConfig }: SetVariableConfigProps)
         </div>
       )}
 
-      {/* Code Editor (when Custom) */}
       {valueType === "custom" && (
         <div className="space-y-2">
           <Label className="text-xs font-bold text-orange-500 uppercase">Modo Desenvolvedor</Label>
@@ -248,20 +314,20 @@ export const SetVariableConfig = ({ config, setConfig }: SetVariableConfigProps)
         </div>
       )}
 
-      {/* Preview for non-custom types */}
       {valueType !== "custom" && (
         <div className="p-3 bg-muted rounded-lg">
           <p className="text-xs text-muted-foreground mb-1">Preview do valor:</p>
-          <code className="text-sm font-mono text-primary">
-            {valueType === "empty" && "(vazio)"}
-            {valueType === "now" && "2025-01-11T10:30:00.000Z"}
-            {valueType === "today" && "11/01/2025"}
-            {valueType === "yesterday" && "10/01/2025"}
-            {valueType === "tomorrow" && "12/01/2025"}
-            {valueType === "random" && "a7b3c9"}
+          <code className="text-sm font-mono text-primary break-all">
+            {previewValue}
           </code>
         </div>
       )}
+
+      <VariableModal
+        open={variableModalOpen}
+        onClose={() => setVariableModalOpen(false)}
+        onSelect={handleVariableSelect}
+      />
     </div>
   );
 };
