@@ -3,7 +3,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
 import { Button } from "@/components/ui/button";
-import { Braces } from "lucide-react";
+import { Braces, X } from "lucide-react";
 import { useState, useRef } from "react";
 import { VariableModal } from "../../VariableModal";
 
