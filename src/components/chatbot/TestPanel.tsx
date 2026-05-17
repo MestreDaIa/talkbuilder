@@ -342,6 +342,48 @@ export const TestPanel = ({
       } else if (nodeType === "input-buttons") {
         waitingFor = "buttons";
         nextButtons = cfg.buttons || [];
+      } else if (nodeType === "script") {
+        const code = String(cfg.code || "");
+        if (code) {
+          try {
+            // Function to get variables
+            const getVar = (name: string) => variables[name];
+            // Function to set variables back to the state
+            const setVar = (name: string, value: any) => {
+              variables[name] = value;
+            };
+
+            // Support legacy {{var}} interpolation
+            const interpolated = code.replace(/{{\s*(.*?)\s*}}/g, (_, key) => {
+              const v = variables[String(key).trim()];
+              return JSON.stringify(v == null ? "" : v);
+            });
+
+            // Context provided to the script
+            const scriptContext = {
+              variables: { ...variables },
+              getVariable: getVar,
+              setVariable: setVar,
+              // Helper to let users just return an object to update multiple variables
+            };
+
+            const body = `"use strict";
+              const variables = this.variables;
+              const getVariable = this.getVariable;
+              const setVariable = this.setVariable;
+              ${interpolated}`;
+
+            const fn = new Function(body);
+            const result = fn.call(scriptContext);
+
+            // If the script returns an object, we can treat it as variable updates if they want
+            if (result && typeof result === "object" && !Array.isArray(result)) {
+              Object.assign(variables, result);
+            }
+          } catch (err) {
+            console.error("[script-node] execution failed:", err);
+          }
+        }
       } else if (nodeType === "set-variable" && cfg.variableName) {
         variables[cfg.variableName] = evaluateSetVariableValue(cfg, variables);
       } else if (nodeType === "condition") {
