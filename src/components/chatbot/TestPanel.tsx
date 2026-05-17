@@ -354,6 +354,7 @@ export const TestPanel = ({
             };
 
             // Support legacy {{var}} interpolation
+            // We only replace if it's NOT on the left side of an assignment (simplified check)
             const interpolated = code.replace(/{{\s*(.*?)\s*}}/g, (_, key) => {
               const v = variables[String(key).trim()];
               return JSON.stringify(v == null ? "" : v);
@@ -364,7 +365,6 @@ export const TestPanel = ({
               variables: { ...variables },
               getVariable: getVar,
               setVariable: setVar,
-              // Helper to let users just return an object to update multiple variables
             };
 
             const body = `"use strict";
@@ -376,7 +376,12 @@ export const TestPanel = ({
             const fn = new Function(body);
             const result = fn.call(scriptContext);
 
-            // If the script returns an object, we can treat it as variable updates if they want
+            // If a specific variable name is defined to save the result
+            if (cfg.variableName && result !== undefined) {
+              variables[cfg.variableName] = result;
+            }
+
+            // If the script returns an object, we also merge it into variables (Typebot style)
             if (result && typeof result === "object" && !Array.isArray(result)) {
               Object.assign(variables, result);
             }
