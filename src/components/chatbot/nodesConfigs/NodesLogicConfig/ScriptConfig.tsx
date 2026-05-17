@@ -83,28 +83,34 @@ export const ScriptConfig = ({ config, setConfig }: ScriptConfigProps) => {
       <div className="space-y-2">
         <Label>Salvar o resultado em</Label>
         <div className="flex gap-2">
-          <Button 
-            variant="outline" 
-            className="w-full justify-start font-normal"
-            onClick={openVariableSelectorForSave}
-          >
-            {config.variableName ? (
-              <span className="flex items-center gap-2">
-                <code className="bg-primary/10 text-primary px-1.5 py-0.5 rounded text-xs">{"{{"}{config.variableName}{"}}"}</code>
-              </span>
-            ) : (
-              <span className="text-muted-foreground">Selecionar variável (opcional)</span>
-            )}
-          </Button>
-          {config.variableName && (
+          <div className="relative flex-1 group">
             <Button 
-              variant="ghost" 
-              size="icon" 
-              onClick={() => setConfig({ ...config, variableName: undefined })}
+              variant="outline" 
+              className="w-full justify-start font-normal pr-10"
+              onClick={openVariableSelectorForSave}
             >
-              <X className="h-4 w-4" />
+              {config.variableName ? (
+                <span className="flex items-center gap-2">
+                  <code className="bg-primary/10 text-primary px-1.5 py-0.5 rounded text-xs">{"{{"}{config.variableName}{"}}"}</code>
+                </span>
+              ) : (
+                <span className="text-muted-foreground">Selecionar variável (opcional)</span>
+              )}
             </Button>
-          )}
+            {config.variableName && (
+              <Button 
+                variant="ghost" 
+                size="icon" 
+                className="absolute right-1 top-1/2 -translate-y-1/2 h-7 w-7 opacity-0 group-hover:opacity-100 transition-opacity"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  setConfig({ ...config, variableName: undefined });
+                }}
+              >
+                <X className="h-4 w-4" />
+              </Button>
+            )}
+          </div>
         </div>
         <p className="text-[10px] text-muted-foreground">
           O valor retornado pelo script (<code>return ...</code>) será salvo nesta variável.
