@@ -60,6 +60,7 @@ export const ChatWidget = ({
   const [input, setInput] = useState("");
   const [sessionId, setSessionId] = useState<string | null>(null);
   const [waitingFor, setWaitingFor] = useState<string | null>(null);
+  const [waitingForConfig, setWaitingForConfig] = useState<any>(null);
   const [buttons, setButtons] = useState<ChatButton[]>([]);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -294,6 +295,7 @@ export const ChatWidget = ({
     setSessionId(null);
     setMessages([]);
     setWaitingFor(null);
+    setWaitingForConfig(null);
     setButtons([]);
     runtimeStateRef.current = null;
     clearWaitTimer();
@@ -436,8 +438,12 @@ export const ChatWidget = ({
               value={input}
               onChange={(e) => setInput(e.target.value)}
               onKeyPress={handleKeyPress}
-              placeholder="Digite sua mensagem..."
+              placeholder={waitingForConfig?.placeholder || "Digite sua mensagem..."}
               disabled={isLoading}
+              type={waitingFor === "input-number" ? "number" : "text"}
+              min={waitingFor === "input-number" ? waitingForConfig?.min : undefined}
+              max={waitingFor === "input-number" ? waitingForConfig?.max : undefined}
+              step={waitingFor === "input-number" ? waitingForConfig?.step : undefined}
               className="flex-1 rounded-full"
               style={{ 
                 color: themeSettings?.inputTextColor || '#1f2937',
