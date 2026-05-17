@@ -124,11 +124,11 @@ export const ScriptConfig = ({ config, setConfig }: ScriptConfigProps) => {
       </div>
 
       <div className="space-y-2 p-3 bg-muted/50 rounded-lg border border-border">
-        <p className="text-xs font-semibold text-foreground uppercase tracking-wider">Como usar (Estilo Typebot):</p>
+        <p className="text-xs font-semibold text-foreground uppercase tracking-wider">Dicas:</p>
         <div className="space-y-1 text-[11px] text-muted-foreground">
-          <p>• <strong>Variáveis:</strong> <code className="bg-background px-1 rounded">variables.nome</code></p>
-          <p>• <strong>Simples:</strong> <code className="bg-background px-1 rounded">return variables.n1 + 5;</code></p>
-          <p>• <strong>Várias:</strong> <code className="bg-background px-1 rounded">return {"{ soma: 15, msg: 'ok' }"}</code></p>
+          <p>• Use as variáveis diretamente: <code className="bg-background px-1 rounded">return n1 + 5;</code></p>
+          <p>• Salve o resultado selecionando a variável acima.</p>
+          <p>• Suporta JavaScript padrão (alert, fetch, etc).</p>
         </div>
       </div>
 
