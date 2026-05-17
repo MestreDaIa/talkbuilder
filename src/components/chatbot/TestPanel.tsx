@@ -346,51 +346,36 @@ export const TestPanel = ({
         const code = String(cfg.code || "");
         if (code) {
           try {
-            // Function to get variables
-            const getVar = (name: string) => variables[name];
-            // Function to set variables back to the state
-            const setVar = (name: string, value: any) => {
-              variables[name] = value;
-            };
-
-            // Support legacy {{var}} interpolation
-            const interpolated = code.replace(/{{\s*(.*?)\s*}}/g, (_, key) => {
-              const v = variables[String(key).trim()];
-              return JSON.stringify(v == null ? "" : v);
-            });
-
-            // Context provided to the script
+            // Contexto simplificado para o script
             const scriptContext = {
-              variables: { ...variables },
-              getVariable: getVar,
-              setVariable: setVar,
+              ...variables, // Permite usar as variáveis diretamente (ex: n1, soma)
+              variables: variables, // Mantém compatibilidade com variables.n1
+              getVariable: (name: string) => variables[name],
+              setVariable: (name: string, value: any) => { variables[name] = value; },
               window: window,
-              alert: window.alert.bind(window),
+              alert: (msg: string) => window.alert(msg),
               console: console,
               fetch: window.fetch.bind(window),
               setTimeout: window.setTimeout.bind(window),
+              JSON: JSON,
+              Math: Math,
+              Date: Date,
             };
 
-            const body = `"use strict";
-              const variables = this.variables;
-              const getVariable = this.getVariable;
-              const setVariable = this.setVariable;
-              const window = this.window;
-              const alert = this.alert;
-              const console = this.console;
-              const fetch = this.fetch;
-              const setTimeout = this.setTimeout;
-              ${interpolated}`;
+            // Criamos as chaves para injetar no script
+            const keys = Object.keys(scriptContext);
+            const values = Object.values(scriptContext);
 
-            const fn = new Function(body);
-            const result = fn.call(scriptContext);
+            // Criamos a função injetando as variáveis como argumentos locais
+            const fn = new Function(...keys, `"use strict"; ${code}`);
+            const result = fn.apply(null, values);
 
-            // If a specific variable name is defined to save the result
+            // Se um nome de variável de destino estiver definido, salva o resultado nela
             if (cfg.variableName && result !== undefined) {
               variables[cfg.variableName] = result;
             }
 
-            // If the script returns an object, we also merge it into variables (Typebot style)
+            // Se o script retornar um objeto, mescla nas variáveis (estilo Typebot)
             if (result && typeof result === "object" && !Array.isArray(result)) {
               Object.assign(variables, result);
             }
