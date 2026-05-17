@@ -126,14 +126,30 @@ export const SetVariableConfig = ({ config, setConfig }: SetVariableConfigProps)
 
         const runScript = (code: string) => {
           try {
-            const func = new Function("variables", `
+            // Remove as chaves {{ }} se o usuário colocou apenas uma variável
+            const cleanCode = code.replace(/\{\{|\}\}/g, '');
+            
+            // Se o código parece ser um bloco com múltiplos statements (tem ; ou várias linhas)
+            if (code.includes(';') || code.includes('\n')) {
+              const func = new Function(`
+                try {
+                  ${code.includes('return') ? code : `return ${code};`}
+                } catch (e) {
+                  return "Erro na execução";
+                }
+              `);
+              return func();
+            }
+
+            // Se for uma expressão simples ou valor único
+            const func = new Function(`
               try {
-                ${code.includes('return') ? code : `return ${code};`}
+                return ${cleanCode};
               } catch (e) {
-                return "${code}";
+                return \`${code}\`;
               }
             `);
-            return func({});
+            return func();
           } catch (e) {
             return code;
           }
