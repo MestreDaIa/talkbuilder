@@ -72,6 +72,7 @@ export async function ensureFlow(workspaceItemId: string, fallbackName: string):
   const { data, error } = await c
     .from("chatbot_flows")
     .insert({
+      workspace_id: (window as any).__CURRENT_WORKSPACE_ID__, // Fallback global ou injetar via hook
       user_id: userId,
       workspace_item_id: workspaceItemId,
       name: fallbackName,
