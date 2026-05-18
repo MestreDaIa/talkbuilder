@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { Link, useNavigate } from "react-router-dom";
+import { Link, useNavigate, useLocation } from "react-router-dom";
 import { z } from "zod";
 import { getSupabase } from "../../lib/supabaseClient";
 import { Button } from "../../components/ui/button";
@@ -46,6 +46,9 @@ const PLAN_PRICES: Record<PlanId, string> = {
 export default function SignupPage() {
 	const { toast } = useToast();
 	const navigate = useNavigate();
+	const location = useLocation();
+	const query = new URLSearchParams(location.search);
+	const redirectUrl = query.get("redirect") || "/";
 
 	const [displayName, setDisplayName] = useState("");
 	const [email, setEmail] = useState("");
@@ -136,13 +139,13 @@ export default function SignupPage() {
 		// Se confirmação de email estiver desativada, já vem com session
 		if (data.session) {
 			toast({ title: "Conta criada!", description: "Bem-vindo ao TalkMap." });
-			navigate("/", { replace: true });
+			navigate(redirectUrl, { replace: true });
 		} else {
 			toast({
 				title: "Confira seu email",
 				description: `Mandamos um link de confirmação pra ${parsed.data.email}.`,
 			});
-			navigate("/login", { replace: true });
+			navigate(`/login${location.search}`, { replace: true });
 		}
 	}
 
@@ -277,7 +280,7 @@ export default function SignupPage() {
 
 						<p className="text-sm text-muted-foreground text-center">
 							Já tem conta?{" "}
-							<Link to="/login" className="text-primary underline">
+							<Link to={`/login${location.search}`} className="text-primary underline">
 								Entrar
 							</Link>
 						</p>
