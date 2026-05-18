@@ -259,7 +259,7 @@ export const TestPanel = ({
     return condition.logicalOperator === "OR" ? results.some(Boolean) : results.every(Boolean);
   };
 
-  const runLocalFlow = (state: RuntimeState | null, input?: { message?: string; button_id?: string }) => {
+    const runLocalFlow = async (state: RuntimeState | null, input?: { message?: string; button_id?: string }) => {
     let currentNodeId = state?.current_node_id || startContainer?.nodes?.[0]?.id || null;
     const variables = { ...(state?.variables || {}) };
     const nextMessages: Message[] = [];
@@ -268,6 +268,7 @@ export const TestPanel = ({
     let nextButtons: ButtonConfig[] = [];
     let waitMs = 0;
     let steps = 0;
+
     const firstText = (...values: any[]) => String(values.find((v) => typeof v === "string" && v.trim()) || "");
     const cleanText = (text: string) => richToPlainText(text);
     const replaceVars = (text: string) => cleanText(text).replace(/{{(.*?)}}/g, (_, key) => variables[key.trim()] ?? `{{${key}}}`);
@@ -424,34 +425,45 @@ export const TestPanel = ({
         }
 
         try {
-          // No preview/test, we need a real or mocked sync request
-          // Since this is a test panel, we'll try a real fetch but handle CORS/failures
-          // In a real environment, this would be done server-side
-          // For the "Test Panel", we'll implement a simple wait/fetch logic
-          // However, 'runLocalFlow' is synchronous. We need to handle this.
-          // For now, let's mock the response if it's a test to show it works, 
-          // or ideally, we should have made the runtime async.
-          
-          // Given the current architecture, I'll add a placeholder for async execution
-          // or use a helper that can be awaited if I change the loop.
-          
-          // But wait, I can just implement a simple object path resolver for the response mappings
-          // if we had a 'lastResult'. 
-          
-          // Let's assume for the "Test" that the user wants to see the variable being set.
-          // To fix the immediate "it doesn't save" problem, I'll implement the logic 
-          // as if the fetch happened.
-          
-          console.log(`[http-request] Simulating request to ${url}`);
-          
-          // We can't do async fetch inside a sync loop. 
-          // The proper fix is making the runtime loop async, but that's a huge change.
-          // For the "Test Panel", maybe we can just simulate a successful response 
-          // for the sake of demonstrating variable saving if a test URL was used.
-          
-          // Realistically, many users use this to test against their own APIs.
-          // I will add a note or try to make the loop async if possible.
-          
+          const response = await fetch(url, {
+            method,
+            headers,
+            body
+          });
+
+          if (response.ok) {
+            const responseData = await response.json();
+            
+            // Apply response mappings
+            const mappings: ResponseMapping[] = cfg.responseMappings || [];
+            mappings.forEach(mapping => {
+              if (mapping.jsonPath && mapping.variableName) {
+                // Simple path resolver (e.g., "data.user.name")
+                const parts = mapping.jsonPath.split('.');
+                let value = responseData;
+                
+                // If path starts with "data." and the root object is the response, skip "data" 
+                // unless the actual response has a "data" property.
+                // Most users will type the path relative to the root.
+                
+                for (const part of parts) {
+                  if (value && typeof value === 'object' && part in value) {
+                    value = value[part];
+                  } else if (part === 'data' && parts.indexOf(part) === 0) {
+                    // Skip 'data' if it's the first part and not in root (common helper)
+                    continue;
+                  } else {
+                    value = undefined;
+                    break;
+                  }
+                }
+                
+                if (value !== undefined) {
+                  variables[mapping.variableName] = value;
+                }
+              }
+            });
+          }
         } catch (err) {
           console.error("[http-request] failed:", err);
         }
@@ -543,15 +555,18 @@ export const TestPanel = ({
   const startRuntimeSession = async () => {
     setIsLoading(true);
     setMessages([]);
-    applyRuntimeData(runLocalFlow(null), true);
+    const data = await runLocalFlow(null);
+    applyRuntimeData(data, true);
     if (!waitTimerRef.current) setIsLoading(false);
   };
 
   const continueRuntime = async () => {
     setIsLoading(true);
-    applyRuntimeData(runLocalFlow(runtimeStateRef.current));
+    const data = await runLocalFlow(runtimeStateRef.current);
+    applyRuntimeData(data);
     if (!waitTimerRef.current) setIsLoading(false);
   };
+
 
   const sendMessage = async (message?: string, buttonId?: string) => {
     const msgToSend = message || currentInput;
@@ -615,7 +630,9 @@ export const TestPanel = ({
     setIsLoading(true);
     setCurrentInput("");
 
-    applyRuntimeData(runLocalFlow(runtimeStateRef.current, { message: msgToSend, button_id: buttonId }));
+    const data = await runLocalFlow(runtimeStateRef.current, { message: msgToSend, button_id: buttonId });
+    applyRuntimeData(data);
+
     if (!waitTimerRef.current) setIsLoading(false);
   };
 
