@@ -29,6 +29,7 @@ import { useToast } from "../../../../hooks/use-toast";
 import { Label } from "../../../../components/ui/label";
 import { getSupabase } from "../../../../lib/supabaseClient";
 import { useAuth } from "../../../../context/AuthContext";
+import { InviteMemberDialog } from "../../../../components/settings/InviteMemberDialog";
 
 const workspaceConfigSchema = z.object({
 	workspaceName: z.string().min(2).max(100),
@@ -230,12 +231,7 @@ export default function WorkspaceConfig() {
 							Gerencie os membros da sua equipe e suas permissões
 						</CardDescription>
 					</div>
-					<Button variant="outline" className="border-primary text-primary hover:bg-primary/5" onClick={() => {
-						const email = prompt("Digite o email do convidado:");
-						if (email) toast({ title: "Convite enviado!", description: `Um convite foi enviado para ${email}` });
-					}}>
-						Convidar Membro
-					</Button>
+					<InviteMemberDialog />
 				</CardHeader>
 				<CardContent className="pt-6">
 					<div className="space-y-3">

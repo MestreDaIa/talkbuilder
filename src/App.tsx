@@ -12,6 +12,7 @@ import SignupPage from "./pages/auth/SignupPage";
 import LandingPage from "./pages/landing/LandingPage";
 import PreviewPage from "./pages/preview/[id]/page";
 import PublicFlowPage from "./pages/public/flow/page";
+import InvitePage from "./pages/invite/[token]/page";
 
 
 import Layout from "./components/layout";
@@ -104,6 +105,9 @@ function App() {
       {/* Auth */}
       <Route path="/login" element={<AuthRoute><LoginPage /></AuthRoute>} />
       <Route path="/signup" element={<AuthRoute><SignupPage /></AuthRoute>} />
+
+      {/* Aceitar convite */}
+      <Route path="/invite/:token" element={<InvitePage />} />
 
       {/* Bot público publicado: /:slug/flow/:publicId */}
       <Route path="/:slug/flow/:publicId" element={<PublicFlowPage />} />
