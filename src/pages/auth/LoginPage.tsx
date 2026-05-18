@@ -37,8 +37,11 @@ export default function LoginPage() {
 
 	async function handleSubmit(e: React.FormEvent) {
 		e.preventDefault();
+		console.log("[Login] Botão clicado");
+		
 		const parsed = schema.safeParse({ email, password });
 		if (!parsed.success) {
+			console.log("[Login] Erro de validação:", parsed.error.issues);
 			toast({
 				title: "Confira os campos",
 				description: parsed.error.issues[0].message,
@@ -48,49 +51,69 @@ export default function LoginPage() {
 		}
 
 		setSubmitting(true);
-		const supabase = getSupabase();
-		if (!supabase) {
-			setSubmitting(false);
-			toast({
-				title: "Supabase não configurado",
-				description: "Não foi possível conectar ao banco do projeto.",
-				variant: "destructive",
-			});
-			return;
-		}
-
-		const { data, error } = await supabase.auth.signInWithPassword({
-			email: parsed.data.email,
-			password: parsed.data.password,
-		});
-
-		if (error) {
-			setSubmitting(false);
-			toast({
-				title: "Falha ao entrar",
-				description: error.message,
-				variant: "destructive",
-			});
-			return;
-		}
-
-		// Busca slug do profile pra montar a URL do workspace
-		let target = redirectTo;
-		if (target === "/" && data.user) {
-			const { data: prof, error: profileError } = await supabase
-				.from("profiles")
-				.select("slug")
-				.eq("id", data.user.id)
-				.maybeSingle();
-			if (profileError) {
-				console.error("[Login] Falha ao carregar profile:", profileError);
+		try {
+			const supabase = getSupabase();
+			if (!supabase) {
+				console.error("[Login] Supabase não inicializado");
+				setSubmitting(false);
+				toast({
+					title: "Supabase não configurado",
+					description: "Não foi possível conectar ao banco do projeto.",
+					variant: "destructive",
+				});
+				return;
 			}
-			if (prof?.slug) target = `/${prof.slug}/workspace`;
-		}
 
-		setSubmitting(false);
-		toast({ title: "Bem-vindo de volta!" });
-		navigate(target, { replace: true });
+			console.log("[Login] Tentando auth com:", parsed.data.email);
+			const { data, error } = await supabase.auth.signInWithPassword({
+				email: parsed.data.email,
+				password: parsed.data.password,
+			});
+
+			if (error) {
+				console.error("[Login] Erro no Supabase Auth:", error);
+				setSubmitting(false);
+				toast({
+					title: "Falha ao entrar",
+					description: error.message,
+					variant: "destructive",
+				});
+				return;
+			}
+
+			console.log("[Login] Auth sucesso, user ID:", data.user?.id);
+
+			// Busca slug do profile pra montar a URL do workspace
+			let target = redirectTo;
+			if (target === "/" && data.user) {
+				const { data: prof, error: profileError } = await supabase
+					.from("profiles")
+					.select("slug")
+					.eq("id", data.user.id)
+					.maybeSingle();
+				
+				if (profileError) {
+					console.error("[Login] Falha ao carregar profile:", profileError);
+				}
+				
+				if (prof?.slug) {
+					target = `/${prof.slug}/workspace`;
+				}
+			}
+
+			console.log("[Login] Redirecionando para:", target);
+			toast({ title: "Bem-vindo de volta!" });
+			navigate(target, { replace: true });
+		} catch (err: any) {
+			console.error("[Login] Erro inesperado:", err);
+			toast({
+				title: "Erro inesperado",
+				description: err.message || "Ocorreu um erro ao tentar entrar.",
+				variant: "destructive",
+			});
+		} finally {
+			setSubmitting(false);
+		}
 	}
 
 	return (
