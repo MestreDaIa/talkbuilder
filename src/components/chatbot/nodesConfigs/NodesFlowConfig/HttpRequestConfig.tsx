@@ -917,7 +917,7 @@ export const HttpRequestConfig = ({
                                     value={v}
                                     onSelect={() => handleResponseMappingChange(index, "variableName", v)}
                                   >
-                                    {{v}}
+                                    {v}
                                   </CommandItem>
                                 ))}
                               </CommandGroup>
