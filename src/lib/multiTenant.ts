@@ -51,7 +51,7 @@ export const useMultiTenantStore = create<MultiTenantStore>((set, get) => ({
 
       if (error) throw error;
 
-      const mappedWorkspaces = data.map((item: any) => ({
+      const mappedWorkspaces: Workspace[] = (data ?? []).map((item: any) => ({
         ...(item.workspaces ?? { id: item.id, name: item.name, slug: item.slug }),
         role: item.role as UserRole,
       }));
