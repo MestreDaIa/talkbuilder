@@ -69,7 +69,8 @@ export const ChatWidget = ({
   const waitTimerRef = useRef<number | null>(null);
 
   const getRuntimeUrl = () => {
-    return "https://fwoescubnnagdvwasbjl.functions.supabase.co/chatbot-runtime";
+    const baseUrl = import.meta.env.VITE_SUPABASE_URL || "https://fwoescubnnagdvwasbjl.supabase.co";
+    return `${baseUrl}/functions/v1/chatbot-runtime`;
   };
 
   // Scroll to bottom when messages change
