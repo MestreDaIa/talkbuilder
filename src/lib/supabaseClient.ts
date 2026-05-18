@@ -19,9 +19,8 @@ import { createClient, type SupabaseClient } from "@supabase/supabase-js";
 // SYSTEM DB (TalkMap interno — via env)
 // -----------------------------------------------------------------------------
 
-const DEFAULT_SYSTEM_URL = "https://fwoescubnnagdvwasbjl.supabase.co";
-const DEFAULT_SYSTEM_KEY =
-  "sb_publishable_v58nZwBN4s5_lMASv4S3Iw_L23jPbIK";
+const DEFAULT_SYSTEM_URL = import.meta.env.VITE_SUPABASE_URL || "";
+const DEFAULT_SYSTEM_KEY = import.meta.env.VITE_SUPABASE_ANON_KEY || "";
 
 const ENV_URL =
   (import.meta.env.VITE_TALKMAP_SUPABASE_URL as string | undefined) ??
