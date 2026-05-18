@@ -884,15 +884,19 @@ export const HttpRequestConfig = ({
                       </div>
                       <Button
                         type="button"
-                        variant="outline"
+                        variant="secondary"
                         size="icon"
-                        className="px-3 border rounded-md bg-muted/50 text-muted-foreground font-mono text-xs shrink-0 h-10 w-auto"
-                        onClick={() => {
+                        className="px-3 border rounded-md bg-primary text-primary-foreground font-mono text-xs shrink-0 h-10 w-auto hover:bg-primary/90 cursor-pointer shadow-sm active:scale-95 transition-all"
+                        onClick={(e) => {
+                          e.preventDefault();
+                          e.stopPropagation();
                           if (mapping.variableName) {
                             const cleanName = mapping.variableName.replace(/[{}]/g, "");
                             addVariable(cleanName);
                             handleResponseMappingChange(index, "variableName", cleanName);
-                            toast.success(`Variável ${cleanName} adicionada`);
+                            toast.success(`Variável ${cleanName} criada com sucesso!`);
+                          } else {
+                            toast.error("Digite o nome da variável primeiro");
                           }
                         }}
                       >
