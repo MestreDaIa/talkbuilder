@@ -588,8 +588,8 @@ export const TestPanel = ({
   if (theme?.fontFamily) themeStyle.fontFamily = theme.fontFamily;
 
   const containerClass = fullScreen
-    ? "absolute top-[49px] bottom-0 left-0 right-0 w-full bg-card flex flex-col z-50"
-    : "w-80 absolute top-[49px] right-0 bottom-0 bg-card border-l border-border shadow-2xl flex flex-col z-50";
+    ? "absolute inset-0 h-full w-full bg-card flex flex-col z-50"
+    : "w-80 absolute top-0 right-0 h-full bg-card border-l border-border shadow-2xl flex flex-col z-50";
 
   return (
     <aside className={containerClass} style={themeStyle}>
