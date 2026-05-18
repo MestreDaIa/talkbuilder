@@ -101,7 +101,7 @@ export const ScriptConfig = ({ config, setConfig }: ScriptConfigProps) => {
               <Button 
                 variant="ghost" 
                 size="icon" 
-                className="absolute right-1 top-1/2 -translate-y-1/2 h-7 w-7 opacity-0 group-hover:opacity-100 transition-opacity"
+                className="absolute right-1 top-1/2 -translate-y-1/2 h-7 w-7 opacity-100 hover:text-destructive transition-all"
                 onClick={(e) => {
                   e.stopPropagation();
                   setConfig({ ...config, variableName: undefined });

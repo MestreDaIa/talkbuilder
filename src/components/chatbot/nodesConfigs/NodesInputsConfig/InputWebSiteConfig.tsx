@@ -48,7 +48,7 @@ export const InputWebSiteConfig = ({ config, setConfig }: InputWebSiteConfigProp
           <Input
             id="placeholder"
             type="text"
-            placeholder="Digite o link..."
+            placeholder="Digite o link"
             value={config.responseUserTextInput || ""}
             onChange={(e) => setConfig({ ...config, responseUserTextInput: e.target.value })}
             className="flex-1"

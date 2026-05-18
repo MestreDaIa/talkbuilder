@@ -48,7 +48,7 @@ export const InputMailConfig = ({ config, setConfig }: InputMailConfigProps) => 
           <Input
             id="placeholder"
             type="text"
-            placeholder="Digite seu email..."
+            placeholder="Digite seu email"
             value={config.responseUserTextInput || ""}
             onChange={(e) => setConfig({ ...config, responseUserTextInput: e.target.value })}
             className="flex-1"

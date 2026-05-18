@@ -82,7 +82,7 @@ export const InputNumberConfig = ({ config, setConfig }: InputNumberConfigProps)
           <Input
             id="placeholder"
             type="text"
-            placeholder="Digite um número..."
+            placeholder="Digite um número"
             value={config.resPonseUserNumber || ""}
             onChange={(e) => setConfig({ ...config, resPonseUserNumber: e.target.value })}
             className="flex-1"
