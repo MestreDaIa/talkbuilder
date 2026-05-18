@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo } from "react";
 import { Label } from "@/components/ui/label";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
@@ -12,12 +12,22 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { Plus, Trash2, Play, Loader2 } from "lucide-react";
+import { Plus, Trash2, Play, Loader2, ChevronDown, ChevronRight } from "lucide-react";
 import { toast } from "sonner";
+import { useVariables } from "@/context/VariablesContext";
+import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
+import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from "@/components/ui/command";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import { cn } from "@/lib/utils";
 
 interface KeyValuePair {
   name: string;
   value: string;
+}
+
+interface ResponseMapping {
+  jsonPath: string;
+  variableName: string;
 }
 
 interface HttpRequestConfigProps {
@@ -47,6 +57,7 @@ interface HttpRequestConfigProps {
     ignoreSSL?: boolean;
     responseVariable?: string;
     responseFormat?: string;
+    responseMappings?: ResponseMapping[];
   };
   setConfig: (config: HttpRequestConfigProps["config"]) => void;
 }
@@ -55,6 +66,7 @@ export const HttpRequestConfig = ({
   config,
   setConfig,
 }: HttpRequestConfigProps) => {
+  const { getAllVariableNames } = useVariables();
   const [method, setMethod] = useState(config.method || "GET");
   const [url, setUrl] = useState(config.url || "");
   const [authType, setAuthType] = useState(config.authType || "none");
@@ -85,8 +97,13 @@ export const HttpRequestConfig = ({
   const [responseFormat, setResponseFormat] = useState(
     config.responseFormat || "json"
   );
+  const [responseMappings, setResponseMappings] = useState<ResponseMapping[]>(
+    config.responseMappings || []
+  );
   const [isTesting, setIsTesting] = useState(false);
   const [testResult, setTestResult] = useState<string | null>(null);
+  const [lastJsonResponse, setLastJsonResponse] = useState<any>(null);
+  const [isSaveExpanded, setIsSaveExpanded] = useState(false);
 
   useEffect(() => {
     setConfig({
@@ -106,6 +123,7 @@ export const HttpRequestConfig = ({
       ignoreSSL,
       responseVariable,
       responseFormat,
+      responseMappings,
     });
   }, [
     method,
@@ -124,7 +142,37 @@ export const HttpRequestConfig = ({
     ignoreSSL,
     responseVariable,
     responseFormat,
+    responseMappings,
   ]);
+
+  const availableVariables = useMemo(() => getAllVariableNames(), [getAllVariableNames]);
+
+  const jsonPaths = useMemo(() => {
+    if (!lastJsonResponse) return [];
+    
+    const paths: string[] = [];
+    const traverse = (obj: any, path: string = "data") => {
+      if (obj === null || typeof obj !== "object") {
+        paths.push(path);
+        return;
+      }
+      
+      paths.push(path);
+      
+      if (Array.isArray(obj)) {
+        obj.forEach((item, index) => {
+          traverse(item, `${path}.${index}`);
+        });
+      } else {
+        Object.keys(obj).forEach((key) => {
+          traverse(obj[key], `${path}.${key}`);
+        });
+      }
+    };
+    
+    traverse(lastJsonResponse);
+    return paths;
+  }, [lastJsonResponse]);
 
   const handleAddKeyValue = (
     list: KeyValuePair[],
@@ -153,6 +201,20 @@ export const HttpRequestConfig = ({
     setList(updated);
   };
 
+  const handleAddResponseMapping = () => {
+    setResponseMappings([...responseMappings, { jsonPath: "", variableName: "" }]);
+  };
+
+  const handleRemoveResponseMapping = (index: number) => {
+    setResponseMappings(responseMappings.filter((_, i) => i !== index));
+  };
+
+  const handleResponseMappingChange = (index: number, field: keyof ResponseMapping, value: string) => {
+    const updated = [...responseMappings];
+    updated[index] = { ...updated[index], [field]: value };
+    setResponseMappings(updated);
+  };
+
   const handleTestRequest = async () => {
     if (!url) {
       toast.error("Informe a URL");
@@ -161,6 +223,7 @@ export const HttpRequestConfig = ({
 
     setIsTesting(true);
     setTestResult(null);
+    setLastJsonResponse(null);
 
     try {
       // Build query string
@@ -227,6 +290,7 @@ export const HttpRequestConfig = ({
       try {
         const json = JSON.parse(responseText);
         formatted = JSON.stringify(json, null, 2);
+        setLastJsonResponse(json);
       } catch {
         // Keep as text
       }
@@ -728,28 +792,145 @@ export const HttpRequestConfig = ({
             <Label htmlFor="ignoreSSL">Ignorar Erros SSL</Label>
           </div>
 
-          <div className="space-y-2">
-            <Label>Salvar resposta em variável</Label>
-            <Input
-              value={responseVariable}
-              onChange={(e) => setResponseVariable(e.target.value)}
-              placeholder="httpResponse"
-            />
-          </div>
+          <Collapsible
+            open={isSaveExpanded}
+            onOpenChange={setIsSaveExpanded}
+            className="space-y-2 border rounded-lg p-3"
+          >
+            <div className="flex items-center justify-between">
+              <Label className="text-sm font-semibold">Save in variable</Label>
+              <CollapsibleTrigger asChild>
+                <Button variant="ghost" size="sm">
+                  {isSaveExpanded ? <ChevronDown className="h-4 w-4" /> : <ChevronRight className="h-4 w-4" />}
+                </Button>
+              </CollapsibleTrigger>
+            </div>
+            
+            <CollapsibleContent className="space-y-4 pt-2">
+              <div className="space-y-2">
+                <Label>Full response variable</Label>
+                <Input
+                  value={responseVariable}
+                  onChange={(e) => setResponseVariable(e.target.value)}
+                  placeholder="httpResponse"
+                />
+              </div>
 
-          <div className="space-y-2">
-            <Label>Formato da Resposta</Label>
-            <Select value={responseFormat} onValueChange={setResponseFormat}>
-              <SelectTrigger>
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="json">JSON</SelectItem>
-                <SelectItem value="text">Texto</SelectItem>
-                <SelectItem value="binary">Binário</SelectItem>
-              </SelectContent>
-            </Select>
-          </div>
+              <div className="space-y-2">
+                <Label>Response Format</Label>
+                <Select value={responseFormat} onValueChange={setResponseFormat}>
+                  <SelectTrigger>
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="json">JSON</SelectItem>
+                    <SelectItem value="text">Texto</SelectItem>
+                    <SelectItem value="binary">Binário</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+
+              <div className="space-y-3 pt-2">
+                <div className="flex items-center justify-between">
+                  <Label className="text-xs">Custom Mappings</Label>
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    className="h-7 text-xs"
+                    onClick={handleAddResponseMapping}
+                  >
+                    <Plus className="h-3 w-3 mr-1" />
+                    Add an entry
+                  </Button>
+                </div>
+
+                {responseMappings.map((mapping, index) => (
+                  <div key={index} className="space-y-2 p-3 border rounded-md bg-muted/30 relative">
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      size="icon"
+                      className="h-6 w-6 absolute top-1 right-1"
+                      onClick={() => handleRemoveResponseMapping(index)}
+                    >
+                      <Trash2 className="h-3 w-3 text-destructive" />
+                    </Button>
+
+                    <div className="space-y-1">
+                      <Label className="text-[10px] uppercase text-muted-foreground">Data</Label>
+                      <Popover>
+                        <PopoverTrigger asChild>
+                          <Button
+                            variant="outline"
+                            role="combobox"
+                            className="w-full justify-between h-9 text-xs font-normal"
+                          >
+                            {mapping.jsonPath || "Select data path..."}
+                            <ChevronDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+                          </Button>
+                        </PopoverTrigger>
+                        <PopoverContent className="w-[300px] p-0">
+                          <Command>
+                            <CommandInput placeholder="Search path..." />
+                            <CommandList>
+                              <CommandEmpty>No path found. Try testing first.</CommandEmpty>
+                              <CommandGroup>
+                                {jsonPaths.map((path) => (
+                                  <CommandItem
+                                    key={path}
+                                    value={path}
+                                    onSelect={() => handleResponseMappingChange(index, "jsonPath", path)}
+                                  >
+                                    {path}
+                                  </CommandItem>
+                                ))}
+                              </CommandGroup>
+                            </CommandList>
+                          </Command>
+                        </PopoverContent>
+                      </Popover>
+                    </div>
+
+                    <div className="space-y-1">
+                      <Label className="text-[10px] uppercase text-muted-foreground">Set variable</Label>
+                      <Popover>
+                        <PopoverTrigger asChild>
+                          <Button
+                            variant="outline"
+                            role="combobox"
+                            className="w-full justify-between h-9 text-xs font-normal"
+                          >
+                            {mapping.variableName ? `{{${mapping.variableName}}}` : "Select variable..."}
+                            <ChevronDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+                          </Button>
+                        </PopoverTrigger>
+                        <PopoverContent className="w-[300px] p-0">
+                          <Command>
+                            <CommandInput placeholder="Search variable..." />
+                            <CommandList>
+                              <CommandEmpty>No variable found.</CommandEmpty>
+                              <CommandGroup>
+                                {availableVariables.map((v) => (
+                                  <CommandItem
+                                    key={v}
+                                    value={v}
+                                    onSelect={() => handleResponseMappingChange(index, "variableName", v)}
+                                  >
+                                    {{v}}
+                                  </CommandItem>
+                                ))}
+                              </CommandGroup>
+                            </CommandList>
+                          </Command>
+                        </PopoverContent>
+                      </Popover>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </CollapsibleContent>
+          </Collapsible>
         </TabsContent>
       </Tabs>
 
