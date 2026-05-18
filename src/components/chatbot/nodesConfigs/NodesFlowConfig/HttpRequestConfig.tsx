@@ -104,6 +104,8 @@ export const HttpRequestConfig = ({
   const [testResult, setTestResult] = useState<string | null>(null);
   const [lastJsonResponse, setLastJsonResponse] = useState<any>(null);
   const [isSaveExpanded, setIsSaveExpanded] = useState(false);
+  const [openDataPopovers, setOpenDataPopovers] = useState<Record<number, boolean>>({});
+  const [openVariablePopovers, setOpenVariablePopovers] = useState<Record<number, boolean>>({});
 
   useEffect(() => {
     setConfig({
