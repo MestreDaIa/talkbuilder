@@ -810,9 +810,9 @@ export const HttpRequestConfig = ({
               {/* Removed full response variable and format fields per user design preference */}
 
 
-              <div className="space-y-3 pt-2">
+              <div className="space-y-3 pt-0">
                 <div className="flex items-center justify-between">
-                  <Label className="text-xs">Custom Mappings</Label>
+                  <div />
                   <Button
                     type="button"
                     variant="outline"
