@@ -55,7 +55,9 @@ export function InviteMemberDialog() {
       let workspaceId = currentWorkspace?.id;
       
       if (!workspaceId) {
-        const slugFromUrl = window.location.pathname.split("/")[1];
+        const pathParts = window.location.hash ? window.location.hash.split("/") : window.location.pathname.split("/");
+        // O slug geralmente é o segundo elemento após o hash ou no início da rota
+        const slugFromUrl = pathParts.find(p => p !== "" && p !== "#" && p !== "workspace" && p !== "configs");
         if (!slugFromUrl) {
           throw new Error("Workspace não carregado. Abra a página pelo slug do workspace e tente novamente.");
         }

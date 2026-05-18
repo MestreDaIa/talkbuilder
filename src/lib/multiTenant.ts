@@ -59,7 +59,8 @@ export const useMultiTenantStore = create<MultiTenantStore>((set, get) => ({
       set({ workspaces: mappedWorkspaces });
 
       // Selecionar workspace atual baseado no slug da URL se possível
-      const pathSlug = window.location.pathname.split('/')[1];
+      const pathParts = window.location.hash ? window.location.hash.split("/") : window.location.pathname.split("/");
+      const pathSlug = pathParts.find(p => p !== "" && p !== "#" && p !== "workspace" && p !== "configs");
       const found = mappedWorkspaces.find(w => w.slug === pathSlug);
       if (found) {
         set({ currentWorkspace: found });
