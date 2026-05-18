@@ -125,7 +125,7 @@ export default function WorkspaceConfig() {
 					return;
 				}
 				if (data) {
-					setMembers(data.map(m => ({ 
+					setMembers(data.map((m: any) => ({ 
 						name: m.display_name || `Usuário ${m.user_id.slice(0,4)}`, 
 						email: m.email || "Sem e-mail", 
 						role: m.role 
