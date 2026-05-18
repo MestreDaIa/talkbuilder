@@ -865,8 +865,13 @@ export const HttpRequestConfig = ({
                             <ChevronDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
                           </Button>
                         </PopoverTrigger>
-                        <PopoverContent className="w-[300px] p-0" align="start" side="bottom">
-                          <Command>
+                        <PopoverContent 
+                          className="w-[300px] p-0" 
+                          align="start" 
+                          side="bottom"
+                          onOpenAutoFocus={(e) => e.preventDefault()}
+                        >
+                          <Command manualFiltering={false}>
                             <CommandInput placeholder="Search path..." />
                             <CommandList className="max-h-[200px] overflow-y-auto">
                               <CommandEmpty>No path found. Try testing first.</CommandEmpty>
@@ -875,8 +880,8 @@ export const HttpRequestConfig = ({
                                   <CommandItem
                                     key={path}
                                     value={path}
-                                    onSelect={() => {
-                                      handleResponseMappingChange(index, "jsonPath", path);
+                                    onSelect={(currentValue) => {
+                                      handleResponseMappingChange(index, "jsonPath", currentValue);
                                       setOpenDataPopovers(prev => ({ ...prev, [index]: false }));
                                     }}
                                   >
