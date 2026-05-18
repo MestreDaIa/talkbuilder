@@ -104,6 +104,8 @@ export const HttpRequestConfig = ({
   const [testResult, setTestResult] = useState<string | null>(null);
   const [lastJsonResponse, setLastJsonResponse] = useState<any>(null);
   const [isSaveExpanded, setIsSaveExpanded] = useState(false);
+  const [openDataPopovers, setOpenDataPopovers] = useState<Record<number, boolean>>({});
+  const [openVariablePopovers, setOpenVariablePopovers] = useState<Record<number, boolean>>({});
 
   useEffect(() => {
     setConfig({
@@ -794,7 +796,17 @@ export const HttpRequestConfig = ({
         </TabsContent>
       </Tabs>
 
-      <div className="space-y-4 pt-4 border-t">
+      {/* Test Result */}
+      {testResult && (
+        <div className="space-y-2 mt-4">
+          <Label>Resultado do Teste</Label>
+          <pre className="text-xs bg-muted p-3 rounded overflow-x-auto max-h-48 overflow-y-auto">
+            {testResult}
+          </pre>
+        </div>
+      )}
+
+      <div className="space-y-4 pt-4">
         <Collapsible
           open={isSaveExpanded}
           onOpenChange={setIsSaveExpanded}
@@ -840,7 +852,7 @@ export const HttpRequestConfig = ({
                   <div className="space-y-2">
                     <Label className="text-sm font-medium">data:</Label>
                     <div className="flex gap-2">
-                      <Popover>
+                      <Popover open={openDataPopovers[index]} onOpenChange={(open) => setOpenDataPopovers(prev => ({ ...prev, [index]: open }))}>
                         <PopoverTrigger asChild>
                           <Button
                             variant="outline"
@@ -865,6 +877,7 @@ export const HttpRequestConfig = ({
                                     value={path}
                                     onSelect={() => {
                                       handleResponseMappingChange(index, "jsonPath", path);
+                                      setOpenDataPopovers(prev => ({ ...prev, [index]: false }));
                                     }}
                                   >
                                     {path}
@@ -884,7 +897,7 @@ export const HttpRequestConfig = ({
                   <div className="space-y-2">
                     <Label className="text-sm font-medium">set variable:</Label>
                     <div className="flex gap-2">
-                      <Popover>
+                      <Popover open={openVariablePopovers[index]} onOpenChange={(open) => setOpenVariablePopovers(prev => ({ ...prev, [index]: open }))}>
                         <PopoverTrigger asChild>
                           <Button
                             variant="outline"
@@ -909,6 +922,7 @@ export const HttpRequestConfig = ({
                                     value={v}
                                     onSelect={() => {
                                       handleResponseMappingChange(index, "variableName", v);
+                                      setOpenVariablePopovers(prev => ({ ...prev, [index]: false }));
                                     }}
                                   >
                                     {v}
@@ -930,17 +944,6 @@ export const HttpRequestConfig = ({
           </CollapsibleContent>
         </Collapsible>
       </div>
-
-
-      {/* Test Result */}
-      {testResult && (
-        <div className="space-y-2">
-          <Label>Resultado do Teste</Label>
-          <pre className="text-xs bg-muted p-3 rounded overflow-x-auto max-h-48 overflow-y-auto">
-            {testResult}
-          </pre>
-        </div>
-      )}
 
       <div className="bg-muted/50 rounded-lg p-3">
         <p className="text-xs text-muted-foreground">
