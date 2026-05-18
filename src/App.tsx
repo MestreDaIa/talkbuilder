@@ -45,9 +45,9 @@ function HomeRoute() {
  * Login/Signup: se já estiver logado, manda direto pro workspace.
  */
 function AuthRoute({ children }: { children: React.ReactNode }) {
-  const { user, loading, profile } = useAuth();
+  const { user, loading, profile, currentWorkspace } = useAuth();
   if (loading) return null;
-  if (user) return <Navigate to={workspaceRoot(profile?.slug)} replace />;
+  if (user) return <Navigate to={workspaceRoot(currentWorkspace?.slug ?? profile?.slug)} replace />;
   return <>{children}</>;
 }
 
@@ -60,7 +60,7 @@ function AuthRoute({ children }: { children: React.ReactNode }) {
  * (em modo embedded, com o slug recebido no JWT).
  */
 function SlugGuard({ children }: { children: React.ReactNode }) {
-  const { profile, loading } = useAuth();
+  const { profile, loading, currentWorkspace, workspaces } = useAuth();
   const { mode, session } = useEmbed();
   const { slug } = useParams();
   if (loading) return null;
@@ -71,9 +71,13 @@ function SlugGuard({ children }: { children: React.ReactNode }) {
     }
     return <>{children}</>;
   }
-  if (!profile?.slug) return <>{children}</>;
-  if (slug && slug !== profile.slug) {
-    return <Navigate to={workspaceRoot(profile.slug)} replace />;
+  const allowedSlug = slug && workspaces.some((workspace) => workspace.slug === slug);
+  if (allowedSlug) return <>{children}</>;
+
+  const fallbackSlug = currentWorkspace?.slug ?? profile?.slug;
+  if (!fallbackSlug) return <>{children}</>;
+  if (slug && slug !== fallbackSlug) {
+    return <Navigate to={workspaceRoot(fallbackSlug)} replace />;
   }
   return <>{children}</>;
 }
