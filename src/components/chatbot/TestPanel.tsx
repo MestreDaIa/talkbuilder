@@ -647,7 +647,15 @@ export const TestPanel = ({
                 waitingForConfig?.placeholder || 
                 "Digite..."
               }
-              type={waitingForType === "input-number" ? "number" : waitingForType === "input-mail" ? "email" : waitingForType === "input-webSite" ? "url" : "text"}
+              type={
+                waitingForType === "input-number" 
+                  ? (typeof waitingForConfig?.min === 'number' || typeof waitingForConfig?.max === 'number' ? "number" : "text") 
+                  : waitingForType === "input-mail" 
+                  ? "email" 
+                  : waitingForType === "input-webSite" 
+                  ? "url" 
+                  : "text"
+              }
               min={waitingForType === "input-number" ? waitingForConfig?.min : undefined}
               max={waitingForType === "input-number" ? waitingForConfig?.max : undefined}
               step={waitingForType === "input-number" ? waitingForConfig?.step : undefined}
