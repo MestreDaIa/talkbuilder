@@ -2,9 +2,8 @@
 // TalkMap — Sistema de banco de dados em duas camadas
 // =============================================================================
 //
-// 1) SYSTEM DB (este arquivo, default export): banco do TalkMap, administrado
-//    pelo desenvolvedor via .env.local. Usado para auth, profiles, e qualquer
-//    dado interno do sistema. Cliente final NUNCA configura isso.
+// 1) PROJECT DB (este arquivo, default export): Supabase principal do projeto.
+//    Usado para auth, profiles, workspaces, convites e dados internos do app.
 //
 // 2) CLIENT DB (BYO — Bring Your Own): banco opcional do próprio cliente,
 //    configurado via UI em /workspace/configs → Integrações. Salvo em
@@ -16,11 +15,14 @@
 import { createClient, type SupabaseClient } from "@supabase/supabase-js";
 
 // -----------------------------------------------------------------------------
-// SYSTEM DB (TalkMap interno — via env)
+// PROJECT DB (Supabase principal do projeto — via env)
 // -----------------------------------------------------------------------------
 
-const DEFAULT_SYSTEM_URL = import.meta.env.VITE_SUPABASE_URL || "";
-const DEFAULT_SYSTEM_KEY = import.meta.env.VITE_SUPABASE_ANON_KEY || "";
+const DEFAULT_PROJECT_URL = "https://fwoescubnnagdvwasbjl.supabase.co";
+const DEFAULT_PROJECT_KEY = "sb_publishable_v58nZwBN4s5_lMASv4S3Iw_L23jPbIK";
+
+const DEFAULT_SYSTEM_URL = import.meta.env.VITE_SUPABASE_URL || DEFAULT_PROJECT_URL;
+const DEFAULT_SYSTEM_KEY = import.meta.env.VITE_SUPABASE_ANON_KEY || DEFAULT_PROJECT_KEY;
 
 const ENV_URL =
   (import.meta.env.VITE_TALKMAP_SUPABASE_URL as string | undefined) ??
