@@ -1,15 +1,5 @@
 // =============================================================================
-// TalkMap — Sistema de banco de dados em duas camadas
-// =============================================================================
-//
-// 1) PROJECT DB (este arquivo, default export): Supabase principal do projeto.
-//    Usado para auth, profiles, workspaces, convites e dados internos do app.
-//
-// 2) CLIENT DB (BYO — Bring Your Own): banco opcional do próprio cliente,
-//    configurado via UI em /workspace/configs → Integrações. Salvo em
-//    localStorage. Usado quando o cliente quer guardar bots/variáveis no
-//    Supabase dele. Funções: getClientSupabaseConfig / saveClientSupabaseConfig
-//    / clearClientSupabaseConfig / getClientSupabase.
+// TalkMap — Sistema de banco de dados
 // =============================================================================
 
 import { createClient, type SupabaseClient } from "@supabase/supabase-js";
@@ -21,9 +11,7 @@ import { createClient, type SupabaseClient } from "@supabase/supabase-js";
 const ENV_URL = import.meta.env.VITE_TALKMAP_SUPABASE_URL || import.meta.env.VITE_SUPABASE_URL;
 const ENV_KEY = import.meta.env.VITE_TALKMAP_SUPABASE_ANON_KEY || import.meta.env.VITE_SUPABASE_ANON_KEY;
 
-// Fallback: permite configurar via localStorage (útil em preview do Lovable
-// onde o dev server pode ter sido iniciado antes do .env.local existir, ou
-// quando o usuário quer testar com outro projeto sem reiniciar o build).
+// Fallback manual via localStorage para o sistema
 const SYSTEM_FALLBACK_KEY = "talkmap_system_supabase";
 
 interface SystemCreds {
@@ -32,17 +20,31 @@ interface SystemCreds {
 }
 
 function readSystemCreds(): SystemCreds | null {
-  if (ENV_URL && ENV_KEY) return { url: ENV_URL, anonKey: ENV_KEY };
-  if (typeof window === "undefined") return null;
-  try {
-    const raw = window.localStorage.getItem(SYSTEM_FALLBACK_KEY);
-    if (!raw) return null;
-    const parsed = JSON.parse(raw) as Partial<SystemCreds>;
-    if (!parsed.url || !parsed.anonKey) return null;
-    return { url: parsed.url, anonKey: parsed.anonKey };
-  } catch {
-    return null;
+  // 1. Prioridade: Variáveis de Ambiente
+  if (ENV_URL && ENV_KEY) {
+    return { url: ENV_URL, anonKey: ENV_KEY };
   }
+  
+  // 2. Fallback: LocalStorage (para desenvolvimento/preview)
+  if (typeof window !== "undefined") {
+    try {
+      const raw = window.localStorage.getItem(SYSTEM_FALLBACK_KEY);
+      if (raw) {
+        const parsed = JSON.parse(raw) as Partial<SystemCreds>;
+        if (parsed.url && parsed.anonKey) {
+          return { url: parsed.url, anonKey: parsed.anonKey };
+        }
+      }
+    } catch (e) {
+      console.error("Erro ao ler credenciais do localStorage", e);
+    }
+  }
+
+  // 3. Fallback final: Banco interno do Lovable (apenas se nada mais existir)
+  const INTERNAL_URL = "https://fwoescubnnagdvwasbjl.supabase.co";
+  const INTERNAL_KEY = "sb_publishable_v58nZwBN4s5_lMASv4S3Iw_L23jPbIK";
+  
+  return { url: INTERNAL_URL, anonKey: INTERNAL_KEY };
 }
 
 export function saveSystemSupabaseCreds(creds: SystemCreds): void {
@@ -53,10 +55,11 @@ export function saveSystemSupabaseCreds(creds: SystemCreds): void {
 
 let systemClient: SupabaseClient | null = null;
 
-function buildSystemClient(): SupabaseClient | null {
-  const creds = readSystemCreds();
-  if (!creds) return null;
+function buildSystemClient(): SupabaseClient {
   if (systemClient) return systemClient;
+  
+  const creds = readSystemCreds()!; // Sempre retorna algo por causa do fallback interno
+  
   systemClient = createClient(creds.url, creds.anonKey, {
     auth: {
       persistSession: true,
@@ -67,14 +70,14 @@ function buildSystemClient(): SupabaseClient | null {
   return systemClient;
 }
 
-/** Retorna o client do banco do sistema TalkMap. Null se nada estiver configurado. */
-export function getSupabase(): SupabaseClient | null {
+/** Retorna o client do banco do sistema TalkMap. */
+export function getSupabase(): SupabaseClient {
   return buildSystemClient();
 }
 
-/** True se há credenciais (env OU localStorage de fallback). */
+/** True se há credenciais (env OU localStorage OU fallback interno). */
 export function isSupabaseConfigured(): boolean {
-  return readSystemCreds() !== null;
+  return true; // Sempre configurado devido ao fallback interno
 }
 
 /** True somente se veio de variável de ambiente (modo "produção"). */
@@ -83,18 +86,11 @@ export function isSupabaseFromEnv(): boolean {
 }
 
 /**
- * Proxy retrocompatível usado pelos componentes legados do chatbot.
- * Resolve preguiçosamente para o client do SYSTEM DB. Se o desenvolvedor
- * esqueceu de configurar o .env.local, lança erro descritivo.
+ * Proxy retrocompatível usado pelos componentes legados.
  */
 export const supabaseClient: SupabaseClient = new Proxy({} as SupabaseClient, {
   get(_t, prop, receiver) {
     const client = buildSystemClient();
-    if (!client) {
-      throw new Error(
-        "TalkMap System DB não configurado. Defina VITE_TALKMAP_SUPABASE_URL e VITE_TALKMAP_SUPABASE_ANON_KEY em .env.local."
-      );
-    }
     const value = Reflect.get(client as object, prop, receiver);
     return typeof value === "function" ? value.bind(client) : value;
   },
