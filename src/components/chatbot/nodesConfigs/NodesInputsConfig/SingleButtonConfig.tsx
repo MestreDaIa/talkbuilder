@@ -107,7 +107,7 @@ export const SingleButtonConfig = ({
               id="btn-description"
               value={description}
               onChange={(e) => setDescription(e.target.value)}
-              placeholder="Descrição adicional..."
+              placeholder="Descrição adicional"
               rows={2}
             />
           </div>
@@ -128,7 +128,7 @@ export const SingleButtonConfig = ({
               <Input
                 value={redirectUrl}
                 onChange={(e) => setRedirectUrl(e.target.value)}
-                placeholder="https://..."
+                placeholder="https://exemplo.com"
               />
             )}
           </div>

@@ -457,7 +457,7 @@ export const ChatWidget = ({
               min={waitingFor === "input-number" ? waitingForConfig?.min : undefined}
               max={waitingFor === "input-number" ? waitingForConfig?.max : undefined}
               step={waitingFor === "input-number" ? waitingForConfig?.step : undefined}
-              className="flex-1 rounded-full"
+              className="flex-1 rounded-full min-w-0"
               style={{ 
                 color: themeSettings?.inputTextColor || '#1f2937',
                 backgroundColor: 'rgba(255, 255, 255, 0.1)', // Subtle overlay

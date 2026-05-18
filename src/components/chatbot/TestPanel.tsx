@@ -659,7 +659,7 @@ export const TestPanel = ({
               min={waitingForType === "input-number" ? waitingForConfig?.min : undefined}
               max={waitingForType === "input-number" ? waitingForConfig?.max : undefined}
               step={waitingForType === "input-number" ? waitingForConfig?.step : undefined}
-              className="flex-1" 
+              className="flex-1 min-w-0" 
               style={{ 
                 background: theme?.inputBackgroundColor ? "rgba(255,255,255,0.1)" : undefined,
                 color: theme?.inputTextColor || "inherit",
