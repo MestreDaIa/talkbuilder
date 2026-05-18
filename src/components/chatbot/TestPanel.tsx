@@ -494,7 +494,7 @@ export const TestPanel = ({
           setIsLoading(false);
           return;
         }
-      } else if (waitingForType === "input-website") {
+      } else if (waitingForType === "input-webSite") {
         try {
           new URL(msgToSend.startsWith('http') ? msgToSend : `https://${msgToSend}`);
         } catch (e) {
@@ -647,7 +647,7 @@ export const TestPanel = ({
                 waitingForConfig?.placeholder || 
                 "Digite..."
               }
-              type={waitingForType === "input-number" ? "number" : waitingForType === "input-mail" ? "email" : waitingForType === "input-website" ? "url" : "text"}
+              type={waitingForType === "input-number" ? "number" : waitingForType === "input-mail" ? "email" : waitingForType === "input-webSite" ? "url" : "text"}
               min={waitingForType === "input-number" ? waitingForConfig?.min : undefined}
               max={waitingForType === "input-number" ? waitingForConfig?.max : undefined}
               step={waitingForType === "input-number" ? waitingForConfig?.step : undefined}
