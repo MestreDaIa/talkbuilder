@@ -853,7 +853,7 @@ export const HttpRequestConfig = ({
                             <ChevronDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
                           </Button>
                         </PopoverTrigger>
-                        <PopoverContent className="w-[300px] p-0" align="start" side="bottom" portal={true}>
+                        <PopoverContent className="w-[300px] p-0" align="start" side="bottom">
                           <Command>
                             <CommandInput placeholder="Search path..." />
                             <CommandList className="max-h-[200px] overflow-y-auto">
