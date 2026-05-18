@@ -117,17 +117,17 @@ export default function WorkspaceConfig() {
 		if (!supabase || !currentWorkspace) return;
 
 		supabase
-			.from("workspace_members")
-			.select("role, user_id")
-			.eq("workspace_id", currentWorkspace.id)
+			.rpc("get_workspace_members", { target_workspace_id: currentWorkspace.id })
 			.then(({ data, error }) => {
-				if (error) console.error(error);
+				if (error) {
+					console.error(error);
+					setMembers([]);
+					return;
+				}
 				if (data) {
-					// Aqui idealmente faríamos um join com profiles para pegar nome/email
-					// Por simplicidade agora, usaremos os IDs
-					setMembers(data.map(m => ({ 
-						name: `Usuário ${m.user_id.slice(0,4)}`, 
-						email: "Carregando...", 
+					setMembers(data.map((m: any) => ({ 
+						name: m.display_name || `Usuário ${m.user_id.slice(0,4)}`, 
+						email: m.email || "Sem e-mail", 
 						role: m.role 
 					})));
 				}
@@ -259,8 +259,6 @@ export default function WorkspaceConfig() {
 											<SelectContent>
 												<SelectItem value="admin">Administrador</SelectItem>
 												<SelectItem value="editor">Editor</SelectItem>
-												<SelectItem value="membro">Membro</SelectItem>
-												<SelectItem value="viewer">Visualizador</SelectItem>
 											</SelectContent>
 										</Select>
 										<Button variant="ghost" size="icon" className="text-red-500 hover:text-red-600 hover:bg-red-50">

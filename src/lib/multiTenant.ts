@@ -31,21 +31,28 @@ export const useMultiTenantStore = create<MultiTenantStore>((set, get) => ({
 
     set({ isLoading: true });
     try {
-      const { data, error } = await supabase
-        .from('workspace_members')
-        .select(`
-          role,
-          workspaces (
-            id,
-            name,
-            slug
-          )
-        `);
+      let { data, error } = await supabase.rpc('get_my_workspaces');
+
+      if (error) {
+        console.warn('RPC get_my_workspaces failed, trying fallback:', error);
+        const fallback = await supabase
+          .from('workspace_members')
+          .select(`
+            role,
+            workspaces (
+              id,
+              name,
+              slug
+            )
+          `);
+        data = fallback.data;
+        error = fallback.error;
+      }
 
       if (error) throw error;
 
-      const mappedWorkspaces = data.map((item: any) => ({
-        ...item.workspaces,
+      const mappedWorkspaces: Workspace[] = (data ?? []).map((item: any) => ({
+        ...(item.workspaces ?? { id: item.id, name: item.name, slug: item.slug }),
         role: item.role as UserRole,
       }));
 

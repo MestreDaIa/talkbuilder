@@ -25,7 +25,7 @@ import { Copy, Loader2 } from "lucide-react";
 
 export function InviteMemberDialog() {
   const [email, setEmail] = useState("");
-  const [role, setRole] = useState("membro");
+  const [role, setRole] = useState("editor");
   const [loading, setLoading] = useState(false);
   const [open, setOpen] = useState(false);
   const [inviteLink, setInviteLink] = useState<string | null>(null);
@@ -50,25 +50,28 @@ export function InviteMemberDialog() {
       // LOG PARA DEBUG: Verificar as credenciais atuais do Supabase
       console.log("Supabase Client URL:", (supabase as any).supabaseUrl);
 
-      // Garantir que temos um workspace_id
+      // Garantir que temos um workspace_id sem consultar workspace_members.
+      // Essa tabela é justamente a que está com política RLS recursiva no Supabase do usuário.
       let workspaceId = currentWorkspace?.id;
       
       if (!workspaceId) {
-        // Fallback: buscar o primeiro workspace onde o usuário é owner ou admin
-        const { data: wsData, error: wsError } = await supabase
-          .from("workspace_members")
-          .select("workspace_id")
-          .eq("user_id", user.id)
-          .in("role", ["owner", "admin"])
-          .limit(1)
+        const slugFromUrl = window.location.pathname.split("/")[1];
+        if (!slugFromUrl) {
+          throw new Error("Workspace não carregado. Abra a página pelo slug do workspace e tente novamente.");
+        }
+
+        const { data: workspaceData, error: workspaceError } = await supabase
+          .from("workspaces")
+          .select("id")
+          .eq("slug", slugFromUrl)
           .maybeSingle();
           
-        if (wsError) {
-          console.error("Erro ao buscar workspace fallback:", wsError);
-          throw wsError;
+        if (workspaceError) {
+          console.error("Erro ao buscar workspace pelo slug:", workspaceError);
+          throw workspaceError;
         }
-        if (!wsData) throw new Error("Você não possui permissão para convidar membros em nenhum workspace.");
-        workspaceId = wsData.workspace_id;
+        if (!workspaceData?.id) throw new Error("Workspace não encontrado para gerar o convite.");
+        workspaceId = workspaceData.id;
       }
 
       const { data, error } = await supabase
@@ -118,7 +121,7 @@ export function InviteMemberDialog() {
 
   const resetForm = () => {
     setEmail("");
-    setRole("membro");
+    setRole("editor");
     setInviteLink(null);
   };
 
@@ -158,8 +161,6 @@ export function InviteMemberDialog() {
                 <SelectContent>
                   <SelectItem value="admin">Administrador</SelectItem>
                   <SelectItem value="editor">Editor</SelectItem>
-                  <SelectItem value="membro">Membro</SelectItem>
-                  <SelectItem value="viewer">Visualizador</SelectItem>
                 </SelectContent>
               </Select>
             </div>
