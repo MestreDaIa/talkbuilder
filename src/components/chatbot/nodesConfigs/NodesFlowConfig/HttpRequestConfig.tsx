@@ -66,7 +66,7 @@ export const HttpRequestConfig = ({
   config,
   setConfig,
 }: HttpRequestConfigProps) => {
-  const { getAllVariableNames } = useVariables();
+  const { getAllVariableNames, addVariable } = useVariables();
   const [method, setMethod] = useState(config.method || "GET");
   const [url, setUrl] = useState(config.url || "");
   const [authType, setAuthType] = useState(config.authType || "none");
@@ -889,7 +889,10 @@ export const HttpRequestConfig = ({
                         className="px-3 border rounded-md bg-muted/50 text-muted-foreground font-mono text-xs shrink-0 h-10 w-auto"
                         onClick={() => {
                           if (mapping.variableName) {
-                            handleResponseMappingChange(index, "variableName", `{{${mapping.variableName}}}`);
+                            const cleanName = mapping.variableName.replace(/[{}]/g, "");
+                            addVariable(cleanName);
+                            handleResponseMappingChange(index, "variableName", cleanName);
+                            toast.success(`Variável ${cleanName} adicionada`);
                           }
                         }}
                       >
