@@ -112,10 +112,18 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 	async function loadWorkspaces(userId: string) {
 		const supabase = getSupabase();
 		if (!supabase) return;
-		const { data, error } = await supabase
-			.from("workspace_members")
-			.select("role, workspaces(id, name, slug)")
-			.eq("user_id", userId);
+		let { data, error } = await supabase
+			.rpc("get_my_workspaces");
+
+		if (error) {
+			console.warn("[Auth] RPC get_my_workspaces falhou, tentando fallback:", error);
+			const fallback = await supabase
+				.from("workspace_members")
+				.select("role, workspaces(id, name, slug)")
+				.eq("user_id", userId);
+			data = fallback.data;
+			error = fallback.error;
+		}
 		
 		if (error) {
 			console.error("[Auth] Erro ao carregar workspaces:", error);
@@ -125,7 +133,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 		}
 
 		const mapped = (data ?? [])
-			.map((m: any) => ({ ...m.workspaces, role: m.role }))
+			.map((m: any) => m.workspaces ? ({ ...m.workspaces, role: m.role }) : ({ id: m.id, name: m.name, slug: m.slug, role: m.role }))
 			.filter((workspace: any) => Boolean(workspace.id));
 		setWorkspaces(mapped);
 		
