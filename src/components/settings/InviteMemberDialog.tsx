@@ -47,6 +47,9 @@ export function InviteMemberDialog() {
       const supabase = getSupabase();
       if (!supabase) throw new Error("Supabase não configurado");
 
+      // LOG PARA DEBUG: Verificar as credenciais atuais do Supabase
+      console.log("Supabase Client URL:", (supabase as any).supabaseUrl);
+
       // Garantir que temos um workspace_id
       let workspaceId = currentWorkspace?.id;
       
@@ -60,7 +63,10 @@ export function InviteMemberDialog() {
           .limit(1)
           .maybeSingle();
           
-        if (wsError) throw wsError;
+        if (wsError) {
+          console.error("Erro ao buscar workspace fallback:", wsError);
+          throw wsError;
+        }
         if (!wsData) throw new Error("Você não possui permissão para convidar membros em nenhum workspace.");
         workspaceId = wsData.workspace_id;
       }
@@ -76,7 +82,10 @@ export function InviteMemberDialog() {
         .select("token")
         .single();
 
-      if (error) throw error;
+      if (error) {
+        console.error("Erro ao inserir convite:", error);
+        throw error;
+      }
 
       const link = `${window.location.origin}/invite/${data.token}`;
       setInviteLink(link);
@@ -86,9 +95,10 @@ export function InviteMemberDialog() {
         description: `O convite para ${email} foi criado com sucesso.`,
       });
     } catch (error: any) {
+      console.error("Catch error handleInvite:", error);
       toast({
         title: "Erro ao convidar",
-        description: error.message,
+        description: error.message + " (verifique se você está usando o Supabase do sistema)",
         variant: "destructive",
       });
     } finally {
