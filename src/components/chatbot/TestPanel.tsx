@@ -3,6 +3,12 @@ import { X, Send, Headphones, Play, Pause, FileText, Loader2, RefreshCw } from "
 import { Button } from "../../components/ui/button";
 import { Input } from "../../components/ui/input";
 import { type Container, type Node, type ButtonConfig, type Edge, type ConditionComparison, type ConditionGroup } from "../../types/chatbot";
+
+interface ResponseMapping {
+  jsonPath: string;
+  variableName: string;
+}
+
 import { ScrollArea } from "../../components/ui/scroll-area";
 import { renderTextSegments } from "@/lib/textParser";
 import { richHtmlFor, richToPlainText } from "@/lib/richText";
@@ -259,7 +265,7 @@ export const TestPanel = ({
     return condition.logicalOperator === "OR" ? results.some(Boolean) : results.every(Boolean);
   };
 
-  const runLocalFlow = (state: RuntimeState | null, input?: { message?: string; button_id?: string }) => {
+    const runLocalFlow = async (state: RuntimeState | null, input?: { message?: string; button_id?: string }) => {
     let currentNodeId = state?.current_node_id || startContainer?.nodes?.[0]?.id || null;
     const variables = { ...(state?.variables || {}) };
     const nextMessages: Message[] = [];
@@ -268,6 +274,7 @@ export const TestPanel = ({
     let nextButtons: ButtonConfig[] = [];
     let waitMs = 0;
     let steps = 0;
+
     const firstText = (...values: any[]) => String(values.find((v) => typeof v === "string" && v.trim()) || "");
     const cleanText = (text: string) => richToPlainText(text);
     const replaceVars = (text: string) => cleanText(text).replace(/{{(.*?)}}/g, (_, key) => variables[key.trim()] ?? `{{${key}}}`);
@@ -389,6 +396,86 @@ export const TestPanel = ({
             console.error("[script-node] execution failed:", err);
           }
         }
+      } else if (nodeType === "http-request") {
+        const url = replaceVars(cfg.url || "");
+        const method = cfg.method || "GET";
+        const headers: Record<string, string> = {};
+        (cfg.headers || []).forEach((h: any) => {
+          if (h.name) headers[h.name] = replaceVars(h.value);
+        });
+
+        // Auth headers
+        if (cfg.authType === "bearer" && cfg.authCredentials?.token) {
+          headers["Authorization"] = `Bearer ${replaceVars(cfg.authCredentials.token)}`;
+        } else if (cfg.authType === "basic" && cfg.authCredentials?.username) {
+          const user = replaceVars(cfg.authCredentials.username);
+          const pass = replaceVars(cfg.authCredentials.password || "");
+          const encoded = btoa(`${user}:${pass}`);
+          headers["Authorization"] = `Basic ${encoded}`;
+        }
+
+        // Body
+        let body: any = undefined;
+        if (cfg.sendBody && !["GET", "HEAD"].includes(method)) {
+          if (cfg.bodyContentType === "json") {
+            headers["Content-Type"] = "application/json";
+            body = replaceVars(cfg.bodyJson || "{}");
+          } else if (cfg.bodyContentType === "form-urlencoded") {
+            headers["Content-Type"] = "application/x-www-form-urlencoded";
+            const params = new URLSearchParams();
+            (cfg.bodyParams || []).forEach((p: any) => {
+              if (p.name) params.append(p.name, replaceVars(p.value));
+            });
+            body = params.toString();
+          }
+        }
+
+        try {
+          const response = await fetch(url, {
+            method,
+            headers,
+            body
+          });
+
+          if (response.ok) {
+            const responseData = await response.json();
+            
+            // Apply response mappings
+            const mappings: ResponseMapping[] = cfg.responseMappings || [];
+            mappings.forEach(mapping => {
+              if (mapping.jsonPath && mapping.variableName) {
+                // Simple path resolver (e.g., "data.user.name")
+                const parts = mapping.jsonPath.split('.');
+                let value = responseData;
+                
+                // If path starts with "data." and the root object is the response, skip "data" 
+                // unless the actual response has a "data" property.
+                // Most users will type the path relative to the root.
+                
+                for (let i = 0; i < parts.length; i++) {
+                  const part = parts[i];
+                  if (value && typeof value === 'object' && part in value) {
+                    value = value[part];
+                  } else if (part === 'data' && i === 0 && (!value || !(part in value))) {
+                    // Skip 'data' if it's the first part and NOT in the root response object
+                    // This handles users who think they need to prefix with 'data'
+                    continue;
+                  } else {
+                    value = undefined;
+                    break;
+                  }
+                }
+
+                
+                if (value !== undefined) {
+                  variables[mapping.variableName] = value;
+                }
+              }
+            });
+          }
+        } catch (err) {
+          console.error("[http-request] failed:", err);
+        }
       } else if (nodeType === "set-variable" && cfg.variableName) {
         variables[cfg.variableName] = evaluateSetVariableValue(cfg, variables);
       } else if (nodeType === "condition") {
@@ -477,15 +564,18 @@ export const TestPanel = ({
   const startRuntimeSession = async () => {
     setIsLoading(true);
     setMessages([]);
-    applyRuntimeData(runLocalFlow(null), true);
+    const data = await runLocalFlow(null);
+    applyRuntimeData(data, true);
     if (!waitTimerRef.current) setIsLoading(false);
   };
 
   const continueRuntime = async () => {
     setIsLoading(true);
-    applyRuntimeData(runLocalFlow(runtimeStateRef.current));
+    const data = await runLocalFlow(runtimeStateRef.current);
+    applyRuntimeData(data);
     if (!waitTimerRef.current) setIsLoading(false);
   };
+
 
   const sendMessage = async (message?: string, buttonId?: string) => {
     const msgToSend = message || currentInput;
@@ -549,7 +639,9 @@ export const TestPanel = ({
     setIsLoading(true);
     setCurrentInput("");
 
-    applyRuntimeData(runLocalFlow(runtimeStateRef.current, { message: msgToSend, button_id: buttonId }));
+    const data = await runLocalFlow(runtimeStateRef.current, { message: msgToSend, button_id: buttonId });
+    applyRuntimeData(data);
+
     if (!waitTimerRef.current) setIsLoading(false);
   };
 
