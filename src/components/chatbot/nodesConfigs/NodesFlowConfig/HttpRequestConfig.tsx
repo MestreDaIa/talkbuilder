@@ -794,7 +794,17 @@ export const HttpRequestConfig = ({
         </TabsContent>
       </Tabs>
 
-      <div className="space-y-4 pt-4 border-t">
+      {/* Test Result */}
+      {testResult && (
+        <div className="space-y-2 mt-4">
+          <Label>Resultado do Teste</Label>
+          <pre className="text-xs bg-muted p-3 rounded overflow-x-auto max-h-48 overflow-y-auto">
+            {testResult}
+          </pre>
+        </div>
+      )}
+
+      <div className="space-y-4 pt-4">
         <Collapsible
           open={isSaveExpanded}
           onOpenChange={setIsSaveExpanded}
@@ -930,17 +940,6 @@ export const HttpRequestConfig = ({
           </CollapsibleContent>
         </Collapsible>
       </div>
-
-
-      {/* Test Result */}
-      {testResult && (
-        <div className="space-y-2">
-          <Label>Resultado do Teste</Label>
-          <pre className="text-xs bg-muted p-3 rounded overflow-x-auto max-h-48 overflow-y-auto">
-            {testResult}
-          </pre>
-        </div>
-      )}
 
       <div className="bg-muted/50 rounded-lg p-3">
         <p className="text-xs text-muted-foreground">
