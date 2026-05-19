@@ -55,9 +55,13 @@ export function InviteMemberDialog() {
       let workspaceId = currentWorkspace?.id;
       
       if (!workspaceId) {
-        const pathParts = window.location.hash ? window.location.hash.split("/") : window.location.pathname.split("/");
-        // O slug geralmente é o segundo elemento após o hash ou no início da rota
-        const slugFromUrl = pathParts.find(p => p !== "" && p !== "#" && p !== "workspace" && p !== "configs");
+        const hash = window.location.hash;
+        const cleanHash = hash.startsWith('#') ? hash.substring(1) : hash;
+        const pathParts = cleanHash.split("/").filter(Boolean);
+        
+        // No talkbuilder.lovable.app/#/teste03/workspace/configs, 
+        // teste03 é o primeiro elemento do array filtrado.
+        const slugFromUrl = pathParts[0];
         if (!slugFromUrl) {
           throw new Error("Workspace não carregado. Abra a página pelo slug do workspace e tente novamente.");
         }
