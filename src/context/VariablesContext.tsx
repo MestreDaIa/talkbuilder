@@ -5,6 +5,7 @@ type VariableContextType = {
   setVariables: React.Dispatch<React.SetStateAction<Record<string, any>>>;
   getAllVariableNames: () => string[];
   addVariable: (name: string, value?: any) => void;
+  removeVariable: (name: string) => void;
   setVariable: (name: string, value: any) => void;
   replaceVariablesInText: (text: string, extraVars?: Record<string, any>) => string;
 };
@@ -44,6 +45,13 @@ export function VariablesProvider({
     );
   }, []);
 
+  const removeVariable = useCallback((name: string) => {
+    setVariables((prev) => {
+      const { [name]: _, ...rest } = prev;
+      return rest;
+    });
+  }, []);
+
   const setVariable = useCallback((name: string, value: any) => {
     setVariables((prev) => ({ ...prev, [name]: value }));
   }, []);
@@ -69,6 +77,7 @@ export function VariablesProvider({
         setVariables,
         getAllVariableNames,
         addVariable,
+        removeVariable,
         setVariable,
         replaceVariablesInText,
       }}
