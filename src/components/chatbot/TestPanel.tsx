@@ -560,12 +560,16 @@ export const TestPanel = ({
                 }
               } else if (selectedProvider === "google" || (selectedProvider as string) === "gemini") {
                 let modelsToTry = [];
-                if (cfg.model?.includes("gemini-1.5-pro")) {
-                  modelsToTry = ["gemini-1.5-pro-latest", "gemini-1.5-pro"];
-                } else if (cfg.model?.includes("gemini-1.5-flash")) {
-                  modelsToTry = ["gemini-1.5-flash-latest", "gemini-1.5-flash"];
+                const modelInput = cfg.model || "";
+                
+                if (modelInput.includes("gemini-1.5-pro")) {
+                  modelsToTry = ["gemini-1.5-pro", "gemini-1.5-pro-001", "gemini-1.5-pro-002", "gemini-1.5-pro-latest"];
+                } else if (modelInput.includes("gemini-1.5-flash")) {
+                  modelsToTry = ["gemini-1.5-flash", "gemini-1.5-flash-001", "gemini-1.5-flash-002", "gemini-1.5-flash-latest"];
+                } else if (modelInput === "gemini-pro") {
+                  modelsToTry = ["gemini-pro", "gemini-1.0-pro"];
                 } else {
-                  modelsToTry = [cfg.model || "gemini-1.5-flash-latest", "gemini-1.5-flash", "gemini-pro"];
+                  modelsToTry = [modelInput || "gemini-1.5-flash", "gemini-1.5-flash", "gemini-1.5-pro", "gemini-pro"];
                 }
 
                 let lastError = null;
