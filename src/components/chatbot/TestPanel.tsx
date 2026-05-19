@@ -141,6 +141,7 @@ interface TestPanelProps {
   fullScreen?: boolean;
   theme?: TestPanelTheme;
   flowId?: string;
+  settings?: Record<string, any>;
 }
 
 export const TestPanel = ({
