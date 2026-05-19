@@ -47,78 +47,30 @@ export function InviteMemberDialog() {
       const supabase = getSupabase();
       if (!supabase) throw new Error("Supabase não configurado");
 
-      // 1. Identificar o slug da URL de forma robusta
-      const hash = window.location.hash || "";
-      const cleanHash = hash.startsWith('#') ? hash.substring(1) : hash;
-      const pathParts = cleanHash.split("/").filter(p => p && p !== "workspace" && p !== "configs");
-      
-      // Se estiver em #/teste03/workspace/configs, o pathParts será ["teste03"]
-      // Mas se o usuário estiver em uma URL diferente, precisamos garantir que pegamos o slug certo
-      const pathSlug = pathParts[0];
+      const hashPath = (window.location.hash || "").replace(/^#/, "");
+      const pathParts = hashPath.split("/").filter(Boolean);
+      const slugFromUrl = pathParts[0];
+      const finalSlug = currentWorkspace?.slug || slugFromUrl;
 
-      if (!pathSlug || pathSlug.includes('.')) { 
-        // Fallback: tentar pegar do contexto se a URL falhar ou for ambígua
-        if (currentWorkspace?.slug) {
-          console.log("Usando slug do contexto:", currentWorkspace.slug);
-        } else {
-          throw new Error("Não foi possível identificar o workspace. Certifique-se de que está na página de configurações do workspace.");
-        }
-      }
-      
-      const finalSlug = currentWorkspace?.slug || pathSlug;
-
-      console.log("Detectando workspace para convite:", pathSlug);
-      console.log("URL Atual:", window.location.href);
-      console.log("Hash Atual:", window.location.hash);
-
-      // 2. Buscar o workspace e validar se o usuário é admin/owner nele diretamente no banco
-      const { data: wsData, error: wsError } = await supabase
-        .from("workspaces")
-        .select(`
-          id,
-          slug,
-          workspace_members (
-            role,
-            user_id
-          )
-        `)
-        .eq("slug", finalSlug)
-        .maybeSingle();
-
-      if (wsError || !wsData) {
-        console.error("Erro ao localizar workspace:", wsError);
-        throw new Error(`Workspace "${finalSlug}" não encontrado. Se você acabou de criar o workspace, tente atualizar a página.`);
+      if (!finalSlug) {
+        throw new Error("Workspace não identificado. Atualize a página e tente novamente.");
       }
 
-      // Filtrar manualmente as permissões do usuário logado
-      const members = wsData.workspace_members as any[];
-      const myMembership = members?.find(m => m.user_id === user.id);
-      const userRole = myMembership?.role;
-      
-      console.log("Minha relação com o workspace:", { myMembership, userRole });
-
-      if (!userRole || (userRole !== 'owner' && userRole !== 'admin')) {
-        throw new Error(`Permissões insuficientes. Para convidar membros, você precisa ser Owner ou Admin. Seu cargo atual: ${userRole || 'Visitante'}.`);
-      }
-
-      // 3. Gerar o convite no banco de dados
-      const { data, error } = await supabase
-        .from("workspace_invites")
-        .insert({
-          workspace_id: wsData.id,
-          email: email.toLowerCase().trim(),
-          role,
-          invited_by: user.id,
-        })
-        .select("token")
-        .single();
+      const { data, error } = await supabase.rpc("create_workspace_invite", {
+        target_workspace_slug: finalSlug,
+        invite_email: email.toLowerCase().trim(),
+        invite_role: role,
+      });
 
       if (error) {
-        console.error("Erro ao inserir convite:", error);
+        console.error("Erro ao criar convite:", error);
         throw error;
       }
 
-      const link = `${window.location.origin}/#/invite/${data.token}`;
+      const inviteToken = Array.isArray(data) ? data[0]?.token : data?.token;
+      if (!inviteToken) throw new Error("Convite criado, mas o token não foi retornado pelo banco.");
+
+      const link = `${window.location.origin}/#/invite/${inviteToken}`;
       setInviteLink(link);
       
       toast({
