@@ -491,12 +491,21 @@ export const TestPanel = ({
         const userMessage = String(variables.__last_agent_user_message || "").trim();
         
         // Verifica se existem chaves de API configuradas no settings ou no próprio nó
-        const nodeKey = cfg.apiKey;
+        const nodeKey = (cfg.apiKey || "").trim();
+        const nodeProvider = (cfg.provider || "openai").toLowerCase();
         const globalKeys = settings?.aiKeys || {};
-        const hasOpenAI = !!globalKeys.openaiKey || (cfg.provider === "openai" && !!nodeKey);
-        const hasAnthropic = !!globalKeys.anthropicKey || (cfg.provider === "anthropic" && !!nodeKey);
-        const hasGoogle = !!globalKeys.googleKey || (cfg.provider === "google" && !!nodeKey);
-        const hasAnyKey = hasOpenAI || hasAnthropic || hasGoogle;
+        const openaiKey = (globalKeys.openaiKey || "").trim() || (nodeProvider === "openai" ? nodeKey : "");
+        const anthropicKey = (globalKeys.anthropicKey || "").trim() || (nodeProvider === "anthropic" ? nodeKey : "");
+        const googleKey = (globalKeys.googleKey || "").trim() || (nodeProvider === "google" ? nodeKey : "");
+        // Fallback final: se o usuário colocou uma chave no nó mas não selecionou provider, usa pelo provider do nó (default openai)
+        const fallbackKey = nodeKey && !openaiKey && !anthropicKey && !googleKey ? nodeKey : "";
+        const selectedProvider: "openai" | "anthropic" | "google" =
+          openaiKey ? "openai" :
+          anthropicKey ? "anthropic" :
+          googleKey ? "google" :
+          fallbackKey ? (nodeProvider as any) : "openai";
+        const activeKey = openaiKey || anthropicKey || googleKey || fallbackKey;
+        const hasAnyKey = !!activeKey;
 
         // Limpa a mensagem processada para evitar repetições
         variables.__last_agent_user_message = "";
@@ -507,14 +516,12 @@ export const TestPanel = ({
             type: "bot", 
             content: userMessage
               ? `🤖 [SIMULAÇÃO DE AGENTE]\nRecebi: "${userMessage}"\n\nAinda não encontrei uma chave de API configurada para responder de verdade. Objetivo atual: ${objective}\n\n${hasTools ? "Também identifiquei Skills disponíveis no fluxo." : "Dica: marque blocos como Skill para o agente poder usá-los."}`
-              : `🤖 [SIMULAÇÃO DE AGENTE]\nObjetivo: ${objective}\n\nO sistema de IA está configurado, mas para funcionar de verdade, você precisará configurar uma chave de API nas configurações do bot.\n\n${hasTools ? "Identifiquei que você já tem blocos configurados como Skills!" : "Dica: Você ainda não marcou nenhum bloco como 'Skill' para este agente usar."}`, 
+              : `🤖 [SIMULAÇÃO DE AGENTE]\nObjetivo: ${objective}\n\nO sistema de IA está configurado, mas para funcionar de verdade, você precisará configurar uma chave de API nas configurações do bot ou no próprio nó.\n\n${hasTools ? "Identifiquei que você já tem blocos configurados como Skills!" : "Dica: Você ainda não marcou nenhum bloco como 'Skill' para este agente usar."}`, 
           });
           
           waitingFor = "input-text";
           waitingForCfg = { placeholder: "Simule uma conversa com o agente..." };
         } else {
-          const selectedProvider = hasOpenAI ? "openai" : hasAnthropic ? "anthropic" : "google";
-          const activeKey = hasOpenAI ? (globalKeys.openaiKey || nodeKey) : hasAnthropic ? (globalKeys.anthropicKey || nodeKey) : (globalKeys.googleKey || nodeKey);
           const skillsText = hasTools ? "\n\nPercebi que existem Skills disponíveis neste fluxo; quando o motor real estiver conectado, eu poderei decidir quando acioná-las." : "";
           
           if (userMessage) {
