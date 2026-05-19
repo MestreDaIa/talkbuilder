@@ -25,6 +25,7 @@ import { Badge } from '../../../../components/ui/badge'
 import { Separator } from '../../../../components/ui/separator'
 import { Progress } from '../../../../components/ui/progress'
 import { usePlan, PLAN_LIMITS, type PlanId } from '../../../../context/PlanContext'
+import { useAuth } from '../../../../context/AuthContext'
 
 type Plan = {
   id: PlanId
@@ -87,6 +88,37 @@ export default function PaymentPlan() {
   // Simula a detecção da integração com flow-appoint
   const [managedByAppoint] = useState(false)
   const { currentPlan, setCurrentPlan, botsUsed, limits } = usePlan()
+  const { profile } = useAuth()
+
+  // ===== Cenário: Usuário convidado (Guest) =====
+  if (profile?.is_guest) {
+    return (
+      <Card className="p-4">
+        <CardHeader>
+          <div className="flex items-center gap-3">
+            <div className="w-12 h-12 rounded-xl bg-gradient-to-br from-amber-500 to-orange-600 flex items-center justify-center text-white">
+              <Sparkles className="w-6 h-6" />
+            </div>
+            <div>
+              <CardTitle className="text-2xl text-left">Plano do Workspace</CardTitle>
+              <CardDescription className="text-left">
+                Você está acessando este workspace como convidado.
+              </CardDescription>
+            </div>
+          </div>
+        </CardHeader>
+        <CardContent className="flex flex-col gap-4">
+          <div className="bg-amber-50 border border-amber-200 rounded-lg p-4 flex gap-3">
+            <AlertCircle className="w-5 h-5 text-amber-600 flex-shrink-0 mt-0.5" />
+            <div className="text-sm text-amber-900 text-left">
+              A gestão de faturas e planos é restrita ao <strong>proprietário</strong> do workspace. 
+              Os limites aplicados são baseados na assinatura ativa do dono.
+            </div>
+          </div>
+        </CardContent>
+      </Card>
+    )
+  }
 
   const usage = {
     botsUsed,

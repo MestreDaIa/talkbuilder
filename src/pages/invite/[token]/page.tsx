@@ -4,16 +4,27 @@ import { getSupabase } from "../../../lib/supabaseClient";
 import { useAuth } from "../../../context/AuthContext";
 import { Button } from "../../../components/ui/button";
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "../../../components/ui/card";
-import { Loader2, CheckCircle2, XCircle, LogIn } from "lucide-react";
+import { Loader2, CheckCircle2, XCircle, LogIn, UserPlus } from "lucide-react";
 import { useToast } from "../../../hooks/use-toast";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "../../../components/ui/tabs";
+import { Input } from "../../../components/ui/input";
+import { Label } from "../../../components/ui/label";
 
 export default function InvitePage() {
   const { token } = useParams<{ token: string }>();
-  const { user, loading: authLoading } = useAuth();
+  const { user, loading: authLoading, refreshProfile } = useAuth();
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [inviteData, setInviteData] = useState<any>(null);
   const [accepted, setAccepted] = useState(false);
+  const [submitting, setSubmitting] = useState(false);
+  
+  // Signup/Login states
+  const [displayName, setDisplayName] = useState("");
+  const [password, setPassword] = useState("");
+  const [email, setEmail] = useState("");
+  const [loginPassword, setLoginPassword] = useState("");
+
   const navigate = useNavigate();
   const { toast } = useToast();
 
@@ -39,6 +50,7 @@ export default function InvitePage() {
           setError("Este convite expirou.");
         } else {
           setInviteData(invite);
+          setEmail(invite.email);
         }
       } catch (err: any) {
         console.error("Erro ao carregar convite:", err);
@@ -52,7 +64,7 @@ export default function InvitePage() {
   }, [token]);
 
   const handleAccept = async () => {
-    if (!token || !user) return;
+    if (!token) return;
 
     setLoading(true);
     try {
@@ -76,10 +88,9 @@ export default function InvitePage() {
         description: `Agora você é membro de ${data.workspace_name}` 
       });
 
-      // Redirecionar após breve delay
       setTimeout(() => {
         navigate(`/${data.workspace_slug}/workspace`);
-      }, 2000);
+      }, 1500);
 
     } catch (err: any) {
       toast({ 
@@ -92,7 +103,65 @@ export default function InvitePage() {
     }
   };
 
-  if (authLoading || loading) {
+  const handleSignup = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!token || !inviteData) return;
+    
+    setSubmitting(true);
+    try {
+      const supabase = getSupabase();
+      if (!supabase) return;
+
+      const { error } = await supabase.auth.signUp({
+        email: inviteData.email,
+        password,
+        options: {
+          data: {
+            display_name: displayName,
+            invite_token: token
+          },
+          emailRedirectTo: `${window.location.origin}/invite/${token}`
+        }
+      });
+
+      if (error) throw error;
+
+      toast({ 
+        title: "Conta criada!", 
+        description: "Agora você pode aceitar o convite." 
+      });
+      
+      // onAuthStateChange vai lidar com o login se auto-confirm for true
+    } catch (err: any) {
+      toast({ title: "Erro no cadastro", description: err.message, variant: "destructive" });
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
+  const handleLogin = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setSubmitting(true);
+    try {
+      const supabase = getSupabase();
+      if (!supabase) return;
+
+      const { error } = await supabase.auth.signInWithPassword({
+        email: inviteData.email,
+        password: loginPassword
+      });
+
+      if (error) throw error;
+      
+      toast({ title: "Bem-vindo de volta!" });
+    } catch (err: any) {
+      toast({ title: "Erro no login", description: err.message, variant: "destructive" });
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
+  if (authLoading || (loading && !inviteData)) {
     return (
       <div className="flex min-h-screen items-center justify-center bg-gray-50">
         <Loader2 className="h-8 w-8 animate-spin text-primary" />
@@ -101,20 +170,20 @@ export default function InvitePage() {
   }
 
   return (
-    <div className="flex min-h-screen items-center justify-center bg-gray-50 p-6">
-      <Card className="max-w-md w-full shadow-lg">
+    <div className="flex min-h-screen items-center justify-center bg-gradient-to-br from-background to-muted p-6">
+      <Card className="max-w-md w-full shadow-2xl border-primary/10">
         <CardHeader className="text-center">
-          <div className="mx-auto w-12 h-12 bg-primary/10 rounded-full flex items-center justify-center mb-4">
+          <div className="mx-auto w-16 h-16 bg-primary/10 rounded-full flex items-center justify-center mb-4">
             {accepted ? (
-              <CheckCircle2 className="h-6 w-6 text-green-600" />
+              <CheckCircle2 className="h-8 w-8 text-green-600" />
             ) : error ? (
-              <XCircle className="h-6 w-6 text-red-600" />
+              <XCircle className="h-8 w-8 text-red-600" />
             ) : (
-              <CheckCircle2 className="h-6 w-6 text-primary" />
+              <UserPlus className="h-8 w-8 text-primary" />
             )}
           </div>
           <CardTitle className="text-2xl font-bold">Convite para Equipe</CardTitle>
-          <CardDescription>
+          <CardDescription className="text-base mt-2">
             {accepted 
               ? "Convite aceito com sucesso!" 
               : error 
@@ -124,45 +193,99 @@ export default function InvitePage() {
           </CardDescription>
         </CardHeader>
 
-        <CardContent className="text-center pb-6">
+        <CardContent className="space-y-4">
           {accepted ? (
-            <p className="text-gray-600">Redirecionando você para o workspace...</p>
+            <div className="text-center py-4 space-y-4">
+              <Loader2 className="h-8 w-8 animate-spin mx-auto text-primary" />
+              <p className="text-muted-foreground">Redirecionando você para o workspace...</p>
+            </div>
           ) : error ? (
-            <div className="p-4 bg-red-50 border border-red-100 rounded-lg text-red-700 text-sm">
+            <div className="p-4 bg-destructive/10 border border-destructive/20 rounded-lg text-destructive text-sm text-center">
               {error}
             </div>
           ) : !user ? (
-            <div className="space-y-4">
-              <p className="text-gray-600 text-sm">
-                Você precisa estar logado para aceitar este convite. Se ainda não tem uma conta, crie uma agora.
-              </p>
-              <div className="flex flex-col gap-2">
-                <Button asChild className="w-full">
-                  <Link to={`/login?redirect=/invite/${token}`}>Entrar</Link>
-                </Button>
-                <Button asChild variant="outline" className="w-full">
-                  <Link to={`/signup?redirect=/invite/${token}`}>Criar Conta</Link>
-                </Button>
-              </div>
-            </div>
+            <Tabs defaultValue="signup" className="w-full">
+              <TabsList className="grid w-full grid-cols-2 mb-6">
+                <TabsTrigger value="signup">Criar Conta</TabsTrigger>
+                <TabsTrigger value="login">Já tenho conta</TabsTrigger>
+              </TabsList>
+              
+              <TabsContent value="signup" className="space-y-4">
+                <form onSubmit={handleSignup} className="space-y-4">
+                  <div className="space-y-2">
+                    <Label htmlFor="signup-email">Email (Convidado)</Label>
+                    <Input id="signup-email" value={email} disabled className="bg-muted" />
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="display-name">Seu Nome</Label>
+                    <Input 
+                      id="display-name" 
+                      placeholder="Ex: João Silva" 
+                      value={displayName} 
+                      onChange={e => setDisplayName(e.target.value)}
+                      required
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="password">Criar Senha</Label>
+                    <Input 
+                      id="password" 
+                      type="password" 
+                      placeholder="Mínimo 6 caracteres"
+                      value={password}
+                      onChange={e => setPassword(e.target.value)}
+                      required
+                    />
+                  </div>
+                  <Button type="submit" className="w-full" disabled={submitting}>
+                    {submitting && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+                    Criar conta e aceitar
+                  </Button>
+                </form>
+              </TabsContent>
+
+              <TabsContent value="login" className="space-y-4">
+                <form onSubmit={handleLogin} className="space-y-4">
+                  <div className="space-y-2">
+                    <Label htmlFor="login-email">Email</Label>
+                    <Input id="login-email" value={email} disabled className="bg-muted" />
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="login-password">Senha</Label>
+                    <Input 
+                      id="login-password" 
+                      type="password" 
+                      value={loginPassword}
+                      onChange={e => setLoginPassword(e.target.value)}
+                      required
+                    />
+                  </div>
+                  <Button type="submit" className="w-full" disabled={submitting}>
+                    {submitting && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+                    Entrar e aceitar
+                  </Button>
+                </form>
+              </TabsContent>
+            </Tabs>
           ) : (
-            <div className="space-y-2">
-              <p className="text-sm text-gray-500">Logado como:</p>
-              <p className="font-medium">{user.email}</p>
+            <div className="text-center py-4 space-y-4">
+              <div className="p-4 bg-primary/5 border border-primary/10 rounded-lg">
+                <p className="text-sm text-muted-foreground mb-1">Logado como:</p>
+                <p className="font-semibold text-foreground">{user.email}</p>
+              </div>
+              <Button 
+                onClick={handleAccept} 
+                className="w-full h-12 text-lg font-semibold" 
+                disabled={loading}
+              >
+                {loading && <Loader2 className="mr-2 h-5 w-5 animate-spin" />}
+                Aceitar e Entrar no Workspace
+              </Button>
             </div>
           )}
         </CardContent>
 
-        {!accepted && !error && user && (
-          <CardFooter>
-            <Button onClick={handleAccept} className="w-full" size="lg" disabled={loading}>
-              {loading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-              Aceitar Convite
-            </Button>
-          </CardFooter>
-        )}
-        
-        {error && (
+        {(error || (user && !accepted)) && (
           <CardFooter>
             <Button asChild variant="ghost" className="w-full">
               <Link to="/">Voltar para o Início</Link>
