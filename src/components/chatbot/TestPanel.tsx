@@ -141,6 +141,7 @@ interface TestPanelProps {
   fullScreen?: boolean;
   theme?: TestPanelTheme;
   flowId?: string;
+  settings?: Record<string, any>;
 }
 
 export const TestPanel = ({
@@ -155,6 +156,7 @@ export const TestPanel = ({
   fullScreen = false,
   theme,
   flowId,
+  settings,
 }: TestPanelProps) => {
   const [messages, setMessages] = useState<Message[]>([]);
   const [currentInput, setCurrentInput] = useState("");
@@ -477,18 +479,40 @@ export const TestPanel = ({
           console.error("[http-request] failed:", err);
         }
       } else if (nodeType === "ai-node" || nodeType === "ai-agent") {
-        // Simulação do Agente/IA para teste local sem API Key
         const objective = cfg.objective || cfg.systemPrompt || "agente de teste";
         const hasTools = allContainers.some(c => c.nodes.some(n => n.config?.isSkill));
         
-        nextMessages.push({ 
-          id: crypto.randomUUID(), 
-          type: "bot", 
-          content: `🤖 [SIMULAÇÃO DE AGENTE]\nObjetivo: ${objective}\n\nO sistema de IA está configurado, mas para funcionar de verdade, você precisará configurar uma chave de API nas configurações do workspace.\n\n${hasTools ? "Identifiquei que você já tem blocos configurados como Skills!" : "Dica: Você ainda não marcou nenhum bloco como 'Skill' para este agente usar."}`, 
-        });
-        
-        waitingFor = "input-text";
-        waitingForCfg = { placeholder: "Simule uma conversa com o agente..." };
+        // Verifica se existem chaves de API configuradas no settings
+        const keys = settings?.aiKeys || {};
+        const hasOpenAI = !!keys.openaiKey;
+        const hasAnthropic = !!keys.anthropicKey;
+        const hasGoogle = !!keys.googleKey;
+        const hasAnyKey = hasOpenAI || hasAnthropic || hasGoogle;
+
+        if (!hasAnyKey) {
+          nextMessages.push({ 
+            id: crypto.randomUUID(), 
+            type: "bot", 
+            content: `🤖 [SIMULAÇÃO DE AGENTE]\nObjetivo: ${objective}\n\nO sistema de IA está configurado, mas para funcionar de verdade, você precisará configurar uma chave de API nas configurações do workspace.\n\n${hasTools ? "Identifiquei que você já tem blocos configurados como Skills!" : "Dica: Você ainda não marcou nenhum bloco como 'Skill' para este agente usar."}`, 
+          });
+          
+          waitingFor = "input-text";
+          waitingForCfg = { placeholder: "Simule uma conversa com o agente..." };
+        } else {
+          // Se tiver chave, vamos processar a IA de verdade
+          // Por enquanto vamos simular a resposta mas indicando que a chave foi detectada
+          // Em uma implementação futura, aqui chamamos a API da OpenAI/Anthropic/Google
+          const selectedProvider = hasOpenAI ? "OpenAI" : hasAnthropic ? "Anthropic" : "Google Gemini";
+          
+          nextMessages.push({ 
+            id: crypto.randomUUID(), 
+            type: "bot", 
+            content: `✨ [AGENTE ATIVO - ${selectedProvider}]\nChave configurada com sucesso! Conectando com a inteligência...\n\n(O motor de execução real está sendo integrado. Por enquanto, seu agente já sabe que deve agir como: "${objective}")`, 
+          });
+          
+          waitingFor = "input-text";
+          waitingForCfg = { placeholder: "Converse com seu agente real..." };
+        }
       } else if (nodeType === "set-variable" && cfg.variableName) {
         variables[cfg.variableName] = evaluateSetVariableValue(cfg, variables);
       } else if (nodeType === "condition") {
