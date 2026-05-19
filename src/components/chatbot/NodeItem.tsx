@@ -296,7 +296,6 @@ export const NodeItem = ({ node, onClick }: NodeItemProps) => {
                 Pular para bloco ID: {node.config.targetContainerId.slice(-4)}
               </p>
             </div>
-            </div>
           ) : hasAIPreview ? (
             <div className="mt-2 p-2 bg-cyan-50 rounded border border-cyan-200 max-h-[150px] overflow-y-auto">
               <p className="text-xs font-semibold text-cyan-700">
