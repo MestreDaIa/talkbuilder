@@ -10,6 +10,8 @@ export default function Header() {
   const { flags } = useEmbed();
   const { user, profile, signOut, currentWorkspace } = useAuth();
   const slug = currentWorkspace?.slug || profile?.slug;
+  const userRole = currentWorkspace?.role || 'owner';
+  const showSettings = userRole === 'owner' || userRole === 'admin';
 
   async function handleLogout() {
     await signOut();
