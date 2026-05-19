@@ -28,7 +28,12 @@ export type NodeType =
   | "script"
   | "condition"
   | "wait"
-  | "await";
+  | "await"
+  // AI
+  | "ai-node"
+  // integrations
+  | "google-sheets"
+  | "human-handoff";
 
 export interface NodeConfig {
   [key: string]: any;

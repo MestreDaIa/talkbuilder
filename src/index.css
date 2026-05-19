@@ -235,6 +235,10 @@ code {
   --bot-inputs-fg: oklch(0.16 0 0);
   --bot-logic: oklch(0.62 0.22 295);
   --bot-logic-fg: oklch(0.99 0 0);
+  --bot-ai: oklch(0.7 0.12 200);
+  --bot-ai-fg: oklch(0.99 0 0);
+  --bot-integrations: oklch(0.6 0.15 30);
+  --bot-integrations-fg: oklch(0.99 0 0);
 
   /* Chat bubble accents */
   --bot-msg-bg: oklch(0.45 0.16 250);

@@ -23,6 +23,9 @@ import {
   Hourglass,
   ExternalLink,
   Redo2,
+  Cpu,
+  Table,
+  UserRound,
 } from "lucide-react";
 import { Node, NodeType } from "@/types/chatbot";
 import { renderTextSegments } from "@/lib/textParser";
@@ -65,6 +68,11 @@ const nodeIcons: Record<NodeType, React.ReactNode> = {
   "condition": <Filter className="h-4 w-4" />,
   "wait": <Hourglass className="h-4 w-4" />,
   "await": <Hourglass className="h-4 w-4" />,
+  // AI
+  "ai-node": <Cpu className="h-4 w-4" />,
+  // Integrations
+  "google-sheets": <Table className="h-4 w-4" />,
+  "human-handoff": <UserRound className="h-4 w-4" />,
 };
 
 const nodeColors: Record<NodeType, string> = {
@@ -98,6 +106,9 @@ const nodeColors: Record<NodeType, string> = {
   "condition": "bg-purple-100 border-purple-300 text-purple-700",
   "wait": "bg-purple-100 border-purple-300 text-purple-700",
   "await": "bg-purple-100 border-purple-300 text-purple-700",
+  "ai-node": "bg-cyan-100 border-cyan-300 text-cyan-700",
+  "google-sheets": "bg-orange-100 border-orange-300 text-orange-700",
+  "human-handoff": "bg-orange-100 border-orange-300 text-orange-700",
 };
 
 const nodeLabels: Record<NodeType, string> = {
@@ -131,6 +142,9 @@ const nodeLabels: Record<NodeType, string> = {
   "condition": "Condição",
   "wait": "Aguardar",
   "await": "Aguardar",
+  "ai-node": "Inteligência Artificial",
+  "google-sheets": "Google Sheets / Excel",
+  "human-handoff": "Transbordo Humano",
 };
 
 export const NodeItem = ({ node, onClick }: NodeItemProps) => {
@@ -168,6 +182,9 @@ export const NodeItem = ({ node, onClick }: NodeItemProps) => {
   const hasWaitPreview = effectiveType === "wait" && node.config.waitTime;
   const hasRedirectPreview = node.type === "redirect" && node.config.targetFlow;
   const hasGoToPreview = node.type === "go-to" && node.config.targetContainerId;
+  const hasAIPreview = node.type === "ai-node" && node.config.provider;
+  const hasSheetsPreview = node.type === "google-sheets" && node.config.spreadsheetId;
+  const hasHandoffPreview = node.type === "human-handoff";
 
   return (
     <div
@@ -278,6 +295,35 @@ export const NodeItem = ({ node, onClick }: NodeItemProps) => {
               <p className="text-xs font-semibold text-green-700">
                 Pular para bloco ID: {node.config.targetContainerId.slice(-4)}
               </p>
+            </div>
+          ) : hasAIPreview ? (
+            <div className="mt-2 p-2 bg-cyan-50 rounded border border-cyan-200 max-h-[150px] overflow-y-auto">
+              <p className="text-xs font-semibold text-cyan-700">
+                AI: {node.config.provider} ({node.config.model || "padrão"})
+              </p>
+              <p className="text-[10px] text-cyan-600 truncate mt-1">
+                {node.config.systemPrompt?.substring(0, 40)}...
+              </p>
+            </div>
+          ) : hasSheetsPreview ? (
+            <div className="mt-2 p-2 bg-orange-50 rounded border border-orange-200 max-h-[150px] overflow-y-auto">
+              <p className="text-xs font-semibold text-orange-700">
+                Sheets: {node.config.action === 'insert' ? 'Inserir' : node.config.action === 'update' ? 'Atualizar' : 'Obter'}
+              </p>
+              <p className="text-[10px] text-orange-600 truncate mt-1">
+                Tab: {node.config.tabName || "(não definida)"}
+              </p>
+            </div>
+          ) : hasHandoffPreview ? (
+            <div className="mt-2 p-2 bg-orange-50 rounded border border-orange-200 max-h-[150px] overflow-y-auto">
+              <p className="text-xs font-semibold text-orange-700">
+                Transferir para Humano
+              </p>
+              {node.config.department && (
+                <p className="text-[10px] text-orange-600 truncate mt-1">
+                  Depto: {node.config.department}
+                </p>
+              )}
             </div>
           ) : (
             messageValue && (

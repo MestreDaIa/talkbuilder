@@ -23,6 +23,9 @@ import {
   Hourglass,
   ExternalLink,
   Redo2,
+  Cpu,
+  Table,
+  UserRound,
 } from "lucide-react";
 import { NodeType } from "@/types/chatbot";
 import { Button } from "@/components/ui/button";
@@ -66,6 +69,11 @@ const nodeTypes: {
   { type: "wait", label: "Aguardar", icon: <Hourglass className="h-5 w-5" />, category: "logic" },
   { type: "http-request", label: "HTTP Request", icon: <Send className="h-5 w-5" />, category: "logic" },
   { type: "webhook", label: "Webhook", icon: <Webhook className="h-5 w-5" />, category: "logic" },
+  // AI
+  { type: "ai-node", label: "IA", icon: <Cpu className="h-5 w-5" />, category: "ai" },
+  // Integrations
+  { type: "google-sheets", label: "Sheets", icon: <Table className="h-5 w-5" />, category: "integrations" },
+  { type: "human-handoff", label: "Transbordo", icon: <UserRound className="h-5 w-5" />, category: "integrations" },
 ];
 
 const getCategoryStyle = (category: string): React.CSSProperties => {
@@ -73,6 +81,8 @@ const getCategoryStyle = (category: string): React.CSSProperties => {
   if (category === "bubbles") return { background: "var(--bot-bubbles)", color: "var(--bot-bubbles-fg)" };
   if (category === "inputs") return { background: "var(--bot-inputs)", color: "var(--bot-inputs-fg)" };
   if (category === "logic") return { background: "var(--bot-logic)", color: "var(--bot-logic-fg)" };
+  if (category === "ai") return { background: "var(--bot-ai)", color: "var(--bot-ai-fg)" };
+  if (category === "integrations") return { background: "var(--bot-integrations)", color: "var(--bot-integrations-fg)" };
   return {};
 };
 
