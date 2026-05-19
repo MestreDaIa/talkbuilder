@@ -14,8 +14,8 @@ import { sortByIndex } from "../lib/workspaceOrder";
 
 export default function WorkspaceMain() {
 	const navigate = useNavigate();
-	const { profile } = useAuth();
-	const slug = profile?.slug;
+	const { profile, currentWorkspace } = useAuth();
+	const slug = currentWorkspace?.slug ?? profile?.slug;
 
 	const { items, activeId } = useWorkspace();
 

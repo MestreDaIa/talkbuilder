@@ -49,9 +49,9 @@ function FolderIconComponent({
 	description,
 }: FolderIconProps) {
 	const router = useNavigate();
-	const { profile } = useAuth();
+	const { profile, currentWorkspace } = useAuth();
 	const { items, setItems } = useWorkspace();
-	const slug = profile?.slug;
+	const slug = currentWorkspace?.slug ?? profile?.slug;
 
 	const [confirmDelete, setConfirmDelete] = useState(false);
 	const [editOpen, setEditOpen] = useState(false);

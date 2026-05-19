@@ -15,8 +15,8 @@ export default function FolderPage() {
 	const router = useNavigate();
 	const params = useParams();
 	const folderId = params.id as string;
-	const { profile } = useAuth();
-	const slug = profile?.slug;
+	const { profile, currentWorkspace } = useAuth();
+	const slug = currentWorkspace?.slug ?? profile?.slug;
 
 	const { items } = useWorkspace();
 	const [currentBotId, setCurrentBotId] = useState<string | null>(null);
