@@ -54,14 +54,14 @@ export function InviteMemberDialog() {
       let workspaceId = currentWorkspace?.id;
       
       if (!workspaceId) {
-        // Tenta pegar o slug da URL ignorando o hash (#)
+        // Pega o slug da URL de forma ultra robusta
         const hash = window.location.hash || "";
-        // Remove o caractere # e divide por barras
-        const cleanHash = hash.startsWith('#') ? hash.substring(1) : hash;
-        const parts = cleanHash.split('/').filter(p => p && p !== 'workspace' && p !== 'configs');
-        const slugFromUrl = parts[0];
+        // Remove tudo até o primeiro caractere alfanumérico após o #
+        const slugMatch = hash.match(/#?\/([^/]+)/);
+        const slugFromUrl = slugMatch ? slugMatch[1] : "";
 
-        console.log("Slug from URL (cleaned):", slugFromUrl);
+        console.log("Hash original:", hash);
+        console.log("Slug extraído:", slugFromUrl);
 
         if (!slugFromUrl) {
           throw new Error("Não foi possível identificar o workspace na URL. Acesse pelo menu lateral.");
