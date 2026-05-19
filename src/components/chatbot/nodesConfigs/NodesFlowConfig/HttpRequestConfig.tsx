@@ -595,7 +595,7 @@ export const HttpRequestConfig = ({
               type="button"
               variant="outline"
               size="sm"
-              onClick={() => handleAddKeyValue(headers, setHeaders)}
+              onClick={() => handleAddKeyValue(headers, setHeaders, "headers")}
             >
               <Plus className="h-4 w-4 mr-1" />
               Adicionar
@@ -615,7 +615,8 @@ export const HttpRequestConfig = ({
                         "name",
                         e.target.value,
                         headers,
-                        setHeaders
+                        setHeaders,
+                        "headers"
                       )
                     }
                     placeholder="Nome"
@@ -629,7 +630,8 @@ export const HttpRequestConfig = ({
                         "value",
                         e.target.value,
                         headers,
-                        setHeaders
+                        setHeaders,
+                        "headers"
                       )
                     }
                     placeholder="Valor (suporta {{var}})"
@@ -640,7 +642,7 @@ export const HttpRequestConfig = ({
                     variant="ghost"
                     size="icon"
                     onClick={() =>
-                      handleRemoveKeyValue(index, headers, setHeaders)
+                      handleRemoveKeyValue(index, headers, setHeaders, "headers")
                     }
                   >
                     <Trash2 className="h-4 w-4 text-destructive" />
@@ -722,7 +724,8 @@ export const HttpRequestConfig = ({
                             "name",
                             e.target.value,
                             bodyParams,
-                            setBodyParams
+                            setBodyParams,
+                            "bodyParams"
                           )
                         }
                         placeholder="Nome"
@@ -736,7 +739,8 @@ export const HttpRequestConfig = ({
                             "value",
                             e.target.value,
                             bodyParams,
-                            setBodyParams
+                            setBodyParams,
+                            "bodyParams"
                           )
                         }
                         placeholder="Valor"
@@ -747,7 +751,7 @@ export const HttpRequestConfig = ({
                         variant="ghost"
                         size="icon"
                         onClick={() =>
-                          handleRemoveKeyValue(index, bodyParams, setBodyParams)
+                          handleRemoveKeyValue(index, bodyParams, setBodyParams, "bodyParams")
                         }
                       >
                         <Trash2 className="h-4 w-4 text-destructive" />
