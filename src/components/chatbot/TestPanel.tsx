@@ -503,10 +503,12 @@ export const TestPanel = ({
         // Fallback final: se o usuário colocou uma chave no nó mas não selecionou provider, usa pelo provider do nó
         const fallbackKey = nodeKey && !openaiKey && !anthropicKey && !googleKey ? nodeKey : "";
         
-        let selectedProvider: "openai" | "anthropic" | "google" = "openai";
+        let selectedProvider: "openai" | "anthropic" | "google" | "gemini" = "openai";
         if (openaiKey) selectedProvider = "openai";
         else if (anthropicKey) selectedProvider = "anthropic";
-        else if (googleKey || (isGoogle && fallbackKey)) selectedProvider = "google";
+        else if (googleKey || (isGoogle && fallbackKey)) {
+          selectedProvider = (nodeProvider === "gemini" || nodeProvider === "google") ? nodeProvider as any : "google";
+        }
         else if (fallbackKey) selectedProvider = nodeProvider as any;
 
         const activeKey = openaiKey || anthropicKey || googleKey || fallbackKey;
