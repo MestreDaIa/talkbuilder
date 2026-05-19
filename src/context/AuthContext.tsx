@@ -110,6 +110,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 	const [currentWorkspace, setCurrentWorkspace] = useState<any | null>(null);
 
 	async function loadWorkspaces(userId: string) {
+		console.log("[Auth] Carregando workspaces para:", userId);
 		const supabase = getSupabase();
 		if (!supabase) return;
 		let { data, error } = await supabase
@@ -136,6 +137,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 			.map((m: any) => m.workspaces ? ({ ...m.workspaces, role: m.role }) : ({ id: m.id, name: m.name, slug: m.slug, role: m.role }))
 			.filter((workspace: any) => Boolean(workspace.id));
 		setWorkspaces(mapped);
+		console.log("[Auth] Workspaces carregados:", mapped);
 		
 		// Auto-select based on URL or first available
 		const hash = window.location.hash || "";

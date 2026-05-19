@@ -58,6 +58,8 @@ export function InviteMemberDialog() {
       }
 
       console.log("Detectando workspace para convite:", pathSlug);
+      console.log("URL Atual:", window.location.href);
+      console.log("Hash Atual:", window.location.hash);
 
       // 2. Buscar o workspace e validar se o usuário é admin/owner nele diretamente no banco
       const { data: wsData, error: wsError } = await supabase
