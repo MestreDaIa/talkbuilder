@@ -315,7 +315,7 @@ export const TestPanel = ({
         const value = input.message ?? input.button_id;
         if (varName && value !== undefined) variables[varName] = value;
         const currentType = String(current.node.type || "").toLowerCase();
-        if (currentType === "ai-agent") {
+        if (currentType === "ai-agent" || currentType === "ai-node") {
           variables.__last_agent_user_message = value ?? "";
           currentNodeId = current.node.id;
         } else {
