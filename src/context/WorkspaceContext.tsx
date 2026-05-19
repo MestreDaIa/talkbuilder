@@ -112,7 +112,14 @@ export function WorkspaceProvider({
 
 		setItemsState(next);
 
-		if (!supabase || !user || !currentWorkspace) return;
+		if (!supabase || !user || !currentWorkspace) {
+			console.warn("[Workspace] setItems called but dependencies missing", { 
+				hasSupabase: !!supabase, 
+				hasUser: !!user, 
+				hasWorkspace: !!currentWorkspace 
+			});
+			return;
+		}
 
 		const prevById = new Map(prev.map((i) => [i.id, i]));
 		const nextById = new Map(next.map((i) => [i.id, i]));
@@ -120,12 +127,14 @@ export function WorkspaceProvider({
 		// INSERTs
 		const inserts = next.filter((i) => !prevById.has(i.id));
 		if (inserts.length) {
+			console.log("[Workspace] inserting items:", inserts);
 			supabase
 				.from("workspace_items")
 				.insert(
 					inserts.map((i) => ({
 						id: i.id,
 						workspace_id: currentWorkspace.id,
+						user_id: user.id,
 						type: i.type,
 						title: i.title,
 						description: i.description,
@@ -135,7 +144,11 @@ export function WorkspaceProvider({
 					})),
 				)
 				.then(({ error }) => {
-					if (error) console.error("[Workspace] insert error", error);
+					if (error) {
+						console.error("[Workspace] insert error", error);
+						// Revert locally on error to stay in sync with DB
+						setItemsState(prev);
+					}
 				});
 		}
 

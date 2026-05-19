@@ -37,7 +37,9 @@ export default function WorkspaceLayout({
 			</PlanProvider>
 		</WorkspaceProvider>
 	);
-		function WorkspaceLayoutContent({ children }: { children: React.ReactNode }) {
+}
+
+function WorkspaceLayoutContent({ children }: { children: React.ReactNode }) {
 			const { items, setItems } = useWorkspace();
 			const { flags, mode } = useEmbed();
 		
@@ -76,6 +78,8 @@ export default function WorkspaceLayout({
 		
 		
 			function createFolder() {
+				if (!folderName.trim()) return;
+				
 				setItems((prev) => [
 					...prev,
 					{
@@ -96,6 +100,8 @@ export default function WorkspaceLayout({
 			}
 		
 			function createBot() {
+				if (!botName.trim()) return;
+				
 				setItems((prev) => [
 					...prev,
 					{
