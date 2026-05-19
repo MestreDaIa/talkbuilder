@@ -24,6 +24,7 @@ import {
   ExternalLink,
   Redo2,
   Cpu,
+  Brain,
   Table,
   UserRound,
 } from "lucide-react";
@@ -71,6 +72,7 @@ const nodeTypes: {
   { type: "webhook", label: "Webhook", icon: <Webhook className="h-5 w-5" />, category: "logic" },
   // AI
   { type: "ai-node", label: "IA", icon: <Cpu className="h-5 w-5" />, category: "ai" },
+  { type: "ai-agent", label: "Agente IA", icon: <Brain className="h-5 w-5" />, category: "ai" },
   // Integrations
   { type: "google-sheets", label: "Sheets", icon: <Table className="h-5 w-5" />, category: "integrations" },
   { type: "human-handoff", label: "Transbordo", icon: <UserRound className="h-5 w-5" />, category: "integrations" },

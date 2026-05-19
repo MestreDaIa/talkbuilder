@@ -15,7 +15,7 @@ import { ScriptConfig } from "./NodesLogicConfig/ScriptConfig";
 import { ConditionConfig } from "./NodesLogicConfig/ConditionConfig";
 import { WaitConfig } from "./NodesLogicConfig/WaitConfig";
 import { StartConfig, WebhookConfig, HttpRequestConfig, RedirectConfig, GoToConfig } from "./NodesFlowConfig";
-import { AIConfig } from "./NodesAIConfig";
+import { AIConfig, AgentConfig } from "./NodesAIConfig";
 import { GoogleSheetsConfig, HumanHandoffConfig } from "./NodesIntegrationsConfig";
 
 export const nodeConfigComponents: Record<string, React.FC<any>> = {
@@ -50,6 +50,7 @@ export const nodeConfigComponents: Record<string, React.FC<any>> = {
   "wait": WaitConfig,
   // AI
   "ai-node": AIConfig,
+  "ai-agent": AgentConfig,
   // Integrations
   "google-sheets": GoogleSheetsConfig,
   "human-handoff": HumanHandoffConfig,

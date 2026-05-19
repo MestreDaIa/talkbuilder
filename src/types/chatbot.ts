@@ -31,6 +31,7 @@ export type NodeType =
   | "await"
   // AI
   | "ai-node"
+  | "ai-agent"
   // integrations
   | "google-sheets"
   | "human-handoff";

@@ -24,6 +24,7 @@ import {
   ExternalLink,
   Redo2,
   Cpu,
+  Brain,
   Table,
   UserRound,
 } from "lucide-react";
@@ -70,6 +71,7 @@ const nodeIcons: Record<NodeType, React.ReactNode> = {
   "await": <Hourglass className="h-4 w-4" />,
   // AI
   "ai-node": <Cpu className="h-4 w-4" />,
+  "ai-agent": <Brain className="h-4 w-4" />,
   // Integrations
   "google-sheets": <Table className="h-4 w-4" />,
   "human-handoff": <UserRound className="h-4 w-4" />,
@@ -107,6 +109,7 @@ const nodeColors: Record<NodeType, string> = {
   "wait": "bg-purple-100 border-purple-300 text-purple-700",
   "await": "bg-purple-100 border-purple-300 text-purple-700",
   "ai-node": "bg-cyan-100 border-cyan-300 text-cyan-700",
+  "ai-agent": "bg-indigo-100 border-indigo-300 text-indigo-700",
   "google-sheets": "bg-orange-100 border-orange-300 text-orange-700",
   "human-handoff": "bg-orange-100 border-orange-300 text-orange-700",
 };
@@ -143,6 +146,7 @@ const nodeLabels: Record<NodeType, string> = {
   "wait": "Aguardar",
   "await": "Aguardar",
   "ai-node": "Inteligência Artificial",
+  "ai-agent": "Agente IA (Autônomo)",
   "google-sheets": "Google Sheets / Excel",
   "human-handoff": "Transbordo Humano",
 };
@@ -183,6 +187,7 @@ export const NodeItem = ({ node, onClick }: NodeItemProps) => {
   const hasRedirectPreview = node.type === "redirect" && node.config.targetFlow;
   const hasGoToPreview = node.type === "go-to" && node.config.targetContainerId;
   const hasAIPreview = node.type === "ai-node" && node.config.provider;
+  const hasAgentPreview = node.type === "ai-agent" && node.config.provider;
   const hasSheetsPreview = node.type === "google-sheets" && node.config.spreadsheetId;
   const hasHandoffPreview = node.type === "human-handoff";
 
@@ -215,7 +220,14 @@ export const NodeItem = ({ node, onClick }: NodeItemProps) => {
           {nodeIcons[effectiveType]}
         </div>
         <div className="flex-1 min-w-0 flex flex-col gap-1">
-          <p className="text-xs font-semibold text-left w-full pr-4">{nodeLabels[effectiveType]}</p>
+          <div className="flex items-center justify-between gap-2">
+            <p className="text-xs font-semibold text-left w-full pr-4 truncate">{nodeLabels[effectiveType]}</p>
+            {node.config.isSkill && (
+              <div title="Ativado como Skill para IA">
+                <Brain className="h-3 w-3 text-primary shrink-0" />
+              </div>
+            )}
+          </div>
 
           {hasVideoPreview ? (
             <div className="mt-2 max-h-[150px] overflow-hidden">
@@ -303,6 +315,15 @@ export const NodeItem = ({ node, onClick }: NodeItemProps) => {
               </p>
               <p className="text-[10px] text-cyan-600 truncate mt-1">
                 {node.config.systemPrompt?.substring(0, 40)}...
+              </p>
+            </div>
+          ) : hasAgentPreview ? (
+            <div className="mt-2 p-2 bg-indigo-50 rounded border border-indigo-200 max-h-[150px] overflow-y-auto">
+              <p className="text-xs font-semibold text-indigo-700">
+                Agente: {node.config.provider}
+              </p>
+              <p className="text-[10px] text-indigo-600 truncate mt-1">
+                {node.config.objective?.substring(0, 40)}...
               </p>
             </div>
           ) : hasSheetsPreview ? (

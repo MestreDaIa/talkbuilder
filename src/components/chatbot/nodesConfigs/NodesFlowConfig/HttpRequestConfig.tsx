@@ -20,6 +20,7 @@ import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, Command
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { VariableModal } from "../../VariableModal";
 import { cn } from "@/lib/utils";
+import { SkillConfig } from "../SkillConfig";
 
 interface KeyValuePair {
   name: string;
@@ -929,6 +930,8 @@ export const HttpRequestConfig = ({
           variável configurada.
         </p>
       </div>
+
+      <SkillConfig config={config} setConfig={setConfig} />
     </div>
   );
 };

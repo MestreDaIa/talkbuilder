@@ -9,6 +9,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Info } from "lucide-react";
+import { SkillConfig } from "../SkillConfig";
 
 interface RedirectConfigProps {
   config: NodeConfig;
@@ -42,6 +43,7 @@ export const RedirectConfig = ({ config, setConfig }: RedirectConfigProps) => {
           Direciona o fluxo atual para outro bot.
         </p>
       </div>
+      <SkillConfig config={config} setConfig={setConfig} />
     </div>
   );
 };

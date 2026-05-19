@@ -2,6 +2,7 @@ import { NodeConfig } from "@/types/chatbot";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Input } from "@/components/ui/input";
+import { SkillConfig } from "../SkillConfig";
 
 interface HumanHandoffConfigProps {
   config: NodeConfig;
@@ -38,6 +39,7 @@ export const HumanHandoffConfig = ({ config, setConfig }: HumanHandoffConfigProp
           Este nó encerra a automação e sinaliza para sua plataforma de atendimento que este chat precisa de atenção humana.
         </p>
       </div>
+      <SkillConfig config={config} setConfig={setConfig} />
     </div>
   );
 };
