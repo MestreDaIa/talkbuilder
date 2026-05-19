@@ -47,53 +47,45 @@ export function InviteMemberDialog() {
       const supabase = getSupabase();
       if (!supabase) throw new Error("Supabase não configurado");
 
-      // LOG PARA DEBUG: Verificar a URL do Supabase para saber qual banco está sendo usado
-      const supabaseUrl = (supabase as any).supabaseUrl;
-      console.log("Supabase Client URL:", supabaseUrl);
-
       let workspaceId = currentWorkspace?.id;
       
+      // Se não temos o ID no contexto, tentamos pegar pela URL de forma agressiva
       if (!workspaceId) {
+        const fullUrl = window.location.href;
         const hash = window.location.hash;
-        const cleanHash = hash.startsWith('#') ? hash.substring(1) : hash;
-        const pathParts = cleanHash.split("/").filter(Boolean);
-        const slugFromUrl = pathParts[0];
+        
+        // No talkbuilder.lovable.app/#/teste03/workspace/configs
+        // Queremos 'teste03'
+        const urlParts = (hash || fullUrl).split('/').filter(p => p && p !== '#' && p !== 'http:' && p !== 'https:' && !p.includes('.'));
+        const slugFromUrl = urlParts[0];
 
-        if (!slugFromUrl || slugFromUrl === 'workspace' || slugFromUrl === 'invite') {
-          throw new Error("Slug do workspace não identificado na URL.");
-        }
+        console.log("DEBUG INVITE:", { fullUrl, hash, urlParts, slugFromUrl });
 
-        // TENTATIVA 1: Buscar diretamente pelo slug
-        const { data: workspaceData, error: workspaceError } = await supabase
-          .from("workspaces")
-          .select("id")
-          .eq("slug", slugFromUrl)
-          .maybeSingle();
+        if (slugFromUrl && slugFromUrl !== 'workspace') {
+          // Buscamos o ID sem usar 'maybeSingle' para evitar silenciar erros de permissão
+          const { data: ws, error: wsError } = await supabase
+            .from("workspaces")
+            .select("id")
+            .eq("slug", slugFromUrl);
 
-        if (workspaceData) {
-          workspaceId = workspaceData.id;
-        } else {
-          // TENTATIVA 2: Se não encontrou, pode ser que o usuário não tenha permissão de ler a tabela 'workspaces'
-          // Vamos tentar verificar se ele tem algum membro em 'workspace_members' para esse slug
-          console.log("Slug não encontrado em 'workspaces', tentando via 'workspace_members'...");
-          const { data: memberData, error: memberError } = await supabase
-            .from("workspace_members")
-            .select("workspace_id, workspaces(slug)")
-            .limit(10);
-          
-          console.log("Dados de membros encontrados:", memberData);
-          
-          const foundMember = memberData?.find((m: any) => m.workspaces?.slug === slugFromUrl);
-          if (foundMember) {
-            workspaceId = foundMember.workspace_id;
+          if (wsError) throw wsError;
+          if (ws && ws.length > 0) {
+            workspaceId = ws[0].id;
           } else {
-            // TENTATIVA 3: Último recurso - buscar qualquer workspace para ver se o banco está vazio ou inacessível
-            const { data: allW } = await supabase.from("workspaces").select("slug").limit(5);
-            const visibleSlugs = allW?.map(w => w.slug).join(", ") || "nenhum";
-            
-            throw new Error(`Workspace '${slugFromUrl}' não encontrado no banco ${supabaseUrl}. Slugs visíveis: ${visibleSlugs}. Verifique se você está no ambiente correto.`);
+            // Plano C: Ver se o usuário tem algum workspace disponível para ele
+            const { data: myWs } = await supabase.from("workspaces").select("id, slug");
+            const found = myWs?.find(w => w.slug === slugFromUrl);
+            if (found) {
+              workspaceId = found.id;
+            } else {
+              throw new Error(`Workspace '${slugFromUrl}' não encontrado. Verifique se o slug na URL está correto.`);
+            }
           }
         }
+      }
+
+      if (!workspaceId) {
+        throw new Error("Não foi possível determinar o Workspace atual. Recarregue a página.");
       }
 
       const { data, error } = await supabase
@@ -123,7 +115,7 @@ export function InviteMemberDialog() {
       console.error("Catch error handleInvite:", error);
       toast({
         title: "Erro ao convidar",
-        description: error.message + " (verifique se você está usando o Supabase do sistema)",
+        description: error.message,
         variant: "destructive",
       });
     } finally {
