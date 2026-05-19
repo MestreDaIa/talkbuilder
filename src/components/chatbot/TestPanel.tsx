@@ -562,15 +562,21 @@ export const TestPanel = ({
                 let modelsToTry = [];
                 const modelInput = cfg.model || "";
                 
+                // Fallback models if everything else fails
+                const defaultFallbacks = ["gemini-1.5-flash", "gemini-1.5-pro", "gemini-pro"];
+                
                 if (modelInput.includes("gemini-1.5-pro")) {
-                  modelsToTry = ["gemini-1.5-pro", "gemini-1.5-pro-001", "gemini-1.5-pro-002", "gemini-1.5-pro-latest"];
+                  modelsToTry = ["gemini-1.5-pro-002", "gemini-1.5-pro-001", "gemini-1.5-pro", "gemini-1.5-pro-latest"];
                 } else if (modelInput.includes("gemini-1.5-flash")) {
-                  modelsToTry = ["gemini-1.5-flash", "gemini-1.5-flash-001", "gemini-1.5-flash-002", "gemini-1.5-flash-latest"];
+                  modelsToTry = ["gemini-1.5-flash-002", "gemini-1.5-flash-001", "gemini-1.5-flash", "gemini-1.5-flash-latest"];
                 } else if (modelInput === "gemini-pro") {
-                  modelsToTry = ["gemini-pro", "gemini-1.0-pro"];
+                  modelsToTry = ["gemini-1.0-pro", "gemini-pro"];
                 } else {
-                  modelsToTry = [modelInput || "gemini-1.5-flash", "gemini-1.5-flash", "gemini-1.5-pro", "gemini-pro"];
+                  modelsToTry = [modelInput].filter(Boolean);
                 }
+                
+                // Ensure we always have fallbacks
+                modelsToTry = [...new Set([...modelsToTry, ...defaultFallbacks])];
 
                 let lastError = null;
                 let success = false;
@@ -578,33 +584,43 @@ export const TestPanel = ({
                 for (const model of modelsToTry) {
                   try {
                     console.log(`[TestPanel] Trying Gemini model: ${model}`);
-                    const res = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${encodeURIComponent(activeKey)}`, {
-                      method: "POST",
-                      headers: { "Content-Type": "application/json" },
-                      body: JSON.stringify({
-                        system_instruction: { parts: [{ text: systemPrompt }] },
-                        contents: [{ role: "user", parts: [{ text: userMessage }] }],
-                      }),
-                    });
+                    // Try both v1 and v1beta as some keys only work with one
+                    const versions = ["v1beta", "v1"];
+                    
+                    for (const version of versions) {
+                      const res = await fetch(`https://generativelanguage.googleapis.com/${version}/models/${model}:generateContent?key=${encodeURIComponent(activeKey)}`, {
+                        method: "POST",
+                        headers: { "Content-Type": "application/json" },
+                        body: JSON.stringify({
+                          contents: [{ role: "user", parts: [{ text: userMessage }] }],
+                          // system_instruction is only supported in some versions/models, if it fails we might need to prepend to prompt
+                          ...(systemPrompt ? { system_instruction: { parts: [{ text: systemPrompt }] } } : {})
+                        }),
+                      });
 
-                    if (res.ok) {
-                      const data = await res.json();
-                      const firstCandidate = data.candidates?.[0];
-                      if (firstCandidate?.content?.parts) {
-                        aiReply = firstCandidate.content.parts.map((p: any) => p.text).join("");
-                      } else if (firstCandidate?.finishReason) {
-                        aiReply = `⚠️ O Gemini não gerou uma resposta. Motivo: ${firstCandidate.finishReason}`;
+                      if (res.ok) {
+                        const data = await res.json();
+                        const firstCandidate = data.candidates?.[0];
+                        if (firstCandidate?.content?.parts) {
+                          aiReply = firstCandidate.content.parts.map((p: any) => p.text).join("");
+                          success = true;
+                          break;
+                        } else if (firstCandidate?.finishReason) {
+                          aiReply = `⚠️ O Gemini não gerou uma resposta. Motivo: ${firstCandidate.finishReason}`;
+                          success = true;
+                          break;
+                        }
                       } else {
-                        aiReply = "O Gemini retornou uma resposta vazia ou em formato inesperado.";
+                        lastError = await res.json().catch(() => ({}));
+                        console.warn(`[TestPanel] Gemini model ${model} (${version}) failed:`, lastError);
+                        
+                        // If it's an API key error, stop trying everything
+                        if (res.status === 400 && lastError.error?.message?.toLowerCase().includes("api key")) break;
+                        // If it's a model error but not a 404, we might want to try other models but maybe not other versions
                       }
-                      success = true;
-                      break;
-                    } else {
-                      lastError = await res.json().catch(() => ({}));
-                      console.warn(`[TestPanel] Gemini model ${model} failed:`, lastError);
-                      // Se for erro de chave, não adianta tentar outros modelos
-                      if (res.status === 400 && lastError.error?.message?.includes("API key")) break;
                     }
+                    if (success) break;
+                    if (lastError?.error?.message?.toLowerCase().includes("api key")) break;
                   } catch (err) {
                     console.error(`[TestPanel] Error calling Gemini model ${model}:`, err);
                     lastError = err;
@@ -612,7 +628,7 @@ export const TestPanel = ({
                 }
 
                 if (!success) {
-                  console.error("[TestPanel] All Gemini models failed", lastError);
+                  console.error("[TestPanel] All Gemini models/versions failed", lastError);
                   if (lastError?.error?.message?.includes("API key")) {
                     aiReply = "❌ Chave de API do Gemini inválida ou não autorizada.";
                   } else {
