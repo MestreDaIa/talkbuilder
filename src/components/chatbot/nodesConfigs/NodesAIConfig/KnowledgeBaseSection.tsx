@@ -32,8 +32,15 @@ const TEXT_EXT_REGEX = /\.(txt|md|markdown|csv|tsv|json|xml|yaml|yml|html|htm|lo
 const readFileAsText = (file: File): Promise<string> =>
   new Promise((resolve, reject) => {
     const reader = new FileReader();
-    reader.onload = () => resolve(String(reader.result || ""));
-    reader.onerror = () => reject(reader.error);
+    reader.onload = () => {
+      const result = String(reader.result || "");
+      console.log(`[KB] File "${file.name}" read success, length: ${result.length}`);
+      resolve(result);
+    };
+    reader.onerror = () => {
+      console.error(`[KB] File "${file.name}" read error:`, reader.error);
+      reject(reader.error);
+    };
     reader.readAsText(file);
   });
 
