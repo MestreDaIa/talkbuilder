@@ -54,12 +54,18 @@ export function InviteMemberDialog() {
       let workspaceId = currentWorkspace?.id;
       
       if (!workspaceId) {
-        // Pega o slug da URL de forma robusta
+        // Tenta pegar o slug da URL ignorando o hash (#)
         const hash = window.location.hash || "";
-        const parts = hash.split('/').filter(p => p && p !== '#' && p !== 'workspace' && p !== 'configs');
+        // Remove o caractere # e divide por barras
+        const cleanHash = hash.startsWith('#') ? hash.substring(1) : hash;
+        const parts = cleanHash.split('/').filter(p => p && p !== 'workspace' && p !== 'configs');
         const slugFromUrl = parts[0];
 
-        console.log("Slug from URL:", slugFromUrl);
+        console.log("Slug from URL (cleaned):", slugFromUrl);
+
+        if (!slugFromUrl) {
+          throw new Error("Não foi possível identificar o workspace na URL. Acesse pelo menu lateral.");
+        }
 
         // TENTATIVA 1: Buscar diretamente o workspace pelo slug
         const { data: ws, error: wsError } = await supabase
@@ -72,28 +78,28 @@ export function InviteMemberDialog() {
           workspaceId = ws.id;
           console.log("Found workspace by slug:", ws.id);
         } else {
-          // TENTATIVA 2: Buscar workspaces onde o usuário é membro
-          const { data: memberWorkspaces, error: memberError } = await supabase
+          // TENTATIVA 2: Buscar workspaces onde o usuário é membro (via RPC ou Tabela)
+          const { data: memberWorkspaces } = await supabase
             .from("workspace_members")
             .select("workspace_id, workspaces(id, slug)")
             .eq("user_id", user.id);
 
-          console.log("Member workspaces:", memberWorkspaces);
+          console.log("Member workspaces found:", memberWorkspaces);
 
           const found = memberWorkspaces?.find((m: any) => m.workspaces?.slug === slugFromUrl);
           if (found) {
             workspaceId = found.workspace_id;
-            console.log("Found via members:", workspaceId);
+            console.log("Found via members match:", workspaceId);
           } else if (memberWorkspaces && memberWorkspaces.length > 0) {
-            // Se não achou o slug mas tem workspaces, usa o primeiro (fallback emergencial)
+            // Se o slug não bate mas o cara só tem UM workspace, assume que é esse (facilitador)
             workspaceId = memberWorkspaces[0].workspace_id;
-            console.log("Using first available workspace member:", workspaceId);
+            console.log("Fallback to first member workspace:", workspaceId);
           }
         }
       }
 
       if (!workspaceId) {
-        throw new Error(`Não foi possível localizar o ID do Workspace. Slug detectado: ${window.location.hash}. Verifique se você criou o workspace no banco correto.`);
+        throw new Error(`Workspace "${window.location.hash}" não encontrado. Verifique se você está no banco de dados correto ou se o workspace existe.`);
       }
 
       const { data, error } = await supabase
