@@ -61,6 +61,10 @@ export const AIConfig = ({ config, setConfig }: AIConfigProps) => {
   const topP = config.topP ?? 1;
   const streaming = config.streaming ?? false;
   const saveVariable = config.saveVariable || "";
+  const memoryEnabled = config.memoryEnabled ?? false;
+  const visionEnabled = config.visionEnabled ?? false;
+  const toolCallingEnabled = config.toolCallingEnabled ?? false;
+  const knowledgeBaseId = config.knowledgeBaseId || "";
 
   const selectedProvider = AI_PROVIDERS.find(p => p.id === provider);
 
@@ -222,14 +226,69 @@ export const AIConfig = ({ config, setConfig }: AIConfigProps) => {
             onChange={(e) => setConfig({ ...config, maxTokens: parseInt(e.target.value) || 0 })}
           />
         </div>
-        <div className="flex items-center justify-between pt-8">
-          <Label htmlFor="streaming-mode">Streaming</Label>
+      <div className="grid grid-cols-2 gap-4">
+        <div className="flex items-center justify-between py-2 border rounded-md px-3 bg-muted/30">
+          <div className="space-y-0.5">
+            <Label htmlFor="memory-toggle" className="text-sm">Memory</Label>
+            <p className="text-[10px] text-muted-foreground">Histórico de conversa</p>
+          </div>
           <Switch 
-            id="streaming-mode"
-            checked={streaming}
-            onCheckedChange={(v) => setConfig({ ...config, streaming: v })}
+            id="memory-toggle"
+            checked={memoryEnabled}
+            onCheckedChange={(v) => setConfig({ ...config, memoryEnabled: v })}
           />
         </div>
+        <div className="flex items-center justify-between py-2 border rounded-md px-3 bg-muted/30">
+          <div className="space-y-0.5">
+            <Label htmlFor="vision-toggle" className="text-sm">Vision</Label>
+            <p className="text-[10px] text-muted-foreground">Análise de imagens</p>
+          </div>
+          <Switch 
+            id="vision-toggle"
+            checked={visionEnabled}
+            onCheckedChange={(v) => setConfig({ ...config, visionEnabled: v })}
+          />
+        </div>
+        <div className="flex items-center justify-between py-2 border rounded-md px-3 bg-muted/30">
+          <div className="space-y-0.5">
+            <Label htmlFor="tool-calling-toggle" className="text-sm">Tool Calling</Label>
+            <p className="text-[10px] text-muted-foreground">Chamada de funções</p>
+          </div>
+          <Switch 
+            id="tool-calling-toggle"
+            checked={toolCallingEnabled}
+            onCheckedChange={(v) => setConfig({ ...config, toolCallingEnabled: v })}
+          />
+        </div>
+      </div>
+
+      <div className="space-y-2">
+        <Label>Knowledge Base (Base de Conhecimento)</Label>
+        <Select
+          value={knowledgeBaseId}
+          onValueChange={(v) => setConfig({ ...config, knowledgeBaseId: v })}
+        >
+          <SelectTrigger>
+            <SelectValue placeholder="Selecione uma base de conhecimento" />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="none">Nenhuma</SelectItem>
+            <SelectItem value="kb_01">Documentação Geral</SelectItem>
+            <SelectItem value="kb_02">FAQ Produtos</SelectItem>
+            <SelectItem value="kb_03">Políticas da Empresa</SelectItem>
+          </SelectContent>
+        </Select>
+      </div>
+
+      <div className="flex items-center justify-between pt-2">
+        <Label htmlFor="streaming-mode">Streaming</Label>
+        <Switch 
+          id="streaming-mode"
+          checked={streaming}
+          onCheckedChange={(v) => setConfig({ ...config, streaming: v })}
+        />
+      </div>
+
       </div>
 
       <div className="space-y-2">
