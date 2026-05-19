@@ -109,12 +109,12 @@ export const NodesSidebar = ({ onAddNode }: NodesSidebarProps) => {
                       key={node.type}
                       onClick={() => onAddNode(node.type)}
                       style={getCategoryStyle(category)}
-                      className={`${collapsed ? "w-full justify-start gap-1.5 px-1.5" : "w-12 h-12 p-0"} rounded-lg shadow-sm hover:opacity-90 hover:scale-[1.02] transition-all duration-200 flex items-center cursor-pointer border-0`}
+                      className={`${collapsed ? "w-full justify-start gap-0 px-1.5" : "w-12 h-12 p-0"} rounded-lg shadow-sm hover:opacity-90 hover:scale-[1.02] transition-all duration-200 flex items-center cursor-pointer border-0 overflow-hidden`}
                     >
-                      <div className="w-8 h-8 flex items-center justify-center rounded-md shrink-0">
+                      <div className={`${collapsed ? "w-6 h-6" : "w-8 h-8"} flex items-center justify-center rounded-md shrink-0`}>
                         {node.icon}
                       </div>
-                      <span className={`text-sm font-medium ${collapsed ? "flex" : "hidden"}`}>
+                      <span className={`text-xs font-medium truncate ${collapsed ? "flex" : "hidden"}`}>
                         {node.label}
                       </span>
                     </Button>
