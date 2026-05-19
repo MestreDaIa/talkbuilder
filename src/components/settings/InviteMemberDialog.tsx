@@ -42,70 +42,24 @@ export function InviteMemberDialog() {
       return;
     }
 
+    if (!currentWorkspace?.id) {
+      toast({
+        title: "Erro de Workspace",
+        description: "Workspace não identificado. Tente atualizar a página.",
+        variant: "destructive",
+      });
+      return;
+    }
+
     setLoading(true);
     try {
       const supabase = getSupabase();
       if (!supabase) throw new Error("Supabase não configurado");
 
-      // LOG PARA DEBUG: Verificar a URL do Supabase e o usuário atual
-      console.log("Supabase Client URL:", (supabase as any).supabaseUrl);
-      console.log("Current User:", user?.id);
-
-      let workspaceId = currentWorkspace?.id;
-      
-      if (!workspaceId) {
-        // Pega o slug da URL de forma ultra robusta
-        const hash = window.location.hash || "";
-        // Remove tudo até o primeiro caractere alfanumérico após o #
-        const slugMatch = hash.match(/#?\/([^/]+)/);
-        const slugFromUrl = slugMatch ? slugMatch[1] : "";
-
-        console.log("Hash original:", hash);
-        console.log("Slug extraído:", slugFromUrl);
-
-        if (!slugFromUrl) {
-          throw new Error("Não foi possível identificar o workspace na URL. Acesse pelo menu lateral.");
-        }
-
-        // TENTATIVA 1: Buscar diretamente o workspace pelo slug
-        const { data: ws, error: wsError } = await supabase
-          .from("workspaces")
-          .select("id, slug")
-          .eq("slug", slugFromUrl)
-          .maybeSingle();
-
-        if (ws) {
-          workspaceId = ws.id;
-          console.log("Found workspace by slug:", ws.id);
-        } else {
-          // TENTATIVA 2: Buscar workspaces onde o usuário é membro (via RPC ou Tabela)
-          const { data: memberWorkspaces } = await supabase
-            .from("workspace_members")
-            .select("workspace_id, workspaces(id, slug)")
-            .eq("user_id", user.id);
-
-          console.log("Member workspaces found:", memberWorkspaces);
-
-          const found = memberWorkspaces?.find((m: any) => m.workspaces?.slug === slugFromUrl);
-          if (found) {
-            workspaceId = found.workspace_id;
-            console.log("Found via members match:", workspaceId);
-          } else if (memberWorkspaces && memberWorkspaces.length > 0) {
-            // Se o slug não bate mas o cara só tem UM workspace, assume que é esse (facilitador)
-            workspaceId = memberWorkspaces[0].workspace_id;
-            console.log("Fallback to first member workspace:", workspaceId);
-          }
-        }
-      }
-
-      if (!workspaceId) {
-        throw new Error(`Workspace "${window.location.hash}" não encontrado. Verifique se você está no banco de dados correto ou se o workspace existe.`);
-      }
-
       const { data, error } = await supabase
         .from("workspace_invitations")
         .insert({
-          workspace_id: workspaceId,
+          workspace_id: currentWorkspace.id,
           email: email.toLowerCase().trim(),
           role,
           invited_by: user.id,
