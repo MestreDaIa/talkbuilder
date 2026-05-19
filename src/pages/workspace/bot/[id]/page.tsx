@@ -290,27 +290,35 @@ export default function BotPage() {
     if (!flow) {
       // sem Supabase — só salva local
       saveLocal(botId, { containers, edges });
-      toast.success("Fluxo salvo localmente");
+      toast.success("Fluxo salvo localmente (aguardando conexão)");
       return;
     }
+    
     setIsSaving(true);
     try {
-      const updated = await saveDraft(flow.id, containers, edges);
+      // Criamos uma cópia profunda para garantir consistência no que é enviado
+      const containersToSave = JSON.parse(JSON.stringify(containers));
+      const edgesToSave = JSON.parse(JSON.stringify(edges));
+      
+      console.log("[BotPage] Iniciando salvamento no Supabase...", {
+        flowId: flow.id,
+        nodesCount: containersToSave.length,
+        edgesCount: edgesToSave.length
+      });
+
+      const updated = await saveDraft(flow.id, containersToSave, edgesToSave);
+      
       setFlow(updated);
       lastSavedAtRef.current = Date.now();
       
       // Limpa o histórico após salvar com sucesso para economizar memória
-      const currentState = { 
-        containers: JSON.parse(JSON.stringify(containers)), 
-        edges: JSON.parse(JSON.stringify(edges)) 
-      };
-      setHistory([currentState]);
+      setHistory([{ containers: containersToSave, edges: edgesToSave }]);
       setHistoryIndex(0);
       
-      toast.success("Fluxo salvo!");
+      toast.success("Fluxo salvo com sucesso!");
     } catch (err: any) {
-      console.error(err);
-      toast.error("Erro ao salvar: " + (err.message ?? "tente novamente"));
+      console.error("[BotPage] Erro ao salvar:", err);
+      toast.error("Erro ao salvar no servidor: " + (err.message ?? "tente novamente"));
     } finally {
       setIsSaving(false);
     }

@@ -97,17 +97,29 @@ export async function getFlowByWorkspaceItem(workspaceItemId: string): Promise<C
 /** Salva o rascunho (containers + edges). Não muda status de publicação. */
 export async function saveDraft(flowId: string, containers: Container[], edges: Edge[]): Promise<ChatbotFlowRow> {
   const c = client();
+  
+  // Garantimos que os dados estão limpos de referências circulares ou estados do React Flow
+  // antes de enviar para o banco de dados.
+  const cleanContainers = JSON.parse(JSON.stringify(containers));
+  const cleanEdges = JSON.parse(JSON.stringify(edges));
+
+  console.log("[flowsApi] Salvando rascunho para flow:", flowId, "Nodes:", cleanContainers.length);
+
   const { data, error } = await c
     .from("chatbot_flows")
     .update({
-      draft_containers: containers,
-      draft_edges: edges,
+      draft_containers: cleanContainers,
+      draft_edges: cleanEdges,
       draft_updated_at: new Date().toISOString(),
     })
     .eq("id", flowId)
     .select("*")
     .single();
-  if (error) throw error;
+    
+  if (error) {
+    console.error("[flowsApi] Erro ao salvar rascunho:", error);
+    throw error;
+  }
   return data as ChatbotFlowRow;
 }
 
