@@ -51,11 +51,21 @@ export function InviteMemberDialog() {
       const hash = window.location.hash || "";
       const cleanHash = hash.startsWith('#') ? hash.substring(1) : hash;
       const pathParts = cleanHash.split("/").filter(p => p && p !== "workspace" && p !== "configs");
+      
+      // Se estiver em #/teste03/workspace/configs, o pathParts será ["teste03"]
+      // Mas se o usuário estiver em uma URL diferente, precisamos garantir que pegamos o slug certo
       const pathSlug = pathParts[0];
 
-      if (!pathSlug) {
-        throw new Error("Não foi possível identificar o workspace pela URL.");
+      if (!pathSlug || pathSlug.includes('.')) { 
+        // Fallback: tentar pegar do contexto se a URL falhar ou for ambígua
+        if (currentWorkspace?.slug) {
+          console.log("Usando slug do contexto:", currentWorkspace.slug);
+        } else {
+          throw new Error("Não foi possível identificar o workspace. Certifique-se de que está na página de configurações do workspace.");
+        }
       }
+      
+      const finalSlug = currentWorkspace?.slug || pathSlug;
 
       console.log("Detectando workspace para convite:", pathSlug);
       console.log("URL Atual:", window.location.href);
@@ -66,17 +76,18 @@ export function InviteMemberDialog() {
         .from("workspaces")
         .select(`
           id,
+          slug,
           workspace_members (
             role,
             user_id
           )
         `)
-        .eq("slug", pathSlug)
-        .single();
+        .eq("slug", finalSlug)
+        .maybeSingle();
 
       if (wsError || !wsData) {
         console.error("Erro ao localizar workspace:", wsError);
-        throw new Error(`Workspace "${pathSlug}" não encontrado ou erro de conexão.`);
+        throw new Error(`Workspace "${finalSlug}" não encontrado. Se você acabou de criar o workspace, tente atualizar a página.`);
       }
 
       // Filtrar manualmente as permissões do usuário logado
