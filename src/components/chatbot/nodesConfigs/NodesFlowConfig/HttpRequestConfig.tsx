@@ -396,7 +396,8 @@ export const HttpRequestConfig = ({
                         "name",
                         e.target.value,
                         queryParams,
-                        setQueryParams
+                        setQueryParams,
+                        "queryParams"
                       )
                     }
                     placeholder="Nome"
@@ -708,7 +709,7 @@ export const HttpRequestConfig = ({
                       type="button"
                       variant="outline"
                       size="sm"
-                      onClick={() => handleAddKeyValue(bodyParams, setBodyParams)}
+                      onClick={() => handleAddKeyValue(bodyParams, setBodyParams, "bodyParams")}
                     >
                       <Plus className="h-4 w-4 mr-1" />
                       Adicionar
