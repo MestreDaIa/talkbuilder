@@ -9,6 +9,7 @@ import { useToast } from "../../../hooks/use-toast";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "../../../components/ui/tabs";
 import { Input } from "../../../components/ui/input";
 import { Label } from "../../../components/ui/label";
+import { browserHrefForRoute } from "../../../lib/workspaceRoutes";
 
 export default function InvitePage() {
   const { token } = useParams<{ token: string }>();
@@ -112,7 +113,7 @@ export default function InvitePage() {
       const supabase = getSupabase();
       if (!supabase) return;
 
-      const { error } = await supabase.auth.signUp({
+      const { data, error } = await supabase.auth.signUp({
         email: inviteData.email,
         password,
         options: {
@@ -120,18 +121,21 @@ export default function InvitePage() {
             display_name: displayName,
             invite_token: token
           },
-          emailRedirectTo: `${window.location.origin}/invite/${token}`
+          emailRedirectTo: browserHrefForRoute(`/invite/${token}`)
         }
       });
 
       if (error) throw error;
 
-      toast({ 
-        title: "Conta criada!", 
-        description: "Agora você pode aceitar o convite." 
-      });
-      
-      // onAuthStateChange vai lidar com o login se auto-confirm for true
+      if (data.session) {
+        toast({ title: "Conta criada!", description: "Aceitando o convite..." });
+        await handleAccept();
+      } else {
+        toast({ 
+          title: "Confira seu email", 
+          description: "Enviamos um link de confirmação para concluir o convite." 
+        });
+      }
     } catch (err: any) {
       toast({ title: "Erro no cadastro", description: err.message, variant: "destructive" });
     } finally {
