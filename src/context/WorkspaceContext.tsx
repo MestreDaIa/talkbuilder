@@ -80,7 +80,7 @@ export function WorkspaceProvider({
 		supabase
 			.from("workspace_items")
 			.select("id,user_id,type,title,description,emoji,parent_id,index_item")
-			.eq("workspace_id", currentWorkspace.id)
+			.eq("user_id", user.id)
 			.order("created_at", { ascending: true })
 			.then(({ data, error }) => {
 				if (cancelled) return;
@@ -134,7 +134,7 @@ export function WorkspaceProvider({
 				.insert(
 					inserts.map((i) => ({
 						id: i.id,
-						workspace_id: currentWorkspace.id,
+						// workspace_id: currentWorkspace.id, // Comentado pois a coluna não existe no banco
 						user_id: user.id,
 						type: i.type,
 						title: i.title,
