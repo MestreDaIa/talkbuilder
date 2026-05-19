@@ -202,14 +202,6 @@ export default function InvitePage() {
           invitation_token: token
         });
 
-        // Se falhar com PGRST202, tenta o nome alternativo que criamos
-        if (rpcResult.error && rpcResult.error.code === 'PGRST202') {
-          console.warn("[InvitePage] accept_invitation não encontrada, tentando process_invite_token...");
-          rpcResult = await supabase.rpc("process_invite_token", {
-            token_value: token
-          });
-        }
-
         const { data: rpcData, error: rpcError } = rpcResult;
 
         if (rpcError) throw rpcError;
@@ -271,18 +263,9 @@ export default function InvitePage() {
         await new Promise(resolve => setTimeout(resolve, 500));
 
         // Tenta processar o convite
-        let rpcResult = await supabase.rpc("accept_invitation", {
+        const { data: rpcData, error: rpcError } = await supabase.rpc("accept_invitation", {
           invitation_token: token
         });
-
-        // Fallback para o nome alternativo
-        if (rpcResult.error && rpcResult.error.code === 'PGRST202') {
-          rpcResult = await supabase.rpc("process_invite_token", {
-            token_value: token
-          });
-        }
-
-        const { data: rpcData, error: rpcError } = rpcResult;
 
         if (rpcError) throw rpcError;
 
