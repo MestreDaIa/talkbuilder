@@ -18,7 +18,6 @@ export type Profile = {
 	display_name: string | null;
 	avatar_url: string | null;
 	plan: PlanId;
-	is_guest: boolean;
 	embed_source: string | null;
 	embed_company_id: string | null;
 	embed_plan_tier: string | null;

@@ -179,9 +179,9 @@ export default function InvitePage() {
         // Forçar um pequeno delay para garantir que a sessão esteja estabilizada
         await new Promise(resolve => setTimeout(resolve, 500));
         
-        // Chamar o RPC diretamente
-        const { data: rpcData, error: rpcError } = await supabase.rpc("accept_invitation", {
-          invitation_token: token
+        // Chamar o novo RPC para processar o convite
+        const { data: rpcData, error: rpcError } = await supabase.rpc("process_invite_token", {
+          token_value: token
         });
 
         if (rpcError) throw rpcError;
@@ -242,9 +242,9 @@ export default function InvitePage() {
         // Pequeno delay para estabilidade
         await new Promise(resolve => setTimeout(resolve, 500));
 
-        // Chamar o RPC diretamente
-        const { data: rpcData, error: rpcError } = await supabase.rpc("accept_invitation", {
-          invitation_token: token
+        // Chamar o novo RPC
+        const { data: rpcData, error: rpcError } = await supabase.rpc("process_invite_token", {
+          token_value: token
         });
 
         if (rpcError) throw rpcError;
