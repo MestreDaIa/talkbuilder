@@ -37,8 +37,6 @@ const nodeTypes: {
 }[] = [
   // Flow
   { type: "start", label: "Start", icon: <Play className="h-5 w-5" />, category: "flow" },
-  { type: "webhook", label: "Webhook", icon: <Webhook className="h-5 w-5" />, category: "flow" },
-  { type: "http-request", label: "HTTP Request", icon: <Send className="h-5 w-5" />, category: "flow" },
   // Bubbles
   { type: "bubble-text", label: "Texto", icon: <MessageSquare className="h-5 w-5" />, category: "bubbles" },
   { type: "bubble-number", label: "Número", icon: <Hash className="h-5 w-5" />, category: "bubbles" },
@@ -62,6 +60,8 @@ const nodeTypes: {
   { type: "condition", label: "Condição", icon: <Filter className="h-5 w-5" />, category: "logic" },
   { type: "script", label: "Script", icon: <Code className="h-5 w-5" />, category: "logic" },
   { type: "wait", label: "Aguardar", icon: <Hourglass className="h-5 w-5" />, category: "logic" },
+  { type: "http-request", label: "HTTP Request", icon: <Send className="h-5 w-5" />, category: "logic" },
+  { type: "webhook", label: "Webhook", icon: <Webhook className="h-5 w-5" />, category: "logic" },
 ];
 
 const getCategoryStyle = (category: string): React.CSSProperties => {
@@ -109,7 +109,7 @@ export const NodesSidebar = ({ onAddNode }: NodesSidebarProps) => {
                       key={node.type}
                       onClick={() => onAddNode(node.type)}
                       style={getCategoryStyle(category)}
-                      className={`${collapsed ? "w-full justify-start gap-2 px-2" : "w-12 h-12 p-0"} rounded-lg shadow-sm hover:opacity-90 hover:scale-[1.02] transition-all duration-200 flex items-center cursor-pointer border-0`}
+                      className={`${collapsed ? "w-full justify-start gap-1.5 px-1.5" : "w-12 h-12 p-0"} rounded-lg shadow-sm hover:opacity-90 hover:scale-[1.02] transition-all duration-200 flex items-center cursor-pointer border-0`}
                     >
                       <div className="w-8 h-8 flex items-center justify-center rounded-md shrink-0">
                         {node.icon}
