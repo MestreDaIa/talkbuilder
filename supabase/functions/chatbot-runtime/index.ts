@@ -594,8 +594,52 @@ function runFlow(execution: any, containers: any[], edges: any[], input: any) {
                   break;
                 }
               }
+            } else if (provider === "anthropic") {
+              const res = await fetch("https://api.anthropic.com/v1/messages", {
+                method: "POST",
+                headers: {
+                  "x-api-key": activeKey,
+                  "anthropic-version": "2023-06-01",
+                  "Content-Type": "application/json",
+                },
+                body: JSON.stringify({
+                  model: cfg.model || "claude-3-haiku-20240307",
+                  max_tokens: 1024,
+                  system: `Objetivo: ${objective}\nInstruções: ${instructions}`,
+                  messages: [{ role: "user", content: userMessage }],
+                }),
+              });
+              
+              if (res.ok) {
+                const data = await res.json();
+                const aiReply = data.content?.[0]?.text;
+                if (aiReply) {
+                  messages.push({ id: crypto.randomUUID(), type: "bot", content: aiReply });
+                  variables.__last_agent_user_message = "";
+                  waiting_for = "input-text";
+                  break;
+                }
+              }
+            } else if (provider === "google") {
+              const res = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${cfg.model || "gemini-pro"}:generateContent?key=${activeKey}`, {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({
+                  contents: [{ parts: [{ text: `Objetivo: ${objective}\nInstruções: ${instructions}\n\nUsuário: ${userMessage}` }] }],
+                }),
+              });
+              
+              if (res.ok) {
+                const data = await res.json();
+                const aiReply = data.candidates?.[0]?.content?.parts?.[0]?.text;
+                if (aiReply) {
+                  messages.push({ id: crypto.randomUUID(), type: "bot", content: aiReply });
+                  variables.__last_agent_user_message = "";
+                  waiting_for = "input-text";
+                  break;
+                }
+              }
             }
-            // Fallback for other providers or if fetch failed
           } catch (e) {
             console.error("[ai-agent] AI Call failed", e);
           }
