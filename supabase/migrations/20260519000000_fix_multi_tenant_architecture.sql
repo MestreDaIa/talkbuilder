@@ -34,7 +34,7 @@ CREATE TABLE IF NOT EXISTS public.workspace_members (
     UNIQUE(workspace_id, user_id)
 );
 
-CREATE TABLE IF NOT EXISTS public.workspace_invitations (
+CREATE TABLE IF NOT EXISTS public.workspace_invites (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     workspace_id UUID REFERENCES public.workspaces(id) ON DELETE CASCADE,
     email TEXT NOT NULL,
@@ -117,7 +117,7 @@ END;
 ALTER TABLE public.workspaces ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.workspace_members ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.profiles ENABLE ROW LEVEL SECURITY;
-ALTER TABLE public.workspace_invitations ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.workspace_invites ENABLE ROW LEVEL SECURITY;
 
 -- Workspaces: access if member
 CREATE POLICY "Users can view workspaces they are members of" ON public.workspaces
@@ -145,11 +145,11 @@ CREATE POLICY "Users can update own profile" ON public.profiles
     FOR UPDATE USING (auth.uid() = id);
 
 -- Invitations: access if owner/admin of workspace
-CREATE POLICY "Admins can manage invitations" ON public.workspace_invitations
+CREATE POLICY "Admins can manage invitations" ON public.workspace_invites
     FOR ALL USING (
         EXISTS (
             SELECT 1 FROM public.workspace_members 
-            WHERE workspace_id = public.workspace_invitations.workspace_id 
+            WHERE workspace_id = public.workspace_invites.workspace_id 
             AND user_id = auth.uid() 
             AND role IN ('owner', 'admin')
         )
