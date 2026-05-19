@@ -49,45 +49,69 @@ export function InviteMemberDialog() {
 
       let workspaceId = currentWorkspace?.id;
       
-      // Se não temos o ID no contexto, tentamos pegar pela URL de forma agressiva
+      // Se não temos o ID no contexto, tentamos identificar pela URL
       if (!workspaceId) {
-        const fullUrl = window.location.href;
-        const hash = window.location.hash;
+        const hash = window.location.hash || "";
+        const path = window.location.pathname || "";
+        // Une hash e path para garantir que pegamos o slug em qualquer modo de roteamento
+        const combinedPath = (hash + path).replace('#', '');
+        const parts = combinedPath.split('/').filter(p => p && p !== 'workspace' && p !== 'configs' && p !== 'invite');
         
-        // No talkbuilder.lovable.app/#/teste03/workspace/configs
-        // Queremos 'teste03'
-        const urlParts = (hash || fullUrl).split('/').filter(p => p && p !== '#' && p !== 'http:' && p !== 'https:' && !p.includes('.'));
-        const slugFromUrl = urlParts[0];
+        const slugFromUrl = parts[0];
+        console.log("Detecting workspace slug from URL:", { slugFromUrl, parts, hash, path });
 
-        console.log("DEBUG INVITE:", { fullUrl, hash, urlParts, slugFromUrl });
-
-        if (slugFromUrl && slugFromUrl !== 'workspace') {
-          // Buscamos o ID sem usar 'maybeSingle' para evitar silenciar erros de permissão
+        if (slugFromUrl) {
+          // Busca o workspace pelo slug no banco de dados
           const { data: ws, error: wsError } = await supabase
             .from("workspaces")
             .select("id")
-            .eq("slug", slugFromUrl);
+            .eq("slug", slugFromUrl)
+            .maybeSingle();
 
-          if (wsError) throw wsError;
-          if (ws && ws.length > 0) {
-            workspaceId = ws[0].id;
-          } else {
-            // Plano C: Ver se o usuário tem algum workspace disponível para ele
-            const { data: myWs } = await supabase.from("workspaces").select("id, slug");
-            const found = myWs?.find(w => w.slug === slugFromUrl);
-            if (found) {
-              workspaceId = found.id;
-            } else {
-              throw new Error(`Workspace '${slugFromUrl}' não encontrado. Verifique se o slug na URL está correto.`);
-            }
+          if (wsError) {
+            console.error("Error fetching workspace by slug:", wsError);
+          } else if (ws) {
+            workspaceId = ws.id;
           }
         }
       }
 
+      // Se ainda não encontrou, tenta buscar qualquer workspace onde o usuário seja membro
       if (!workspaceId) {
-        throw new Error("Não foi possível determinar o Workspace atual. Recarregue a página.");
+        const { data: memberData } = await supabase
+          .from("workspace_members")
+          .select("workspace_id")
+          .eq("user_id", user.id)
+          .limit(1);
+        
+        if (memberData && memberData.length > 0) {
+          workspaceId = memberData[0].workspace_id;
+        }
       }
 
+      if (!workspaceId) {
+        throw new Error("Não foi possível identificar seu Workspace. Por favor, recarregue a página.");
+      }
+
+      // 1. Verificar se o convite já existe para evitar duplicados
+      const { data: existingInvite } = await supabase
+        .from("workspace_invitations")
+        .select("token")
+        .eq("workspace_id", workspaceId)
+        .eq("email", email.toLowerCase().trim())
+        .maybeSingle();
+
+      if (existingInvite) {
+        const link = `${window.location.origin}/#/invite/${existingInvite.token}`;
+        setInviteLink(link);
+        toast({
+          title: "Convite já existe",
+          description: "Um convite para este e-mail já foi gerado anteriormente.",
+        });
+        return;
+      }
+
+      // 2. Inserir novo convite
       const { data, error } = await supabase
         .from("workspace_invitations")
         .insert({
@@ -101,10 +125,10 @@ export function InviteMemberDialog() {
 
       if (error) {
         console.error("Erro ao inserir convite:", error);
-        throw error;
+        throw new Error(error.message);
       }
 
-      const link = `${window.location.origin}/invite/${data.token}`;
+      const link = `${window.location.origin}/#/invite/${data.token}`;
       setInviteLink(link);
       
       toast({
