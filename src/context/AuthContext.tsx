@@ -59,10 +59,13 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 			data: { subscription },
 		} = supabase.auth.onAuthStateChange((_event, newSession) => {
 			setSession(newSession);
-			setUser(newSession?.user ?? null);
-			if (newSession?.user) {
-				// We don't call loadProfile/loadWorkspaces here to avoid multiple calls on init
-				// The initial getSession will handle it.
+			const newUser = newSession?.user ?? null;
+			setUser(newUser);
+			
+			if (newUser) {
+				// Avoid refresh loop by checking if we already have the profile/workspaces for this user
+				// But for simplicity, we just trigger the load
+				loadAll(newUser.id);
 			} else {
 				setProfile(null);
 				setWorkspaces([]);
@@ -71,22 +74,25 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 			}
 		});
 
-		async function init() {
+		async function loadAll(userId: string) {
 			setLoading(true);
-			const { data: { session: s } } = await supabase!.auth.getSession();
+			await Promise.all([
+				loadProfile(userId),
+				loadWorkspaces(userId)
+			]);
+			setLoading(false);
+		}
+
+		supabase.auth.getSession().then(({ data: { session: s } }) => {
 			setSession(s);
 			setUser(s?.user ?? null);
 			if (s?.user) {
-				await Promise.all([
-					loadProfile(s.user.id),
-					loadWorkspaces(userIdShort(s.user.id)) // wait, userIdShort was a helper in profile page.
-				]);
-				// Wait, I need to call loadWorkspaces correctly.
+				loadAll(s.user.id);
+			} else {
+				setLoading(false);
 			}
-			setLoading(false);
-		}
-		
-		// Wait, I should stick to the existing structure but fix the race condition.
+		});
+
 		return () => subscription.unsubscribe();
 	}, []);
 
@@ -119,13 +125,10 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 	const [currentWorkspace, setCurrentWorkspace] = useState<any | null>(null);
 
 	async function loadWorkspaces(userId: string) {
-		setLoading(true);
 		console.log("[Auth] Carregando workspaces para:", userId);
 		const supabase = getSupabase();
-		if (!supabase) {
-			setLoading(false);
-			return;
-		}
+		if (!supabase) return;
+		
 		let { data, error } = await supabase
 			.rpc("get_my_workspaces");
 
@@ -143,7 +146,6 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 			console.error("[Auth] Erro ao carregar workspaces:", error);
 			setWorkspaces([]);
 			setCurrentWorkspace(null);
-			setLoading(false);
 			return;
 		}
 
@@ -161,7 +163,6 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 		
 		const found = mapped.find((w: any) => w.slug === pathSlug);
 		setCurrentWorkspace(found || mapped[0] || null);
-		setLoading(false);
 	}
 
 	function switchWorkspace(slug: string) {
@@ -169,14 +170,15 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 		if (found) setCurrentWorkspace(found);
 	}
 
-	useEffect(() => {
-		if (user) {
-			loadWorkspaces(user.id);
-		} else {
-			setWorkspaces([]);
-			setCurrentWorkspace(null);
-		}
-	}, [user]);
+	// Remove redundant useEffect that calls loadWorkspaces independently
+	// useEffect(() => {
+	// 	if (user) {
+	// 		loadWorkspaces(user.id);
+	// 	} else {
+	// 		setWorkspaces([]);
+	// 		setCurrentWorkspace(null);
+	// 	}
+	// }, [user]);
 
 	return (
 		<AuthContext.Provider
