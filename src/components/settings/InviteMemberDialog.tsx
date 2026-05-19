@@ -42,24 +42,49 @@ export function InviteMemberDialog() {
       return;
     }
 
-    if (!currentWorkspace?.id) {
-      toast({
-        title: "Erro de Workspace",
-        description: "Workspace não identificado. Tente atualizar a página.",
-        variant: "destructive",
-      });
-      return;
-    }
-
     setLoading(true);
     try {
       const supabase = getSupabase();
       if (!supabase) throw new Error("Supabase não configurado");
 
+      // 1. Identificar o slug da URL de forma robusta
+      const hash = window.location.hash || "";
+      const cleanHash = hash.startsWith('#') ? hash.substring(1) : hash;
+      const pathParts = cleanHash.split("/").filter(p => p && p !== "workspace" && p !== "configs");
+      const pathSlug = pathParts[0];
+
+      if (!pathSlug) {
+        throw new Error("Não foi possível identificar o workspace pela URL.");
+      }
+
+      console.log("Detectando workspace para convite:", pathSlug);
+
+      // 2. Buscar o workspace e validar se o usuário é admin/owner nele diretamente no banco
+      const { data: wsData, error: wsError } = await supabase
+        .from("workspaces")
+        .select(`
+          id,
+          workspace_members!inner(role)
+        `)
+        .eq("slug", pathSlug)
+        .eq("workspace_members.user_id", user.id)
+        .single();
+
+      if (wsError || !wsData) {
+        console.error("Erro ao validar workspace:", wsError);
+        throw new Error("Workspace não encontrado ou você não tem permissão para convidar membros.");
+      }
+
+      const userRole = (wsData.workspace_members as any)[0]?.role;
+      if (userRole !== 'owner' && userRole !== 'admin') {
+        throw new Error("Apenas proprietários ou administradores podem convidar novos membros.");
+      }
+
+      // 3. Gerar o convite no banco de dados
       const { data, error } = await supabase
         .from("workspace_invitations")
         .insert({
-          workspace_id: currentWorkspace.id,
+          workspace_id: wsData.id,
           email: email.toLowerCase().trim(),
           role,
           invited_by: user.id,
