@@ -13,7 +13,7 @@ interface VariableModalProps {
 
 export const VariableModal = ({ open, onClose, onSelect }: VariableModalProps) => {
   const [searchTerm, setSearchTerm] = useState('');
-  const { getAllVariableNames, addVariable } = useVariables();
+  const { getAllVariableNames, addVariable, variables } = useVariables();
 
   const allVariables = getAllVariableNames();
 
