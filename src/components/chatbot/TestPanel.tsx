@@ -314,7 +314,13 @@ export const TestPanel = ({
         const varName = current.node.config?.variableName || current.node.config?.saveVariable;
         const value = input.message ?? input.button_id;
         if (varName && value !== undefined) variables[varName] = value;
-        currentNodeId = nextFromNode(current.node.id, current.container.id, input.button_id);
+        const currentType = String(current.node.type || "").toLowerCase();
+        if (currentType === "ai-agent") {
+          variables.__last_agent_user_message = value ?? "";
+          currentNodeId = current.node.id;
+        } else {
+          currentNodeId = nextFromNode(current.node.id, current.container.id, input.button_id);
+        }
       }
     }
 
@@ -480,7 +486,9 @@ export const TestPanel = ({
         }
       } else if (nodeType === "ai-node" || nodeType === "ai-agent") {
         const objective = cfg.objective || cfg.systemPrompt || "agente de teste";
+        const instructions = firstText(cfg.instructions, cfg.prompt, cfg.message);
         const hasTools = allContainers.some(c => c.nodes.some(n => n.config?.isSkill));
+        const userMessage = String(variables.__last_agent_user_message || "").trim();
         
         // Verifica se existem chaves de API configuradas no settings
         const keys = settings?.aiKeys || {};
@@ -493,21 +501,24 @@ export const TestPanel = ({
           nextMessages.push({ 
             id: crypto.randomUUID(), 
             type: "bot", 
-            content: `🤖 [SIMULAÇÃO DE AGENTE]\nObjetivo: ${objective}\n\nO sistema de IA está configurado, mas para funcionar de verdade, você precisará configurar uma chave de API nas configurações do workspace.\n\n${hasTools ? "Identifiquei que você já tem blocos configurados como Skills!" : "Dica: Você ainda não marcou nenhum bloco como 'Skill' para este agente usar."}`, 
+            content: userMessage
+              ? `🤖 [SIMULAÇÃO DE AGENTE]\nRecebi: "${userMessage}"\n\nAinda não encontrei uma chave de API configurada para responder de verdade. Objetivo atual: ${objective}\n\n${hasTools ? "Também identifiquei Skills disponíveis no fluxo." : "Dica: marque blocos como Skill para o agente poder usá-los."}`
+              : `🤖 [SIMULAÇÃO DE AGENTE]\nObjetivo: ${objective}\n\nO sistema de IA está configurado, mas para funcionar de verdade, você precisará configurar uma chave de API nas configurações do bot.\n\n${hasTools ? "Identifiquei que você já tem blocos configurados como Skills!" : "Dica: Você ainda não marcou nenhum bloco como 'Skill' para este agente usar."}`, 
           });
           
           waitingFor = "input-text";
           waitingForCfg = { placeholder: "Simule uma conversa com o agente..." };
         } else {
-          // Se tiver chave, vamos processar a IA de verdade
-          // Por enquanto vamos simular a resposta mas indicando que a chave foi detectada
-          // Em uma implementação futura, aqui chamamos a API da OpenAI/Anthropic/Google
           const selectedProvider = hasOpenAI ? "OpenAI" : hasAnthropic ? "Anthropic" : "Google Gemini";
+          const skillsText = hasTools ? "\n\nPercebi que existem Skills disponíveis neste fluxo; quando o motor real estiver conectado, eu poderei decidir quando acioná-las." : "";
+          const reply = userMessage
+            ? `Oi! Recebi sua mensagem: "${userMessage}".\n\nEstou operando como agente com o objetivo: ${objective}.${instructions ? `\n\nInstruções que vou seguir: ${instructions}` : ""}${skillsText}`
+            : `✨ [AGENTE ATIVO - ${selectedProvider}]\nChave configurada com sucesso. Pode mandar uma mensagem para conversar comigo.\n\nObjetivo: ${objective}${skillsText}`;
           
           nextMessages.push({ 
             id: crypto.randomUUID(), 
             type: "bot", 
-            content: `✨ [AGENTE ATIVO - ${selectedProvider}]\nChave configurada com sucesso! Conectando com a inteligência...\n\n(O motor de execução real está sendo integrado. Por enquanto, seu agente já sabe que deve agir como: "${objective}")`, 
+            content: reply, 
           });
           
           waitingFor = "input-text";
