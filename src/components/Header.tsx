@@ -27,7 +27,7 @@ export default function Header() {
         WORKSPACE
       </span>
       <h1 className="flex-1 text-center text-base sm:text-lg font-semibold truncate">
-        {profile?.slug ? `@${profile.slug}` : "Talk-Flow-Creator"}
+        {slug ? `@${slug}` : "Talk-Flow-Creator"}
         {profile?.display_name ? ` - ${profile.display_name}` : ""}
       </h1>
       <div className="flex items-center shrink-0 gap-2">
