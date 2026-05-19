@@ -525,45 +525,79 @@ export const TestPanel = ({
           const skillsText = hasTools ? "\n\nPercebi que existem Skills disponíveis neste fluxo; quando o motor real estiver conectado, eu poderei decidir quando acioná-las." : "";
           
           if (userMessage) {
-            // Tentativa de chamada real de IA no Test Panel (apenas OpenAI para brevidade, expansível se necessário)
-            if (selectedProvider === "openai" && activeKey) {
-              try {
+            const systemPrompt = `Objetivo: ${objective}${instructions ? `\nInstruções: ${instructions}` : ""}`;
+            let aiReply: string | null = null;
+            try {
+              if (selectedProvider === "openai") {
                 const res = await fetch("https://api.openai.com/v1/chat/completions", {
                   method: "POST",
-                  headers: {
-                    "Authorization": `Bearer ${activeKey}`,
-                    "Content-Type": "application/json",
-                  },
+                  headers: { "Authorization": `Bearer ${activeKey}`, "Content-Type": "application/json" },
                   body: JSON.stringify({
-                    model: cfg.model || "gpt-3.5-turbo",
+                    model: cfg.model || "gpt-4o-mini",
                     messages: [
-                      { role: "system", content: `Objetivo: ${objective}\nInstruções: ${instructions}` },
+                      { role: "system", content: systemPrompt },
                       { role: "user", content: userMessage }
                     ],
                   }),
                 });
-                
                 if (res.ok) {
                   const data = await res.json();
-                  const aiReply = data.choices?.[0]?.message?.content;
-                  if (aiReply) {
-                    nextMessages.push({ id: crypto.randomUUID(), type: "bot", content: aiReply });
-                    waitingFor = "input-text";
-                    waitingForCfg = { placeholder: "Converse com seu agente real..." };
-                    break;
-                  }
+                  aiReply = data.choices?.[0]?.message?.content || null;
+                } else {
+                  console.error("[TestPanel] OpenAI error", res.status, await res.text());
                 }
-              } catch (e) {
-                console.error("[TestPanel] AI Call failed", e);
+              } else if (selectedProvider === "google") {
+                const model = cfg.model || "gemini-1.5-flash";
+                const res = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${encodeURIComponent(activeKey)}`, {
+                  method: "POST",
+                  headers: { "Content-Type": "application/json" },
+                  body: JSON.stringify({
+                    system_instruction: { parts: [{ text: systemPrompt }] },
+                    contents: [{ role: "user", parts: [{ text: userMessage }] }],
+                  }),
+                });
+                if (res.ok) {
+                  const data = await res.json();
+                  aiReply = data.candidates?.[0]?.content?.parts?.map((p: any) => p.text).join("") || null;
+                } else {
+                  console.error("[TestPanel] Gemini error", res.status, await res.text());
+                }
+              } else if (selectedProvider === "anthropic") {
+                const res = await fetch("https://api.anthropic.com/v1/messages", {
+                  method: "POST",
+                  headers: {
+                    "x-api-key": activeKey,
+                    "anthropic-version": "2023-06-01",
+                    "anthropic-dangerous-direct-browser-access": "true",
+                    "Content-Type": "application/json",
+                  },
+                  body: JSON.stringify({
+                    model: cfg.model || "claude-3-5-sonnet-latest",
+                    max_tokens: 1024,
+                    system: systemPrompt,
+                    messages: [{ role: "user", content: userMessage }],
+                  }),
+                });
+                if (res.ok) {
+                  const data = await res.json();
+                  aiReply = data.content?.[0]?.text || null;
+                } else {
+                  console.error("[TestPanel] Anthropic error", res.status, await res.text());
+                }
               }
+            } catch (e) {
+              console.error("[TestPanel] AI Call failed", e);
             }
 
-            // Fallback se a chamada falhar ou for outro provedor
-            nextMessages.push({ 
-              id: crypto.randomUUID(), 
-              type: "bot", 
-              content: `Oi! Recebi sua mensagem: "${userMessage}".\n\nEstou operando como agente com o objetivo: ${objective}.${instructions ? `\n\nInstruções que vou seguir: ${instructions}` : ""}${skillsText}`, 
-            });
+            if (aiReply) {
+              nextMessages.push({ id: crypto.randomUUID(), type: "bot", content: aiReply });
+            } else {
+              nextMessages.push({
+                id: crypto.randomUUID(),
+                type: "bot",
+                content: `⚠️ Não consegui obter resposta do provedor ${selectedProvider.toUpperCase()}. Verifique se a chave de API é válida e se o modelo "${cfg.model || "(padrão)"}" está disponível. Veja o console do navegador para detalhes.`,
+              });
+            }
           } else {
             nextMessages.push({ 
               id: crypto.randomUUID(), 
