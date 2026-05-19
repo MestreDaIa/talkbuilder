@@ -11,9 +11,9 @@ import { Input } from "../../../components/ui/input";
 import { Label } from "../../../components/ui/label";
 import { browserHrefForRoute } from "../../../lib/workspaceRoutes";
 
-// v1.0.6
+// v1.0.7
 export default function InvitePage() {
-  console.log("[InvitePage] Renderizado v1.0.6");
+  console.log("[InvitePage] Renderizado v1.0.7");
   const { token } = useParams<{ token: string }>();
   const { user, loading: authLoading, refreshProfile } = useAuth();
   const [loading, setLoading] = useState(true);
@@ -97,16 +97,20 @@ export default function InvitePage() {
 
       if (error) {
         console.error("Erro RPC accept_invitation:", error);
-        // Se o erro for PGRST202, a função não existe no cache do schema
+        
+        // Melhora na mensagem de erro para o usuário
+        let errorMsg = error.message || "Não foi possível processar o convite no servidor.";
+        
         if (error.code === 'PGRST202') {
-           toast({ 
-             title: "Erro de Configuração", 
-             description: "A função de aceitar convite ainda não foi sincronizada no banco de dados. Por favor, tente novamente em alguns instantes ou contate o suporte.", 
-             variant: "destructive" 
-           });
-           return;
+           errorMsg = "A função de aceitar convite (accept_invitation) não foi encontrada ou sincronizada no banco de dados. Por favor, solicite que o administrador do sistema aplique as migrações SQL.";
         }
-        throw error;
+        
+        toast({ 
+          title: "Erro no Servidor", 
+          description: errorMsg, 
+          variant: "destructive" 
+        });
+        return;
       }
       
       console.log("Resposta do RPC accept_invitation:", data);
