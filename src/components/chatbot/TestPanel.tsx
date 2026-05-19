@@ -532,7 +532,27 @@ export const TestPanel = ({
           const skillsText = hasTools ? "\n\nPercebi que existem Skills disponíveis neste fluxo; quando o motor real estiver conectado, eu poderei decidir quando acioná-las." : "";
           
           if (userMessage) {
-            const systemPrompt = `Objetivo: ${objective}${instructions ? `\nInstruções: ${instructions}` : ""}`;
+            const kbFiles: Array<{ name: string; content?: string; truncated?: boolean }> = Array.isArray(cfg.kbFiles) ? cfg.kbFiles : [];
+            const kbLinks: Array<{ url: string }> = Array.isArray(cfg.kbLinks) ? cfg.kbLinks : [];
+            const kbFilesEnabled = cfg.kbFilesEnabled && kbFiles.length > 0;
+            const kbLinksEnabled = cfg.kbLinksEnabled && kbLinks.length > 0;
+            let kbBlock = "";
+            if (kbFilesEnabled || kbLinksEnabled) {
+              const parts: string[] = [`\n\n=== BASE DE CONHECIMENTO${cfg.kbName ? ` (${cfg.kbName})` : ""} ===`];
+              parts.push("Use EXCLUSIVAMENTE as informações abaixo como sua fonte de verdade. Se a resposta não estiver aqui, diga que não encontrou na base.");
+              if (kbFilesEnabled) {
+                kbFiles.forEach((f, i) => {
+                  parts.push(`\n--- Arquivo ${i + 1}: ${f.name} ---\n${(f.content || "[arquivo sem conteúdo legível]").trim()}${f.truncated ? "\n[...conteúdo truncado...]" : ""}`);
+                });
+              }
+              if (kbLinksEnabled) {
+                parts.push(`\n--- Links de referência ---`);
+                kbLinks.forEach((l, i) => parts.push(`${i + 1}. ${l.url}`));
+              }
+              parts.push("\n=== FIM DA BASE DE CONHECIMENTO ===");
+              kbBlock = parts.join("\n");
+            }
+            const systemPrompt = `Objetivo: ${objective}${instructions ? `\nInstruções: ${instructions}` : ""}${kbBlock}`;
             let aiReply: string | null = null;
             try {
               if (selectedProvider === "openai") {

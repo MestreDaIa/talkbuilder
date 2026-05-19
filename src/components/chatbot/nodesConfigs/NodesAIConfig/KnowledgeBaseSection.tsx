@@ -23,8 +23,19 @@ export const ToggleRow = ({ id, title, description, checked, onChange }: ToggleR
   </div>
 );
 
-interface KBFile { id: string; name: string; }
+interface KBFile { id: string; name: string; content?: string; size?: number; truncated?: boolean; }
 interface KBLink { id: string; url: string; }
+
+const MAX_FILE_CHARS = 100_000; // ~100KB de texto por arquivo
+const TEXT_EXT_REGEX = /\.(txt|md|markdown|csv|tsv|json|xml|yaml|yml|html|htm|log|rtf)$/i;
+
+const readFileAsText = (file: File): Promise<string> =>
+  new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = () => resolve(String(reader.result || ""));
+    reader.onerror = () => reject(reader.error);
+    reader.readAsText(file);
+  });
 
 export const KnowledgeBaseSection = ({ config, setConfig }: { config: NodeConfig; setConfig: (c: NodeConfig) => void }) => {
   const kbName: string = config.kbName || "";
@@ -37,11 +48,33 @@ export const KnowledgeBaseSection = ({ config, setConfig }: { config: NodeConfig
     const input = document.createElement("input");
     input.type = "file";
     input.multiple = true;
-    input.onchange = () => {
-      const newFiles: KBFile[] = Array.from(input.files || []).map((f) => ({
-        id: crypto.randomUUID(),
-        name: f.name,
-      }));
+    input.accept = ".txt,.md,.markdown,.csv,.tsv,.json,.xml,.yaml,.yml,.html,.htm,.log,.rtf,text/*";
+    input.onchange = async () => {
+      const picked = Array.from(input.files || []);
+      const newFiles: KBFile[] = [];
+      for (const f of picked) {
+        const isText = TEXT_EXT_REGEX.test(f.name) || f.type.startsWith("text/") || f.type === "application/json";
+        let content = "";
+        let truncated = false;
+        if (isText) {
+          try {
+            const raw = await readFileAsText(f);
+            truncated = raw.length > MAX_FILE_CHARS;
+            content = truncated ? raw.slice(0, MAX_FILE_CHARS) : raw;
+          } catch (e) {
+            console.error("[KB] failed reading file", f.name, e);
+          }
+        } else {
+          content = `[Arquivo binário "${f.name}" não suportado para leitura. Use TXT, MD, CSV, JSON, etc.]`;
+        }
+        newFiles.push({
+          id: crypto.randomUUID(),
+          name: f.name,
+          size: f.size,
+          content,
+          truncated,
+        });
+      }
       setConfig({ ...config, kbFiles: [...files, ...newFiles] });
     };
     input.click();
