@@ -543,6 +543,7 @@ export const TestPanel = ({
               if (kbFilesEnabled) {
                 kbFiles.forEach((f, i) => {
                   const content = (f.content || "").trim();
+                  console.log(`[TestPanel] Injecting file ${i+1}: ${f.name}, content length: ${content.length}`);
                   parts.push(`\n--- Arquivo ${i + 1}: ${f.name} ---\n${content || "[arquivo sem conteúdo legível]"}${f.truncated ? "\n[...conteúdo truncado...]" : ""}`);
                 });
               }

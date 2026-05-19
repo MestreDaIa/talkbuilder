@@ -34,7 +34,7 @@ const readFileAsText = (file: File): Promise<string> =>
     const reader = new FileReader();
     reader.onload = () => {
       const result = String(reader.result || "");
-      console.log(`[KB] File "${file.name}" read success, length: ${result.length}`);
+      console.log(`[KB] File "${file.name}" read success, length: ${result.length}, first 50 chars: "${result.substring(0, 50)}"`);
       resolve(result);
     };
     reader.onerror = () => {
