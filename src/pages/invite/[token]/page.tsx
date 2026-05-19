@@ -164,11 +164,13 @@ export default function InvitePage() {
       };
 
       // Create the account
-      const { data, error } = await supabase.auth.signUp({
+      let { data, error } = await supabase.auth.signUp({
         email: inviteData.email,
         password,
         options: signupOptions
       });
+
+      let currentSession = data.session;
 
       if (error) {
         if (error.message.includes("User already registered")) {
@@ -179,15 +181,15 @@ export default function InvitePage() {
             password: password
           });
           if (loginRes.error) throw loginRes.error;
-          data.session = loginRes.data.session;
+          currentSession = loginRes.data.session;
         } else {
           throw error;
         }
       }
 
-      // Handle successful signup
-      if (data.session) {
-        toast({ title: "Conta criada!", description: "Aceitando o convite..." });
+      // Handle successful signup or login
+      if (currentSession) {
+        toast({ title: "Autenticado!", description: "Aceitando o convite..." });
         
         // Forçar um pequeno delay para garantir que a sessão esteja estabilizada
         await new Promise(resolve => setTimeout(resolve, 500));
@@ -224,7 +226,7 @@ export default function InvitePage() {
         setTimeout(() => {
           navigate(`/${rpcData.workspace_slug}/workspace`);
         }, 1500);
-      } else if (data.user) {
+      } else if (data && data.user) {
         // User created but needs email verification
         toast({ 
           title: "Confira seu email", 
