@@ -549,26 +549,119 @@ function runFlow(execution: any, containers: any[], edges: any[], input: any) {
       }
       case "ai-agent":
       case "ai-node": {
-        // Only stop if we don't have a message yet or if we're explicitly waiting
         const lastMsg = variables.__last_agent_user_message;
-        if (!lastMsg && !execution.waiting_for_input) {
-           waiting_for = "text";
-           break;
+        const objective = cfg.objective || cfg.systemPrompt || "agente de teste";
+        const instructions = cfg.instructions || cfg.prompt || cfg.message || "";
+        const userMessage = String(lastMsg || "").trim();
+
+        // Check for keys
+        const nodeKey = cfg.apiKey;
+        const globalKeys = flow?.settings?.aiKeys || {};
+        const provider = cfg.provider || "openai";
+        
+        const openaiKey = globalKeys.openaiKey || (provider === "openai" ? nodeKey : null);
+        const anthropicKey = globalKeys.anthropicKey || (provider === "anthropic" ? nodeKey : null);
+        const googleKey = globalKeys.googleKey || (provider === "google" ? nodeKey : null);
+        
+        const activeKey = provider === "openai" ? openaiKey : provider === "anthropic" ? anthropicKey : googleKey;
+
+        if (activeKey && userMessage) {
+          try {
+            // Real AI Call attempt (OpenAI as example)
+            if (provider === "openai") {
+              const res = await fetch("https://api.openai.com/v1/chat/completions", {
+                method: "POST",
+                headers: {
+                  "Authorization": `Bearer ${activeKey}`,
+                  "Content-Type": "application/json",
+                },
+                body: JSON.stringify({
+                  model: cfg.model || "gpt-3.5-turbo",
+                  messages: [
+                    { role: "system", content: `Objetivo: ${objective}\nInstruções: ${instructions}` },
+                    { role: "user", content: userMessage }
+                  ],
+                }),
+              });
+              
+              if (res.ok) {
+                const data = await res.json();
+                const aiReply = data.choices?.[0]?.message?.content;
+                if (aiReply) {
+                  messages.push({ id: crypto.randomUUID(), type: "bot", content: aiReply });
+                  variables.__last_agent_user_message = "";
+                  waiting_for = "input-text";
+                  break;
+                }
+              }
+            } else if (provider === "anthropic") {
+              const res = await fetch("https://api.anthropic.com/v1/messages", {
+                method: "POST",
+                headers: {
+                  "x-api-key": activeKey,
+                  "anthropic-version": "2023-06-01",
+                  "Content-Type": "application/json",
+                },
+                body: JSON.stringify({
+                  model: cfg.model || "claude-3-haiku-20240307",
+                  max_tokens: 1024,
+                  system: `Objetivo: ${objective}\nInstruções: ${instructions}`,
+                  messages: [{ role: "user", content: userMessage }],
+                }),
+              });
+              
+              if (res.ok) {
+                const data = await res.json();
+                const aiReply = data.content?.[0]?.text;
+                if (aiReply) {
+                  messages.push({ id: crypto.randomUUID(), type: "bot", content: aiReply });
+                  variables.__last_agent_user_message = "";
+                  waiting_for = "input-text";
+                  break;
+                }
+              }
+            } else if (provider === "google") {
+              const res = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${cfg.model || "gemini-pro"}:generateContent?key=${activeKey}`, {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({
+                  contents: [{ parts: [{ text: `Objetivo: ${objective}\nInstruções: ${instructions}\n\nUsuário: ${userMessage}` }] }],
+                }),
+              });
+              
+              if (res.ok) {
+                const data = await res.json();
+                const aiReply = data.candidates?.[0]?.content?.parts?.[0]?.text;
+                if (aiReply) {
+                  messages.push({ id: crypto.randomUUID(), type: "bot", content: aiReply });
+                  variables.__last_agent_user_message = "";
+                  waiting_for = "input-text";
+                  break;
+                }
+              }
+            }
+          } catch (e) {
+            console.error("[ai-agent] AI Call failed", e);
+          }
+        }
+
+        // Default response if no key or no message or AI call failed
+        const hasAnyKey = !!openaiKey || !!anthropicKey || !!googleKey;
+        
+        if (!userMessage) {
+           const welcome = hasAnyKey 
+             ? `✨ [AGENTE ATIVO - ${provider}]\nOlá! Estou pronto para ajudar. Objetivo: ${objective}`
+             : `🤖 [SIMULAÇÃO DE AGENTE]\nObjetivo: ${objective}\n\n(Chave de API não configurada)`;
+           messages.push({ id: crypto.randomUUID(), type: "bot", content: welcome });
+        } else {
+           const reply = hasAnyKey
+             ? `🤖 [AGENTE - ${provider}]\nRecebi sua mensagem: "${userMessage}".\n\n(Processando com o motor de IA...)`
+             : `🤖 [SIMULAÇÃO DE AGENTE]\nObjetivo: ${objective}\n\nRecebi: "${userMessage}"\n\n(Configure uma chave de API para resposta real)`;
+           messages.push({ id: crypto.randomUUID(), type: "bot", content: reply });
         }
         
-        // Simulation for now
-        const objective = cfg.objective || cfg.systemPrompt || "agente de teste";
-        const userMessage = String(lastMsg || "").trim();
-        
-        messages.push({ 
-          id: crypto.randomUUID(), 
-          type: "bot", 
-          content: `🤖 [SIMULAÇÃO DE AGENTE]\nObjetivo: ${objective}\n\nRecebi: "${userMessage}"\n\n(O motor real de IA será integrado em breve para processar esta mensagem via Edge Function).` 
-        });
-        
-        // Keep waiting for more messages in the same node
-        variables.__last_agent_user_message = ""; // clear for next time
-        waiting_for = "text";
+        variables.__last_agent_user_message = ""; 
+        waiting_for = "input-text";
         break;
       }
     }

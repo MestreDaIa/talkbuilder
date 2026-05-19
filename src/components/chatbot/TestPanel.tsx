@@ -315,7 +315,7 @@ export const TestPanel = ({
         const value = input.message ?? input.button_id;
         if (varName && value !== undefined) variables[varName] = value;
         const currentType = String(current.node.type || "").toLowerCase();
-        if (currentType === "ai-agent") {
+        if (currentType === "ai-agent" || currentType === "ai-node") {
           variables.__last_agent_user_message = value ?? "";
           currentNodeId = current.node.id;
         } else {
@@ -490,12 +490,16 @@ export const TestPanel = ({
         const hasTools = allContainers.some(c => c.nodes.some(n => n.config?.isSkill));
         const userMessage = String(variables.__last_agent_user_message || "").trim();
         
-        // Verifica se existem chaves de API configuradas no settings
-        const keys = settings?.aiKeys || {};
-        const hasOpenAI = !!keys.openaiKey;
-        const hasAnthropic = !!keys.anthropicKey;
-        const hasGoogle = !!keys.googleKey;
+        // Verifica se existem chaves de API configuradas no settings ou no próprio nó
+        const nodeKey = cfg.apiKey;
+        const globalKeys = settings?.aiKeys || {};
+        const hasOpenAI = !!globalKeys.openaiKey || (cfg.provider === "openai" && !!nodeKey);
+        const hasAnthropic = !!globalKeys.anthropicKey || (cfg.provider === "anthropic" && !!nodeKey);
+        const hasGoogle = !!globalKeys.googleKey || (cfg.provider === "google" && !!nodeKey);
         const hasAnyKey = hasOpenAI || hasAnthropic || hasGoogle;
+
+        // Limpa a mensagem processada para evitar repetições
+        variables.__last_agent_user_message = "";
 
         if (!hasAnyKey) {
           nextMessages.push({ 
@@ -509,17 +513,57 @@ export const TestPanel = ({
           waitingFor = "input-text";
           waitingForCfg = { placeholder: "Simule uma conversa com o agente..." };
         } else {
-          const selectedProvider = hasOpenAI ? "OpenAI" : hasAnthropic ? "Anthropic" : "Google Gemini";
+          const selectedProvider = hasOpenAI ? "openai" : hasAnthropic ? "anthropic" : "google";
+          const activeKey = hasOpenAI ? (globalKeys.openaiKey || nodeKey) : hasAnthropic ? (globalKeys.anthropicKey || nodeKey) : (globalKeys.googleKey || nodeKey);
           const skillsText = hasTools ? "\n\nPercebi que existem Skills disponíveis neste fluxo; quando o motor real estiver conectado, eu poderei decidir quando acioná-las." : "";
-          const reply = userMessage
-            ? `Oi! Recebi sua mensagem: "${userMessage}".\n\nEstou operando como agente com o objetivo: ${objective}.${instructions ? `\n\nInstruções que vou seguir: ${instructions}` : ""}${skillsText}`
-            : `✨ [AGENTE ATIVO - ${selectedProvider}]\nChave configurada com sucesso. Pode mandar uma mensagem para conversar comigo.\n\nObjetivo: ${objective}${skillsText}`;
           
-          nextMessages.push({ 
-            id: crypto.randomUUID(), 
-            type: "bot", 
-            content: reply, 
-          });
+          if (userMessage) {
+            // Tentativa de chamada real de IA no Test Panel (apenas OpenAI para brevidade, expansível se necessário)
+            if (selectedProvider === "openai" && activeKey) {
+              try {
+                const res = await fetch("https://api.openai.com/v1/chat/completions", {
+                  method: "POST",
+                  headers: {
+                    "Authorization": `Bearer ${activeKey}`,
+                    "Content-Type": "application/json",
+                  },
+                  body: JSON.stringify({
+                    model: cfg.model || "gpt-3.5-turbo",
+                    messages: [
+                      { role: "system", content: `Objetivo: ${objective}\nInstruções: ${instructions}` },
+                      { role: "user", content: userMessage }
+                    ],
+                  }),
+                });
+                
+                if (res.ok) {
+                  const data = await res.json();
+                  const aiReply = data.choices?.[0]?.message?.content;
+                  if (aiReply) {
+                    nextMessages.push({ id: crypto.randomUUID(), type: "bot", content: aiReply });
+                    waitingFor = "input-text";
+                    waitingForCfg = { placeholder: "Converse com seu agente real..." };
+                    break;
+                  }
+                }
+              } catch (e) {
+                console.error("[TestPanel] AI Call failed", e);
+              }
+            }
+
+            // Fallback se a chamada falhar ou for outro provedor
+            nextMessages.push({ 
+              id: crypto.randomUUID(), 
+              type: "bot", 
+              content: `Oi! Recebi sua mensagem: "${userMessage}".\n\nEstou operando como agente com o objetivo: ${objective}.${instructions ? `\n\nInstruções que vou seguir: ${instructions}` : ""}${skillsText}`, 
+            });
+          } else {
+            nextMessages.push({ 
+              id: crypto.randomUUID(), 
+              type: "bot", 
+              content: `✨ [AGENTE ATIVO - ${selectedProvider.toUpperCase()}]\nChave configurada com sucesso. Pode mandar uma mensagem para conversar comigo.\n\nObjetivo: ${objective}${skillsText}`, 
+            });
+          }
           
           waitingFor = "input-text";
           waitingForCfg = { placeholder: "Converse com seu agente real..." };
