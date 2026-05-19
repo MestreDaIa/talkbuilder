@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { Link, useLocation, useNavigate } from "react-router-dom";
+import { Link, Navigate, useLocation, useNavigate } from "react-router-dom";
 import { z } from "zod";
 import { getSupabase } from "../../lib/supabaseClient";
 import { Button } from "../../components/ui/button";
@@ -34,6 +34,11 @@ export default function LoginPage() {
 	const query = new URLSearchParams(location.search);
 	const redirectTo =
 		query.get("redirect") || (location.state as { from?: string } | null)?.from || "/";
+	const isInviteAuth = redirectTo.startsWith("/invite/");
+
+	if (isInviteAuth) {
+		return <Navigate to={redirectTo} replace />;
+	}
 
 	async function handleSubmit(e: React.FormEvent) {
 		e.preventDefault();
