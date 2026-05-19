@@ -424,7 +424,7 @@ export default function BotPage() {
   }
 
   return (
-    <VariablesProvider>
+    <VariablesProvider initialVariables={botVariables}>
       <div className="bot-editor fixed inset-0 flex flex-col bg-background z-50 text-foreground">
         {/* Header */}
         <header className="flex items-center gap-2 px-3 py-2 bg-card border-b border-border text-foreground shadow-sm">
