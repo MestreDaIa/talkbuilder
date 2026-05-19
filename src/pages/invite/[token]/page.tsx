@@ -70,15 +70,23 @@ export default function InvitePage() {
     setLoading(true);
     try {
       const supabase = getSupabase();
-      if (!supabase) return;
+      if (!supabase || !user) {
+        console.warn("Supabase ou usuário não disponível para aceitar convite");
+        setLoading(false);
+        return;
+      }
 
+      console.log("Aceitando convite com token:", token);
       const { data, error } = await supabase.rpc("accept_invitation", {
         invitation_token: token
       });
 
-      if (error) throw error;
+      if (error) {
+        console.error("Erro RPC accept_invitation:", error);
+        throw error;
+      }
       
-      if (data.error) {
+      if (data && data.error) {
         toast({ title: "Erro", description: data.error, variant: "destructive" });
         return;
       }
@@ -86,17 +94,25 @@ export default function InvitePage() {
       setAccepted(true);
       toast({ 
         title: "Sucesso!", 
-        description: `Agora você é membro de ${data.workspace_name}` 
+        description: `Agora você é membro de ${data?.workspace_name || 'equipe'}` 
       });
 
+      // Forçar atualização do perfil e workspaces no context
+      await refreshProfile();
+
       setTimeout(() => {
-        navigate(`/${data.workspace_slug}/workspace`);
+        if (data?.workspace_slug) {
+          navigate(`/${data.workspace_slug}/workspace`);
+        } else {
+          navigate('/');
+        }
       }, 1500);
 
     } catch (err: any) {
+      console.error("Catch handleAccept:", err);
       toast({ 
         title: "Erro ao aceitar", 
-        description: err.message, 
+        description: err.message || "Erro desconhecido", 
         variant: "destructive" 
       });
     } finally {
@@ -113,28 +129,39 @@ export default function InvitePage() {
       const supabase = getSupabase();
       if (!supabase) return;
 
+      // Prepare signup options
+      const signupOptions: any = {
+        data: {
+          display_name: displayName,
+          invite_token: token
+        },
+        emailRedirectTo: browserHrefForRoute(`/invite/${token}`)
+      };
+
+      // Create the account
       const { data, error } = await supabase.auth.signUp({
         email: inviteData.email,
         password,
-        options: {
-          data: {
-            display_name: displayName,
-            invite_token: token
-          },
-          emailRedirectTo: browserHrefForRoute(`/invite/${token}`)
-        }
+        options: signupOptions
       });
 
       if (error) throw error;
 
+      // Handle successful signup
       if (data.session) {
         toast({ title: "Conta criada!", description: "Aceitando o convite..." });
+        // The onAuthStateChange in AuthContext will trigger, but we call handleAccept directly
+        // to ensure the workspace redirect happens immediately
         await handleAccept();
-      } else {
+      } else if (data.user) {
+        // User created but needs email verification
         toast({ 
           title: "Confira seu email", 
-          description: "Enviamos um link de confirmação para concluir o convite." 
+          description: "Enviamos um link de confirmação. Após confirmar, volte a esta página.",
+          duration: 10000
         });
+      } else {
+        throw new Error("Não foi possível criar a conta. Tente novamente.");
       }
     } catch (err: any) {
       toast({ title: "Erro no cadastro", description: err.message, variant: "destructive" });
@@ -145,19 +172,26 @@ export default function InvitePage() {
 
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (!inviteData) return;
+
     setSubmitting(true);
     try {
       const supabase = getSupabase();
       if (!supabase) return;
 
-      const { error } = await supabase.auth.signInWithPassword({
+      const { data, error } = await supabase.auth.signInWithPassword({
         email: inviteData.email,
         password: loginPassword
       });
 
       if (error) throw error;
       
-      toast({ title: "Bem-vindo de volta!" });
+      if (data.session) {
+        toast({ title: "Bem-vindo de volta!", description: "Acessando workspace..." });
+        // After login, handleAccept will be called via the useEffect if user is present,
+        // or we can call it here for faster response.
+        await handleAccept();
+      }
     } catch (err: any) {
       toast({ title: "Erro no login", description: err.message, variant: "destructive" });
     } finally {
