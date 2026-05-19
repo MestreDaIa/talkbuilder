@@ -930,6 +930,8 @@ export const HttpRequestConfig = ({
           variável configurada.
         </p>
       </div>
+
+      <SkillConfig config={config} setConfig={setConfig} />
     </div>
   );
 };
