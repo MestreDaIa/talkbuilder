@@ -122,16 +122,6 @@ export function InviteMemberDialog() {
       setLoading(false);
     }
   };
-      console.error("Catch error handleInvite:", error);
-      toast({
-        title: "Erro ao convidar",
-        description: error.message + " (verifique se você está usando o Supabase do sistema)",
-        variant: "destructive",
-      });
-    } finally {
-      setLoading(false);
-    }
-  };
 
   const copyToClipboard = () => {
     if (inviteLink) {
