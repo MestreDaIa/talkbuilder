@@ -80,6 +80,7 @@ export default function BotPage() {
   const [flow, setFlow] = useState<ChatbotFlowRow | null>(null);
   const [containers, setContainers] = useState<Container[]>([]);
   const [edges, setEdges] = useState<Edge[]>([]);
+  const [botVariables, setBotVariables] = useState<Record<string, any>>({});
   const [hydrated, setHydrated] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
   const [isEditingName, setIsEditingName] = useState(false);
