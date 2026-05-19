@@ -493,17 +493,24 @@ export const TestPanel = ({
         // Verifica se existem chaves de API configuradas no settings ou no próprio nó
         const nodeKey = (cfg.apiKey || "").trim();
         const nodeProvider = (cfg.provider || "openai").toLowerCase();
+        const isGoogle = nodeProvider === "google" || nodeProvider === "gemini";
+        
         const globalKeys = settings?.aiKeys || {};
         const openaiKey = (globalKeys.openaiKey || "").trim() || (nodeProvider === "openai" ? nodeKey : "");
         const anthropicKey = (globalKeys.anthropicKey || "").trim() || (nodeProvider === "anthropic" ? nodeKey : "");
-        const googleKey = (globalKeys.googleKey || "").trim() || (nodeProvider === "google" ? nodeKey : "");
-        // Fallback final: se o usuário colocou uma chave no nó mas não selecionou provider, usa pelo provider do nó (default openai)
+        const googleKey = (globalKeys.googleKey || "").trim() || (isGoogle ? nodeKey : "");
+        
+        // Fallback final: se o usuário colocou uma chave no nó mas não selecionou provider, usa pelo provider do nó
         const fallbackKey = nodeKey && !openaiKey && !anthropicKey && !googleKey ? nodeKey : "";
-        const selectedProvider: "openai" | "anthropic" | "google" =
-          openaiKey ? "openai" :
-          anthropicKey ? "anthropic" :
-          googleKey ? "google" :
-          fallbackKey ? (nodeProvider as any) : "openai";
+        
+        let selectedProvider: "openai" | "anthropic" | "google" | "gemini" = "openai";
+        if (openaiKey) selectedProvider = "openai";
+        else if (anthropicKey) selectedProvider = "anthropic";
+        else if (googleKey || (isGoogle && fallbackKey)) {
+          selectedProvider = (nodeProvider === "gemini" || nodeProvider === "google") ? nodeProvider as any : "google";
+        }
+        else if (fallbackKey) selectedProvider = nodeProvider as any;
+
         const activeKey = openaiKey || anthropicKey || googleKey || fallbackKey;
         const hasAnyKey = !!activeKey;
 
@@ -551,7 +558,7 @@ export const TestPanel = ({
                     console.error("[TestPanel] OpenAI error", res.status, errorData);
                   }
                 }
-              } else if (selectedProvider === "google") {
+              } else if (selectedProvider === "google" || (selectedProvider as string) === "gemini") {
                 const model = cfg.model || "gemini-1.5-flash";
                 const res = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${encodeURIComponent(activeKey)}`, {
                   method: "POST",
@@ -563,10 +570,20 @@ export const TestPanel = ({
                 });
                 if (res.ok) {
                   const data = await res.json();
-                  aiReply = data.candidates?.[0]?.content?.parts?.map((p: any) => p.text).join("") || null;
+                  const firstCandidate = data.candidates?.[0];
+                  if (firstCandidate?.content?.parts) {
+                    aiReply = firstCandidate.content.parts.map((p: any) => p.text).join("");
+                  } else if (firstCandidate?.finishReason) {
+                    aiReply = `⚠️ O Gemini não gerou uma resposta. Motivo: ${firstCandidate.finishReason}`;
+                  } else {
+                    aiReply = "O Gemini retornou uma resposta vazia ou em formato inesperado.";
+                  }
                 } else {
                   const errorData = await res.json().catch(() => ({}));
                   console.error("[TestPanel] Gemini error", res.status, errorData);
+                  if (res.status === 400 && errorData.error?.message?.includes("API key")) {
+                    aiReply = "❌ Chave de API do Gemini inválida ou não autorizada.";
+                  }
                 }
               } else if (selectedProvider === "anthropic") {
                 const res = await fetch("https://api.anthropic.com/v1/messages", {
@@ -592,8 +609,9 @@ export const TestPanel = ({
                   console.error("[TestPanel] Anthropic error", res.status, errorData);
                 }
               }
-            } catch (e) {
+            } catch (e: any) {
               console.error("[TestPanel] AI Call failed", e);
+              aiReply = `❌ Erro de conexão ou CORS: ${e.message || "Não foi possível conectar ao provedor"}. Verifique se seu navegador está bloqueando a requisição direta para a API.`;
             }
 
             if (aiReply) {
