@@ -51,10 +51,10 @@ export default function AddOptionToolbar({ onAddFolder, onAddBot }: Props) {
 	const [importing, setImporting] = useState(false)
 	const fileInputRef = useRef<HTMLInputElement>(null)
 	const navigate = useNavigate()
-	const { profile, user } = useAuth()
+	const { profile, user, currentWorkspace } = useAuth()
 	const { setItems, items } = useWorkspace()
 	const { pathname } = useLocation()
-	const slug = profile?.slug
+	const slug = currentWorkspace?.slug || profile?.slug
 
 	const limitLabel = Number.isFinite(limits.bots) ? limits.bots : "ilimitados"
 
