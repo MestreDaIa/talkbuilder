@@ -111,6 +111,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 	const [currentWorkspace, setCurrentWorkspace] = useState<any | null>(null);
 
 	async function loadWorkspaces(userId: string) {
+		setLoading(true);
 		console.log("[Auth] Carregando workspaces para:", userId);
 		const supabase = getSupabase();
 		if (!supabase) return;
