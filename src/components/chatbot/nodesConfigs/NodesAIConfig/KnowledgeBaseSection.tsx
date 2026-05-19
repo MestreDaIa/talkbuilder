@@ -60,28 +60,37 @@ export const KnowledgeBaseSection = ({ config, setConfig }: { config: NodeConfig
       const picked = Array.from(input.files || []);
       const newFiles: KBFile[] = [];
       for (const f of picked) {
-        const isText = TEXT_EXT_REGEX.test(f.name) || f.type.startsWith("text/") || f.type === "application/json";
+        const isText = TEXT_EXT_REGEX.test(f.name) || f.type.startsWith("text/") || f.type === "application/json" || f.type === "";
         let content = "";
         let truncated = false;
-        if (isText) {
+        
+        console.log(`[KB] Processing file: ${f.name}, type: ${f.type}, size: ${f.size}`);
+
+        if (isText || f.size < 1024 * 500) { // Se for texto OU arquivo pequeno (tentar ler como texto mesmo sem tipo)
           try {
             const raw = await readFileAsText(f);
+            if (raw.trim().length === 0 && f.size > 0) {
+              console.warn(`[KB] File ${f.name} read as empty string but has size ${f.size} bytes. Checking for encoding issues?`);
+            }
             truncated = raw.length > MAX_FILE_CHARS;
             content = truncated ? raw.slice(0, MAX_FILE_CHARS) : raw;
           } catch (e) {
             console.error("[KB] failed reading file", f.name, e);
+            content = `[Erro ao ler arquivo: ${f.name}]`;
           }
         } else {
-          content = `[Arquivo binário "${f.name}" não suportado para leitura. Use TXT, MD, CSV, JSON, etc.]`;
+          content = `[Arquivo binário "${f.name}" não suportado para leitura direta no navegador. Use TXT, MD, CSV, JSON, etc.]`;
         }
+        
         newFiles.push({
           id: crypto.randomUUID(),
           name: f.name,
           size: f.size,
-          content,
+          content: content || "[arquivo sem conteúdo legível]",
           truncated,
         });
       }
+      console.log("[KB] Updating config with new files:", newFiles);
       setConfig({ ...config, kbFiles: [...files, ...newFiles] });
     };
     input.click();
