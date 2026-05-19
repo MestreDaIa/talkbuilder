@@ -77,21 +77,20 @@ function WorkspaceLayoutContent({ children }: { children: React.ReactNode }) {
 			const [botEmoji, setBotEmoji] = useState<string>(defaultBotEmoji);
 		
 		
-			function createFolder() {
+			async function createFolder() {
 				if (!folderName.trim()) return;
 				
-				setItems((prev) => [
-					...prev,
-					{
-						id: crypto.randomUUID(),
-						type: "folder",
-						indexItem: nextIndexFor(prev, currentFolderId),
-						title: folderName,
-						description: folderDescription,
-						emoji: folderEmoji,
-						parentId: currentFolderId,
-					},
-				]);
+				const newFolder = {
+					id: crypto.randomUUID(),
+					type: "folder" as const,
+					indexItem: nextIndexFor(items, currentFolderId),
+					title: folderName,
+					description: folderDescription,
+					emoji: folderEmoji,
+					parentId: currentFolderId,
+				};
+
+				setItems((prev) => [...prev, newFolder]);
 		
 				setFolderName("");
 				setFolderDescription("");
@@ -99,21 +98,20 @@ function WorkspaceLayoutContent({ children }: { children: React.ReactNode }) {
 				setFolderEmoji(defaultFolderEmoji);
 			}
 		
-			function createBot() {
+			async function createBot() {
 				if (!botName.trim()) return;
 				
-				setItems((prev) => [
-					...prev,
-					{
-						id: crypto.randomUUID(),
-						type: "bot",
-						indexItem: nextIndexFor(prev, currentFolderId),
-						emoji: botEmoji,
-						title: botName,
-						description: botDescription,
-						parentId: currentFolderId,
-					},
-				]);
+				const newBot = {
+					id: crypto.randomUUID(),
+					type: "bot" as const,
+					indexItem: nextIndexFor(items, currentFolderId),
+					emoji: botEmoji,
+					title: botName,
+					description: botDescription,
+					parentId: currentFolderId,
+				};
+
+				setItems((prev) => [...prev, newBot]);
 		
 				setBotName("");
 				setBotDescription("");

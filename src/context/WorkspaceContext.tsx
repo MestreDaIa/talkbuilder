@@ -146,8 +146,11 @@ export function WorkspaceProvider({
 				.then(({ error }) => {
 					if (error) {
 						console.error("[Workspace] insert error", error);
-						// Revert locally on error to stay in sync with DB
-						setItemsState(prev);
+						// If error is not a duplicate key error, we revert
+						// (Duplicate key errors happen during fast updates)
+						if (error.code !== '23505') {
+							setItemsState(prev);
+						}
 					}
 				});
 		}
