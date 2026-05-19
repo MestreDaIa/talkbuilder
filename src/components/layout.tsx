@@ -284,5 +284,5 @@ function WorkspaceLayoutContent({ children }: { children: React.ReactNode }) {
 				</div>
 			);
 		}
-}
+
 
