@@ -70,43 +70,34 @@ export function InviteMemberDialog() {
           throw new Error("Slug do workspace não identificado na URL.");
         }
 
-        // Se o slug for 'teste03', vamos tentar buscar exatamente por ele
-        // mas também tentamos listar os workspaces para ver se o slug está lá
-        const { data: workspaces, error: listError } = await supabase
+        // Tentar buscar por slug exato (usando eq() de forma sensível a maiúsculas/minúsculas)
+        const { data: workspaceData, error: workspaceError } = await supabase
           .from("workspaces")
-          .select("id, slug");
+          .select("id, slug")
+          .or(`slug.eq.${slugFromUrl},slug.ilike.${slugFromUrl}`)
+          .maybeSingle();
+          
+        if (workspaceError) {
+          console.error("Erro ao buscar workspace:", workspaceError);
+          throw workspaceError;
+        }
 
-        if (listError) {
-          console.error("Erro ao listar workspaces:", listError);
-          // Se falhar ao listar, tentamos a busca direta
-          const { data: workspaceData, error: workspaceError } = await supabase
-            .from("workspaces")
-            .select("id")
-            .eq("slug", slugFromUrl)
-            .maybeSingle();
-
-          if (workspaceError || !workspaceData) {
-            throw new Error(`Workspace '${slugFromUrl}' não encontrado ou erro de acesso.`);
-          }
+        if (workspaceData) {
           workspaceId = workspaceData.id;
         } else {
-          console.log("Workspaces encontrados no banco:", workspaces);
-          const found = workspaces?.find(w => w.slug === slugFromUrl);
+          // Fallback: listar tudo o que este usuário PODE ver na tabela workspaces
+          // Se a RLS permitir select, isso deve funcionar.
+          const { data: allWorkspaces } = await supabase
+            .from("workspaces")
+            .select("id, slug");
+            
+          console.log("Workspaces visíveis para este usuário:", allWorkspaces);
+          
+          const found = allWorkspaces?.find(w => w.slug.toLowerCase() === slugFromUrl.toLowerCase());
           if (found) {
             workspaceId = found.id;
           } else {
-            // Caso especial: o slug na URL pode estar encodado ou ter variações
-            const fallbackFound = workspaces?.find(w => 
-              w.slug.toLowerCase() === slugFromUrl.toLowerCase() || 
-              slugFromUrl.includes(w.slug) || 
-              w.slug.includes(slugFromUrl)
-            );
-            
-            if (fallbackFound) {
-              workspaceId = fallbackFound.id;
-            } else {
-              throw new Error(`Workspace '${slugFromUrl}' não encontrado. Disponíveis: ${workspaces?.map(w => w.slug).join(", ")}`);
-            }
+            throw new Error(`Workspace '${slugFromUrl}' não encontrado ou você não tem acesso a ele neste banco. (Visíveis: ${allWorkspaces?.map(w => w.slug).join(", ") || 'nenhum'})`);
           }
         }
       }
