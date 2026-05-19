@@ -45,7 +45,6 @@ CREATE TABLE IF NOT EXISTS public.workspace_invites (
     created_at TIMESTAMPTZ DEFAULT now(),
     expires_at TIMESTAMPTZ DEFAULT (now() + interval '7 days')
 );
-)
 
 ALTER TABLE public.profiles ADD COLUMN IF NOT EXISTS slug TEXT;
 ALTER TABLE public.profiles ADD COLUMN IF NOT EXISTS display_name TEXT;
