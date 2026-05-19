@@ -82,7 +82,7 @@ export function InviteMemberDialog() {
 
       // 3. Gerar o convite no banco de dados
       const { data, error } = await supabase
-        .from("workspace_invitations")
+        .from("workspace_invites")
         .insert({
           workspace_id: wsData.id,
           email: email.toLowerCase().trim(),
