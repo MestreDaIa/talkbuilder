@@ -47,71 +47,55 @@ export function InviteMemberDialog() {
       const supabase = getSupabase();
       if (!supabase) throw new Error("Supabase não configurado");
 
+      // LOG PARA DEBUG: Verificar a URL do Supabase e o usuário atual
+      console.log("Supabase Client URL:", (supabase as any).supabaseUrl);
+      console.log("Current User:", user?.id);
+
       let workspaceId = currentWorkspace?.id;
       
-      // Se não temos o ID no contexto, tentamos identificar pela URL
       if (!workspaceId) {
+        // Pega o slug da URL de forma robusta
         const hash = window.location.hash || "";
-        const path = window.location.pathname || "";
-        // Une hash e path para garantir que pegamos o slug em qualquer modo de roteamento
-        const combinedPath = (hash + path).replace('#', '');
-        const parts = combinedPath.split('/').filter(p => p && p !== 'workspace' && p !== 'configs' && p !== 'invite');
-        
+        const parts = hash.split('/').filter(p => p && p !== '#' && p !== 'workspace' && p !== 'configs');
         const slugFromUrl = parts[0];
-        console.log("Detecting workspace slug from URL:", { slugFromUrl, parts, hash, path });
 
-        if (slugFromUrl) {
-          // Busca o workspace pelo slug no banco de dados
-          const { data: ws, error: wsError } = await supabase
-            .from("workspaces")
-            .select("id")
-            .eq("slug", slugFromUrl)
-            .maybeSingle();
+        console.log("Slug from URL:", slugFromUrl);
 
-          if (wsError) {
-            console.error("Error fetching workspace by slug:", wsError);
-          } else if (ws) {
-            workspaceId = ws.id;
+        // TENTATIVA 1: Buscar diretamente o workspace pelo slug
+        const { data: ws, error: wsError } = await supabase
+          .from("workspaces")
+          .select("id, slug")
+          .eq("slug", slugFromUrl)
+          .maybeSingle();
+
+        if (ws) {
+          workspaceId = ws.id;
+          console.log("Found workspace by slug:", ws.id);
+        } else {
+          // TENTATIVA 2: Buscar workspaces onde o usuário é membro
+          const { data: memberWorkspaces, error: memberError } = await supabase
+            .from("workspace_members")
+            .select("workspace_id, workspaces(id, slug)")
+            .eq("user_id", user.id);
+
+          console.log("Member workspaces:", memberWorkspaces);
+
+          const found = memberWorkspaces?.find((m: any) => m.workspaces?.slug === slugFromUrl);
+          if (found) {
+            workspaceId = found.workspace_id;
+            console.log("Found via members:", workspaceId);
+          } else if (memberWorkspaces && memberWorkspaces.length > 0) {
+            // Se não achou o slug mas tem workspaces, usa o primeiro (fallback emergencial)
+            workspaceId = memberWorkspaces[0].workspace_id;
+            console.log("Using first available workspace member:", workspaceId);
           }
         }
       }
 
-      // Se ainda não encontrou, tenta buscar qualquer workspace onde o usuário seja membro
       if (!workspaceId) {
-        const { data: memberData } = await supabase
-          .from("workspace_members")
-          .select("workspace_id")
-          .eq("user_id", user.id)
-          .limit(1);
-        
-        if (memberData && memberData.length > 0) {
-          workspaceId = memberData[0].workspace_id;
-        }
+        throw new Error(`Não foi possível localizar o ID do Workspace. Slug detectado: ${window.location.hash}. Verifique se você criou o workspace no banco correto.`);
       }
 
-      if (!workspaceId) {
-        throw new Error("Não foi possível identificar seu Workspace. Por favor, recarregue a página.");
-      }
-
-      // 1. Verificar se o convite já existe para evitar duplicados
-      const { data: existingInvite } = await supabase
-        .from("workspace_invitations")
-        .select("token")
-        .eq("workspace_id", workspaceId)
-        .eq("email", email.toLowerCase().trim())
-        .maybeSingle();
-
-      if (existingInvite) {
-        const link = `${window.location.origin}/#/invite/${existingInvite.token}`;
-        setInviteLink(link);
-        toast({
-          title: "Convite já existe",
-          description: "Um convite para este e-mail já foi gerado anteriormente.",
-        });
-        return;
-      }
-
-      // 2. Inserir novo convite
       const { data, error } = await supabase
         .from("workspace_invitations")
         .insert({
@@ -125,7 +109,7 @@ export function InviteMemberDialog() {
 
       if (error) {
         console.error("Erro ao inserir convite:", error);
-        throw new Error(error.message);
+        throw error;
       }
 
       const link = `${window.location.origin}/#/invite/${data.token}`;
