@@ -629,7 +629,9 @@ function runFlow(execution: any, containers: any[], edges: any[], input: any) {
                 method: "POST",
                 headers: { "Content-Type": "application/json" },
                 body: JSON.stringify({
-                  contents: [{ parts: [{ text: `Objetivo: ${objective}\nInstruções: ${instructions}\n\nUsuário: ${userMessage}` }] }],
+                  contents: [{ 
+                    parts: [{ text: `System Instruction: Objetivo: ${objective}\nInstruções: ${instructions}\n\nUser Message: ${userMessage}` }] 
+                  }],
                 }),
               });
               

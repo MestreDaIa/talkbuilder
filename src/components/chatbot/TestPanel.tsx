@@ -583,11 +583,12 @@ export const TestPanel = ({
                       const res = await fetch(`https://generativelanguage.googleapis.com/${version}/models/${model}:generateContent?key=${encodeURIComponent(activeKey)}`, {
                         method: "POST",
                         headers: { "Content-Type": "application/json" },
-                        body: JSON.stringify({
-                          contents: [{ role: "user", parts: [{ text: userMessage }] }],
-                          // system_instruction is only supported in some versions/models, if it fails we might need to prepend to prompt
-                          ...(systemPrompt ? { system_instruction: { parts: [{ text: systemPrompt }] } } : {})
-                        }),
+                          body: JSON.stringify({
+                            contents: [
+                              ...(systemPrompt ? [{ role: "user", parts: [{ text: `System Instruction: ${systemPrompt}` }] }] : []),
+                              { role: "user", parts: [{ text: userMessage }] }
+                            ],
+                          }),
                       });
 
                       if (res.ok) {
