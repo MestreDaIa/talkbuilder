@@ -133,6 +133,11 @@ export default function BotPage() {
         if (cancelled) return;
         setFlow(row);
         
+        // Carrega as variáveis se existirem no settings
+        if (row.settings?.variables) {
+          setBotVariables(row.settings.variables);
+        }
+
         // Se o servidor tem dados, e eles parecem ser mais novos ou o local está vazio, prefere o servidor
         const hasServerData = row.draft_containers?.length || row.draft_edges?.length;
         if (hasServerData) {
