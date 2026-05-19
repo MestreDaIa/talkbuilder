@@ -90,10 +90,14 @@ export const SetVariableConfig = ({ config, setConfig }: SetVariableConfigProps)
       case "custom":
         newValue = config.value || "";
         break;
+      case "expression":
+        newValue = config.value || "";
+        break;
     }
     
     setConfig({ ...config, valueType: type, value: newValue });
   };
+
 
   const handleVariableSelect = (variableName: string) => {
     const textarea = document.getElementById('expression-textarea') as HTMLTextAreaElement;

@@ -30,7 +30,8 @@ export const NodeConfigDialog = ({ node, open, onClose, onSave, containers = [] 
   }, [node]);
 
   const handleSave = () => {
-    onSave(config);
+    console.log("[NodeConfigDialog] Saving config to parent:", config);
+    onSave(JSON.parse(JSON.stringify(config)));
     onClose();
   };
 

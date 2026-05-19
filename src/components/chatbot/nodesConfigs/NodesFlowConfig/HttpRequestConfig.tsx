@@ -131,53 +131,9 @@ export const HttpRequestConfig = ({
   const [openVariablePopovers, setOpenVariablePopovers] = useState<Record<number, boolean>>({});
   const [variableModalOpen, setVariableModalOpen] = useState<{ open: boolean; index: number }>({ open: false, index: -1 });
 
-  useEffect(() => {
-    // Evita loop infinito comparando config atual com o novo objeto
-    const newConfig = {
-      method,
-      url,
-      authType,
-      authCredentials,
-      queryParams,
-      headers,
-      sendBody,
-      bodyContentType,
-      bodyParams,
-      bodyJson,
-      bodyRaw,
-      timeout,
-      followRedirects,
-      ignoreSSL,
-      responseVariable,
-      responseFormat,
-      responseMappings,
-    };
+  // Removido useEffect que chamava setConfig automaticamente.
+  // Agora apenas o clique em "Salvar" no modal dispara a atualização no pai.
 
-    if (JSON.stringify(config) !== JSON.stringify(newConfig)) {
-      console.log("[HttpRequestConfig] Updating parent config:", newConfig);
-      setConfig(newConfig);
-    }
-  }, [
-    method,
-    url,
-    authType,
-    authCredentials,
-    queryParams,
-    headers,
-    sendBody,
-    bodyContentType,
-    bodyParams,
-    bodyJson,
-    bodyRaw,
-    timeout,
-    followRedirects,
-    ignoreSSL,
-    responseVariable,
-    responseFormat,
-    responseMappings,
-    config,
-    setConfig
-  ]);
 
   const availableVariables = useMemo(() => getAllVariableNames(), [getAllVariableNames]);
 
@@ -342,11 +298,14 @@ export const HttpRequestConfig = ({
   };
 
   return (
-    <div className="space-y-4">
+    <div className="space-y-4 p-4">
       {/* Method & URL */}
       <div className="flex gap-2">
         <div className="w-32">
-          <Select value={method} onValueChange={setMethod}>
+          <Select value={method} onValueChange={(val) => {
+            setMethod(val);
+            setConfig({ ...config, method: val });
+          }}>
             <SelectTrigger>
               <SelectValue />
             </SelectTrigger>
@@ -364,7 +323,10 @@ export const HttpRequestConfig = ({
         <Input
           className="flex-1"
           value={url}
-          onChange={(e) => setUrl(e.target.value)}
+          onChange={(e) => {
+            setUrl(e.target.value);
+            setConfig({ ...config, url: e.target.value });
+          }}
           placeholder="https://api.exemplo.com/endpoint"
         />
         <Button
