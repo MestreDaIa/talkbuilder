@@ -560,10 +560,10 @@ export const TestPanel = ({
                 }
               } else if (selectedProvider === "google" || (selectedProvider as string) === "gemini") {
                 let model = cfg.model || "gemini-1.5-flash";
-                // Corrigindo para os modelos estáveis mais recentes que funcionam na v1beta
-                if (model === "gemini-1.5-pro") model = "gemini-1.5-pro";
-                if (model === "gemini-1.5-flash") model = "gemini-1.5-flash";
-                if (model === "gemini-pro") model = "gemini-pro";
+                // Usando modelos GA (General Availability) que são garantidos na v1beta
+                if (model.includes("gemini-1.5-pro")) model = "gemini-1.5-pro";
+                else if (model.includes("gemini-1.5-flash")) model = "gemini-1.5-flash";
+                else if (model.includes("gemini-pro")) model = "gemini-pro";
 
                 const res = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${encodeURIComponent(activeKey)}`, {
                   method: "POST",
