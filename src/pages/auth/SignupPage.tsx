@@ -59,10 +59,6 @@ export default function SignupPage() {
 	const [slugStatus, setSlugStatus] = useState<SlugStatus>("idle");
 	const [submitting, setSubmitting] = useState(false);
 
-	if (isInviteSignup) {
-		return <Navigate to={redirectUrl} replace />;
-	}
-
 	// debounce slug check
 	useEffect(() => {
 		if (!slug) {
@@ -89,6 +85,10 @@ export default function SignupPage() {
 		}, 400);
 		return () => clearTimeout(t);
 	}, [slug]);
+
+	if (isInviteSignup) {
+		return <Navigate to={redirectUrl} replace />;
+	}
 
 	async function handleSubmit(e: React.FormEvent) {
 		e.preventDefault();
