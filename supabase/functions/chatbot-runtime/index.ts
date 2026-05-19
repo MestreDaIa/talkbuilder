@@ -620,8 +620,14 @@ function runFlow(execution: any, containers: any[], edges: any[], input: any) {
                   break;
                 }
               }
-            } else if (provider === "google") {
-              const res = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${cfg.model || "gemini-pro"}:generateContent?key=${activeKey}`, {
+            } else if (provider === "google" || provider === "gemini") {
+              let model = cfg.model || "gemini-1.5-flash";
+              // Mapeamento rigoroso para evitar sufixos como -latest que a v1beta pode rejeitar
+              if (model.includes("gemini-1.5-pro")) model = "gemini-1.5-pro";
+              else if (model.includes("gemini-1.5-flash")) model = "gemini-1.5-flash";
+              else if (model.includes("gemini-pro")) model = "gemini-pro";
+
+              const res = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${activeKey}`, {
                 method: "POST",
                 headers: { "Content-Type": "application/json" },
                 body: JSON.stringify({
