@@ -3,6 +3,8 @@ export type NodeType =
   | "start"
   | "webhook"
   | "http-request"
+  | "redirect"
+  | "go-to"
   // bubbles
   | "bubble-text"
   | "bubble-number"

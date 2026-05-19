@@ -21,6 +21,8 @@ import {
   Send,
   MoveIcon,
   Hourglass,
+  ExternalLink,
+  Redo2,
 } from "lucide-react";
 import { Node, NodeType } from "@/types/chatbot";
 import { renderTextSegments } from "@/lib/textParser";
@@ -37,6 +39,8 @@ const nodeIcons: Record<NodeType, React.ReactNode> = {
   "start": <Play className="h-4 w-4" />,
   "webhook": <Webhook className="h-4 w-4" />,
   "http-request": <Send className="h-4 w-4" />,
+  "redirect": <ExternalLink className="h-4 w-4" />,
+  "go-to": <Redo2 className="h-4 w-4" />,
   // Bubbles
   "bubble-text": <MessageSquare className="h-4 w-4" />,
   "bubble-number": <Hash className="h-4 w-4" />,
@@ -68,6 +72,8 @@ const nodeColors: Record<NodeType, string> = {
   "start": "bg-green-100 border-green-300 text-green-700",
   "webhook": "bg-blue-100 border-blue-300 text-blue-700",
   "http-request": "bg-orange-100 border-orange-300 text-orange-700",
+  "redirect": "bg-green-100 border-green-300 text-green-700",
+  "go-to": "bg-green-100 border-green-300 text-green-700",
   // Bubbles
   "bubble-text": "bg-primary/10 border-primary/30 text-primary",
   "bubble-number": "bg-primary/10 border-primary/30 text-primary",
@@ -99,6 +105,8 @@ const nodeLabels: Record<NodeType, string> = {
   "start": "Início do Fluxo",
   "webhook": "Webhook",
   "http-request": "HTTP Request",
+  "redirect": "Redirecionar para Fluxo",
+  "go-to": "Ir para Bloco",
   // Bubbles
   "bubble-text": "Bot envia Mensagem de Texto",
   "bubble-number": "Bot envia Mensagem de Número",
@@ -158,6 +166,8 @@ export const NodeItem = ({ node, onClick }: NodeItemProps) => {
   const hasSetVariablePreview = node.type === "set-variable" && node.config.variableName;
   const hasScriptPreview = node.type === "script" && node.config.code;
   const hasWaitPreview = effectiveType === "wait" && node.config.waitTime;
+  const hasRedirectPreview = node.type === "redirect" && node.config.targetFlow;
+  const hasGoToPreview = node.type === "go-to" && node.config.targetContainerId;
 
   return (
     <div
@@ -255,6 +265,18 @@ export const NodeItem = ({ node, onClick }: NodeItemProps) => {
             <div className="mt-2 p-2 bg-purple-50 rounded border border-purple-200 max-h-[150px] overflow-y-auto">
               <p className="text-xs font-semibold text-purple-700">
                 Aguardar {node.config.waitTime} {node.config.timeUnit === 'seconds' ? 'segundo(s)' : node.config.timeUnit === 'minutes' ? 'minuto(s)' : 'hora(s)'}
+              </p>
+            </div>
+          ) : hasRedirectPreview ? (
+            <div className="mt-2 p-2 bg-green-50 rounded border border-green-200 max-h-[150px] overflow-y-auto">
+              <p className="text-xs font-semibold text-green-700">
+                Fluxo: {node.config.targetFlow === "main-flow" ? "Fluxo Principal" : node.config.targetFlow === "support-flow" ? "Suporte Técnico" : "Vendas"}
+              </p>
+            </div>
+          ) : hasGoToPreview ? (
+            <div className="mt-2 p-2 bg-green-50 rounded border border-green-200 max-h-[150px] overflow-y-auto">
+              <p className="text-xs font-semibold text-green-700">
+                Pular para bloco ID: {node.config.targetContainerId.slice(-4)}
               </p>
             </div>
           ) : (

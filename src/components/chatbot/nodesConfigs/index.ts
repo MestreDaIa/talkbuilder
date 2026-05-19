@@ -14,13 +14,15 @@ import { SetVariableConfig } from "./NodesLogicConfig/SetVariableConfig";
 import { ScriptConfig } from "./NodesLogicConfig/ScriptConfig";
 import { ConditionConfig } from "./NodesLogicConfig/ConditionConfig";
 import { WaitConfig } from "./NodesLogicConfig/WaitConfig";
-import { StartConfig, WebhookConfig, HttpRequestConfig } from "./NodesFlowConfig";
+import { StartConfig, WebhookConfig, HttpRequestConfig, RedirectConfig, GoToConfig } from "./NodesFlowConfig";
 
 export const nodeConfigComponents: Record<string, React.FC<any>> = {
   // Flow
   "start": StartConfig,
   "webhook": WebhookConfig,
   "http-request": HttpRequestConfig,
+  "redirect": RedirectConfig,
+  "go-to": GoToConfig,
   // Bubbles
   "bubble-text": BubbleTextConfig,
   "bubble-number": BubbleNumberConfig,
