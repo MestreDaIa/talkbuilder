@@ -476,6 +476,19 @@ export const TestPanel = ({
         } catch (err) {
           console.error("[http-request] failed:", err);
         }
+      } else if (nodeType === "ai-node" || nodeType === "ai-agent") {
+        // Simulação do Agente/IA para teste local sem API Key
+        const objective = cfg.objective || cfg.systemPrompt || "agente de teste";
+        const hasTools = allContainers.some(c => c.nodes.some(n => n.config?.isSkill));
+        
+        nextMessages.push({ 
+          id: crypto.randomUUID(), 
+          type: "bot", 
+          content: `🤖 [SIMULAÇÃO DE AGENTE]\nObjetivo: ${objective}\n\nO sistema de IA está configurado, mas para funcionar de verdade, você precisará configurar uma chave de API nas configurações do workspace.\n\n${hasTools ? "Identifiquei que você já tem blocos configurados como Skills!" : "Dica: Você ainda não marcou nenhum bloco como 'Skill' para este agente usar."}`, 
+        });
+        
+        waitingFor = "input-text";
+        waitingForCfg = { placeholder: "Simule uma conversa com o agente..." };
       } else if (nodeType === "set-variable" && cfg.variableName) {
         variables[cfg.variableName] = evaluateSetVariableValue(cfg, variables);
       } else if (nodeType === "condition") {
