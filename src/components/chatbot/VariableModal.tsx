@@ -13,9 +13,9 @@ interface VariableModalProps {
 
 export const VariableModal = ({ open, onClose, onSelect }: VariableModalProps) => {
   const [searchTerm, setSearchTerm] = useState('');
-  const { getAllVariableNames, addVariable } = useVariables();
+  const { getAllVariableNames, addVariable, variables } = useVariables();
 
-  const allVariables = getAllVariableNames();
+  const allVariables = useMemo(() => getAllVariableNames(), [variables, getAllVariableNames]);
 
   const filteredVariables = useMemo(() => {
     if (!searchTerm.trim()) return allVariables;

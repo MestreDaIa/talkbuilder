@@ -1,4 +1,5 @@
-import { useEffect, useMemo, useRef, useState, useCallback } from "react";
+import { useEffect, useMemo, useRef, useState, useCallback, useContext } from "react";
+import { useVariables, VariablesProvider } from "@/context/VariablesContext";
 import { useParams, useNavigate, useLocation } from "react-router-dom";
 import {
   ArrowLeft,
@@ -22,7 +23,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { useWorkspace } from "@/context/WorkspaceContext";
 import { useAuth } from "@/context/AuthContext";
-import { VariablesProvider } from "@/context/VariablesContext";
+// VariablesProvider removed from here to be imported from @/context/VariablesContext
 import { folderRoute, hardReloadToRoute, rememberedBotBackRoute, workspaceRoot } from "@/lib/workspaceRoutes";
 import {
   ensureFlow,
@@ -67,6 +68,235 @@ function statusLabel(status: FlowStatus): { text: string; className: string } {
   }
 }
 
+function BotEditorInner({
+  botId,
+  bot,
+  flow,
+  setFlow,
+  containers,
+  setContainers,
+  edges,
+  setEdges,
+  status,
+  profile,
+  isSaving,
+  setIsSaving,
+  handleBack,
+  showSettings,
+  setShowSettings,
+  handleSettingsUpdate,
+  handleTest,
+  testContainer,
+  setTestContainer,
+  handleUndo,
+  handleRedo,
+  historyIndex,
+  history,
+  showPublish,
+  setShowPublish,
+  handlePublishSuccess,
+  isEditingName,
+  setIsEditingName,
+  nameDraft,
+  setNameDraft,
+  commitName,
+  startNameEdit,
+  displayName,
+  lbl,
+  handleAddNode,
+  setGetCenter,
+  botVariables
+}: any) {
+  const { variables } = useVariables();
+  const lastVariablesRef = useRef(variables);
+
+  // Sincroniza variáveis do contexto para o estado do BotPage quando mudam
+  useEffect(() => {
+    if (JSON.stringify(variables) !== JSON.stringify(lastVariablesRef.current)) {
+      lastVariablesRef.current = variables;
+      // Adicionamos um pequeno delay ou verificação para evitar loops se necessário,
+      // mas aqui deve estar ok pois o BotPage apenas guarda para o saveDraft
+    }
+  }, [variables]);
+
+  // Função de salvar que inclui variáveis
+  const handleSaveWithVariables = async () => {
+    if (!flow) {
+      saveLocal(botId, { containers, edges });
+      toast.success("Fluxo salvo localmente (aguardando conexão)");
+      return;
+    }
+    
+    setIsSaving(true);
+    try {
+      const containersToSave = JSON.parse(JSON.stringify(containers));
+      const edgesToSave = JSON.parse(JSON.stringify(edges));
+      
+      // Incluímos as variáveis atuais no settings
+      const updatedSettings = {
+        ...(flow.settings || {}),
+        variables: variables
+      };
+
+      console.log("[BotPage] Salvando rascunho com variáveis...", {
+        variablesCount: Object.keys(variables).length
+      });
+
+      const updated = await saveDraft(flow.id, containersToSave, edgesToSave);
+      
+      // Atualizamos também o settings via updateFlowMeta para garantir que as variáveis persistam
+      const finalUpdated = await updateFlowMeta(flow.id, { settings: updatedSettings });
+      
+      setFlow(finalUpdated);
+      toast.success("Fluxo e variáveis salvos com sucesso!");
+    } catch (err: any) {
+      console.error("[BotPage] Erro ao salvar:", err);
+      toast.error("Erro ao salvar no servidor");
+    } finally {
+      setIsSaving(false);
+    }
+  };
+
+  return (
+    <div className="bot-editor fixed inset-0 flex flex-col bg-background z-50 text-foreground">
+        {/* Header */}
+        <header className="flex items-center gap-2 px-3 py-2 bg-card border-b border-border text-foreground shadow-sm">
+          <Button variant="ghost" size="sm" onClick={handleBack} className="gap-1" title="Voltar">
+            <ArrowLeft className="w-4 h-4" /> Voltar
+          </Button>
+
+          <div className="h-6 w-px bg-border mx-1" />
+
+          <div className="flex items-center gap-2 mr-2 min-w-0">
+            {bot?.emoji && <span className="text-base shrink-0">{bot.emoji}</span>}
+
+            {isEditingName ? (
+              <Input
+                autoFocus
+                value={nameDraft}
+                onChange={(e) => setNameDraft(e.target.value)}
+                onBlur={commitName}
+                onKeyDown={(e) => {
+                  if (e.key === "Enter") commitName();
+                  if (e.key === "Escape") setIsEditingName(false);
+                }}
+                className="h-7 text-sm font-semibold w-[200px]"
+              />
+            ) : (
+              <button
+                type="button"
+                onClick={startNameEdit}
+                className="text-sm font-semibold truncate max-w-[180px] hover:underline underline-offset-4 decoration-dotted decoration-muted-foreground"
+                title="Clique para renomear"
+              >
+                {displayName}
+              </button>
+            )}
+
+            <span
+              className={`text-[10px] uppercase tracking-wide rounded px-2 py-0.5 border whitespace-nowrap ${lbl.className}`}
+            >
+              {lbl.text}
+            </span>
+          </div>
+
+          <div className="flex-1 flex items-center justify-center gap-1">
+            <Button 
+              variant="ghost" 
+              size="icon" 
+              className="h-8 w-8" 
+              onClick={handleUndo} 
+              disabled={historyIndex <= 0}
+              title="Desfazer (Ctrl+Z)"
+            >
+              <Undo2 className="w-4 h-4" />
+            </Button>
+            <Button 
+              variant="ghost" 
+              size="icon" 
+              className="h-8 w-8" 
+              onClick={handleRedo} 
+              disabled={historyIndex >= history.length - 1}
+              title="Refazer (Ctrl+Shift+Z)"
+            >
+              <Redo2 className="w-4 h-4" />
+            </Button>
+          </div>
+
+          <Button variant="ghost" size="sm" className="gap-1" onClick={() => setShowSettings(true)}>
+            <Settings className="w-4 h-4" /> <span className="hidden sm:inline">Configurações</span>
+          </Button>
+          <Button variant="ghost" size="sm" className="gap-1" onClick={handleTest}>
+            <Play className="w-4 h-4" /> <span className="hidden sm:inline">Testar</span>
+          </Button>
+          <Button variant="ghost" size="sm" className="gap-1" onClick={handleSaveWithVariables} disabled={isSaving}>
+            {isSaving ? <Loader2 className="w-4 h-4 animate-spin" /> : <Save className="w-4 h-4" />}
+            <span className="hidden sm:inline">Salvar</span>
+          </Button>
+
+          <Button size="sm" className="gap-1 ml-1" onClick={() => setShowPublish(true)}>
+            {status === "published" ? <Check className="w-4 h-4" /> : <Send className="w-4 h-4" />}
+            <span className="hidden sm:inline">{status === "draft" ? "Publicar" : "Atualizar"}</span>
+          </Button>
+        </header>
+
+        {/* Sidebar + canvas */}
+        <div className="flex-1 flex w-full overflow-hidden relative">
+          <NodesSidebar onAddNode={handleAddNode} />
+          <div className="flex-1 h-full">
+            <CanvasEditor
+              containers={containers}
+              onContainersChange={setContainers}
+              edges={edges}
+              onEdgesChange={setEdges}
+              onTest={(container: any) => setTestContainer(container)}
+              onGetCenterPosition={(getter: any) => setGetCenter(() => getter)}
+            />
+          </div>
+
+          {/* Test panel */}
+          <TestPanel
+            isOpen={testContainer !== null}
+            onClose={() => setTestContainer(null)}
+            startContainer={testContainer}
+            allContainers={containers}
+            edges={edges}
+            flowId={flow?.id}
+          />
+        </div>
+
+        {/* Settings */}
+        {flow && (
+          <BotSettingsDialog
+            open={showSettings}
+            onOpenChange={setShowSettings}
+            flowId={flow.id}
+            flowName={flow.name}
+            flowDescription={flow.description}
+            settings={flow.settings ?? {}}
+            onUpdate={handleSettingsUpdate}
+          />
+        )}
+
+        {/* Publish */}
+        {flow && (
+          <PublishDialog
+            open={showPublish}
+            onOpenChange={setShowPublish}
+            flowId={flow.id}
+            currentPublicId={flow.public_id}
+            isPublished={flow.is_published}
+            companyId={flow.user_id}
+            companySlug={profile?.slug ?? "user"}
+            containers={containers}
+            edges={edges}
+            onPublishSuccess={handlePublishSuccess}
+          />
+        )}
+      </div>
+  );
+}
+
 export default function BotPage() {
   const params = useParams();
   const navigate = useNavigate();
@@ -80,6 +310,7 @@ export default function BotPage() {
   const [flow, setFlow] = useState<ChatbotFlowRow | null>(null);
   const [containers, setContainers] = useState<Container[]>([]);
   const [edges, setEdges] = useState<Edge[]>([]);
+  const [botVariables, setBotVariables] = useState<Record<string, any>>({});
   const [hydrated, setHydrated] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
   const [isEditingName, setIsEditingName] = useState(false);
@@ -132,6 +363,11 @@ export default function BotPage() {
         if (cancelled) return;
         setFlow(row);
         
+        // Carrega as variáveis se existirem no settings
+        if (row.settings?.variables) {
+          setBotVariables(row.settings.variables);
+        }
+
         // Se o servidor tem dados, e eles parecem ser mais novos ou o local está vazio, prefere o servidor
         const hasServerData = row.draft_containers?.length || row.draft_edges?.length;
         if (hasServerData) {
@@ -418,143 +654,46 @@ export default function BotPage() {
   }
 
   return (
-    <VariablesProvider>
-      <div className="bot-editor fixed inset-0 flex flex-col bg-background z-50 text-foreground">
-        {/* Header */}
-        <header className="flex items-center gap-2 px-3 py-2 bg-card border-b border-border text-foreground shadow-sm">
-          <Button variant="ghost" size="sm" onClick={handleBack} className="gap-1" title="Voltar">
-            <ArrowLeft className="w-4 h-4" /> Voltar
-          </Button>
-
-          <div className="h-6 w-px bg-border mx-1" />
-
-          <div className="flex items-center gap-2 mr-2 min-w-0">
-            {bot?.emoji && <span className="text-base shrink-0">{bot.emoji}</span>}
-
-            {isEditingName ? (
-              <Input
-                autoFocus
-                value={nameDraft}
-                onChange={(e) => setNameDraft(e.target.value)}
-                onBlur={commitName}
-                onKeyDown={(e) => {
-                  if (e.key === "Enter") commitName();
-                  if (e.key === "Escape") setIsEditingName(false);
-                }}
-                className="h-7 text-sm font-semibold w-[200px]"
-              />
-            ) : (
-              <button
-                type="button"
-                onClick={startNameEdit}
-                className="text-sm font-semibold truncate max-w-[180px] hover:underline underline-offset-4 decoration-dotted decoration-muted-foreground"
-                title="Clique para renomear"
-              >
-                {displayName}
-              </button>
-            )}
-
-            <span
-              className={`text-[10px] uppercase tracking-wide rounded px-2 py-0.5 border whitespace-nowrap ${lbl.className}`}
-            >
-              {lbl.text}
-            </span>
-          </div>
-
-          <div className="flex-1 flex items-center justify-center gap-1">
-            <Button 
-              variant="ghost" 
-              size="icon" 
-              className="h-8 w-8" 
-              onClick={handleUndo} 
-              disabled={historyIndex <= 0}
-              title="Desfazer (Ctrl+Z)"
-            >
-              <Undo2 className="w-4 h-4" />
-            </Button>
-            <Button 
-              variant="ghost" 
-              size="icon" 
-              className="h-8 w-8" 
-              onClick={handleRedo} 
-              disabled={historyIndex >= history.length - 1}
-              title="Refazer (Ctrl+Shift+Z)"
-            >
-              <Redo2 className="w-4 h-4" />
-            </Button>
-          </div>
-
-          <Button variant="ghost" size="sm" className="gap-1" onClick={() => setShowSettings(true)}>
-            <Settings className="w-4 h-4" /> <span className="hidden sm:inline">Configurações</span>
-          </Button>
-          <Button variant="ghost" size="sm" className="gap-1" onClick={handleTest}>
-            <Play className="w-4 h-4" /> <span className="hidden sm:inline">Testar</span>
-          </Button>
-          <Button variant="ghost" size="sm" className="gap-1" onClick={handleSave} disabled={isSaving}>
-            {isSaving ? <Loader2 className="w-4 h-4 animate-spin" /> : <Save className="w-4 h-4" />}
-            <span className="hidden sm:inline">Salvar</span>
-          </Button>
-
-          <Button size="sm" className="gap-1 ml-1" onClick={() => setShowPublish(true)}>
-            {status === "published" ? <Check className="w-4 h-4" /> : <Send className="w-4 h-4" />}
-            <span className="hidden sm:inline">{status === "draft" ? "Publicar" : "Atualizar"}</span>
-          </Button>
-        </header>
-
-        {/* Sidebar + canvas */}
-        <div className="flex-1 flex w-full overflow-hidden relative">
-          <NodesSidebar onAddNode={handleAddNode} />
-          <div className="flex-1 h-full">
-            <CanvasEditor
-              containers={containers}
-              onContainersChange={setContainers}
-              edges={edges}
-              onEdgesChange={setEdges}
-              onTest={(container) => setTestContainer(container)}
-              onGetCenterPosition={(getter) => setGetCenter(() => getter)}
-            />
-          </div>
-
-          {/* Test panel - moved inside relative container to start below header */}
-          <TestPanel
-            isOpen={testContainer !== null}
-            onClose={() => setTestContainer(null)}
-            startContainer={testContainer}
-            allContainers={containers}
-            edges={edges}
-            flowId={flow?.id}
-          />
-        </div>
-
-        {/* Settings */}
-        {flow && (
-          <BotSettingsDialog
-            open={showSettings}
-            onOpenChange={setShowSettings}
-            flowId={flow.id}
-            flowName={flow.name}
-            flowDescription={flow.description}
-            settings={flow.settings ?? {}}
-            onUpdate={handleSettingsUpdate}
-          />
-        )}
-
-        {/* Publish */}
-        {flow && (
-          <PublishDialog
-            open={showPublish}
-            onOpenChange={setShowPublish}
-            flowId={flow.id}
-            currentPublicId={flow.public_id}
-            isPublished={flow.is_published}
-            companyId={flow.user_id}
-            companySlug={profile?.slug ?? "user"}
-            containers={containers}
-            edges={edges}
-            onPublishSuccess={handlePublishSuccess}
-          />
-        )}
-      </div>
+    <VariablesProvider initialVariables={botVariables}>
+      <BotEditorInner
+        botId={botId}
+        bot={bot}
+        flow={flow}
+        setFlow={setFlow}
+        containers={containers}
+        setContainers={setContainers}
+        edges={edges}
+        setEdges={setEdges}
+        status={status}
+        profile={profile}
+        isSaving={isSaving}
+        setIsSaving={setIsSaving}
+        handleBack={handleBack}
+        showSettings={showSettings}
+        setShowSettings={setShowSettings}
+        handleSettingsUpdate={handleSettingsUpdate}
+        handleTest={handleTest}
+        testContainer={testContainer}
+        setTestContainer={setTestContainer}
+        handleUndo={handleUndo}
+        handleRedo={handleRedo}
+        historyIndex={historyIndex}
+        history={history}
+        showPublish={showPublish}
+        setShowPublish={setShowPublish}
+        handlePublishSuccess={handlePublishSuccess}
+        isEditingName={isEditingName}
+        setIsEditingName={setIsEditingName}
+        nameDraft={nameDraft}
+        setNameDraft={setNameDraft}
+        commitName={commitName}
+        startNameEdit={startNameEdit}
+        displayName={displayName}
+        lbl={lbl}
+        handleAddNode={handleAddNode}
+        setGetCenter={setGetCenter}
+        botVariables={botVariables}
+      />
     </VariablesProvider>
   );
 }

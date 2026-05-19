@@ -1,4 +1,4 @@
-import { createContext, useCallback, useContext, useState } from "react";
+import { createContext, useCallback, useContext, useState, useEffect } from "react";
 
 type VariableContextType = {
   variables: Record<string, any>;
@@ -11,8 +11,27 @@ type VariableContextType = {
 
 const VariablesContext = createContext<VariableContextType | null>(null);
 
-export function VariablesProvider({ children }: { children: React.ReactNode }) {
-  const [variables, setVariables] = useState<Record<string, any>>({});
+export function VariablesProvider({ 
+  children,
+  initialVariables = {}
+}: { 
+  children: React.ReactNode;
+  initialVariables?: Record<string, any>;
+}) {
+  const [variables, setVariables] = useState<Record<string, any>>(initialVariables);
+
+  // Sync with initialVariables when it changes from outside (e.g. from DB load)
+  useEffect(() => {
+    if (Object.keys(initialVariables).length > 0) {
+      setVariables(prev => {
+        // Only update if actually different to avoid cycles
+        if (JSON.stringify(prev) !== JSON.stringify(initialVariables)) {
+          return { ...prev, ...initialVariables };
+        }
+        return prev;
+      });
+    }
+  }, [initialVariables]);
 
   const getAllVariableNames = useCallback(
     () => Object.keys(variables),
