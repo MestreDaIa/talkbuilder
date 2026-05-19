@@ -556,7 +556,7 @@ export const TestPanel = ({
                     console.error("[TestPanel] OpenAI error", res.status, errorData);
                   }
                 }
-              } else if (selectedProvider === "google") {
+              } else if (selectedProvider === "google" || (selectedProvider as string) === "gemini") {
                 const model = cfg.model || "gemini-1.5-flash";
                 const res = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${encodeURIComponent(activeKey)}`, {
                   method: "POST",
