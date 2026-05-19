@@ -350,13 +350,16 @@ function runFlow(execution: any, containers: any[], edges: any[], input: any) {
     const info = findNode(currentNodeId);
     if (info) {
       const cfg = info.node.config || {};
+      const nodeType = (info.node.type || "").toLowerCase();
       const varName = cfg.variableName || cfg.saveVariable;
       const value = input.message ?? input.button_id;
+      
       if (varName && value !== undefined) variables[varName] = value;
       
-      // If we are currently in a wait period, don't advance.
-      if (!execution.is_waiting_time) {
-        // If we were explicitly waiting for input, then we can advance.
+      if (nodeType === "ai-agent" || nodeType === "ai-node") {
+        variables.__last_agent_user_message = value ?? "";
+        // Don't advance, stay in the agent node
+      } else if (!execution.is_waiting_time) {
         if (execution.waiting_for_input) {
           currentNodeId = nextFromNode(info.node.id, info.container, input.button_id);
         }
@@ -543,6 +546,30 @@ function runFlow(execution: any, containers: any[], edges: any[], input: any) {
         const conditionHandle = matchedCondition ? `${node.id}-cond-${matchedCondition.id}` : `${node.id}-else`;
         currentNodeId = nextFromNode(node.id, container, conditionHandle, true);
         continue;
+      }
+      case "ai-agent":
+      case "ai-node": {
+        // Only stop if we don't have a message yet or if we're explicitly waiting
+        const lastMsg = variables.__last_agent_user_message;
+        if (!lastMsg && !execution.waiting_for_input) {
+           waiting_for = "text";
+           break;
+        }
+        
+        // Simulation for now
+        const objective = cfg.objective || cfg.systemPrompt || "agente de teste";
+        const userMessage = String(lastMsg || "").trim();
+        
+        messages.push({ 
+          id: crypto.randomUUID(), 
+          type: "bot", 
+          content: `🤖 [SIMULAÇÃO DE AGENTE]\nObjetivo: ${objective}\n\nRecebi: "${userMessage}"\n\n(O motor real de IA será integrado em breve para processar esta mensagem via Edge Function).` 
+        });
+        
+        // Keep waiting for more messages in the same node
+        variables.__last_agent_user_message = ""; // clear for next time
+        waiting_for = "text";
+        break;
       }
     }
 
