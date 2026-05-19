@@ -10,6 +10,7 @@ import {
 } from "@/components/ui/select";
 import { Button } from "@/components/ui/button";
 import { Plus, Trash2 } from "lucide-react";
+import { SkillConfig } from "../SkillConfig";
 
 interface GoogleSheetsConfigProps {
   config: NodeConfig;
@@ -119,6 +120,8 @@ export const GoogleSheetsConfig = ({ config, setConfig }: GoogleSheetsConfigProp
           )}
         </div>
       </div>
+
+      <SkillConfig config={config} setConfig={setConfig} />
     </div>
   );
 };
