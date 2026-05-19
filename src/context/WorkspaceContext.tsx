@@ -111,6 +111,7 @@ export function WorkspaceProvider({
 				: updater;
 
 		setItemsState(next);
+		itemsRef.current = next; // Update ref immediately to prevent race conditions
 
 		if (!supabase || !user || !currentWorkspace) {
 			console.warn("[Workspace] setItems called but dependencies missing", { 
