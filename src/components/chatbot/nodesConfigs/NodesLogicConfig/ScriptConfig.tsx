@@ -6,6 +6,7 @@ import { Button } from "@/components/ui/button";
 import { Braces, X } from "lucide-react";
 import { useState, useRef } from "react";
 import { VariableModal } from "../../VariableModal";
+import { SkillConfig } from "../SkillConfig";
 
 interface ScriptConfigProps {
   config: NodeConfig;
@@ -138,7 +139,10 @@ export const ScriptConfig = ({ config, setConfig }: ScriptConfigProps) => {
         </div>
       </div>
 
+      <SkillConfig config={config} setConfig={setConfig} />
+
       <VariableModal
+
         open={variableModalOpen}
         onClose={() => {
           setVariableModalOpen(false);

@@ -9,6 +9,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Info } from "lucide-react";
+import { SkillConfig } from "../SkillConfig";
 
 interface GoToConfigProps {
   config: NodeConfig;
@@ -44,6 +45,8 @@ export const GoToConfig = ({ config, setConfig, containers }: GoToConfigProps) =
           Salta a execução diretamente para o bloco selecionado.
         </p>
       </div>
+      <SkillConfig config={config} setConfig={setConfig} />
     </div>
+
   );
 };

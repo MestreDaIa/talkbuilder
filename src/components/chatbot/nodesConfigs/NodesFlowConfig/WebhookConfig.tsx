@@ -11,6 +11,7 @@ import {
 } from "@/components/ui/select";
 import { Copy, Check } from "lucide-react";
 import { toast } from "sonner";
+import { SkillConfig } from "../SkillConfig";
 
 interface WebhookConfigProps {
   config: {
@@ -279,6 +280,9 @@ export const WebhookConfig = ({ config, setConfig }: WebhookConfigProps) => {
           outros sistemas.
         </p>
       </div>
+
+      <SkillConfig config={config} setConfig={setConfig} />
     </div>
+
   );
 };
