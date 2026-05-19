@@ -153,7 +153,7 @@ export default function InvitePage() {
           display_name: displayName,
           invite_token: token
         },
-        emailRedirectTo: browserHrefForRoute(`/invite/${token}`)
+        emailRedirectTo: window.location.origin + `/invite/${token}`
       };
 
       // Create the account
@@ -168,9 +168,33 @@ export default function InvitePage() {
       // Handle successful signup
       if (data.session) {
         toast({ title: "Conta criada!", description: "Aceitando o convite..." });
-        // The onAuthStateChange in AuthContext will trigger, but we call handleAccept directly
-        // to ensure the workspace redirect happens immediately
-        await handleAccept();
+        
+        // Forçar um pequeno delay para garantir que a sessão esteja estabilizada
+        await new Promise(resolve => setTimeout(resolve, 500));
+        
+        // Chamar o RPC diretamente
+        const { data: rpcData, error: rpcError } = await supabase.rpc("accept_invitation", {
+          invitation_token: token
+        });
+
+        if (rpcError) throw rpcError;
+
+        if (rpcData && rpcData.error) {
+          toast({ title: "Erro", description: rpcData.error, variant: "destructive" });
+          return;
+        }
+
+        setAccepted(true);
+        toast({ 
+          title: "Sucesso!", 
+          description: `Agora você é membro de ${rpcData.workspace_name}` 
+        });
+
+        await refreshProfile();
+
+        setTimeout(() => {
+          navigate(`/${rpcData.workspace_slug}/workspace`);
+        }, 1500);
       } else if (data.user) {
         // User created but needs email verification
         toast({ 
@@ -182,6 +206,7 @@ export default function InvitePage() {
         throw new Error("Não foi possível criar a conta. Tente novamente.");
       }
     } catch (err: any) {
+      console.error("Erro no signup:", err);
       toast({ title: "Erro no cadastro", description: err.message, variant: "destructive" });
     } finally {
       setSubmitting(false);
@@ -190,7 +215,7 @@ export default function InvitePage() {
 
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!inviteData) return;
+    if (!inviteData || !token) return;
 
     setSubmitting(true);
     try {
@@ -206,11 +231,36 @@ export default function InvitePage() {
       
       if (data.session) {
         toast({ title: "Bem-vindo de volta!", description: "Acessando workspace..." });
-        // After login, handleAccept will be called via the useEffect if user is present,
-        // or we can call it here for faster response.
-        await handleAccept();
+        
+        // Pequeno delay para estabilidade
+        await new Promise(resolve => setTimeout(resolve, 500));
+
+        // Chamar o RPC diretamente
+        const { data: rpcData, error: rpcError } = await supabase.rpc("accept_invitation", {
+          invitation_token: token
+        });
+
+        if (rpcError) throw rpcError;
+
+        if (rpcData && rpcData.error) {
+          toast({ title: "Erro", description: rpcData.error, variant: "destructive" });
+          return;
+        }
+
+        setAccepted(true);
+        toast({ 
+          title: "Sucesso!", 
+          description: `Agora você é membro de ${rpcData.workspace_name}` 
+        });
+
+        await refreshProfile();
+
+        setTimeout(() => {
+          navigate(`/${rpcData.workspace_slug}/workspace`);
+        }, 1500);
       }
     } catch (err: any) {
+      console.error("Erro no login:", err);
       toast({ title: "Erro no login", description: err.message, variant: "destructive" });
     } finally {
       setSubmitting(false);
