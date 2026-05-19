@@ -23,7 +23,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { useWorkspace } from "@/context/WorkspaceContext";
 import { useAuth } from "@/context/AuthContext";
-import { VariablesProvider } from "@/context/VariablesContext";
+// VariablesProvider removed from here to be imported from @/context/VariablesContext
 import { folderRoute, hardReloadToRoute, rememberedBotBackRoute, workspaceRoot } from "@/lib/workspaceRoutes";
 import {
   ensureFlow,
