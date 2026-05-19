@@ -1,0 +1,2 @@
+-- Test
+SELECT 1;
