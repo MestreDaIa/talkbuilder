@@ -542,7 +542,8 @@ export const TestPanel = ({
               parts.push("Use EXCLUSIVAMENTE as informações abaixo como sua fonte de verdade. Se a resposta não estiver aqui, diga que não encontrou na base.");
               if (kbFilesEnabled) {
                 kbFiles.forEach((f, i) => {
-                  parts.push(`\n--- Arquivo ${i + 1}: ${f.name} ---\n${(f.content || "[arquivo sem conteúdo legível]").trim()}${f.truncated ? "\n[...conteúdo truncado...]" : ""}`);
+                  const content = (f.content || "").trim();
+                  parts.push(`\n--- Arquivo ${i + 1}: ${f.name} ---\n${content || "[arquivo sem conteúdo legível]"}${f.truncated ? "\n[...conteúdo truncado...]" : ""}`);
                 });
               }
               if (kbLinksEnabled) {
