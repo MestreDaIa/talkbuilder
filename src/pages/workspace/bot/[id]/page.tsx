@@ -655,142 +655,45 @@ export default function BotPage() {
 
   return (
     <VariablesProvider initialVariables={botVariables}>
-      <div className="bot-editor fixed inset-0 flex flex-col bg-background z-50 text-foreground">
-        {/* Header */}
-        <header className="flex items-center gap-2 px-3 py-2 bg-card border-b border-border text-foreground shadow-sm">
-          <Button variant="ghost" size="sm" onClick={handleBack} className="gap-1" title="Voltar">
-            <ArrowLeft className="w-4 h-4" /> Voltar
-          </Button>
-
-          <div className="h-6 w-px bg-border mx-1" />
-
-          <div className="flex items-center gap-2 mr-2 min-w-0">
-            {bot?.emoji && <span className="text-base shrink-0">{bot.emoji}</span>}
-
-            {isEditingName ? (
-              <Input
-                autoFocus
-                value={nameDraft}
-                onChange={(e) => setNameDraft(e.target.value)}
-                onBlur={commitName}
-                onKeyDown={(e) => {
-                  if (e.key === "Enter") commitName();
-                  if (e.key === "Escape") setIsEditingName(false);
-                }}
-                className="h-7 text-sm font-semibold w-[200px]"
-              />
-            ) : (
-              <button
-                type="button"
-                onClick={startNameEdit}
-                className="text-sm font-semibold truncate max-w-[180px] hover:underline underline-offset-4 decoration-dotted decoration-muted-foreground"
-                title="Clique para renomear"
-              >
-                {displayName}
-              </button>
-            )}
-
-            <span
-              className={`text-[10px] uppercase tracking-wide rounded px-2 py-0.5 border whitespace-nowrap ${lbl.className}`}
-            >
-              {lbl.text}
-            </span>
-          </div>
-
-          <div className="flex-1 flex items-center justify-center gap-1">
-            <Button 
-              variant="ghost" 
-              size="icon" 
-              className="h-8 w-8" 
-              onClick={handleUndo} 
-              disabled={historyIndex <= 0}
-              title="Desfazer (Ctrl+Z)"
-            >
-              <Undo2 className="w-4 h-4" />
-            </Button>
-            <Button 
-              variant="ghost" 
-              size="icon" 
-              className="h-8 w-8" 
-              onClick={handleRedo} 
-              disabled={historyIndex >= history.length - 1}
-              title="Refazer (Ctrl+Shift+Z)"
-            >
-              <Redo2 className="w-4 h-4" />
-            </Button>
-          </div>
-
-          <Button variant="ghost" size="sm" className="gap-1" onClick={() => setShowSettings(true)}>
-            <Settings className="w-4 h-4" /> <span className="hidden sm:inline">Configurações</span>
-          </Button>
-          <Button variant="ghost" size="sm" className="gap-1" onClick={handleTest}>
-            <Play className="w-4 h-4" /> <span className="hidden sm:inline">Testar</span>
-          </Button>
-          <Button variant="ghost" size="sm" className="gap-1" onClick={handleSave} disabled={isSaving}>
-            {isSaving ? <Loader2 className="w-4 h-4 animate-spin" /> : <Save className="w-4 h-4" />}
-            <span className="hidden sm:inline">Salvar</span>
-          </Button>
-
-          <Button size="sm" className="gap-1 ml-1" onClick={() => setShowPublish(true)}>
-            {status === "published" ? <Check className="w-4 h-4" /> : <Send className="w-4 h-4" />}
-            <span className="hidden sm:inline">{status === "draft" ? "Publicar" : "Atualizar"}</span>
-          </Button>
-        </header>
-
-        {/* Sidebar + canvas */}
-        <div className="flex-1 flex w-full overflow-hidden relative">
-          <NodesSidebar onAddNode={handleAddNode} />
-          <div className="flex-1 h-full">
-            <CanvasEditor
-              containers={containers}
-              onContainersChange={setContainers}
-              edges={edges}
-              onEdgesChange={setEdges}
-              onTest={(container) => setTestContainer(container)}
-              onGetCenterPosition={(getter) => setGetCenter(() => getter)}
-            />
-          </div>
-
-          {/* Test panel - moved inside relative container to start below header */}
-          <TestPanel
-            isOpen={testContainer !== null}
-            onClose={() => setTestContainer(null)}
-            startContainer={testContainer}
-            allContainers={containers}
-            edges={edges}
-            flowId={flow?.id}
-          />
-        </div>
-
-        {/* Settings */}
-        {flow && (
-          <BotSettingsDialog
-            open={showSettings}
-            onOpenChange={setShowSettings}
-            flowId={flow.id}
-            flowName={flow.name}
-            flowDescription={flow.description}
-            settings={flow.settings ?? {}}
-            onUpdate={handleSettingsUpdate}
-          />
-        )}
-
-        {/* Publish */}
-        {flow && (
-          <PublishDialog
-            open={showPublish}
-            onOpenChange={setShowPublish}
-            flowId={flow.id}
-            currentPublicId={flow.public_id}
-            isPublished={flow.is_published}
-            companyId={flow.user_id}
-            companySlug={profile?.slug ?? "user"}
-            containers={containers}
-            edges={edges}
-            onPublishSuccess={handlePublishSuccess}
-          />
-        )}
-      </div>
+      <BotEditorInner
+        botId={botId}
+        bot={bot}
+        flow={flow}
+        setFlow={setFlow}
+        containers={containers}
+        setContainers={setContainers}
+        edges={edges}
+        setEdges={setEdges}
+        status={status}
+        profile={profile}
+        isSaving={isSaving}
+        setIsSaving={setIsSaving}
+        handleBack={handleBack}
+        showSettings={showSettings}
+        setShowSettings={setShowSettings}
+        handleSettingsUpdate={handleSettingsUpdate}
+        handleTest={handleTest}
+        testContainer={testContainer}
+        setTestContainer={setTestContainer}
+        handleUndo={handleUndo}
+        handleRedo={handleRedo}
+        historyIndex={historyIndex}
+        history={history}
+        showPublish={showPublish}
+        setShowPublish={setShowPublish}
+        handlePublishSuccess={handlePublishSuccess}
+        isEditingName={isEditingName}
+        setIsEditingName={setIsEditingName}
+        nameDraft={nameDraft}
+        setNameDraft={setNameDraft}
+        commitName={commitName}
+        startNameEdit={startNameEdit}
+        displayName={displayName}
+        lbl={lbl}
+        handleAddNode={handleAddNode}
+        setGetCenter={setGetCenter}
+        botVariables={botVariables}
+      />
     </VariablesProvider>
   );
 }
