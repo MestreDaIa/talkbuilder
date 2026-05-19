@@ -11,7 +11,9 @@ import { Input } from "../../../components/ui/input";
 import { Label } from "../../../components/ui/label";
 import { browserHrefForRoute } from "../../../lib/workspaceRoutes";
 
+// v1.0.6
 export default function InvitePage() {
+  console.log("[InvitePage] Renderizado v1.0.6");
   const { token } = useParams<{ token: string }>();
   const { user, loading: authLoading, refreshProfile } = useAuth();
   const [loading, setLoading] = useState(true);
@@ -195,12 +197,14 @@ export default function InvitePage() {
         await new Promise(resolve => setTimeout(resolve, 500));
         
         // Tenta processar o convite
+        console.log("[InvitePage] Chamando RPC accept_invitation...");
         let rpcResult = await supabase.rpc("accept_invitation", {
           invitation_token: token
         });
 
         // Se falhar com PGRST202, tenta o nome alternativo que criamos
         if (rpcResult.error && rpcResult.error.code === 'PGRST202') {
+          console.warn("[InvitePage] accept_invitation não encontrada, tentando process_invite_token...");
           rpcResult = await supabase.rpc("process_invite_token", {
             token_value: token
           });
