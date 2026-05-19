@@ -10,6 +10,8 @@ export default function Header() {
   const { flags } = useEmbed();
   const { user, profile, signOut, currentWorkspace } = useAuth();
   const slug = currentWorkspace?.slug || profile?.slug;
+  const userRole = currentWorkspace?.role || 'owner';
+  const showSettings = userRole === 'owner' || userRole === 'admin';
 
   async function handleLogout() {
     await signOut();
@@ -26,45 +28,46 @@ export default function Header() {
       </span>
       <h1 className="flex-1 text-center text-base sm:text-lg font-semibold truncate">
         {profile?.slug ? `@${profile.slug}` : "Talk-Flow-Creator"}
+        {profile?.display_name ? ` - ${profile.display_name}` : ""}
       </h1>
       <div className="flex items-center shrink-0 gap-2">
-        <DropdownMenu.Root>
-          <DropdownMenu.Trigger asChild>
-            <Settings className="relative z-10 w-6 h-6 cursor-pointer" />
-          </DropdownMenu.Trigger>
+        {showSettings && (
+          <DropdownMenu.Root>
+            <DropdownMenu.Trigger asChild>
+              <Settings className="relative z-10 w-6 h-6 cursor-pointer" />
+            </DropdownMenu.Trigger>
 
-          <DropdownMenu.Content
-            side="left"
-            sideOffset={8}
-            className="relative z-10 data-[side=left]:animate-slide-down data-[side=right]:animate-slide-up p-2 bg-white rounded-md shadow-md text-gray-800 min-w-[180px]"
-          >
-            {flags.showProfile && (
+            <DropdownMenu.Content
+              side="left"
+              sideOffset={8}
+              className="relative z-10 data-[side=left]:animate-slide-down data-[side=right]:animate-slide-up p-2 bg-white rounded-md shadow-md text-gray-800 min-w-[180px]"
+            >
+              {flags.showProfile && (
+                <DropdownMenu.Item
+                  className="select-none outline-none cursor-pointer px-3 py-1.5 rounded-md data-[highlighted]:bg-gray-100 data-[highlighted]:text-green-500"
+                  onClick={() => navigate(perfilRoute(slug))}
+                >
+                  PERFIL
+                </DropdownMenu.Item>
+              )}
               <DropdownMenu.Item
                 className="select-none outline-none cursor-pointer px-3 py-1.5 rounded-md data-[highlighted]:bg-gray-100 data-[highlighted]:text-green-500"
-                onClick={() => navigate(perfilRoute(slug))}
+                onClick={() => navigate(configsRoute(slug))}
               >
-                PERFIL
+                CONFIGURAÇÕES
               </DropdownMenu.Item>
-            )}
-            <DropdownMenu.Item
-              className="select-none outline-none cursor-pointer px-3 py-1.5 rounded-md data-[highlighted]:bg-gray-100 data-[highlighted]:text-green-500"
-              onClick={() => navigate(configsRoute(slug))}
-            >
-              CONFIGURAÇÕES
-            </DropdownMenu.Item>
-            {flags.allowLogout && user && (
-              <>
-                <DropdownMenu.Separator className="h-px bg-gray-200 my-1" />
-                <DropdownMenu.Item
-                  className="select-none outline-none cursor-pointer px-3 py-1.5 rounded-md data-[highlighted]:bg-gray-100 data-[highlighted]:text-red-500 flex items-center gap-2"
-                  onClick={handleLogout}
-                >
-                  <LogOut className="w-4 h-4" /> SAIR
-                </DropdownMenu.Item>
-              </>
-            )}
-          </DropdownMenu.Content>
-        </DropdownMenu.Root>
+            </DropdownMenu.Content>
+          </DropdownMenu.Root>
+        )}
+        {flags.allowLogout && user && (
+          <button
+            onClick={handleLogout}
+            className="p-1 hover:bg-gray-700 rounded-full transition-colors flex items-center justify-center"
+            title="SAIR"
+          >
+            <LogOut className="w-6 h-6" />
+          </button>
+        )}
       </div>
     </div>
   );
