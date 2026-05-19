@@ -65,18 +65,30 @@ export default function InvitePage() {
   }, [token]);
 
   const handleAccept = async () => {
-    if (!token) return;
+    if (!token) {
+      console.error("handleAccept: Token não encontrado");
+      return;
+    }
 
     setLoading(true);
     try {
       const supabase = getSupabase();
-      if (!supabase || !user) {
-        console.warn("Supabase ou usuário não disponível para aceitar convite");
+      if (!supabase) {
+        toast({ title: "Erro", description: "Configuração do Supabase não encontrada.", variant: "destructive" });
         setLoading(false);
         return;
       }
 
-      console.log("Aceitando convite com token:", token);
+      const { data: { user: currentUser } } = await supabase.auth.getUser();
+      
+      if (!currentUser) {
+        console.warn("handleAccept: Nenhum usuário autenticado encontrado");
+        toast({ title: "Atenção", description: "Você precisa estar logado para aceitar o convite.", variant: "destructive" });
+        setLoading(false);
+        return;
+      }
+
+      console.log("Chamando RPC accept_invitation com token:", token);
       const { data, error } = await supabase.rpc("accept_invitation", {
         invitation_token: token
       });
@@ -86,33 +98,39 @@ export default function InvitePage() {
         throw error;
       }
       
+      console.log("Resposta do RPC accept_invitation:", data);
+
       if (data && data.error) {
         toast({ title: "Erro", description: data.error, variant: "destructive" });
+        return;
+      }
+
+      if (!data || !data.workspace_slug) {
+        // Fallback caso a função retorne sucesso mas sem dados esperados
+        console.warn("RPC retornou sem workspace_slug, tentando redirecionar para home");
+        setAccepted(true);
+        setTimeout(() => navigate('/'), 2000);
         return;
       }
 
       setAccepted(true);
       toast({ 
         title: "Sucesso!", 
-        description: `Agora você é membro de ${data?.workspace_name || 'equipe'}` 
+        description: `Agora você é membro de ${data.workspace_name}` 
       });
 
       // Forçar atualização do perfil e workspaces no context
       await refreshProfile();
 
       setTimeout(() => {
-        if (data?.workspace_slug) {
-          navigate(`/${data.workspace_slug}/workspace`);
-        } else {
-          navigate('/');
-        }
+        navigate(`/${data.workspace_slug}/workspace`);
       }, 1500);
 
     } catch (err: any) {
-      console.error("Catch handleAccept:", err);
+      console.error("Erro completo no handleAccept:", err);
       toast({ 
         title: "Erro ao aceitar", 
-        description: err.message || "Erro desconhecido", 
+        description: err.message || "Não foi possível processar o convite no servidor.", 
         variant: "destructive" 
       });
     } finally {
