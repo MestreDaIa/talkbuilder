@@ -810,7 +810,7 @@ export const TestPanel = ({
           continue;
         }
 
-        console.log("[TestPanel] Iniciando chamada de IA via Direct API (Gemini)");
+        console.log("[EXTERNAL-API] Iniciando chamada de IA via Conexão Direta (Gemini)");
 
         const { system, messages: contextMessages } = buildAgentContext({
           systemPrompt: `Objetivo: ${objective}\nInstruções: ${instructions}`,
