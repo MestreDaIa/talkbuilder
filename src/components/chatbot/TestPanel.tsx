@@ -937,7 +937,13 @@ export const TestPanel = ({
     setIsLoading(true);
     setCurrentInput("");
 
-    const data = await runLocalFlow(runtimeStateRef.current, { message: msgToSend, button_id: buttonId });
+    // Use a temporary state for the call to avoid blocking the input if the AI takes too long
+    // But we need to make sure we're using the latest variables
+    const currentState = runtimeStateRef.current;
+    const data = await runLocalFlow(currentState, { message: msgToSend, button_id: buttonId });
+    
+    // Check if the runtime state has changed while we were waiting (e.g., if user reset or sent multiple)
+    // Actually runLocalFlow is pure-ish relative to runtimeStateRef, it uses state and returns new state.
     applyRuntimeData(data);
 
     if (!waitTimerRef.current) setIsLoading(false);
