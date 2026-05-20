@@ -436,6 +436,12 @@ async function runFlow(execution: any, containers: any[], edges: any[], input: a
 
     // AI Node (Execução Única)
     if (nodeType === "ai-node") {
+      const hasUserInput = !!(variables["last_message"] && String(variables["last_message"]).trim());
+      if (!hasUserInput) {
+        console.log("[node:ai_skipped] sem input do usuário", node.id);
+        currentNodeId = nextFromNode(node.id, container);
+        continue;
+      }
       if (cfg.waitForInput && (!input || (input.message === undefined && input.button_id === undefined))) {
         console.log("[node:waiting_input] AI Node", node.id);
         waiting_for = "text";
