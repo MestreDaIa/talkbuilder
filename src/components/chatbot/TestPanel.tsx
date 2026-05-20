@@ -702,8 +702,7 @@ export const TestPanel = ({
         const userMsgContent = String(variables["last_message"] || "").trim();
 
         console.log(`[AI Node] ${isAgent ? 'AGENT' : 'FLOW'} execution:`, {
-          provider: cfg.provider || "openai",
-          model: cfg.model,
+          provider: "lovable-ai",
           objective,
           instructions_length: instructions.length,
           hasInput: !!userMsgContent
