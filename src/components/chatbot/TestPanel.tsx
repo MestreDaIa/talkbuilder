@@ -772,29 +772,34 @@ export const TestPanel = ({
               const modelName = (cfg.model || "gemini-1.5-flash").trim();
               const cleanModel = modelName.startsWith("models/") ? modelName.substring(7) : modelName;
               
-              // Tenta modelos em ordem de preferência se o primeiro falhar com 404
-              // Isso resolve o problema de contas novas que não têm acesso ao 1.5 e precisam do 2.0 ou aliases "latest"
-              const modelsToTry = [cleanModel];
-              // Adicionamos os modelos gemini-2.0-flash e gemini-2.0-flash-lite que são os mais estáveis atualmente
-              if (cleanModel.includes("gemini-1.5")) {
-                modelsToTry.push("gemini-2.0-flash", "gemini-2.0-flash-lite-preview-02-05", "gemini-1.5-flash");
-              } else {
-                modelsToTry.push("gemini-2.0-flash", "gemini-1.5-flash");
-              }
+              // Lista exaustiva de modelos para tentar em caso de erro de cota ou "não encontrado"
+              // Alguns usuários têm acesso apenas a modelos específicos ou versões específicas
+              const modelsToTry = [
+                cleanModel,
+                "gemini-1.5-flash",
+                "gemini-1.5-flash-8b",
+                "gemini-1.5-flash-latest",
+                "gemini-2.0-flash",
+                "gemini-2.0-flash-lite-preview-02-05",
+                "gemini-1.5-pro",
+                "gemini-1.5-pro-latest"
+              ].filter((v, i, a) => a.indexOf(v) === i); // Remove duplicatas
               
               let lastError = "";
               let success = false;
 
               for (const modelToTry of modelsToTry) {
-                try {
-                  const url = `https://generativelanguage.googleapis.com/v1beta/models/${modelToTry}:generateContent?key=${activeKey}`;
-                  const response = await fetch(url, {
-                    method: "POST",
-                    headers: { "Content-Type": "application/json" },
-                    body: JSON.stringify({
-                      system_instruction: {
-                        parts: [{ text: system }]
-                      },
+                // Tentamos primeiro v1beta (que suporta system_instruction) 
+                // e depois v1 (mais estável) como fallback se der erro de "not found"
+                const apiVersions = ["v1beta", "v1"];
+                
+                for (const apiVer of apiVersions) {
+                  try {
+                    const url = `https://generativelanguage.googleapis.com/${apiVer}/models/${modelToTry}:generateContent?key=${activeKey}`;
+                    
+                    // Se for v1, não usamos system_instruction para evitar erro de "Unknown name"
+                    // Em vez disso, anexamos ao primeiro conteúdo
+                    const payload: any = {
                       contents: [
                         {
                           role: "user",
@@ -805,28 +810,49 @@ export const TestPanel = ({
                           parts: [{ text: String(m.content || "") }]
                         })) : [])
                       ]
-                    }),
-                  });
+                    };
 
-                  if (response.ok) {
-                    const data = await response.json();
-                    aiReply = data.candidates?.[0]?.content?.parts?.[0]?.text || null;
-                    success = true;
-                    console.log(`[Gemini] Sucesso com o modelo: ${modelToTry}`);
+                    if (apiVer === "v1beta") {
+                      payload.system_instruction = {
+                        parts: [{ text: system }]
+                      };
+                    } else {
+                      // No v1, injetamos a instrução no início da primeira mensagem se possível
+                      if (payload.contents[0]) {
+                        payload.contents[0].parts[0].text = `Instruções do Sistema: ${system}\n\nPergunta do Usuário: ${payload.contents[0].parts[0].text}`;
+                      }
+                    }
+
+                    const response = await fetch(url, {
+                      method: "POST",
+                      headers: { "Content-Type": "application/json" },
+                      body: JSON.stringify(payload),
+                    });
+
+                    if (response.ok) {
+                      const data = await response.json();
+                      aiReply = data.candidates?.[0]?.content?.parts?.[0]?.text || null;
+                      success = true;
+                      console.log(`[Gemini] Sucesso com ${modelToTry} na versão ${apiVer}`);
+                      break;
+                    } else {
+                      const errorData = await response.json();
+                      lastError = errorData.error?.message || response.statusText;
+                      console.warn(`[Gemini] Falha no ${modelToTry} (${apiVer}): ${lastError}`);
+                      
+                      // Se o erro for "not found" para v1beta, tentamos v1 antes de pular o modelo
+                      if (lastError.toLowerCase().includes("not found") && apiVer === "v1beta") {
+                        continue;
+                      }
+                      // Se for outro erro (como cota), passamos para o próximo modelo
+                      break;
+                    }
+                  } catch (err: any) {
+                    lastError = err.message;
                     break;
-                  } else {
-                    const errorData = await response.json();
-                    lastError = errorData.error?.message || response.statusText;
-                    console.warn(`[Gemini] Falha no modelo ${modelToTry}: ${lastError}`);
-                    
-                    // Se o erro for "High demand" ou 404, tentamos o próximo modelo da lista
-                    const isHighDemand = lastError.toLowerCase().includes("high demand");
-                    if (response.status !== 404 && !isHighDemand) break;
                   }
-                } catch (err: any) {
-                  lastError = err.message;
-                  break;
                 }
+                if (success) break;
               }
 
               if (!success) {
