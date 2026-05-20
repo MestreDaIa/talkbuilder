@@ -1064,7 +1064,7 @@ export const TestPanel = ({
               <Input 
                 value={currentInput} 
                 onChange={(e) => setCurrentInput(e.target.value)} 
-                onKeyPress={(e) => e.key === "Enter" && !isLoading && handleSendMessage()} 
+                onKeyPress={(e) => e.key === "Enter" && handleSendMessage()} 
                 placeholder={waitingForConfig?.resPonseUserNumber || waitingForConfig?.responseUserTextInput || waitingForConfig?.placeholder || "Digite aqui"}
                 type={waitingForType === "input-number" ? (typeof waitingForConfig?.min === 'number' || typeof waitingForConfig?.max === 'number' ? "number" : "text") : waitingForType === "input-mail" ? "email" : "url"}
                 min={waitingForType === "input-number" ? waitingForConfig?.min : undefined}
@@ -1072,7 +1072,7 @@ export const TestPanel = ({
                 step={waitingForType === "input-number" ? waitingForConfig?.step : undefined}
                 className="flex-1 min-w-0"
                 style={{ background: theme?.inputBackgroundColor ? "rgba(255,255,255,0.1)" : undefined, color: theme?.inputTextColor || "inherit", borderColor: theme?.inputTextColor ? `${theme.inputTextColor}40` : undefined }}
-                disabled={isLoading}
+                disabled={isLoading && !waitingForInput}
               />
             ) : (
               <Textarea
@@ -1081,20 +1081,20 @@ export const TestPanel = ({
                 onKeyDown={(e) => {
                   if (e.key === "Enter" && !e.shiftKey) {
                     e.preventDefault();
-                    if (!isLoading) handleSendMessage();
+                    handleSendMessage();
                   }
                 }}
                 placeholder={waitingForConfig?.responseUserTextInput || waitingForConfig?.placeholder || "Digite aqui (Shift+Enter para quebrar linha)"}
                 rows={1}
                 className="flex-1 min-w-0 resize-none min-h-[40px] max-h-[160px]"
                 style={{ background: theme?.inputBackgroundColor ? "rgba(255,255,255,0.1)" : undefined, color: theme?.inputTextColor || "inherit", borderColor: theme?.inputTextColor ? `${theme.inputTextColor}40` : undefined }}
-                disabled={isLoading}
+                disabled={isLoading && !waitingForInput}
               />
             )}
             <Button 
               size="icon" 
               onClick={handleSendMessage} 
-              disabled={isLoading || !currentInput.trim()}
+              disabled={(isLoading && !waitingForInput) || !currentInput.trim()}
               style={{ background: theme?.primaryColor, color: "#ffffff" }}
             >
               <Send className="h-4 w-4" />
