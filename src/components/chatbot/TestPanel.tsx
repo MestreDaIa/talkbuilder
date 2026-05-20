@@ -770,7 +770,7 @@ export const TestPanel = ({
               }
             } else if (selectedProvider === "google") {
               let model = (cfg.model || "gemini-1.5-flash").trim().replace("gemini-2.5", "gemini-1.5");
-              if (!model.startsWith("models/")) model = `models/${model}`;
+              if (model.startsWith("models/")) model = model.substring(7);
               const url = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${encodeURIComponent(activeKey)}`;
               console.log("[TestPanel] Fetching Gemini:", url.replace(activeKey, "REDACTED"));
               const res = await fetch(url, {
