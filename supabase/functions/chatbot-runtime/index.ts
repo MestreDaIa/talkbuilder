@@ -609,14 +609,14 @@ async function runFlow(execution: any, containers: any[], edges: any[], input: a
              messages.push({ id: crypto.randomUUID(), type: "bot", content: replaceVars(welcome) });
              console.log(`[Runtime] [Node:${nodeType}] Enviou welcome message:`, welcome);
              // After sending welcome, we MUST wait for the user to reply before processing the AI prompt
-             waiting_for = "input-text";
+             waiting_for = "text";
              break;
           }
 
           // If manual mode or no welcome, just wait
           if (startMode === "manual" || !welcome) {
             console.log(`[Runtime] [Node:${nodeType}] Aguardando input inicial (manual ou sem welcome)`);
-            waiting_for = "input-text";
+            waiting_for = "text";
             break;
           }
         }
