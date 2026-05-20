@@ -768,7 +768,7 @@ export const TestPanel = ({
                 aiReply = `❌ Erro OpenAI: ${error.error?.message || res.statusText}`;
               }
             } else if (selectedProvider === "google") {
-              const model = (cfg.model || "gemini-1.5-flash").trim().replace(/^models\//, "");
+              const model = (cfg.model || "gemini-1.5-flash").trim().replace("gemini-2.5", "gemini-1.5").replace(/^models\//, "");
               const res = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${encodeURIComponent(activeKey)}`, {
 
                 method: "POST",
