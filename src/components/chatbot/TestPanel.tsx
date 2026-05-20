@@ -327,6 +327,9 @@ export const TestPanel = ({
           currentNodeId = current.node.id;
           // Forçamos a limpeza de waiting_for_input no estado para que o loop processe o nó novamente
           if (state) state.waiting_for_input = false;
+          // Impede o avanço automático para o próximo nó antes de processar a IA
+          steps = 0; 
+          waitingFor = null;
         } else {
           currentNodeId = nextFromNode(current.node.id, current.container.id, input.button_id);
         }
