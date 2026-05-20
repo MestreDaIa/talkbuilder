@@ -191,6 +191,60 @@ export const TestPanel = ({
     return null;
   };
 
+  const firstRunnableNodeOfContainer = (container: Container | null) => {
+    if (!container?.nodes?.length) return null;
+    const explicitStart = container.nodes.find((node) => node.type === "start");
+    return explicitStart?.id ?? container.nodes[0].id;
+  };
+
+  const resolveGraphStartNode = () => {
+    const explicitStart = allContainers
+      .flatMap((container) => container.nodes)
+      .find((node) => node.type === "start");
+    if (explicitStart) return explicitStart.id;
+
+    const containerById = new Map(allContainers.map((container) => [container.id, container]));
+    const incomingContainerIds = new Set<string>();
+
+    edges.forEach((edge) => {
+      if (!edge.target) return;
+      if (containerById.has(edge.target)) {
+        incomingContainerIds.add(edge.target);
+        return;
+      }
+
+      const targetNode = findNode(edge.target);
+      if (targetNode) incomingContainerIds.add(targetNode.container.id);
+    });
+
+    const compareByCanvasPosition = (a: Container, b: Container) => {
+      const ax = Number(a.position?.x ?? 0);
+      const bx = Number(b.position?.x ?? 0);
+      if (ax !== bx) return ax - bx;
+      return Number(a.position?.y ?? 0) - Number(b.position?.y ?? 0);
+    };
+
+    const rootContainers = allContainers
+      .filter((container) => container.nodes.length > 0 && !incomingContainerIds.has(container.id))
+      .sort(compareByCanvasPosition);
+
+    const startContainerByGraph = rootContainers[0] ?? [...allContainers].filter((container) => container.nodes.length > 0).sort(compareByCanvasPosition)[0] ?? null;
+    const startNodeId = firstRunnableNodeOfContainer(startContainerByGraph);
+
+    console.log("[Runtime] Start resolvido pelo grafo:", {
+      startContainerId: startContainerByGraph?.id,
+      startNodeId,
+      rootContainers: rootContainers.map((container) => container.id),
+    });
+
+    return startNodeId;
+  };
+
+  const resolveInitialNodeId = () => {
+    if (fullScreen) return resolveGraphStartNode();
+    return firstRunnableNodeOfContainer(startContainer) ?? resolveGraphStartNode();
+  };
+
   const resolveTarget = (target: string): string | null => {
     if (!target) return null;
     if (findNode(target)) return target;
