@@ -749,7 +749,7 @@ export const TestPanel = ({
         const userMsgContent = String(variables["last_message"] || "").trim();
 
         console.log(`[AI Node] ${isAgent ? 'AGENT' : 'FLOW'} execution:`, {
-          provider: "lovable-ai",
+          provider: "direct-api",
           objective,
           instructions_length: instructions.length,
           hasInput: !!userMsgContent
@@ -795,7 +795,7 @@ export const TestPanel = ({
           continue;
         }
 
-        console.log("[TestPanel] Iniciando chamada de IA via Lovable AI");
+        console.log("[TestPanel] Iniciando chamada de IA via Direct API (Gemini)");
 
         const { system, messages: contextMessages } = buildAgentContext({
           systemPrompt: `Objetivo: ${objective}\nInstruções: ${instructions}`,
@@ -807,7 +807,7 @@ export const TestPanel = ({
         let aiReply: string | null = null;
         
         try {
-          aiReply = await callLovableAI(system, contextMessages);
+          aiReply = await callAIAgent(system, contextMessages);
         } catch (e: any) { 
           console.error(e);
           aiReply = `❌ Erro na IA: ${e.message}`; 
