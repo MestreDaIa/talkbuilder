@@ -25,7 +25,8 @@ export const conversationService = {
       bot_id: botId,
       workspace_id: workspaceId,
       channel: "webchat" as const,
-      runtime_mode: "flow" as const
+      runtime_mode: "flow" as const,
+      memory: {}
     };
 
     const { data, error: createError } = await supabase
@@ -48,11 +49,37 @@ export const conversationService = {
     return data;
   },
 
+  async updateConversation(id: string, updates: Partial<Conversation>): Promise<void> {
+    if (id.startsWith("local-")) return;
+    const supabase = getSupabase();
+    const { error } = await supabase
+      .from("conversations")
+      .update({
+        ...updates,
+        updated_at: new Date().toISOString()
+      })
+      .eq("id", id);
+    
+    if (error) {
+      console.warn("Erro ao atualizar conversa:", error);
+    }
+  },
+
   async saveMessage(message: Partial<Message>): Promise<Message> {
     const supabase = getSupabase();
+    
+    // Garantir que não enviamos campos que não existem na tabela se necessário
+    const cleanMessage = {
+      conversation_id: message.conversation_id,
+      role: message.role,
+      content: message.content,
+      metadata: message.metadata,
+      created_at: message.created_at || new Date().toISOString()
+    };
+
     const { data, error } = await supabase
       .from("messages")
-      .insert(message)
+      .insert(cleanMessage)
       .select()
       .single();
 
@@ -69,6 +96,7 @@ export const conversationService = {
   },
 
   async getMessages(conversationId: string, limit = 50): Promise<Message[]> {
+    if (conversationId.startsWith("local-")) return [];
     const supabase = getSupabase();
     const { data, error } = await supabase
       .from("messages")

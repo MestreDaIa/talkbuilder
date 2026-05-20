@@ -824,6 +824,16 @@ export const TestPanel = ({
     setIsLoading(true);
     setMessages([]);
     const data = await runLocalFlow(null);
+    
+    // Persistir estado inicial se houver conversa
+    if (data.runtime_state?.conversation_id) {
+      await conversationService.updateConversation(data.runtime_state.conversation_id, {
+        runtime_mode: data.runtime_state.mode,
+        active_node_id: data.runtime_state.current_node_id,
+        memory: data.runtime_state.persistent_memory
+      });
+    }
+
     applyRuntimeData(data, true);
     if (!waitTimerRef.current) setIsLoading(false);
   };
@@ -908,6 +918,15 @@ export const TestPanel = ({
     const currentState = runtimeStateRef.current;
     const data = await runLocalFlow(currentState, { message: msgToSend, button_id: buttonId });
     
+    // Persistir estado no banco
+    if (data.runtime_state?.conversation_id) {
+      await conversationService.updateConversation(data.runtime_state.conversation_id, {
+        runtime_mode: data.runtime_state.mode,
+        active_node_id: data.runtime_state.current_node_id || data.runtime_state.active_agent_node_id,
+        memory: data.runtime_state.persistent_memory
+      });
+    }
+
     applyRuntimeData(data);
     setIsLoading(false);
 
