@@ -497,8 +497,8 @@ export const TestPanel = ({
           console.error("[http-request] failed:", err);
         }
       } else if (nodeType === "ai-node" || nodeType === "ai-agent") {
-        const objective = cfg.objective || cfg.systemPrompt || "agente de teste";
-        const instructions = firstText(cfg.instructions, cfg.prompt, cfg.message);
+        const objective = cfg.objective || cfg.systemPrompt || "assistente virtual";
+        const instructions = firstText(cfg.instructions, cfg.prompt, cfg.message) || "Ajude o usuário da melhor forma possível.";
         const hasTools = allContainers.some(c => c.nodes.some(n => n.config?.isSkill));
         
         let userMessage = String(variables.__last_agent_user_message || "").trim();
@@ -536,7 +536,9 @@ export const TestPanel = ({
               waitingFor = "input-text";
               waitingForCfg = { placeholder: "Converse com o agente..." };
             } else {
-              const systemPrompt = `Objetivo: ${objective}\nInstruções: ${instructions}\n\nEnvie uma saudação inicial amigável.`;
+              const systemPrompt = welcomeMsg 
+                ? `Objetivo: ${objective}\nInstruções: ${instructions}`
+                : `Objetivo: ${objective}\nInstruções: ${instructions}\n\nEnvie uma saudação inicial amigável.`;
               let aiReply: string | null = null;
               try {
                 if (selectedProvider === "openai") {
@@ -567,7 +569,7 @@ export const TestPanel = ({
                   }
                 }
               } catch (e) { console.error(e); }
-              nextMessages.push({ id: crypto.randomUUID(), type: "bot", content: aiReply || "Olá! Como posso ajudar?" });
+              if (aiReply) nextMessages.push({ id: crypto.randomUUID(), type: "bot", content: aiReply });
               waitingFor = "input-text";
               waitingForCfg = { placeholder: "Converse com seu agente..." };
             }
