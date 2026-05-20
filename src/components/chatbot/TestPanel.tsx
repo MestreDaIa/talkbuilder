@@ -771,17 +771,13 @@ export const TestPanel = ({
               let model = (cfg.model || "gemini-1.5-flash").trim().replace("gemini-2.5", "gemini-1.5");
               if (!model.startsWith("models/")) model = `models/${model}`;
               const res = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${encodeURIComponent(activeKey)}`, {
-
-
-
-
                 method: "POST",
                 headers: { "Content-Type": "application/json" },
                 body: JSON.stringify({
                   contents: contextMessages.length > 0 ? contextMessages.map(m => ({
                     role: m.role === "assistant" ? "model" : "user",
                     parts: [{ text: m.content }]
-                  })) : [{ role: "user", parts: [{ text: userMsgContent || "Olá!" }] }]
+                  })) : [{ role: "user", parts: [{ text: `System: ${system}\n\nUser: ${userMsgContent || "Olá!"}` }] }]
                 }),
               });
               if (res.ok) {
