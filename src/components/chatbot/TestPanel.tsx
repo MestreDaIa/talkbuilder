@@ -320,6 +320,7 @@ export const TestPanel = ({
         const currentType = String(current.node.type || "").toLowerCase();
         if (currentType === "ai-agent" || currentType === "ai-node") {
           variables.__last_agent_user_message = value ?? "";
+          // Re-executa o próprio nó de IA com a nova mensagem
           currentNodeId = current.node.id;
         } else {
           currentNodeId = nextFromNode(current.node.id, current.container.id, input.button_id);
