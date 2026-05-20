@@ -689,10 +689,10 @@ async function runFlow(execution: any, containers: any[], edges: any[], input: a
                 method: "POST",
                 headers: { "Content-Type": "application/json" },
                 body: JSON.stringify({
-                  system_instruction: {
-                    parts: [{ text: `Objetivo: ${objective}\n${instructions}` }]
-                  },
-                  contents: [{ role: "user", parts: [{ text: userMessage }] }],
+                  contents: [{ 
+                    role: "user", 
+                    parts: [{ text: `System Instruction: Objetivo: ${objective}\n${instructions}\n\nUser: ${userMessage}` }] 
+                  }],
                 }),
               });
               if (res.ok) {

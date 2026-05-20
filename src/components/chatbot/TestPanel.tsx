@@ -777,13 +777,16 @@ export const TestPanel = ({
                 method: "POST",
                 headers: { "Content-Type": "application/json" },
                 body: JSON.stringify({
-                  system_instruction: {
-                    parts: [{ text: system }]
-                  },
-                  contents: contextMessages.length > 0 ? contextMessages.map(m => ({
-                    role: m.role === "assistant" ? "model" : "user",
-                    parts: [{ text: String(m.content || "") }]
-                  })) : [{ role: "user", parts: [{ text: userMsgContent || "Olá!" }] }]
+                  contents: [
+                    {
+                      role: "user",
+                      parts: [{ text: `System Instruction: ${system}\n\nUser: ${userMsgContent || "Olá!"}` }]
+                    },
+                    ...(contextMessages.length > 0 ? contextMessages.map(m => ({
+                      role: m.role === "assistant" ? "model" : "user",
+                      parts: [{ text: String(m.content || "") }]
+                    })) : [])
+                  ]
                 }),
               });
               
