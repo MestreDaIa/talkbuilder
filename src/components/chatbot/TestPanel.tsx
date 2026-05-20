@@ -328,6 +328,15 @@ export const TestPanel = ({
     if (!conversationId && flowId) {
       const conv = await conversationService.getOrCreateConversation(visitorId, flowId, "default-workspace");
       conversationId = conv.id;
+      
+      // Se não temos um estado anterior (início de sessão), mas encontramos uma conversa no banco,
+      // retomamos o modo, o nó ativo e a memória persistente.
+      if (!state) {
+        mode = conv.runtime_mode || "flow";
+        currentNodeId = conv.active_node_id || currentNodeId;
+        Object.assign(persistentMemory, conv.memory || {});
+        console.log("[Runtime] Sessão retomada do banco:", { mode, currentNodeId, memory: persistentMemory });
+      }
     }
 
     // Lógica de Entrada de Usuário
@@ -824,6 +833,16 @@ export const TestPanel = ({
     setIsLoading(true);
     setMessages([]);
     const data = await runLocalFlow(null);
+    
+    // Persistir estado inicial se houver conversa
+    if (data.runtime_state?.conversation_id) {
+      await conversationService.updateConversation(data.runtime_state.conversation_id, {
+        runtime_mode: data.runtime_state.mode,
+        active_node_id: data.runtime_state.current_node_id,
+        memory: data.runtime_state.persistent_memory
+      });
+    }
+
     applyRuntimeData(data, true);
     if (!waitTimerRef.current) setIsLoading(false);
   };
@@ -908,6 +927,15 @@ export const TestPanel = ({
     const currentState = runtimeStateRef.current;
     const data = await runLocalFlow(currentState, { message: msgToSend, button_id: buttonId });
     
+    // Persistir estado no banco
+    if (data.runtime_state?.conversation_id) {
+      await conversationService.updateConversation(data.runtime_state.conversation_id, {
+        runtime_mode: data.runtime_state.mode,
+        active_node_id: data.runtime_state.current_node_id || data.runtime_state.active_agent_node_id,
+        memory: data.runtime_state.persistent_memory
+      });
+    }
+
     applyRuntimeData(data);
     setIsLoading(false);
 

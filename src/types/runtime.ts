@@ -25,6 +25,8 @@ export interface Conversation {
   visitor_id: string;
   channel: "webchat" | "whatsapp" | "api";
   runtime_mode: RuntimeMode;
+  active_node_id?: string | null;
+  memory?: PersistentMemory;
   created_at?: string;
   updated_at?: string;
 }
