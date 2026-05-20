@@ -691,6 +691,10 @@ export const TestPanel = ({
                 content: `⚠️ Não consegui obter resposta do provedor ${selectedProvider.toUpperCase()}. Verifique se a chave de API é válida e se o modelo "${cfg.model || "(padrão)"}" está disponível. Veja o console do navegador para detalhes.`,
               });
             }
+
+            // Mantém o agente aguardando a próxima mensagem do usuário (conversa contínua)
+            waitingFor = "input-text";
+            waitingForCfg = { placeholder: "Converse com seu agente..." };
           } else {
             const startMode = cfg.startMode || "automatic";
             const welcomeMsg = cfg.welcomeMessage;
