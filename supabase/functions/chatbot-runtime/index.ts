@@ -188,8 +188,22 @@ function json(data: any, status = 200) {
 }
 
 async function handleAiCompletion(payload: any) {
+  try {
+    const content = await callLovableAI({
+      system: payload?.system,
+      messages: payload?.messages,
+    });
+    return json({ content });
+  } catch (e: any) {
+    const message = e?.message || "Erro ao chamar a IA.";
+    const status = e?.status || 500;
+    return json({ error: message }, status);
+  }
+}
+
+async function callLovableAI(payload: { system?: string; messages?: any[] }) {
   const LOVABLE_API_KEY = Deno.env.get("LOVABLE_API_KEY");
-  if (!LOVABLE_API_KEY) return json({ error: "Lovable AI não está configurado." }, 500);
+  if (!LOVABLE_API_KEY) throw Object.assign(new Error("Lovable AI não está configurado."), { status: 500 });
 
   const system = String(payload?.system || "Você é um assistente útil. Responda de forma clara e objetiva.").slice(0, 20000);
   const messages = Array.isArray(payload?.messages) ? payload.messages : [];
@@ -211,15 +225,15 @@ async function handleAiCompletion(payload: any) {
   });
 
   if (!response.ok) {
-    if (response.status === 429) return json({ error: "Limite de IA atingido. Tente novamente em instantes." }, 429);
-    if (response.status === 402) return json({ error: "Créditos de IA insuficientes. Adicione saldo em Cloud & AI balance." }, 402);
+    if (response.status === 429) throw Object.assign(new Error("Limite de IA atingido. Tente novamente em instantes."), { status: 429 });
+    if (response.status === 402) throw Object.assign(new Error("Créditos de IA insuficientes. Adicione saldo em Cloud & AI balance."), { status: 402 });
     const detail = await response.text().catch(() => "");
     console.error("[lovable-ai] gateway error", response.status, detail);
-    return json({ error: "Erro ao chamar a IA." }, 500);
+    throw Object.assign(new Error("Erro ao chamar a IA."), { status: 500 });
   }
 
   const data = await response.json();
-  return json({ content: data.choices?.[0]?.message?.content || "" });
+  return data.choices?.[0]?.message?.content || "";
 }
 
 function normalizeClientState(state: any) {
