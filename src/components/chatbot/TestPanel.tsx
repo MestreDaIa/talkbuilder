@@ -343,11 +343,54 @@ export const TestPanel = ({
     const replaceVars = (text: string) => cleanText(text).replace(/{{(.*?)}}/g, (_, key) => variables[key.trim()] ?? `{{${key}}}`);
 
     const callLovableAI = async (system: string, contextMessages: Array<{ role: string; content: string }>) => {
-      // Revertido: Não usa mais a Edge Function do Lovable Cloud
-      // Agora você deve configurar sua própria lógica de chamada ao Supabase externo
-      // ou usar as chaves de API configuradas nos nós.
-      console.warn("Lovable Cloud desativado. Chamada de IA backend ignorada.");
-      throw new Error("Lovable Cloud desativado. Use seu provedor configurado nos nós com sua própria API Key.");
+      // Revertido para usar chamadas diretas ao Gemini conforme solicitado (Supabase Externo / Client-side)
+      const node = findNode(currentNodeId)?.node;
+      const cfg = node?.config || {};
+      const apiKey = cfg.apiKey;
+      const model = cfg.model || "gemini-1.5-flash";
+
+      if (!apiKey) {
+        throw new Error("API Key do Gemini não configurada neste nó.");
+      }
+
+      // Limpeza do nome do modelo para evitar o erro de "models/gemini-1.5-flash is not found"
+      const cleanModel = model.startsWith("google/") ? model.replace("google/", "") : model;
+
+      try {
+        const response = await fetch(
+          `https://generativelanguage.googleapis.com/v1beta/models/${cleanModel}:generateContent?key=${apiKey}`,
+          {
+            method: "POST",
+            headers: {
+              "Content-Type": "application/json",
+            },
+            body: JSON.stringify({
+              contents: [
+                { role: "user", parts: [{ text: system }] },
+                ...contextMessages.map(m => ({
+                  role: m.role === "assistant" ? "model" : "user",
+                  parts: [{ text: m.content }]
+                }))
+              ],
+              generationConfig: {
+                temperature: cfg.temperature ?? 0.7,
+                maxOutputTokens: cfg.maxTokens ?? 1000,
+              }
+            }),
+          }
+        );
+
+        if (!response.ok) {
+          const errorData = await response.json();
+          throw new Error(errorData.error?.message || `Erro HTTP ${response.status}`);
+        }
+
+        const data = await response.json();
+        return data.candidates?.[0]?.content?.parts?.[0]?.text || "Sem resposta da IA.";
+      } catch (error: any) {
+        console.error("Erro na chamada direta ao Gemini:", error);
+        throw error;
+      }
     };
 
     const parseWaitMs = (cfg: any) => {
