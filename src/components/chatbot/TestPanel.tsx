@@ -665,18 +665,50 @@ export const TestPanel = ({
         const objective = cfg.objective || cfg.systemPrompt || "assistente virtual";
         const instructions = firstText(cfg.instructions, cfg.prompt, cfg.message) || "Ajude o usuário da melhor forma possível.";
         
+        // No TestPanel, usamos o variables["last_message"] que foi setado no início do runLocalFlow
+        const userMsgContent = String(variables["last_message"] || "").trim();
+
         console.log(`[AI Node] ${isAgent ? 'AGENT' : 'FLOW'} execution:`, {
           provider: cfg.provider || "openai",
           model: cfg.model,
           objective,
-          instructions_length: instructions.length
+          instructions_length: instructions.length,
+          hasInput: !!userMsgContent
         });
 
+        // 1. Lógica de Início (se não houver mensagem do usuário ainda)
+        if (!userMsgContent) {
+          const startMode = cfg.startMode || "automatic";
+          const welcome = cfg.welcomeMessage || "";
+
+          if (welcome && startMode === "automatic") {
+            const botMsg: Message = {
+              id: crypto.randomUUID(),
+              conversation_id: conversationId || "temp",
+              role: "assistant",
+              type: "bot",
+              content: replaceVars(welcome),
+              isHtml: true,
+              created_at: new Date().toISOString()
+            };
+            nextMessages.push(botMsg);
+            if (conversationId) conversationService.saveMessage(botMsg);
+
+            waitingFor = "input-text";
+            waitingForCfg = { placeholder: "Digite sua resposta..." };
+            break;
+          }
+
+          if (startMode === "manual" || !welcome) {
+            waitingFor = "input-text";
+            waitingForCfg = { placeholder: "Digite sua mensagem..." };
+            break;
+          }
+        }
         
-        // Verificação de intenção de saída (Exit Intents)
-        const userMsgContent = String(variables["last_message"] || "").toLowerCase();
+        // 2. Verificação de intenção de saída (apenas para Agente)
         const exitPhrases = ["voltar menu", "sair", "parar", "cancelar", "exit", "stop"];
-        if (isAgent && exitPhrases.some(p => userMsgContent.includes(p))) {
+        if (isAgent && exitPhrases.some(p => userMsgContent.toLowerCase().includes(p))) {
           console.log("[AI Agent] Exit intent detectado, voltando para o Flow.");
           mode = "flow";
           activeAgentNodeId = null;
@@ -700,7 +732,7 @@ export const TestPanel = ({
         let aiReply: string | null = null;
         
         if (!activeKey) {
-          aiReply = `🤖 [SIMULAÇÃO]\nConfigure uma chave de API para o provedor ${nodeProvider.toUpperCase()}.`;
+          aiReply = `🤖 [SIMULAÇÃO]\nConfigure uma chave de API para o provedor ${nodeProvider.toUpperCase()}.\nRecebi: "${userMsgContent}"`;
         } else {
           try {
             if (selectedProvider === "openai") {
@@ -725,7 +757,7 @@ export const TestPanel = ({
                   contents: contextMessages.length > 0 ? contextMessages.map(m => ({
                     role: m.role === "assistant" ? "model" : "user",
                     parts: [{ text: m.content }]
-                  })) : [{ role: "user", parts: [{ text: "Olá!" }] }]
+                  })) : [{ role: "user", parts: [{ text: userMsgContent || "Olá!" }] }]
                 }),
               });
               if (res.ok) {
@@ -757,6 +789,9 @@ export const TestPanel = ({
           } as Message);
         }
 
+        // Limpa a última mensagem processada para não re-processar no próximo node se houver loop
+        variables["last_message"] = "";
+
         if (isAgent) {
           mode = "agent";
           activeAgentNodeId = node.id;
@@ -765,13 +800,9 @@ export const TestPanel = ({
           console.log("[Runtime] Modo AGENTE ativado: aguardando input do usuário para continuar conversa.");
           break; // Agent pausa o fluxo e assume
         } else {
-          // AI Node pontual: continua o fluxo
+          // AI Node pontual: avança para o próximo node após a resposta
           const nextId = nextFromNode(node.id, container.id);
           console.log("[Runtime] AI Node concluído. Avançando para o próximo nó:", nextId);
-          if (!nextId) {
-            waitingFor = "input-text";
-            waitingForCfg = { placeholder: "Digite aqui..." };
-          }
           currentNodeId = nextId;
           continue;
         }
