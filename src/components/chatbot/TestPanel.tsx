@@ -398,7 +398,7 @@ export const TestPanel = ({
       const { node, container } = found;
       const cfg = node.config || {};
       const nodeType = String(node.type || "").toLowerCase();
-      console.log(`[Runtime] [Node:${nodeType}] Executando: ${node.id} (${node.name || 'sem nome'})`, {
+      console.log(`[Runtime] [Node:${nodeType}] Executando: ${node.id}`, {
         container: container.id,
         mode
       });
