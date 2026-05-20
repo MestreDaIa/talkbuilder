@@ -22,6 +22,10 @@ Deno.serve(async (req: Request) => {
     const body = await req.json();
     const { action, flow_id: flowRef, contact_id, channel = "webchat", payload } = body || {};
 
+    if (action === "ai-completion") {
+      return await handleAiCompletion(payload || {});
+    }
+
     if (!action || !flowRef || !contact_id) {
       return json({ error: "missing required fields: action, flow_id, contact_id" }, 400);
     }
@@ -181,6 +185,41 @@ function json(data: any, status = 200) {
     status,
     headers: { ...corsHeaders, "Content-Type": "application/json" },
   });
+}
+
+async function handleAiCompletion(payload: any) {
+  const LOVABLE_API_KEY = Deno.env.get("LOVABLE_API_KEY");
+  if (!LOVABLE_API_KEY) return json({ error: "Lovable AI não está configurado." }, 500);
+
+  const system = String(payload?.system || "Você é um assistente útil. Responda de forma clara e objetiva.").slice(0, 20000);
+  const messages = Array.isArray(payload?.messages) ? payload.messages : [];
+  const safeMessages = messages
+    .filter((m: any) => (m?.role === "user" || m?.role === "assistant") && typeof m?.content === "string")
+    .slice(-20)
+    .map((m: any) => ({ role: m.role, content: m.content.slice(0, 20000) }));
+
+  const response = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
+    method: "POST",
+    headers: {
+      Authorization: `Bearer ${LOVABLE_API_KEY}`,
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify({
+      model: "google/gemini-3-flash-preview",
+      messages: [{ role: "system", content: system }, ...safeMessages],
+    }),
+  });
+
+  if (!response.ok) {
+    if (response.status === 429) return json({ error: "Limite de IA atingido. Tente novamente em instantes." }, 429);
+    if (response.status === 402) return json({ error: "Créditos de IA insuficientes. Adicione saldo em Cloud & AI balance." }, 402);
+    const detail = await response.text().catch(() => "");
+    console.error("[lovable-ai] gateway error", response.status, detail);
+    return json({ error: "Erro ao chamar a IA." }, 500);
+  }
+
+  const data = await response.json();
+  return json({ content: data.choices?.[0]?.message?.content || "" });
 }
 
 function normalizeClientState(state: any) {
