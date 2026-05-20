@@ -72,39 +72,11 @@ export const AIConfig = ({ config, setConfig }: AIConfigProps) => {
 
   return (
     <div className="p-4 space-y-6">
-      <div className="space-y-4 pb-4 border-b">
-        <Label className="text-sm font-semibold flex items-center gap-2">
-          <Sparkles className="h-4 w-4 text-primary" />
-          Comportamento de Início
-        </Label>
-        <div className="grid grid-cols-2 gap-4">
-          <div className="space-y-2">
-            <Label>Modo de Início</Label>
-            <Select 
-              value={startMode} 
-              onValueChange={(v) => setConfig({ ...config, startMode: v })}
-            >
-              <SelectTrigger>
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="automatic">Agente Inicia</SelectItem>
-                <SelectItem value="manual">Aguardar Usuário</SelectItem>
-              </SelectContent>
-            </Select>
-          </div>
-          {startMode === "automatic" && (
-            <div className="space-y-2">
-              <Label>Mensagem de Boas-vindas</Label>
-              <Input 
-                placeholder="Ex: Olá! Como posso ajudar?"
-                value={welcomeMessage}
-                onChange={(e) => setConfig({ ...config, welcomeMessage: e.target.value })}
-              />
-            </div>
-          )}
-        </div>
+      <div className="flex items-center gap-2 pb-2 border-b">
+        <Sparkles className="h-5 w-5 text-primary" />
+        <h3 className="font-semibold text-sm">Configuração de IA (Processamento Único)</h3>
       </div>
+
 
       <div className="grid grid-cols-2 gap-4">
         <div className="space-y-2">

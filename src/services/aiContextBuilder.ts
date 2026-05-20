@@ -41,12 +41,12 @@ export const buildAgentContext = ({
   // 4. Formatação da Base de Conhecimento
   let kbStr = "";
   if (knowledgeBase) {
-    const files = (knowledgeBase.kbFiles || [])
+    const files = (knowledgeBase.kbFilesEnabled ? (knowledgeBase.kbFiles || []) : [])
       .filter((f: any) => f.content && f.content.length > 0)
       .map((f: any) => `### DOCUMENTO: ${f.name}\nCONTEÚDO:\n${f.content}`)
       .join("\n\n");
     
-    const links = (knowledgeBase.kbLinks || [])
+    const links = (knowledgeBase.kbLinksEnabled ? (knowledgeBase.kbLinks || []) : [])
       .filter((l: any) => l.url)
       .map((l: any) => `- Link: ${l.url}`)
       .join("\n");
@@ -55,6 +55,7 @@ export const buildAgentContext = ({
       kbStr = `\n\n[INFORMAÇÕES DE SUPORTE - BASE DE CONHECIMENTO]\nVocê DEVE usar as informações abaixo como sua fonte principal de verdade. Se o usuário perguntar algo que está nestes documentos, responda EXATAMENTE o que está neles.\n\n${files}\n${links}`;
     }
   }
+
 
   // 5. Montagem do prompt do sistema
   const fullSystemPrompt = `${systemPrompt}${memoryStr}${varsStr}${kbStr}\n\nResponda sempre de forma natural e prestativa.`;
