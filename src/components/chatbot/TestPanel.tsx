@@ -320,6 +320,7 @@ export const TestPanel = ({
         const currentType = String(current.node.type || "").toLowerCase();
         if (currentType === "ai-agent" || currentType === "ai-node") {
           variables.__last_agent_user_message = value ?? "";
+          // Re-executa o próprio nó de IA com a nova mensagem
           currentNodeId = current.node.id;
         } else {
           currentNodeId = nextFromNode(current.node.id, current.container.id, input.button_id);
@@ -692,9 +693,10 @@ export const TestPanel = ({
               });
             }
 
-            // Mantém o agente aguardando a próxima mensagem do usuário (conversa contínua)
+            // Reabre o input e para a execução aqui, forçando o loop a esperar a próxima interação
             waitingFor = "input-text";
             waitingForCfg = { placeholder: "Converse com seu agente..." };
+            break; // Garante que não continue para o próximo nó automaticamente
           } else {
             const startMode = cfg.startMode || "automatic";
             const welcomeMsg = cfg.welcomeMessage;
