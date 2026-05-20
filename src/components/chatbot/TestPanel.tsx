@@ -777,18 +777,26 @@ export const TestPanel = ({
                 method: "POST",
                 headers: { "Content-Type": "application/json" },
                 body: JSON.stringify({
+                  system_instruction: {
+                    parts: [{ text: system }]
+                  },
                   contents: contextMessages.length > 0 ? contextMessages.map(m => ({
                     role: m.role === "assistant" ? "model" : "user",
                     parts: [{ text: String(m.content || "") }]
-                  })) : [{ role: "user", parts: [{ text: `System: ${system}\n\nUser: ${userMsgContent || "Olá!"}` }] }]
+                  })) : [{ role: "user", parts: [{ text: userMsgContent || "Olá!" }] }]
                 }),
               });
+              
               if (res.ok) {
                 const data = await res.json();
                 aiReply = data.candidates?.[0]?.content?.parts?.[0]?.text || null;
               } else {
-                const error = await res.json();
-                aiReply = `❌ Erro Gemini: ${error.error?.message || res.statusText}`;
+                let errorMsg = res.statusText;
+                try {
+                  const error = await res.json();
+                  errorMsg = error.error?.message || errorMsg;
+                } catch (jsonErr) {}
+                aiReply = `❌ Erro Gemini: ${errorMsg}`;
               }
             }
           } catch (e: any) { 
