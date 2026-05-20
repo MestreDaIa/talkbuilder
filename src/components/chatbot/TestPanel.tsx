@@ -342,6 +342,24 @@ export const TestPanel = ({
     const cleanText = (text: string) => richToPlainText(text);
     const replaceVars = (text: string) => cleanText(text).replace(/{{(.*?)}}/g, (_, key) => variables[key.trim()] ?? `{{${key}}}`);
 
+    const callLovableAI = async (system: string, contextMessages: Array<{ role: string; content: string }>) => {
+      const baseUrl = import.meta.env.VITE_SUPABASE_URL || "https://fwoescubnnagdvwasbjl.supabase.co";
+      const response = await fetch(`${baseUrl}/functions/v1/chatbot-runtime`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          action: "ai-completion",
+          flow_id: flowId || "test-panel",
+          contact_id: contactIdRef.current,
+          payload: { system, messages: contextMessages },
+        }),
+      });
+
+      const data = await response.json().catch(() => ({}));
+      if (!response.ok || data.error) throw new Error(data.error || "Erro ao chamar a IA.");
+      return String(data.content || "");
+    };
+
     const parseWaitMs = (cfg: any) => {
       const amount = Math.max(1, Number(cfg.waitTime ?? cfg.duration ?? cfg.seconds ?? 5) || 5);
       const unit = String(cfg.timeUnit ?? cfg.unit ?? "seconds").toLowerCase();
