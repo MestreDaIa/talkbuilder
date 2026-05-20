@@ -763,8 +763,8 @@ export const TestPanel = ({
         // No TestPanel, usamos o variables["last_message"] que foi setado no início do runLocalFlow
         const userMsgContent = String(variables["last_message"] || "").trim();
 
-        console.log(`[AI Node] ${isAgent ? 'AGENT' : 'FLOW'} execution:`, {
-          provider: "direct-api",
+        console.log(`[AI-NODE-EXEC] ${isAgent ? 'AGENT' : 'FLOW'} execution:`, {
+          provider: "external-direct-api",
           objective,
           instructions_length: instructions.length,
           hasInput: !!userMsgContent
