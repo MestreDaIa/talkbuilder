@@ -696,6 +696,36 @@ export const TestPanel = ({
                 console.error("[AI Node] Gemini Error:", errorData);
                 aiReply = `❌ Erro Gemini: ${errorData.error?.message || res.statusText}`;
               }
+            } else if (selectedProvider === "anthropic") {
+              const model = (cfg.model || "claude-3-haiku-20240307").trim();
+              console.log("[AI Node] Sending to Anthropic:", { model, system, contextMessages });
+              
+              const res = await fetch("https://api.anthropic.com/v1/messages", {
+                method: "POST",
+                headers: {
+                  "x-api-key": activeKey,
+                  "anthropic-version": "2023-06-01",
+                  "Content-Type": "application/json",
+                  "dangerously-allow-browser": "true"
+                },
+                body: JSON.stringify({
+                  model: model,
+                  max_tokens: 1024,
+                  system: system,
+                  messages: contextMessages.map(m => ({
+                    role: m.role === "assistant" ? "assistant" : "user",
+                    content: m.content
+                  }))
+                }),
+              });
+              if (res.ok) {
+                const data = await res.json();
+                aiReply = data.content?.[0]?.text || null;
+              } else {
+                const errorData = await res.json();
+                console.error("[AI Node] Anthropic Error:", errorData);
+                aiReply = `❌ Erro Anthropic: ${errorData.error?.message || res.statusText}`;
+              }
             }
           } catch (e: any) { 
             console.error(e);
