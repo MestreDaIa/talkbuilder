@@ -683,8 +683,11 @@ async function runFlow(execution: any, containers: any[], edges: any[], input: a
 
             } else if (provider === "google" || provider === "gemini") {
               let model = (cfg.model || "gemini-1.5-flash").trim();
+              // Auto-fix for the accidental "2.5" version
+              model = model.replace("gemini-2.5", "gemini-1.5");
               // Remove "models/" prefix if present
               model = model.replace(/^models\//, "");
+
 
               const res = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${activeKey}`, {
                 method: "POST",
