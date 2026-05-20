@@ -1,7 +1,7 @@
 export const AI_PROVIDERS = [
-  { id: "gemini", name: "Google Gemini", needsApiKey: true },
   { id: "openai", name: "OpenAI", needsApiKey: true },
   { id: "groq", name: "Groq", needsApiKey: true },
+  { id: "gemini", name: "Google Gemini", needsApiKey: true },
   { id: "anthropic", name: "Anthropic Claude", needsApiKey: true },
   { id: "openrouter", name: "OpenRouter", needsApiKey: true },
   { id: "deepseek", name: "DeepSeek", needsApiKey: true },
@@ -10,9 +10,9 @@ export const AI_PROVIDERS = [
 ];
 
 export const MODELS_BY_PROVIDER: Record<string, string[]> = {
-  gemini: ["google/gemini-1.5-flash", "google/gemini-1.5-pro", "google/gemini-2.0-flash-exp"],
   openai: ["gpt-4o", "gpt-4o-mini", "gpt-4-turbo", "gpt-3.5-turbo"],
   groq: ["llama3-70b-8192", "llama3-8b-8192", "mixtral-8x7b-32768", "gemma-7b-it"],
+  gemini: ["gemini-2.5-flash", "gemini-2.5-pro", "gemini-2.0-flash"],
   anthropic: ["claude-3-5-sonnet-20240620", "claude-3-opus-20240229", "claude-3-sonnet-20240229", "claude-3-haiku-20240307"],
   openrouter: ["auto"],
   deepseek: ["deepseek-chat", "deepseek-coder"],

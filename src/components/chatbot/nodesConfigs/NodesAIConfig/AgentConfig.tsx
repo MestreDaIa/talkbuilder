@@ -20,7 +20,7 @@ interface AgentConfigProps {
 }
 
 export const AgentConfig = ({ config, setConfig }: AgentConfigProps) => {
-  const provider = config.provider || "gemini";
+  const provider = config.provider || "openai";
   const model = config.model || MODELS_BY_PROVIDER[provider]?.[0] || "";
   const apiKey = config.apiKey || "";
   const objective = config.objective || "";

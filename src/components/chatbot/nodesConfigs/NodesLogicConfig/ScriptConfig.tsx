@@ -121,7 +121,7 @@ export const ScriptConfig = ({ config, setConfig }: ScriptConfigProps) => {
       <div className="flex items-center justify-between">
         <div>
           <Label htmlFor="executeOnServer">Executar no Servidor</Label>
-          <p className="text-xs text-muted-foreground">Requer backend configurado</p>
+          <p className="text-xs text-muted-foreground">Requer Lovable Cloud</p>
         </div>
         <Switch
           id="executeOnServer"

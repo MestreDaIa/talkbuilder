@@ -32,7 +32,7 @@ export const AIConfig = ({ config, setConfig }: AIConfigProps) => {
   
   const variableNames = getAllVariableNames();
 
-  const provider = config.provider || "gemini";
+  const provider = config.provider || "openai";
   const model = config.model || MODELS_BY_PROVIDER[provider]?.[0] || "";
   const apiKey = config.apiKey || "";
   const systemPrompt = config.systemPrompt || "";

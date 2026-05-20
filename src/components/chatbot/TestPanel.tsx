@@ -191,60 +191,6 @@ export const TestPanel = ({
     return null;
   };
 
-  const firstRunnableNodeOfContainer = (container: Container | null) => {
-    if (!container?.nodes?.length) return null;
-    const explicitStart = container.nodes.find((node) => node.type === "start");
-    return explicitStart?.id ?? container.nodes[0].id;
-  };
-
-  const resolveGraphStartNode = () => {
-    const explicitStart = allContainers
-      .flatMap((container) => container.nodes)
-      .find((node) => node.type === "start");
-    if (explicitStart) return explicitStart.id;
-
-    const containerById = new Map(allContainers.map((container) => [container.id, container]));
-    const incomingContainerIds = new Set<string>();
-
-    edges.forEach((edge) => {
-      if (!edge.target) return;
-      if (containerById.has(edge.target)) {
-        incomingContainerIds.add(edge.target);
-        return;
-      }
-
-      const targetNode = findNode(edge.target);
-      if (targetNode) incomingContainerIds.add(targetNode.container.id);
-    });
-
-    const compareByCanvasPosition = (a: Container, b: Container) => {
-      const ax = Number(a.position?.x ?? 0);
-      const bx = Number(b.position?.x ?? 0);
-      if (ax !== bx) return ax - bx;
-      return Number(a.position?.y ?? 0) - Number(b.position?.y ?? 0);
-    };
-
-    const rootContainers = allContainers
-      .filter((container) => container.nodes.length > 0 && !incomingContainerIds.has(container.id))
-      .sort(compareByCanvasPosition);
-
-    const startContainerByGraph = rootContainers[0] ?? [...allContainers].filter((container) => container.nodes.length > 0).sort(compareByCanvasPosition)[0] ?? null;
-    const startNodeId = firstRunnableNodeOfContainer(startContainerByGraph);
-
-    console.log("[Runtime] Start resolvido pelo grafo:", {
-      startContainerId: startContainerByGraph?.id,
-      startNodeId,
-      rootContainers: rootContainers.map((container) => container.id),
-    });
-
-    return startNodeId;
-  };
-
-  const resolveInitialNodeId = () => {
-    if (fullScreen) return resolveGraphStartNode();
-    return firstRunnableNodeOfContainer(startContainer) ?? resolveGraphStartNode();
-  };
-
   const resolveTarget = (target: string): string | null => {
     if (!target) return null;
     if (findNode(target)) return target;
@@ -325,7 +271,7 @@ export const TestPanel = ({
 
     const runLocalFlow = async (state: RuntimeState | null, input?: { message?: string; button_id?: string }) => {
     let mode: RuntimeMode = state?.mode || "flow";
-    let currentNodeId = state?.current_node_id || resolveInitialNodeId() || null;
+    let currentNodeId = state?.current_node_id || startContainer?.nodes?.[0]?.id || null;
     let activeAgentNodeId = state?.active_agent_node_id || null;
     const variables = { ...(state?.variables || {}) };
     const persistentMemory: PersistentMemory = { ...(state?.persistent_memory || {}) };
@@ -341,138 +287,6 @@ export const TestPanel = ({
     const firstText = (...values: any[]) => String(values.find((v) => typeof v === "string" && v.trim()) || "");
     const cleanText = (text: string) => richToPlainText(text);
     const replaceVars = (text: string) => cleanText(text).replace(/{{(.*?)}}/g, (_, key) => variables[key.trim()] ?? `{{${key}}}`);
-
-    const callAIAgent = async (system: string, contextMessages: Array<{ role: string; content: string }>) => {
-      const node = findNode(currentNodeId)?.node;
-      const cfg = node?.config || {};
-      const apiKey = cfg.apiKey;
-      const model = cfg.model || "gemini-1.5-flash";
-
-      if (!apiKey) {
-        throw new Error("Chave de API não configurada neste nó.");
-      }
-
-      const modelMap: Record<string, string> = {
-        "google/gemini-1.5-flash": "gemini-1.5-flash",
-        "google/gemini-1.5-pro": "gemini-1.5-pro",
-        "google/gemini-2.0-flash-exp": "gemini-2.0-flash-exp",
-        "gemini-1.5-flash": "gemini-1.5-flash",
-        "gemini-1.5-pro": "gemini-1.5-pro",
-        "gemini-1.5-flash-latest": "gemini-1.5-flash",
-        "gemini-1.5-pro-latest": "gemini-1.5-pro",
-        "gemini-2.0-flash": "gemini-2.0-flash"
-      };
-
-      const cleanModel = modelMap[model] || (model.startsWith("google/") ? model.replace("google/", "") : model);
-
-      const tryFetch = async (apiVersion: string, useSystemInstruction: boolean) => {
-        const formattedMessages: any[] = [];
-        let lastRole: string | null = null;
-
-        contextMessages.forEach(m => {
-          const role = m.role === "assistant" ? "model" : "user";
-          if (role === lastRole && formattedMessages.length > 0) {
-            formattedMessages[formattedMessages.length - 1].parts[0].text += "\n" + m.content;
-          } else {
-            formattedMessages.push({ role, parts: [{ text: m.content }] });
-            lastRole = role;
-          }
-        });
-
-        const body: any = {
-          contents: formattedMessages,
-          generationConfig: {
-            temperature: cfg.temperature ?? 0.7,
-            maxOutputTokens: cfg.maxTokens ?? 1000,
-          }
-        };
-
-        if (system) {
-          if (useSystemInstruction) {
-            body.system_instruction = {
-              parts: [{ text: system }]
-            };
-          } else {
-            // Fallback: injetar no início das mensagens se system_instruction não for suportado
-            if (formattedMessages.length > 0 && formattedMessages[0].role === "user") {
-              formattedMessages[0].parts[0].text = `INSTRUÇÕES DO SISTEMA:\n${system}\n\n---\n\nUSUÁRIO: ${formattedMessages[0].parts[0].text}`;
-            } else {
-              formattedMessages.unshift({
-                role: "user",
-                parts: [{ text: `INSTRUÇÕES DO SISTEMA: ${system}` }]
-              });
-            }
-          }
-        }
-
-        const url = `https://generativelanguage.googleapis.com/${apiVersion}/models/${cleanModel}:generateContent?key=${apiKey}`;
-        
-        return await fetch(url, {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify(body),
-        });
-      };
-
-      try {
-        console.log(`[EXTERNAL-API] Chamada direta ao Gemini: ${cleanModel}`);
-        
-        // Tentativa 1: v1beta com system_instruction (O Google recomenda v1beta para modelos 1.5 e 2.0)
-        let response = await tryFetch("v1beta", true);
-        
-        if (!response.ok) {
-          const firstErrorData = await response.json().catch(() => ({}));
-          const firstMsg = firstErrorData.error?.message || "";
-          console.log(`[EXTERNAL-API] Erro na tentativa 1 (v1beta + system): ${firstMsg}`);
-
-          // Tentativa 2: v1beta sem system_instruction (fallback de segurança)
-          if (firstMsg.includes("system_instruction") || firstMsg.includes("Unknown name")) {
-            console.log(`[EXTERNAL-API] Tentando v1beta sem system_instruction...`);
-            response = await tryFetch("v1beta", false);
-          } else {
-            // Tentativa 3: v1 (fallback para modelos mais antigos ou estáveis)
-            console.log(`[EXTERNAL-API] Tentando v1...`);
-            response = await tryFetch("v1", false);
-          }
-        }
-
-        if (!response.ok) {
-          const finalErrorData = await response.json().catch(() => ({}));
-          const finalMsg = finalErrorData.error?.message || `Erro HTTP ${response.status}`;
-          
-          // Se ainda falhar, tenta um último recurso: gemini-1.5-flash-latest na v1beta
-          if (cleanModel === "gemini-1.5-flash") {
-            console.log("[EXTERNAL-API] Tentativa final com gemini-1.5-flash-latest...");
-            const lastUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash-latest:generateContent?key=${apiKey}`;
-            const lastBody = {
-              contents: [{ role: "user", parts: [{ text: contextMessages[contextMessages.length - 1].content }] }]
-            };
-            response = await fetch(lastUrl, {
-              method: "POST",
-              headers: { "Content-Type": "application/json" },
-              body: JSON.stringify(lastBody),
-            });
-          }
-
-          if (!response.ok) {
-            throw new Error(finalMsg);
-          }
-        }
-
-        const data = await response.json();
-        const text = data.candidates?.[0]?.content?.parts?.[0]?.text;
-        
-        if (!text) {
-          console.error("[EXTERNAL-API] Resposta sem conteúdo:", data);
-          return "O Gemini não retornou nenhum texto. Verifique se o modelo suporta esta requisição.";
-        }
-        
-        return text;
-      } catch (error: any) {
-        console.error("[EXTERNAL-API] Erro final na chamada:", error);
-        throw error;
-      }
-    };
 
     const parseWaitMs = (cfg: any) => {
       const amount = Math.max(1, Number(cfg.waitTime ?? cfg.duration ?? cfg.seconds ?? 5) || 5);
@@ -514,18 +328,6 @@ export const TestPanel = ({
     if (!conversationId && flowId) {
       const conv = await conversationService.getOrCreateConversation(visitorId, flowId, "default-workspace");
       conversationId = conv.id;
-      
-      // Se não temos um estado anterior (início de sessão), mas encontramos uma conversa no banco,
-      // retomamos o modo, o nó ativo e a memória persistente.
-      if (!state) {
-        Object.assign(persistentMemory, conv.memory || {});
-        console.log("[Runtime] Nova execução iniciada no começo do fluxo; memória carregada do banco sem retomar nó antigo:", {
-          previousMode: conv.runtime_mode,
-          previousNodeId: conv.active_node_id,
-          startNodeId: currentNodeId,
-          memory: persistentMemory
-        });
-      }
     }
 
     // Lógica de Entrada de Usuário
@@ -533,7 +335,6 @@ export const TestPanel = ({
       const value = input.message ?? input.button_id;
       if (value !== undefined) {
         variables["last_message"] = value;
-        console.log("[Runtime] Entrada recebida:", { value, mode, activeAgentNodeId });
         
         // Salvar mensagem do usuário no histórico e banco
         const userMsg: RuntimeMessage = {
@@ -547,42 +348,29 @@ export const TestPanel = ({
         if (conversationId) conversationService.saveMessage(userMsg);
 
         if (mode === "agent" && activeAgentNodeId) {
-          console.log("[Runtime] Mantendo modo AGENTE no nó:", activeAgentNodeId);
           currentNodeId = activeAgentNodeId;
         } else if (currentNodeId) {
           const current = findNode(currentNodeId);
           if (current) {
-            console.log("[Runtime] Processando entrada no nó FLOW:", current.node.id);
             const varName = current.node.config?.variableName || current.node.config?.saveVariable;
-            if (varName) {
-              variables[varName] = value;
-              console.log(`[Runtime] Variável salva: ${varName} =`, value);
-            }
+            if (varName) variables[varName] = value;
             
             const currentType = String(current.node.type || "").toLowerCase();
             if (currentType === "ai-agent") {
               mode = "agent";
               activeAgentNodeId = current.node.id;
-              console.log("[Runtime] Transição para modo AGENTE ativada");
             } else if (currentType === "ai-node") {
               currentNodeId = current.node.id;
             } else {
-              const nextId = nextFromNode(current.node.id, current.container.id, input.button_id);
-              console.log("[Runtime] Avançando FLOW para:", nextId);
-              currentNodeId = nextId;
+              currentNodeId = nextFromNode(current.node.id, current.container.id, input.button_id);
             }
           }
         }
       }
     }
 
-    console.log("[Runtime] Iniciando execução", { 
-      startNodeId: currentNodeId, 
-      mode,
-      activeAgentNodeId,
-      hasInput: !!input 
-    });
 
+    console.log("[Runtime] Iniciando loop", { startNodeId: currentNodeId, hasInput: !!input, waitingForInput: state?.waiting_for_input });
 
     while (currentNodeId && steps++ < 100) {
       const found = findNode(currentNodeId);
@@ -596,11 +384,7 @@ export const TestPanel = ({
       const { node, container } = found;
       const cfg = node.config || {};
       const nodeType = String(node.type || "").toLowerCase();
-      console.log(`[Runtime] [Node:${nodeType}] Executando: ${node.id}`, {
-        container: container.id,
-        mode
-      });
-
+      console.log(`[Runtime] Step ${steps} → executando nó:`, { id: node.id, type: nodeType, container: container.id });
 
       if (nodeType === "wait" || nodeType === "await") {
         waitMs = parseWaitMs(cfg);
@@ -795,66 +579,12 @@ export const TestPanel = ({
       } else if (nodeType === "ai-node" || nodeType === "ai-agent") {
         const isAgent = nodeType === "ai-agent";
         const objective = cfg.objective || cfg.systemPrompt || "assistente virtual";
-        let instructions = firstText(cfg.instructions, cfg.prompt, cfg.message) || "Ajude o usuário da melhor forma possível.";
+        const instructions = firstText(cfg.instructions, cfg.prompt, cfg.message) || "Ajude o usuário da melhor forma possível.";
         
-        // Injetar Base de Conhecimento (Knowledge Base)
-        if (cfg.kbFilesEnabled && cfg.kbFiles?.length > 0) {
-          const filesContent = cfg.kbFiles
-            .map((f: any) => `ARQUIVO: ${f.name}\nCONTEÚDO:\n${f.content}`)
-            .join("\n\n---\n\n");
-          instructions = `${instructions}\n\nBASE DE CONHECIMENTO (ARQUIVOS):\n${filesContent}`;
-        }
-
-        if (cfg.kbLinksEnabled && cfg.kbLinks?.length > 0) {
-          const linksList = cfg.kbLinks.map((l: any) => l.url).filter(Boolean).join(", ");
-          if (linksList) {
-            instructions = `${instructions}\n\nLINKS DE REFERÊNCIA:\n${linksList}`;
-          }
-        }
-
-        // No TestPanel, usamos o variables["last_message"] que foi setado no início do runLocalFlow
-        const userMsgContent = String(variables["last_message"] || "").trim();
-
-        console.log(`[AI-NODE-EXEC] ${isAgent ? 'AGENT' : 'FLOW'} execution:`, {
-          provider: "external-direct-api",
-          objective,
-          instructions_length: instructions.length,
-          hasInput: !!userMsgContent
-        });
-
-        // 1. Lógica de Início (se não houver mensagem do usuário ainda)
-        if (!userMsgContent) {
-          const startMode = cfg.startMode || "automatic";
-          const welcome = cfg.welcomeMessage || "";
-
-          if (welcome && startMode === "automatic") {
-            const botMsg: Message = {
-              id: crypto.randomUUID(),
-              conversation_id: conversationId || "temp",
-              role: "assistant",
-              type: "bot",
-              content: replaceVars(welcome),
-              isHtml: true,
-              created_at: new Date().toISOString()
-            };
-            nextMessages.push(botMsg);
-            if (conversationId) conversationService.saveMessage(botMsg);
-
-            waitingFor = "input-text";
-            waitingForCfg = { placeholder: "Digite sua resposta..." };
-            break;
-          }
-
-          if (startMode === "manual" || !welcome) {
-            waitingFor = "input-text";
-            waitingForCfg = { placeholder: "Digite sua mensagem..." };
-            break;
-          }
-        }
-        
-        // 2. Verificação de intenção de saída (apenas para Agente)
+        // Verificação de intenção de saída (Exit Intents)
+        const userMsgContent = String(variables["last_message"] || "").toLowerCase();
         const exitPhrases = ["voltar menu", "sair", "parar", "cancelar", "exit", "stop"];
-        if (isAgent && exitPhrases.some(p => userMsgContent.toLowerCase().includes(p))) {
+        if (isAgent && exitPhrases.some(p => userMsgContent.includes(p))) {
           console.log("[AI Agent] Exit intent detectado, voltando para o Flow.");
           mode = "flow";
           activeAgentNodeId = null;
@@ -862,24 +592,60 @@ export const TestPanel = ({
           continue;
         }
 
-        console.log("[EXTERNAL-API] Iniciando chamada de IA via Conexão Direta (Gemini)");
+        const nodeKey = (cfg.apiKey || "").trim();
+        const nodeProvider = (cfg.provider || "openai").toLowerCase();
+        const globalKeys = settings?.aiKeys || {};
+        const activeKey = (globalKeys[`${nodeProvider}Key`] || "").trim() || nodeKey;
+        const selectedProvider = nodeProvider === "gemini" ? "google" : nodeProvider as "openai" | "anthropic" | "google";
 
         const { system, messages: contextMessages } = buildAgentContext({
           systemPrompt: `Objetivo: ${objective}\nInstruções: ${instructions}`,
           history: messageHistory,
-          persistentMemory: persistentMemory || {},
-          variables: variables || {}
+          persistentMemory,
+          variables
         });
 
         let aiReply: string | null = null;
         
-        try {
-          aiReply = await callAIAgent(system, contextMessages);
-        } catch (e: any) { 
-          console.error(e);
-          aiReply = `❌ Erro na IA: ${e.message}`; 
+        if (!activeKey) {
+          aiReply = `🤖 [SIMULAÇÃO]\nConfigure uma chave de API para o provedor ${nodeProvider.toUpperCase()}.`;
+        } else {
+          try {
+            if (selectedProvider === "openai") {
+              const res = await fetch("https://api.openai.com/v1/chat/completions", {
+                method: "POST",
+                headers: { "Authorization": `Bearer ${activeKey}`, "Content-Type": "application/json" },
+                body: JSON.stringify({
+                  model: cfg.model || "gpt-4o-mini",
+                  messages: [{ role: "system", content: system }, ...contextMessages],
+                }),
+              });
+              if (res.ok) {
+                const data = await res.json();
+                aiReply = data.choices?.[0]?.message?.content || null;
+              }
+            } else if (selectedProvider === "google") {
+              const model = (cfg.model || "gemini-2.0-flash").trim();
+              const res = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${encodeURIComponent(activeKey)}`, {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({
+                  contents: contextMessages.length > 0 ? contextMessages.map(m => ({
+                    role: m.role === "assistant" ? "model" : "user",
+                    parts: [{ text: m.content }]
+                  })) : [{ role: "user", parts: [{ text: "Olá!" }] }]
+                }),
+              });
+              if (res.ok) {
+                const data = await res.json();
+                aiReply = data.candidates?.[0]?.content?.parts?.[0]?.text || null;
+              }
+            }
+          } catch (e: any) { 
+            console.error(e);
+            aiReply = `❌ Erro na IA: ${e.message}`; 
+          }
         }
-
 
         if (aiReply) {
           const botMsg: RuntimeMessage = {
@@ -899,35 +665,22 @@ export const TestPanel = ({
           } as Message);
         }
 
-        // Limpa a última mensagem processada para não re-processar no próximo node se houver loop
-        variables["last_message"] = "";
-
         if (isAgent) {
           mode = "agent";
           activeAgentNodeId = node.id;
           waitingFor = "input-text";
           waitingForCfg = { placeholder: "Converse com o agente..." };
-          console.log("[Runtime] Modo AGENTE ativado: aguardando input do usuário para continuar conversa.");
           break; // Agent pausa o fluxo e assume
         } else {
-          // AI Node pontual: avança para o próximo node após a resposta
-          // IMPORTANTE: Pausamos aqui se acabamos de responder a uma mensagem, 
-          // para evitar que o próximo nó (ex: Agente) execute imediatamente sem o usuário ver a resposta.
-          if (userMsgContent) {
-            currentNodeId = nextFromNode(node.id, container.id);
+          // AI Node pontual: continua o fluxo
+          const nextId = nextFromNode(node.id, container.id);
+          if (!nextId) {
             waitingFor = "input-text";
-            waitingForCfg = { placeholder: "Digite sua resposta..." };
-            console.log("[Runtime] AI Node respondeu ao usuário, pausando fluxo no próximo nó:", currentNodeId);
-            break;
-          } else {
-            const nextId = nextFromNode(node.id, container.id);
-            console.log("[Runtime] AI Node concluído (sem input). Avançando para:", nextId);
-            currentNodeId = nextId;
-            continue;
+            waitingForCfg = { placeholder: "Digite aqui..." };
           }
+          currentNodeId = nextId;
+          continue;
         }
-
-
 
       } else if (nodeType === "set-variable" && cfg.variableName) {
         variables[cfg.variableName] = evaluateSetVariableValue(cfg, variables);
@@ -980,7 +733,7 @@ export const TestPanel = ({
       return;
     }
 
-    const startNodeId = resolveInitialNodeId();
+    const startNodeId = startContainer?.nodes?.[0]?.id || null;
     
     // Se o container de início mudou, reinicia
     if (hasStartedRef.current && startedFlowRef.current === flowId && lastStartNodeIdRef.current === startNodeId) {
@@ -1042,16 +795,6 @@ export const TestPanel = ({
     setIsLoading(true);
     setMessages([]);
     const data = await runLocalFlow(null);
-    
-    // Persistir estado inicial se houver conversa
-    if (data.runtime_state?.conversation_id) {
-      await conversationService.updateConversation(data.runtime_state.conversation_id, {
-        runtime_mode: data.runtime_state.mode,
-        active_node_id: data.runtime_state.current_node_id,
-        memory: data.runtime_state.persistent_memory
-      });
-    }
-
     applyRuntimeData(data, true);
     if (!waitTimerRef.current) setIsLoading(false);
   };
@@ -1136,15 +879,6 @@ export const TestPanel = ({
     const currentState = runtimeStateRef.current;
     const data = await runLocalFlow(currentState, { message: msgToSend, button_id: buttonId });
     
-    // Persistir estado no banco
-    if (data.runtime_state?.conversation_id) {
-      await conversationService.updateConversation(data.runtime_state.conversation_id, {
-        runtime_mode: data.runtime_state.mode,
-        active_node_id: data.runtime_state.current_node_id || data.runtime_state.active_agent_node_id,
-        memory: data.runtime_state.persistent_memory
-      });
-    }
-
     applyRuntimeData(data);
     setIsLoading(false);
 

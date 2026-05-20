@@ -1,1 +1,13 @@
-project_id = "xllkibdddlmcdbrhzedu"
+project_id = "fwoescubnnagdvwasbjl"
+
+[functions.chatbot-runtime]
+verify_jwt = false
+
+[functions.embed-plan-status]
+verify_jwt = false
+
+[functions.sync-embed-plan]
+verify_jwt = false
+
+[functions.provision-account]
+verify_jwt = false
