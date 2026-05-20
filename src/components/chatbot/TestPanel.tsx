@@ -937,7 +937,7 @@ export const TestPanel = ({
                 rows={1}
                 className="flex-1 min-w-0 resize-none min-h-[40px] max-h-[160px]"
                 style={{ background: theme?.inputBackgroundColor ? "rgba(255,255,255,0.1)" : undefined, color: theme?.inputTextColor || "inherit", borderColor: theme?.inputTextColor ? `${theme.inputTextColor}40` : undefined }}
-                disabled={isLoading && !waitingForInput}
+                disabled={isLoading}
               />
             )}
             <Button 
