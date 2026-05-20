@@ -775,8 +775,12 @@ export const TestPanel = ({
               // Tenta modelos em ordem de preferência se o primeiro falhar com 404
               // Isso resolve o problema de contas novas que não têm acesso ao 1.5 e precisam do 2.0 ou aliases "latest"
               const modelsToTry = [cleanModel];
-              if (cleanModel === "gemini-1.5-flash") modelsToTry.push("gemini-1.5-flash-latest", "gemini-flash-latest", "gemini-2.0-flash");
-              else if (cleanModel === "gemini-1.5-pro") modelsToTry.push("gemini-1.5-pro-latest", "gemini-pro-latest", "gemini-2.0-flash");
+              // Adicionamos os modelos gemini-2.0-flash e gemini-2.0-flash-lite que são os mais estáveis atualmente
+              if (cleanModel.includes("gemini-1.5")) {
+                modelsToTry.push("gemini-2.0-flash", "gemini-2.0-flash-lite-preview-02-05", "gemini-1.5-flash");
+              } else {
+                modelsToTry.push("gemini-2.0-flash", "gemini-1.5-flash");
+              }
               
               let lastError = "";
               let success = false;
@@ -814,8 +818,10 @@ export const TestPanel = ({
                     const errorData = await response.json();
                     lastError = errorData.error?.message || response.statusText;
                     console.warn(`[Gemini] Falha no modelo ${modelToTry}: ${lastError}`);
-                    // Se não for 404 (Not Found), provavelmente é erro de chave ou cota, não adianta tentar outro modelo
-                    if (response.status !== 404) break;
+                    
+                    // Se o erro for "High demand" ou 404, tentamos o próximo modelo da lista
+                    const isHighDemand = lastError.toLowerCase().includes("high demand");
+                    if (response.status !== 404 && !isHighDemand) break;
                   }
                 } catch (err: any) {
                   lastError = err.message;
