@@ -353,17 +353,23 @@ export const TestPanel = ({
         throw new Error("API Key do Gemini não configurada neste nó.");
       }
 
-      // Limpeza do nome do modelo para evitar o erro de "models/gemini-1.5-flash is not found"
-      const cleanModel = model.startsWith("google/") ? model.replace("google/", "") : model;
+      // Variações de nomes de modelos que costumam dar erro se o prefixo estiver errado
+      const modelMap: Record<string, string> = {
+        "google/gemini-1.5-flash": "gemini-1.5-flash",
+        "google/gemini-1.5-pro": "gemini-1.5-pro",
+        "google/gemini-2.0-flash-exp": "gemini-2.0-flash-exp",
+        "gemini-1.5-flash": "gemini-1.5-flash",
+        "gemini-1.5-pro": "gemini-1.5-pro"
+      };
 
-      try {
-        const response = await fetch(
-          `https://generativelanguage.googleapis.com/v1beta/models/${cleanModel}:generateContent?key=${apiKey}`,
+      const cleanModel = modelMap[model] || (model.startsWith("google/") ? model.replace("google/", "") : model);
+
+      const tryFetch = async (apiVersion: string) => {
+        return await fetch(
+          `https://generativelanguage.googleapis.com/${apiVersion}/models/${cleanModel}:generateContent?key=${apiKey}`,
           {
             method: "POST",
-            headers: {
-              "Content-Type": "application/json",
-            },
+            headers: { "Content-Type": "application/json" },
             body: JSON.stringify({
               contents: [
                 { role: "user", parts: [{ text: system }] },
@@ -379,6 +385,17 @@ export const TestPanel = ({
             }),
           }
         );
+      };
+
+      try {
+        // Tenta v1 primeiro (mais estável para modelos GA)
+        let response = await tryFetch("v1");
+        
+        // Se falhar com 404, tenta v1beta (para modelos experimentais)
+        if (!response.ok && response.status === 404) {
+          console.log(`Modelo ${cleanModel} não encontrado em v1, tentando v1beta...`);
+          response = await tryFetch("v1beta");
+        }
 
         if (!response.ok) {
           const errorData = await response.json();
