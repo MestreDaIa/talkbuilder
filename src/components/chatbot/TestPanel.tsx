@@ -325,7 +325,7 @@ export const TestPanel = ({
 
     const runLocalFlow = async (state: RuntimeState | null, input?: { message?: string; button_id?: string }) => {
     let mode: RuntimeMode = state?.mode || "flow";
-    let currentNodeId = state?.current_node_id || startContainer?.nodes?.[0]?.id || null;
+    let currentNodeId = state?.current_node_id || resolveInitialNodeId() || null;
     let activeAgentNodeId = state?.active_agent_node_id || null;
     const variables = { ...(state?.variables || {}) };
     const persistentMemory: PersistentMemory = { ...(state?.persistent_memory || {}) };
@@ -386,10 +386,13 @@ export const TestPanel = ({
       // Se não temos um estado anterior (início de sessão), mas encontramos uma conversa no banco,
       // retomamos o modo, o nó ativo e a memória persistente.
       if (!state) {
-        mode = conv.runtime_mode || "flow";
-        currentNodeId = conv.active_node_id || currentNodeId;
         Object.assign(persistentMemory, conv.memory || {});
-        console.log("[Runtime] Sessão retomada do banco:", { mode, currentNodeId, memory: persistentMemory });
+        console.log("[Runtime] Nova execução iniciada no começo do fluxo; memória carregada do banco sem retomar nó antigo:", {
+          previousMode: conv.runtime_mode,
+          previousNodeId: conv.active_node_id,
+          startNodeId: currentNodeId,
+          memory: persistentMemory
+        });
       }
     }
 
@@ -825,7 +828,7 @@ export const TestPanel = ({
       return;
     }
 
-    const startNodeId = startContainer?.nodes?.[0]?.id || null;
+    const startNodeId = resolveInitialNodeId();
     
     // Se o container de início mudou, reinicia
     if (hasStartedRef.current && startedFlowRef.current === flowId && lastStartNodeIdRef.current === startNodeId) {
