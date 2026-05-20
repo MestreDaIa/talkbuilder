@@ -770,8 +770,8 @@ export const TestPanel = ({
               }
             } else if (selectedProvider === "google") {
               let model = (cfg.model || "gemini-1.5-flash").trim().replace("gemini-2.5", "gemini-1.5");
-              if (!model.startsWith("models/")) model = `models/${model}`;
-              const url = `https://generativelanguage.googleapis.com/v1beta/${model}:generateContent?key=${encodeURIComponent(activeKey)}`;
+              const cleanModel = model.startsWith("models/") ? model.substring(7) : model;
+              const url = `https://generativelanguage.googleapis.com/v1beta/models/${cleanModel}:generateContent?key=${encodeURIComponent(activeKey)}`;
               console.log("[TestPanel] Fetching Gemini:", url.replace(activeKey, "REDACTED"));
               const res = await fetch(url, {
                 method: "POST",

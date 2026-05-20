@@ -682,10 +682,10 @@ async function runFlow(execution: any, containers: any[], edges: any[], input: a
               }
 
             } else if (provider === "google" || provider === "gemini") {
-              let modelName = (cfg.model || "gemini-1.5-flash").trim().replace("gemini-2.5", "gemini-1.5");
-              if (!modelName.startsWith("models/")) modelName = `models/${modelName}`;
+              const modelName = (cfg.model || "gemini-1.5-flash").trim().replace("gemini-2.5", "gemini-1.5");
+              const cleanModel = modelName.startsWith("models/") ? modelName.substring(7) : modelName;
 
-              const res = await fetch(`https://generativelanguage.googleapis.com/v1beta/${modelName}:generateContent?key=${activeKey}`, {
+              const res = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${cleanModel}:generateContent?key=${activeKey}`, {
                 method: "POST",
                 headers: { "Content-Type": "application/json" },
                 body: JSON.stringify({
