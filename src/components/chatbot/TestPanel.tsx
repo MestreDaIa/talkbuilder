@@ -336,9 +336,12 @@ export const TestPanel = ({
       }
     }
 
+    console.log("[Runtime] Iniciando loop", { startNodeId: currentNodeId, hasInput: !!input, waitingForInput: state?.waiting_for_input });
+
     while (currentNodeId && steps++ < 100) {
       const found = findNode(currentNodeId);
       if (!found) {
+        console.warn("[Runtime] Nó não encontrado:", currentNodeId);
         currentNodeId = firstNodeOfContainer(currentNodeId);
         if (currentNodeId) continue;
         break;
@@ -347,6 +350,7 @@ export const TestPanel = ({
       const { node, container } = found;
       const cfg = node.config || {};
       const nodeType = String(node.type || "").toLowerCase();
+      console.log(`[Runtime] Step ${steps} → executando nó:`, { id: node.id, type: nodeType, container: container.id });
 
       if (nodeType === "wait" || nodeType === "await") {
         waitMs = parseWaitMs(cfg);
@@ -500,6 +504,7 @@ export const TestPanel = ({
         const objective = cfg.objective || cfg.systemPrompt || "assistente virtual";
         const instructions = firstText(cfg.instructions, cfg.prompt, cfg.message) || "Ajude o usuário da melhor forma possível.";
         const hasTools = allContainers.some(c => c.nodes.some(n => n.config?.isSkill));
+        const hasNextNode = !!nextFromNode(node.id, container.id);
         
         let userMessage = String(variables.__last_agent_user_message || "").trim();
         if (!userMessage && nodeType === "ai-node" && cfg.userMessage) {
@@ -512,6 +517,19 @@ export const TestPanel = ({
         const globalKeys = settings?.aiKeys || {};
         const activeKey = (globalKeys[`${nodeProvider}Key`] || "").trim() || nodeKey;
         const selectedProvider = nodeProvider === "gemini" ? "google" : nodeProvider as "openai" | "anthropic" | "google";
+
+        console.log("[AI Node] Processando:", {
+          nodeId: node.id,
+          nodeType,
+          provider: nodeProvider,
+          model: cfg.model,
+          hasApiKey: !!activeKey,
+          hasNextNode,
+          startMode: cfg.startMode,
+          userMessage,
+          objective,
+          instructions: instructions?.slice(0, 100),
+        });
 
         variables.__last_agent_user_message = "";
 
@@ -621,8 +639,13 @@ export const TestPanel = ({
               }
             } catch (e: any) { aiReply = `❌ Erro: ${e.message}`; }
             if (aiReply) nextMessages.push({ id: crypto.randomUUID(), type: "bot", content: aiReply });
-            waitingFor = "input-text";
-            waitingForCfg = { placeholder: "Digite sua mensagem..." };
+            if (hasNextNode) {
+              console.log("[AI Node] Resposta gerada, avançando para o próximo nó conectado.");
+            } else {
+              console.log("[AI Node] Sem próximo nó conectado — aguardando nova mensagem do usuário.");
+              waitingFor = "input-text";
+              waitingForCfg = { placeholder: "Digite sua mensagem..." };
+            }
           }
         }
         if (waitingFor) break;
@@ -636,10 +659,16 @@ export const TestPanel = ({
         continue;
       }
 
-      if (waitingFor) break;
-      currentNodeId = nextFromNode(node.id, container.id);
+      if (waitingFor) {
+        console.log("[Runtime] Pausando loop — aguardando:", waitingFor, "no nó", node.id);
+        break;
+      }
+      const nextId = nextFromNode(node.id, container.id);
+      console.log(`[Runtime] Nó ${node.id} concluído → próximo:`, nextId);
+      currentNodeId = nextId;
     }
 
+    console.log("[Runtime] Loop finalizado", { steps, currentNodeId, waitingFor, messagesAdded: nextMessages.length });
     return { messages: nextMessages, wait_ms: waitMs, waiting_for: waitingFor, waiting_for_config: waitingForCfg, buttons: nextButtons, runtime_state: { current_node_id: currentNodeId, variables, waiting_for_input: !!waitingFor } };
   };
 
