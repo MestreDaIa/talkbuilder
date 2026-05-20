@@ -336,9 +336,12 @@ export const TestPanel = ({
       }
     }
 
+    console.log("[Runtime] Iniciando loop", { startNodeId: currentNodeId, hasInput: !!input, waitingForInput: state?.waiting_for_input });
+
     while (currentNodeId && steps++ < 100) {
       const found = findNode(currentNodeId);
       if (!found) {
+        console.warn("[Runtime] Nó não encontrado:", currentNodeId);
         currentNodeId = firstNodeOfContainer(currentNodeId);
         if (currentNodeId) continue;
         break;
@@ -347,6 +350,7 @@ export const TestPanel = ({
       const { node, container } = found;
       const cfg = node.config || {};
       const nodeType = String(node.type || "").toLowerCase();
+      console.log(`[Runtime] Step ${steps} → executando nó:`, { id: node.id, type: nodeType, container: container.id });
 
       if (nodeType === "wait" || nodeType === "await") {
         waitMs = parseWaitMs(cfg);
