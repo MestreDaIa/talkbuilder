@@ -812,60 +812,56 @@ export const TestPanel = ({
     if (!msgToSend && !buttonId) return;
 
     if (!buttonId && waitingForType && msgToSend) {
+      const handleError = (errorContent: string) => {
+        const userMsg: Message = { 
+          id: `u-${Date.now()}`, 
+          conversation_id: runtimeStateRef.current?.conversation_id || "temp",
+          role: "user",
+          type: "user", 
+          content: msgToSend 
+        };
+        const errorMsgObj: Message = { 
+          id: `b-err-${Date.now()}`, 
+          conversation_id: runtimeStateRef.current?.conversation_id || "temp",
+          role: "assistant",
+          type: "bot", 
+          content: errorContent
+        };
+        setMessages(prev => [...prev, userMsg, errorMsgObj]);
+        setCurrentInput("");
+        setIsLoading(false);
+      };
+
       if (waitingForType === "input-mail") {
         const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
         if (!emailRegex.test(msgToSend)) {
-          const errorMsg = waitingForConfig?.invalidMessage || "Por favor, insira um e-mail válido.";
-          const userMsg: Message = { 
-            id: `u-${Date.now()}`, 
-            conversation_id: runtimeStateRef.current?.conversation_id || "temp",
-            role: "user",
-            type: "user", 
-            content: msgToSend 
-          };
-          const errorMsg: Message = { 
-            id: `b-err-${Date.now()}`, 
-            conversation_id: runtimeStateRef.current?.conversation_id || "temp",
-            role: "assistant",
-            type: "bot", 
-            content: typeof errorContent === "string" ? errorContent : "Entrada inválida."
-          };
-          setMessages(prev => [...prev, userMsg, errorMsg]);
-          setCurrentInput("");
-          setIsLoading(false);
+          handleError(waitingForConfig?.invalidMessage || "Por favor, insira um e-mail válido.");
           return;
-        };
-
-        if (waitingForType === "input-mail") {
-          const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-          if (!emailRegex.test(msgToSend)) {
-            handleError(waitingForConfig?.invalidMessage || "Por favor, insira um e-mail válido.");
-            return;
-          }
-        } else if (waitingForType === "input-webSite") {
-          try {
-            new URL(msgToSend.startsWith('http') ? msgToSend : `https://${msgToSend}`);
-          } catch (e) {
-            handleError(waitingForConfig?.invalidMessage || "Por favor, insira um link válido.");
-            return;
-          }
-        } else if (waitingForType === "input-number") {
-          const num = Number(msgToSend);
-          if (isNaN(num)) {
-            handleError(waitingForConfig?.invalidMessage || "Por favor, insira um número válido.");
-            return;
-          }
-          if (waitingForConfig?.min !== undefined && num < waitingForConfig.min) {
-            handleError(waitingForConfig?.invalidMessage || `O valor mínimo é ${waitingForConfig.min}.`);
-            return;
-          }
-          if (waitingForConfig?.max !== undefined && num > waitingForConfig.max) {
-            handleError(waitingForConfig?.invalidMessage || `O valor máximo é ${waitingForConfig.max}.`);
-            return;
-          }
+        }
+      } else if (waitingForType === "input-webSite") {
+        try {
+          new URL(msgToSend.startsWith('http') ? msgToSend : `https://${msgToSend}`);
+        } catch (e) {
+          handleError(waitingForConfig?.invalidMessage || "Por favor, insira um link válido.");
+          return;
+        }
+      } else if (waitingForType === "input-number") {
+        const num = Number(msgToSend);
+        if (isNaN(num)) {
+          handleError(waitingForConfig?.invalidMessage || "Por favor, insira um número válido.");
+          return;
+        }
+        if (waitingForConfig?.min !== undefined && num < waitingForConfig.min) {
+          handleError(waitingForConfig?.invalidMessage || `O valor mínimo é ${waitingForConfig.min}.`);
+          return;
+        }
+        if (waitingForConfig?.max !== undefined && num > waitingForConfig.max) {
+          handleError(waitingForConfig?.invalidMessage || `O valor máximo é ${waitingForConfig.max}.`);
+          return;
         }
       }
     }
+
 
     if (msgToSend) {
       setMessages(prev => [...prev, { 
