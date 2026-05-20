@@ -72,7 +72,25 @@ export default function PublicFlowPage() {
 
   const containers: Container[] = data?.containers ?? [];
   const edges: Edge[] = data?.edges ?? [];
-  const startContainer = containers[0] ?? null;
+
+  const findEntryContainer = (): Container | null => {
+    if (!containers.length) return null;
+    const withStart = containers.find((c) =>
+      (c.nodes || []).some((n: any) => String(n.type || "").toLowerCase() === "start")
+    );
+    if (withStart) return withStart;
+    const incoming = new Set<string>();
+    edges.forEach((e) => {
+      if (!e?.target) return;
+      const container = containers.find((c) => (c.nodes || []).some((n: any) => n.id === e.target));
+      if (container) incoming.add(container.id);
+      else incoming.add(e.target);
+    });
+    const entry = containers.find((c) => !incoming.has(c.id));
+    return entry || containers[0];
+  };
+
+  const startContainer = findEntryContainer();
   const settingsAny = (data?.settings as any) ?? {};
   const theme = settingsAny.theme ?? {};
   const meta = settingsAny.metadata ?? {};
