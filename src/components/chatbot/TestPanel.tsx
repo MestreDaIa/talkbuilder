@@ -693,9 +693,10 @@ export const TestPanel = ({
               });
             }
 
-            // Mantém o agente aguardando a próxima mensagem do usuário (conversa contínua)
+            // Reabre o input e para a execução aqui, forçando o loop a esperar a próxima interação
             waitingFor = "input-text";
             waitingForCfg = { placeholder: "Converse com seu agente..." };
+            break; // Garante que não continue para o próximo nó automaticamente
           } else {
             const startMode = cfg.startMode || "automatic";
             const welcomeMsg = cfg.welcomeMessage;
