@@ -696,10 +696,12 @@ export const TestPanel = ({
           activeAgentNodeId = node.id;
           waitingFor = "input-text";
           waitingForCfg = { placeholder: "Converse com o agente..." };
+          console.log("[Runtime] Modo AGENTE ativado: aguardando input do usuário para continuar conversa.");
           break; // Agent pausa o fluxo e assume
         } else {
           // AI Node pontual: continua o fluxo
           const nextId = nextFromNode(node.id, container.id);
+          console.log("[Runtime] AI Node concluído. Avançando para o próximo nó:", nextId);
           if (!nextId) {
             waitingFor = "input-text";
             waitingForCfg = { placeholder: "Digite aqui..." };
@@ -707,6 +709,7 @@ export const TestPanel = ({
           currentNodeId = nextId;
           continue;
         }
+
 
       } else if (nodeType === "set-variable" && cfg.variableName) {
         variables[cfg.variableName] = evaluateSetVariableValue(cfg, variables);
