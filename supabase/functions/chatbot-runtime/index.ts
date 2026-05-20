@@ -708,9 +708,17 @@ async function runFlow(execution: any, containers: any[], edges: any[], input: a
         } else {
           // AI pontual: respondeu, avança para o próximo node
           console.log("[Runtime] AI pontual respondeu, avançando fluxo");
-          // currentNodeId será atualizado pelo nextFromNode no fim do loop
-          break;
+          const nextId = nextFromNode(node.id, container);
+          currentNodeId = nextId;
+          
+          // Se houve input, pausamos para o usuário ler a resposta antes de prosseguir
+          if (userMessage) {
+            waiting_for = "text";
+            break;
+          }
+          continue;
         }
+
       }
     }
 
