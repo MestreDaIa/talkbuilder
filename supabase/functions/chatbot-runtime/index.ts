@@ -685,7 +685,7 @@ async function runFlow(execution: any, containers: any[], edges: any[], input: a
               const modelName = (cfg.model || "gemini-1.5-flash").trim().replace("gemini-2.5", "gemini-1.5");
               const cleanModel = modelName.startsWith("models/") ? modelName.substring(7) : modelName;
 
-              const res = await fetch(`https://generativelanguage.googleapis.com/v1/models/${cleanModel}:generateContent?key=${activeKey}`, {
+              const res = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${cleanModel}:generateContent?key=${activeKey}`, {
                 method: "POST",
                 headers: { "Content-Type": "application/json" },
                 body: JSON.stringify({
