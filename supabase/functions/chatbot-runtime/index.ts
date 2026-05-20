@@ -682,22 +682,29 @@ async function runFlow(execution: any, containers: any[], edges: any[], input: a
               }
 
             } else if (provider === "google" || provider === "gemini") {
-              let model = (cfg.model || "gemini-1.5-flash").trim().replace("gemini-2.5", "gemini-1.5");
-              if (!model.startsWith("models/")) model = `models/${model}`;
+              let modelName = (cfg.model || "gemini-1.5-flash").trim().replace("gemini-2.5", "gemini-1.5");
+              if (modelName.startsWith("models/")) modelName = modelName.substring(7);
 
-              const res = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${activeKey}`, {
+              const res = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${modelName}:generateContent?key=${activeKey}`, {
                 method: "POST",
                 headers: { "Content-Type": "application/json" },
                 body: JSON.stringify({
-                  contents: [{ parts: [{ text: `System: ${objective}\n${instructions}\n\nUser: ${userMessage}` }] }],
+                  system_instruction: {
+                    parts: [{ text: `Objetivo: ${objective}\n${instructions}` }]
+                  },
+                  contents: [{ role: "user", parts: [{ text: userMessage }] }],
                 }),
               });
               if (res.ok) {
                 const data = await res.json();
                 aiReply = data.candidates?.[0]?.content?.parts?.[0]?.text ?? null;
               } else {
-                const error = await res.json();
-                aiReply = `❌ Erro Gemini/Google: ${error.error?.message || res.statusText}`;
+                let errorMsg = res.statusText;
+                try {
+                  const error = await res.json();
+                  errorMsg = error.error?.message || errorMsg;
+                } catch (jsonErr) {}
+                aiReply = `❌ Erro Gemini: ${errorMsg}`;
               }
 
             }

@@ -770,25 +770,33 @@ export const TestPanel = ({
               }
             } else if (selectedProvider === "google") {
               let model = (cfg.model || "gemini-1.5-flash").trim().replace("gemini-2.5", "gemini-1.5");
-              if (!model.startsWith("models/")) model = `models/${model}`;
+              if (model.startsWith("models/")) model = model.substring(7);
               const url = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${encodeURIComponent(activeKey)}`;
               console.log("[TestPanel] Fetching Gemini:", url.replace(activeKey, "REDACTED"));
               const res = await fetch(url, {
                 method: "POST",
                 headers: { "Content-Type": "application/json" },
                 body: JSON.stringify({
+                  system_instruction: {
+                    parts: [{ text: system }]
+                  },
                   contents: contextMessages.length > 0 ? contextMessages.map(m => ({
                     role: m.role === "assistant" ? "model" : "user",
                     parts: [{ text: String(m.content || "") }]
-                  })) : [{ role: "user", parts: [{ text: `System: ${system}\n\nUser: ${userMsgContent || "Olá!"}` }] }]
+                  })) : [{ role: "user", parts: [{ text: userMsgContent || "Olá!" }] }]
                 }),
               });
+              
               if (res.ok) {
                 const data = await res.json();
                 aiReply = data.candidates?.[0]?.content?.parts?.[0]?.text || null;
               } else {
-                const error = await res.json();
-                aiReply = `❌ Erro Gemini: ${error.error?.message || res.statusText}`;
+                let errorMsg = res.statusText;
+                try {
+                  const error = await res.json();
+                  errorMsg = error.error?.message || errorMsg;
+                } catch (jsonErr) {}
+                aiReply = `❌ Erro Gemini: ${errorMsg}`;
               }
             }
           } catch (e: any) { 
