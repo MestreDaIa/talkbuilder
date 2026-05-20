@@ -641,18 +641,7 @@ async function runFlow(execution: any, containers: any[], edges: any[], input: a
 
         console.log(`[Node:${nodeType}] Executando:`, node.id, { isAgent, hasInput: !!userMessage, instructions_length: instructions.length });
 
-        // Check for keys
-        const nodeKey = (cfg.apiKey || "").trim();
-        const globalKeys = flow?.settings?.aiKeys || {};
-        const provider = (cfg.provider || "openai").toLowerCase();
-        
-        // Harmonize key naming
-        const openaiKey = (globalKeys.openaiKey || "").trim() || (provider === "openai" ? nodeKey : "");
-        const anthropicKey = (globalKeys.anthropicKey || "").trim() || (provider === "anthropic" ? nodeKey : "");
-        const googleKey = (globalKeys.googleKey || globalKeys.geminiKey || "").trim() || (provider === "google" || provider === "gemini" ? nodeKey : "");
-        
-        const activeKey = provider === "openai" ? openaiKey : provider === "anthropic" ? anthropicKey : googleKey;
-        const hasAnyKey = !!openaiKey || !!anthropicKey || !!googleKey;
+        const provider = (cfg.provider || "lovable").toLowerCase();
 
 
         // 1. Handle START sequence (when userMessage is empty)
@@ -679,83 +668,20 @@ async function runFlow(execution: any, containers: any[], edges: any[], input: a
 
         let aiReply: string | null = null;
 
-        if (activeKey && userMessage) {
+        if (userMessage) {
           try {
-            if (provider === "openai") {
-              const res = await fetch("https://api.openai.com/v1/chat/completions", {
-                method: "POST",
-                headers: { "Authorization": `Bearer ${activeKey}`, "Content-Type": "application/json" },
-                body: JSON.stringify({
-                  model: cfg.model || "gpt-3.5-turbo",
-                  messages: [
-                    { role: "system", content: `Objetivo: ${objective}\nInstruções: ${instructions}` },
-                    { role: "user", content: userMessage }
-                  ],
-                }),
-              });
-              if (res.ok) {
-                const data = await res.json();
-                aiReply = data.choices?.[0]?.message?.content ?? null;
-              } else {
-                const error = await res.json();
-                aiReply = `❌ Erro OpenAI: ${error.error?.message || res.statusText}`;
-              }
-
-            } else if (provider === "anthropic") {
-              const res = await fetch("https://api.anthropic.com/v1/messages", {
-                method: "POST",
-                headers: { "x-api-key": activeKey, "anthropic-version": "2023-06-01", "Content-Type": "application/json" },
-                body: JSON.stringify({
-                  model: cfg.model || "claude-3-haiku-20240307",
-                  max_tokens: 1024,
-                  system: `Objetivo: ${objective}\nInstruções: ${instructions}`,
-                  messages: [{ role: "user", content: userMessage }],
-                }),
-              });
-              if (res.ok) {
-                const data = await res.json();
-                aiReply = data.content?.[0]?.text ?? null;
-              } else {
-                const error = await res.json();
-                aiReply = `❌ Erro Anthropic: ${error.error?.message || res.statusText}`;
-              }
-
-            } else if (provider === "google" || provider === "gemini") {
-              const modelName = (cfg.model || "gemini-1.5-flash").trim().replace("gemini-2.5", "gemini-1.5");
-              const cleanModel = modelName.startsWith("models/") ? modelName.substring(7) : modelName;
-
-              const res = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${cleanModel}:generateContent?key=${activeKey}`, {
-                method: "POST",
-                headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({
-                  contents: [{ 
-                    role: "user", 
-                    parts: [{ text: `System Instruction: Objetivo: ${objective}\n${instructions}\n\nUser: ${userMessage}` }] 
-                  }],
-                }),
-              });
-              if (res.ok) {
-                const data = await res.json();
-                aiReply = data.candidates?.[0]?.content?.parts?.[0]?.text ?? null;
-              } else {
-                let errorMsg = res.statusText;
-                try {
-                  const error = await res.json();
-                  errorMsg = error.error?.message || errorMsg;
-                } catch (jsonErr) {}
-                aiReply = `❌ Erro Gemini: ${errorMsg}`;
-              }
-
-            }
+            aiReply = await callLovableAI({
+              system: `Objetivo: ${objective}\nInstruções: ${instructions}`,
+              messages: [{ role: "user", content: userMessage }],
+            });
           } catch (e) {
             console.error(`[${nodeType}] AI Call failed`, e);
+            aiReply = `❌ Erro na IA: ${e?.message || String(e)}`;
           }
         }
 
         if (!aiReply) {
-          aiReply = hasAnyKey
-            ? `🤖 [${isAgent ? "AGENTE" : "AI"} - ${provider}]\nRecebi: "${userMessage}"`
-            : `🤖 [SIMULAÇÃO]\nObjetivo: ${objective}\nRecebi: "${userMessage}"\n(Configure API key)`;
+          aiReply = `🤖 [SIMULAÇÃO]\nObjetivo: ${objective}\nRecebi: "${userMessage}"`;
         }
 
         messages.push({ id: crypto.randomUUID(), type: "bot", content: aiReply });
