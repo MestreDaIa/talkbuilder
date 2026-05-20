@@ -363,35 +363,50 @@ export const TestPanel = ({
       const cleanModel = modelMap[model] || (model.startsWith("google/") ? model.replace("google/", "") : model);
 
       const tryFetch = async (apiVersion: string) => {
+        const formattedMessages: any[] = [];
+        let lastRole: string | null = null;
+
+        contextMessages.forEach(m => {
+          const role = m.role === "assistant" ? "model" : "user";
+          if (role === lastRole && formattedMessages.length > 0) {
+            formattedMessages[formattedMessages.length - 1].parts[0].text += "\n" + m.content;
+          } else {
+            formattedMessages.push({ role, parts: [{ text: m.content }] });
+            lastRole = role;
+          }
+        });
+
+        const body: any = {
+          contents: formattedMessages,
+          generationConfig: {
+            temperature: cfg.temperature ?? 0.7,
+            maxOutputTokens: cfg.maxTokens ?? 1000,
+          }
+        };
+
+        if (system) {
+          body.system_instruction = {
+            parts: [{ text: system }]
+          };
+        }
+
         return await fetch(
           `https://generativelanguage.googleapis.com/${apiVersion}/models/${cleanModel}:generateContent?key=${apiKey}`,
           {
             method: "POST",
             headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({
-              contents: [
-                { role: "user", parts: [{ text: system }] },
-                ...contextMessages.map(m => ({
-                  role: m.role === "assistant" ? "model" : "user",
-                  parts: [{ text: m.content }]
-                }))
-              ],
-              generationConfig: {
-                temperature: cfg.temperature ?? 0.7,
-                maxOutputTokens: cfg.maxTokens ?? 1000,
-              }
-            }),
+            body: JSON.stringify(body),
           }
         );
       };
 
       try {
-        console.log(`[TestPanel] Iniciando chamada direta ao Gemini (${cleanModel})`);
-        let response = await tryFetch("v1");
+        console.log(`[EXTERNAL-API] Iniciando chamada direta ao Gemini (${cleanModel})`);
+        let response = await tryFetch("v1beta");
         
         if (!response.ok && response.status === 404) {
-          console.log(`Modelo ${cleanModel} não encontrado em v1, tentando v1beta...`);
-          response = await tryFetch("v1beta");
+          console.log(`[EXTERNAL-API] Modelo ${cleanModel} não encontrado em v1beta, tentando v1...`);
+          response = await tryFetch("v1");
         }
 
         if (!response.ok) {
@@ -748,8 +763,8 @@ export const TestPanel = ({
         // No TestPanel, usamos o variables["last_message"] que foi setado no início do runLocalFlow
         const userMsgContent = String(variables["last_message"] || "").trim();
 
-        console.log(`[AI Node] ${isAgent ? 'AGENT' : 'FLOW'} execution:`, {
-          provider: "direct-api",
+        console.log(`[AI-NODE-EXEC] ${isAgent ? 'AGENT' : 'FLOW'} execution:`, {
+          provider: "external-direct-api",
           objective,
           instructions_length: instructions.length,
           hasInput: !!userMsgContent
@@ -795,7 +810,7 @@ export const TestPanel = ({
           continue;
         }
 
-        console.log("[TestPanel] Iniciando chamada de IA via Direct API (Gemini)");
+        console.log("[EXTERNAL-API] Iniciando chamada de IA via Conexão Direta (Gemini)");
 
         const { system, messages: contextMessages } = buildAgentContext({
           systemPrompt: `Objetivo: ${objective}\nInstruções: ${instructions}`,
