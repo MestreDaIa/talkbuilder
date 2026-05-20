@@ -659,10 +659,16 @@ export const TestPanel = ({
         continue;
       }
 
-      if (waitingFor) break;
-      currentNodeId = nextFromNode(node.id, container.id);
+      if (waitingFor) {
+        console.log("[Runtime] Pausando loop — aguardando:", waitingFor, "no nó", node.id);
+        break;
+      }
+      const nextId = nextFromNode(node.id, container.id);
+      console.log(`[Runtime] Nó ${node.id} concluído → próximo:`, nextId);
+      currentNodeId = nextId;
     }
 
+    console.log("[Runtime] Loop finalizado", { steps, currentNodeId, waitingFor, messagesAdded: nextMessages.length });
     return { messages: nextMessages, wait_ms: waitMs, waiting_for: waitingFor, waiting_for_config: waitingForCfg, buttons: nextButtons, runtime_state: { current_node_id: currentNodeId, variables, waiting_for_input: !!waitingFor } };
   };
 
