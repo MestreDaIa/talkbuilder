@@ -32,8 +32,26 @@ export const buildAgentContext = ({
     ? `\nVariáveis do Fluxo:\n${JSON.stringify(variables, null, 2)}`
     : "";
 
-  // 4. Montagem do prompt do sistema
-  const fullSystemPrompt = `${systemPrompt}${memoryStr}${varsStr}`;
+  // 4. Formatação da Base de Conhecimento
+  let kbStr = "";
+  if (knowledgeBase) {
+    const files = (knowledgeBase.kbFiles || [])
+      .filter((f: any) => knowledgeBase.kbFilesEnabled && f.content)
+      .map((f: any) => `Arquivo: ${f.name}\nConteúdo: ${f.content}`)
+      .join("\n\n");
+    
+    const links = (knowledgeBase.kbLinks || [])
+      .filter((l: any) => knowledgeBase.kbLinksEnabled && l.url)
+      .map((l: any) => `Link: ${l.url}`)
+      .join("\n");
+
+    if (files || links) {
+      kbStr = `\n\nBASE DE CONHECIMENTO:\n${files}\n${links}`;
+    }
+  }
+
+  // 5. Montagem do prompt do sistema
+  const fullSystemPrompt = `${systemPrompt}${memoryStr}${varsStr}${kbStr}`;
 
   return {
     system: fullSystemPrompt,

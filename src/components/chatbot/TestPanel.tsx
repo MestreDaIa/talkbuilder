@@ -638,7 +638,13 @@ export const TestPanel = ({
           systemPrompt: `Objetivo: ${objective}\nInstruções: ${instructions}`,
           history: messageHistory,
           persistentMemory,
-          variables
+          variables,
+          knowledgeBase: {
+            kbFiles: cfg.kbFiles,
+            kbFilesEnabled: cfg.kbFilesEnabled,
+            kbLinks: cfg.kbLinks,
+            kbLinksEnabled: cfg.kbLinksEnabled
+          }
         });
 
         let aiReply: string | null = null;
