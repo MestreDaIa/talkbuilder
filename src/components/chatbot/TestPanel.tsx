@@ -808,18 +808,14 @@ export const TestPanel = ({
                     }),
                   });
 
-                  if (response.ok) {
-                    const data = await response.json();
-                    aiReply = data.candidates?.[0]?.content?.parts?.[0]?.text || null;
-                    success = true;
-                    console.log(`[Gemini] Sucesso com o modelo: ${modelToTry}`);
-                    break;
                   } else {
                     const errorData = await response.json();
                     lastError = errorData.error?.message || response.statusText;
                     console.warn(`[Gemini] Falha no modelo ${modelToTry}: ${lastError}`);
-                    // Se não for 404 (Not Found), provavelmente é erro de chave ou cota, não adianta tentar outro modelo
-                    if (response.status !== 404) break;
+                    
+                    // Se o erro for "High demand" ou 404, tentamos o próximo modelo da lista
+                    const isHighDemand = lastError.toLowerCase().includes("high demand");
+                    if (response.status !== 404 && !isHighDemand) break;
                   }
                 } catch (err: any) {
                   lastError = err.message;
