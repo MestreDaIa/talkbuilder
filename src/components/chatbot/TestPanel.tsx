@@ -516,12 +516,85 @@ export const TestPanel = ({
           }
 
           console.log("[node:ai_generating] Agent", node.id);
-          // AI Agent continuous execution would normally build full context
-          // but for this refactor we ensure it breaks to wait for next message
+          const objective = cfg.objective || "assistente conversacional";
+          const instructions = cfg.instructions || "Ajude o usuário de forma natural.";
+          
+          const nodeKey = (cfg.apiKey || "").trim();
+          const nodeProvider = (cfg.provider || "openai").toLowerCase();
+          const globalKeys = settings?.aiKeys || {};
+          const activeKey = (globalKeys[`${nodeProvider}Key`] || "").trim() || nodeKey;
+          const selectedProvider = nodeProvider === "gemini" ? "google" : nodeProvider as "openai" | "anthropic" | "google";
+
+          const { system, messages: contextMessages } = buildAgentContext({
+            systemPrompt: `Objetivo: ${objective}\nInstruções: ${instructions}`,
+            history: messageHistory,
+            persistentMemory,
+            variables,
+            knowledgeBase: {
+              kbFiles: cfg.kbFiles,
+              kbFilesEnabled: cfg.kbFilesEnabled,
+              kbLinks: cfg.kbLinks,
+              kbLinksEnabled: cfg.kbLinksEnabled
+            }
+          });
+
+          let aiReply: string | null = null;
+          if (activeKey) {
+            try {
+              if (selectedProvider === "openai") {
+                const res = await fetch("https://api.openai.com/v1/chat/completions", {
+                  method: "POST",
+                  headers: { "Authorization": `Bearer ${activeKey}`, "Content-Type": "application/json" },
+                  body: JSON.stringify({
+                    model: cfg.model || "gpt-4o-mini",
+                    messages: [{ role: "system", content: system }, ...contextMessages],
+                  }),
+                });
+                if (res.ok) {
+                  const data = await res.json();
+                  aiReply = data.choices?.[0]?.message?.content || null;
+                }
+              } else if (selectedProvider === "google") {
+                const model = (cfg.model || "gemini-2.0-flash").trim();
+                const res = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${activeKey}`, {
+                  method: "POST",
+                  headers: { "Content-Type": "application/json" },
+                  body: JSON.stringify({
+                    system_instruction: { parts: [{ text: system }] },
+                    contents: contextMessages.map(m => ({
+                      role: m.role === "assistant" ? "model" : "user",
+                      parts: [{ text: m.content }]
+                    }))
+                  }),
+                });
+                if (res.ok) {
+                  const data = await res.json();
+                  aiReply = data.candidates?.[0]?.content?.parts?.[0]?.text || null;
+                }
+              }
+            } catch (e) {
+              console.error("[agent-node] AI call failed", e);
+            }
+          }
+
+          if (aiReply) {
+            const botMsg: RuntimeMessage = {
+              id: crypto.randomUUID(),
+              conversation_id: conversationId || "temp",
+              role: "assistant",
+              content: aiReply,
+              created_at: new Date().toISOString()
+            };
+            messageHistory.push(botMsg);
+            if (conversationId) conversationService.saveMessage(botMsg);
+            nextMessages.push({ ...botMsg, type: "bot", content: aiReply, isHtml: true } as Message);
+          }
+
           waitingFor = "input-text";
           waitingForCfg = { placeholder: "Converse com o agente..." };
           status = "waiting_input";
           break;
+
         }
 
         // Standard nodes
