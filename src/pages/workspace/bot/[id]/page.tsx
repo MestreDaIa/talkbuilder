@@ -562,12 +562,26 @@ export default function BotPage() {
   };
 
   const handleTest = () => {
-    const first = containers[0];
-    if (!first) {
+    if (!containers.length) {
       toast.error("Adicione pelo menos um bloco para testar");
       return;
     }
-    setTestContainer(first);
+    // Encontrar container de entrada (com nó "start" ou sem arestas de entrada)
+    const withStart = containers.find((c) =>
+      (c.nodes || []).some((n: any) => String(n.type || "").toLowerCase() === "start")
+    );
+    let entry: Container | undefined = withStart;
+    if (!entry) {
+      const incoming = new Set<string>();
+      edges.forEach((e: any) => {
+        if (!e?.target) return;
+        const cont = containers.find((c) => (c.nodes || []).some((n: any) => n.id === e.target));
+        if (cont) incoming.add(cont.id);
+        else incoming.add(e.target);
+      });
+      entry = containers.find((c) => !incoming.has(c.id));
+    }
+    setTestContainer(entry || containers[0]);
   };
 
 

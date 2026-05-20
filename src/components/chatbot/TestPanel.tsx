@@ -383,8 +383,13 @@ export const TestPanel = ({
 
         // AI Node (One-off execution)
         if (nodeType === "ai-node") {
+          const hasUserInput = !!(variables["last_message"] && String(variables["last_message"]).trim());
+          if (!hasUserInput) {
+            console.log("[node:ai_skipped] sem input do usuário", node.id);
+            currentNodeId = nextFromNode(node.id, container.id);
+            continue;
+          }
           console.log("[node:start] AI Node processing", node.id);
-
 
           console.log("[node:ai_generating] AI Node", node.id);
           const objective = cfg.objective || cfg.systemPrompt || "assistente";
