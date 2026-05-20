@@ -16,7 +16,12 @@ import { ScrollArea } from "../../components/ui/scroll-area";
 import { renderTextSegments } from "@/lib/textParser";
 import { richHtmlFor, richToPlainText } from "@/lib/richText";
 
-interface Message {
+import { type Message as RuntimeMessage, type RuntimeState, type RuntimeMode, type PersistentMemory } from "../../types/runtime";
+import { conversationService } from "../../services/conversationService";
+import { buildAgentContext } from "../../services/aiContextBuilder";
+
+interface Message extends RuntimeMessage {
+  // UI Specific extension
   id: string;
   type: "bot" | "user";
   content: string;
@@ -29,12 +34,6 @@ interface Message {
   autoplay?: boolean;
 }
 
-interface RuntimeState {
-  current_node_id: string | null;
-  variables: Record<string, any>;
-  waiting_for_input: boolean;
-  pending_wait_node_id?: string | null;
-}
 
 interface AudioPlayerProps {
   src: string;
@@ -271,9 +270,14 @@ export const TestPanel = ({
   };
 
     const runLocalFlow = async (state: RuntimeState | null, input?: { message?: string; button_id?: string }) => {
+    let mode: RuntimeMode = state?.mode || "flow";
     let currentNodeId = state?.current_node_id || startContainer?.nodes?.[0]?.id || null;
+    let activeAgentNodeId = state?.active_agent_node_id || null;
     const variables = { ...(state?.variables || {}) };
+    const persistentMemory: PersistentMemory = { ...(state?.persistent_memory || {}) };
+    const messageHistory: RuntimeMessage[] = [...(state?.message_history || [])];
     const nextMessages: Message[] = [];
+    
     let waitingFor: string | null = null;
     let waitingForCfg: any = null;
     let nextButtons: ButtonConfig[] = [];
@@ -283,58 +287,59 @@ export const TestPanel = ({
     const firstText = (...values: any[]) => String(values.find((v) => typeof v === "string" && v.trim()) || "");
     const cleanText = (text: string) => richToPlainText(text);
     const replaceVars = (text: string) => cleanText(text).replace(/{{(.*?)}}/g, (_, key) => variables[key.trim()] ?? `{{${key}}}`);
-    const evaluateSetVariableValue = (cfg: any, vars: Record<string, any>): any => {
-      const valueType = String(cfg.valueType || "custom").toLowerCase();
-      const raw = cfg.value ?? "";
-      if (valueType === "empty") return "";
-      const code = String(raw);
-      // Substitute {{var}} -> JSON literal so the JS code can use them
-      const interpolated = code.replace(/{{\s*(.*?)\s*}}/g, (_, key) => {
-        const v = vars[String(key).trim()];
-        return JSON.stringify(v == null ? "" : v);
-      });
-      try {
-        const hasReturn = /\breturn\b/.test(interpolated);
-        const body = hasReturn ? interpolated : `return (${interpolated});`;
-        const fn = new Function(`"use strict"; ${body}`);
-        const result = fn();
-        return result;
-      } catch (err) {
-        console.warn("[set-variable] eval failed, using raw value:", err);
-        if (valueType === "custom") return replaceVars(code);
-        return code;
-      }
-    };
-    const parseWaitMs = (cfg: any) => {
-      const amount = Math.max(1, Number(cfg.waitTime ?? cfg.duration ?? cfg.seconds ?? 5) || 5);
-      const unit = String(cfg.timeUnit ?? cfg.unit ?? "seconds").toLowerCase();
-      return amount * (unit.startsWith("hour") || unit.startsWith("hora") ? 3600000 : unit.startsWith("minute") || unit.startsWith("minuto") ? 60000 : 1000);
-    };
 
-    if (state?.waiting_for_input && input && currentNodeId) {
-      const current = findNode(currentNodeId);
-      if (current) {
-        const varName = current.node.config?.variableName || current.node.config?.saveVariable;
-        const value = input.message ?? input.button_id;
-        if (value !== undefined) {
-          variables["last_message"] = value;
-          if (varName) variables[varName] = value;
-        }
+    // Identificação de usuário e conversa (Visitor ID persistente)
+    let visitorId = state?.visitor_id || localStorage.getItem("chat_visitor_id");
+    if (!visitorId) {
+      visitorId = `v-${Math.random().toString(36).slice(2, 11)}`;
+      localStorage.setItem("chat_visitor_id", visitorId);
+    }
+
+    let conversationId = state?.conversation_id || null;
+    if (!conversationId && flowId) {
+      const conv = await conversationService.getOrCreateConversation(visitorId, flowId, "default-workspace");
+      conversationId = conv.id;
+    }
+
+    // Lógica de Entrada de Usuário
+    if (input && (state?.waiting_for_input || mode === "agent")) {
+      const value = input.message ?? input.button_id;
+      if (value !== undefined) {
+        variables["last_message"] = value;
         
-        const currentType = String(current.node.type || "").toLowerCase();
-        if (currentType === "ai-agent" || currentType === "ai-node") {
-          variables.__last_agent_user_message = value ?? "";
-          currentNodeId = current.node.id;
-          // Forçamos a limpeza de waiting_for_input no estado para que o loop processe o nó novamente
-          if (state) state.waiting_for_input = false;
-          // Impede o avanço automático para o próximo nó antes de processar a IA
-          steps = 0; 
-          waitingFor = null;
-        } else {
-          currentNodeId = nextFromNode(current.node.id, current.container.id, input.button_id);
+        // Salvar mensagem do usuário no histórico e banco
+        const userMsg: RuntimeMessage = {
+          id: crypto.randomUUID(),
+          conversation_id: conversationId || "temp",
+          role: "user",
+          content: String(value),
+          created_at: new Date().toISOString()
+        };
+        messageHistory.push(userMsg);
+        if (conversationId) conversationService.saveMessage(userMsg);
+
+        if (mode === "agent" && activeAgentNodeId) {
+          currentNodeId = activeAgentNodeId;
+        } else if (currentNodeId) {
+          const current = findNode(currentNodeId);
+          if (current) {
+            const varName = current.node.config?.variableName || current.node.config?.saveVariable;
+            if (varName) variables[varName] = value;
+            
+            const currentType = String(current.node.type || "").toLowerCase();
+            if (currentType === "ai-agent") {
+              mode = "agent";
+              activeAgentNodeId = current.node.id;
+            } else if (currentType === "ai-node") {
+              currentNodeId = current.node.id;
+            } else {
+              currentNodeId = nextFromNode(current.node.id, current.container.id, input.button_id);
+            }
+          }
         }
       }
     }
+
 
     console.log("[Runtime] Iniciando loop", { startNodeId: currentNodeId, hasInput: !!input, waitingForInput: state?.waiting_for_input });
 
@@ -668,8 +673,26 @@ export const TestPanel = ({
       currentNodeId = nextId;
     }
 
-    console.log("[Runtime] Loop finalizado", { steps, currentNodeId, waitingFor, messagesAdded: nextMessages.length });
-    return { messages: nextMessages, wait_ms: waitMs, waiting_for: waitingFor, waiting_for_config: waitingForCfg, buttons: nextButtons, runtime_state: { current_node_id: currentNodeId, variables, waiting_for_input: !!waitingFor } };
+    console.log("[Runtime] Loop finalizado", { steps, currentNodeId, mode, waitingFor, messagesAdded: nextMessages.length });
+    return { 
+      messages: nextMessages, 
+      wait_ms: waitMs, 
+      waiting_for: waitingFor, 
+      waiting_for_config: waitingForCfg, 
+      buttons: nextButtons, 
+      runtime_state: { 
+        mode,
+        current_node_id: currentNodeId, 
+        active_agent_node_id: activeAgentNodeId,
+        conversation_id: conversationId,
+        visitor_id: visitorId,
+        message_history: messageHistory,
+        persistent_memory: persistentMemory,
+        variables, 
+        waiting_for_input: !!waitingFor 
+      } 
+    };
+
   };
 
   useEffect(() => {
