@@ -581,8 +581,12 @@ export const TestPanel = ({
         const startMode = cfg.startMode || "automatic";
         const welcomeMessage = cfg.welcomeMessage || "";
         
-        // Se estamos chegando no nó sem entrada e ele deve esperar ou mostrar boas-vindas
-        if (!input && !state?.waiting_for_input) {
+        const isResumingThisNode = !!input && state?.waiting_for_input && state?.current_node_id === node.id;
+        const isAgentResuming = !!input && mode === "agent" && activeAgentNodeId === node.id;
+        
+        // Se estamos chegando no nó (não é uma retomada de espera deste nó específico)
+        // E o nó está configurado para esperar ou mostrar boas-vindas
+        if (!isResumingThisNode && !isAgentResuming) {
           if (startMode === "manual") {
             console.log(`[Runtime] AI ${isAgent ? "Agent" : "Node"} aguardando usuário (modo manual)`);
             waitingFor = "input-text";
