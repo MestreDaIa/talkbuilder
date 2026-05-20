@@ -342,18 +342,16 @@ export const TestPanel = ({
     const cleanText = (text: string) => richToPlainText(text);
     const replaceVars = (text: string) => cleanText(text).replace(/{{(.*?)}}/g, (_, key) => variables[key.trim()] ?? `{{${key}}}`);
 
-    const callLovableAI = async (system: string, contextMessages: Array<{ role: string; content: string }>) => {
-      // Revertido para usar chamadas diretas ao Gemini conforme solicitado (Supabase Externo / Client-side)
+    const callAIAgent = async (system: string, contextMessages: Array<{ role: string; content: string }>) => {
       const node = findNode(currentNodeId)?.node;
       const cfg = node?.config || {};
       const apiKey = cfg.apiKey;
       const model = cfg.model || "gemini-1.5-flash";
 
       if (!apiKey) {
-        throw new Error("API Key do Gemini não configurada neste nó.");
+        throw new Error("Chave de API não configurada neste nó.");
       }
 
-      // Variações de nomes de modelos que costumam dar erro se o prefixo estiver errado
       const modelMap: Record<string, string> = {
         "google/gemini-1.5-flash": "gemini-1.5-flash",
         "google/gemini-1.5-pro": "gemini-1.5-pro",
@@ -388,10 +386,9 @@ export const TestPanel = ({
       };
 
       try {
-        // Tenta v1 primeiro (mais estável para modelos GA)
+        console.log(`[TestPanel] Iniciando chamada direta ao Gemini (${cleanModel})`);
         let response = await tryFetch("v1");
         
-        // Se falhar com 404, tenta v1beta (para modelos experimentais)
         if (!response.ok && response.status === 404) {
           console.log(`Modelo ${cleanModel} não encontrado em v1, tentando v1beta...`);
           response = await tryFetch("v1beta");
@@ -752,7 +749,7 @@ export const TestPanel = ({
         const userMsgContent = String(variables["last_message"] || "").trim();
 
         console.log(`[AI Node] ${isAgent ? 'AGENT' : 'FLOW'} execution:`, {
-          provider: "lovable-ai",
+          provider: "direct-api",
           objective,
           instructions_length: instructions.length,
           hasInput: !!userMsgContent
@@ -798,7 +795,7 @@ export const TestPanel = ({
           continue;
         }
 
-        console.log("[TestPanel] Iniciando chamada de IA via Lovable AI");
+        console.log("[TestPanel] Iniciando chamada de IA via Direct API (Gemini)");
 
         const { system, messages: contextMessages } = buildAgentContext({
           systemPrompt: `Objetivo: ${objective}\nInstruções: ${instructions}`,
@@ -810,7 +807,7 @@ export const TestPanel = ({
         let aiReply: string | null = null;
         
         try {
-          aiReply = await callLovableAI(system, contextMessages);
+          aiReply = await callAIAgent(system, contextMessages);
         } catch (e: any) { 
           console.error(e);
           aiReply = `❌ Erro na IA: ${e.message}`; 
