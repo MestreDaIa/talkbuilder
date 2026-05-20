@@ -792,7 +792,10 @@ export const TestPanel = ({
     // Actually runLocalFlow is pure-ish relative to runtimeStateRef, it uses state and returns new state.
     applyRuntimeData(data);
 
-    if (!waitTimerRef.current) setIsLoading(false);
+    // Garante que o estado de carregamento seja removido se estivermos esperando input
+    if (data.waiting_for || !waitTimerRef.current) {
+      setIsLoading(false);
+    }
   };
 
   const handleButtonClick = (button: ButtonConfig) => sendMessage(undefined, button.id);
