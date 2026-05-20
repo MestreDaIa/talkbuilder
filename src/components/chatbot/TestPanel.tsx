@@ -719,8 +719,9 @@ export const TestPanel = ({
         const nodeKey = (cfg.apiKey || "").trim();
         const nodeProvider = (cfg.provider || "openai").toLowerCase();
         const globalKeys = settings?.aiKeys || {};
-        const activeKey = (globalKeys[`${nodeProvider}Key`] || "").trim() || nodeKey;
-        const selectedProvider = nodeProvider === "gemini" ? "google" : nodeProvider as "openai" | "anthropic" | "google";
+        const activeKey = (globalKeys[`${nodeProvider}Key`] || globalKeys.googleKey || "").trim() || nodeKey;
+        const selectedProvider = (nodeProvider === "gemini" || nodeProvider === "google") ? "google" : nodeProvider as "openai" | "anthropic";
+
 
         const { system, messages: contextMessages } = buildAgentContext({
           systemPrompt: `Objetivo: ${objective}\nInstruções: ${instructions}`,
@@ -732,7 +733,7 @@ export const TestPanel = ({
         let aiReply: string | null = null;
         
         if (!activeKey) {
-          aiReply = `🤖 [SIMULAÇÃO]\nConfigure uma chave de API para o provedor ${nodeProvider.toUpperCase()}.\nRecebi: "${userMsgContent}"`;
+          aiReply = `🤖 [SIMULAÇÃO]\nConfigure uma chave de API para o provedor ${nodeProvider.toUpperCase()} nas configurações do bot.\nRecebi: "${userMsgContent}"`;
         } else {
           try {
             if (selectedProvider === "openai") {
@@ -747,6 +748,9 @@ export const TestPanel = ({
               if (res.ok) {
                 const data = await res.json();
                 aiReply = data.choices?.[0]?.message?.content || null;
+              } else {
+                const error = await res.json();
+                aiReply = `❌ Erro OpenAI: ${error.error?.message || res.statusText}`;
               }
             } else if (selectedProvider === "google") {
               const model = (cfg.model || "gemini-2.0-flash").trim();
@@ -763,6 +767,9 @@ export const TestPanel = ({
               if (res.ok) {
                 const data = await res.json();
                 aiReply = data.candidates?.[0]?.content?.parts?.[0]?.text || null;
+              } else {
+                const error = await res.json();
+                aiReply = `❌ Erro Gemini: ${error.error?.message || res.statusText}`;
               }
             }
           } catch (e: any) { 
@@ -770,6 +777,7 @@ export const TestPanel = ({
             aiReply = `❌ Erro na IA: ${e.message}`; 
           }
         }
+
 
         if (aiReply) {
           const botMsg: RuntimeMessage = {
@@ -801,11 +809,22 @@ export const TestPanel = ({
           break; // Agent pausa o fluxo e assume
         } else {
           // AI Node pontual: avança para o próximo node após a resposta
-          const nextId = nextFromNode(node.id, container.id);
-          console.log("[Runtime] AI Node concluído. Avançando para o próximo nó:", nextId);
-          currentNodeId = nextId;
-          continue;
+          // IMPORTANTE: Pausamos aqui se acabamos de responder a uma mensagem, 
+          // para evitar que o próximo nó (ex: Agente) execute imediatamente sem o usuário ver a resposta.
+          if (userMsgContent) {
+            currentNodeId = nextFromNode(node.id, container.id);
+            waitingFor = "input-text";
+            waitingForCfg = { placeholder: "Digite sua resposta..." };
+            console.log("[Runtime] AI Node respondeu ao usuário, pausando fluxo no próximo nó:", currentNodeId);
+            break;
+          } else {
+            const nextId = nextFromNode(node.id, container.id);
+            console.log("[Runtime] AI Node concluído (sem input). Avançando para:", nextId);
+            currentNodeId = nextId;
+            continue;
+          }
         }
+
 
 
       } else if (nodeType === "set-variable" && cfg.variableName) {
