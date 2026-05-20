@@ -582,10 +582,25 @@ async function runFlow(execution: any, containers: any[], edges: any[], input: a
         const isAgent = nodeType === "ai-agent";
         const lastMsg = variables.__last_agent_user_message;
         const objective = cfg.objective || cfg.systemPrompt || "agente de teste";
-        const instructions = cfg.instructions || cfg.prompt || cfg.message || "";
+        let instructions = cfg.instructions || cfg.prompt || cfg.message || "";
         const userMessage = String(lastMsg || "").trim();
 
-        console.log(`[Node:${nodeType}] Executando:`, node.id, { isAgent, hasInput: !!userMessage });
+        // Knowledge Base Injection
+        if (cfg.kbFilesEnabled && cfg.kbFiles?.length > 0) {
+          const filesContent = cfg.kbFiles
+            .map((f: any) => `ARQUIVO: ${f.name}\nCONTEÚDO:\n${f.content}`)
+            .join("\n\n---\n\n");
+          instructions = `${instructions}\n\nBASE DE CONHECIMENTO (ARQUIVOS):\n${filesContent}`;
+        }
+
+        if (cfg.kbLinksEnabled && cfg.kbLinks?.length > 0) {
+          const linksList = cfg.kbLinks.map((l: any) => l.url).filter(Boolean).join(", ");
+          if (linksList) {
+            instructions = `${instructions}\n\nLINKS DE REFERÊNCIA:\n${linksList}`;
+          }
+        }
+
+        console.log(`[Node:${nodeType}] Executando:`, node.id, { isAgent, hasInput: !!userMessage, instructions_length: instructions.length });
 
         // Check for keys
         const nodeKey = (cfg.apiKey || "").trim();

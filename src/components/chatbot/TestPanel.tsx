@@ -663,8 +663,23 @@ export const TestPanel = ({
       } else if (nodeType === "ai-node" || nodeType === "ai-agent") {
         const isAgent = nodeType === "ai-agent";
         const objective = cfg.objective || cfg.systemPrompt || "assistente virtual";
-        const instructions = firstText(cfg.instructions, cfg.prompt, cfg.message) || "Ajude o usuário da melhor forma possível.";
+        let instructions = firstText(cfg.instructions, cfg.prompt, cfg.message) || "Ajude o usuário da melhor forma possível.";
         
+        // Injetar Base de Conhecimento (Knowledge Base)
+        if (cfg.kbFilesEnabled && cfg.kbFiles?.length > 0) {
+          const filesContent = cfg.kbFiles
+            .map((f: any) => `ARQUIVO: ${f.name}\nCONTEÚDO:\n${f.content}`)
+            .join("\n\n---\n\n");
+          instructions = `${instructions}\n\nBASE DE CONHECIMENTO (ARQUIVOS):\n${filesContent}`;
+        }
+
+        if (cfg.kbLinksEnabled && cfg.kbLinks?.length > 0) {
+          const linksList = cfg.kbLinks.map((l: any) => l.url).filter(Boolean).join(", ");
+          if (linksList) {
+            instructions = `${instructions}\n\nLINKS DE REFERÊNCIA:\n${linksList}`;
+          }
+        }
+
         // No TestPanel, usamos o variables["last_message"] que foi setado no início do runLocalFlow
         const userMsgContent = String(variables["last_message"] || "").trim();
 
