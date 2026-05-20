@@ -908,7 +908,9 @@ export const TestPanel = ({
         )}
         {waitingForInput && (
           <div className="p-3 border-t border-border flex gap-2" style={{ background: theme?.inputBackgroundColor }}>
-            {waitingForType === "input-number" || waitingForType === "input-mail" || waitingForType === "input-webSite" ? (
+            {!waitingForButton && (
+              <>
+                {waitingForType === "input-number" || waitingForType === "input-mail" || waitingForType === "input-webSite" ? (
               <Input 
                 value={currentInput} 
                 onChange={(e) => setCurrentInput(e.target.value)} 
