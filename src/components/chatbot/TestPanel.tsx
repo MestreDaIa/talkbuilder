@@ -416,16 +416,15 @@ export const TestPanel = ({
       try {
         console.log(`[EXTERNAL-API] Chamada direta ao Gemini: ${cleanModel}`);
         
-        // Tenta v1 primeiro para o 1.5-flash (mais estável para modelos básicos)
+        // Tentativa 1: v1 (mais estável para modelos 1.5)
         let response = await tryFetch("v1", false);
         
         if (!response.ok) {
           const firstErrorData = await response.json().catch(() => ({}));
           const firstMsg = firstErrorData.error?.message || "";
-          
           console.log(`[EXTERNAL-API] Erro na tentativa 1 (v1): ${firstMsg}`);
 
-          // Tenta v1beta como fallback (bom para 2.0 ou novos modelos)
+          // Tentativa 2: v1beta com system_instruction
           console.log(`[EXTERNAL-API] Tentando v1beta com system_instruction...`);
           response = await tryFetch("v1beta", true);
 
@@ -434,18 +433,17 @@ export const TestPanel = ({
             const secondMsg = secondErrorData.error?.message || "";
             console.log(`[EXTERNAL-API] Erro na tentativa 2 (v1beta + system): ${secondMsg}`);
 
-            // Se for erro de campo, tenta v1beta sem o campo system
+            // Tentativa 3: v1beta sem system_instruction
             if (secondMsg.includes("system_instruction") || secondMsg.includes("Unknown name")) {
               console.log(`[EXTERNAL-API] Tentando v1beta sem system_instruction...`);
               response = await tryFetch("v1beta", false);
             }
           }
         }
-          
-          if (!response.ok) {
-            const finalErrorData = await response.json().catch(() => ({}));
-            throw new Error(finalErrorData.error?.message || `Erro HTTP ${response.status}`);
-          }
+
+        if (!response.ok) {
+          const finalErrorData = await response.json().catch(() => ({}));
+          throw new Error(finalErrorData.error?.message || `Erro HTTP ${response.status}`);
         }
 
         const data = await response.json();
