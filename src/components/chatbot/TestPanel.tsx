@@ -335,6 +335,7 @@ export const TestPanel = ({
       const value = input.message ?? input.button_id;
       if (value !== undefined) {
         variables["last_message"] = value;
+        console.log("[Runtime] Entrada recebida:", { value, mode, activeAgentNodeId });
         
         // Salvar mensagem do usuário no histórico e banco
         const userMsg: RuntimeMessage = {
@@ -348,29 +349,42 @@ export const TestPanel = ({
         if (conversationId) conversationService.saveMessage(userMsg);
 
         if (mode === "agent" && activeAgentNodeId) {
+          console.log("[Runtime] Mantendo modo AGENTE no nó:", activeAgentNodeId);
           currentNodeId = activeAgentNodeId;
         } else if (currentNodeId) {
           const current = findNode(currentNodeId);
           if (current) {
+            console.log("[Runtime] Processando entrada no nó FLOW:", current.node.id);
             const varName = current.node.config?.variableName || current.node.config?.saveVariable;
-            if (varName) variables[varName] = value;
+            if (varName) {
+              variables[varName] = value;
+              console.log(`[Runtime] Variável salva: ${varName} =`, value);
+            }
             
             const currentType = String(current.node.type || "").toLowerCase();
             if (currentType === "ai-agent") {
               mode = "agent";
               activeAgentNodeId = current.node.id;
+              console.log("[Runtime] Transição para modo AGENTE ativada");
             } else if (currentType === "ai-node") {
               currentNodeId = current.node.id;
             } else {
-              currentNodeId = nextFromNode(current.node.id, current.container.id, input.button_id);
+              const nextId = nextFromNode(current.node.id, current.container.id, input.button_id);
+              console.log("[Runtime] Avançando FLOW para:", nextId);
+              currentNodeId = nextId;
             }
           }
         }
       }
     }
 
+    console.log("[Runtime] Iniciando execução", { 
+      startNodeId: currentNodeId, 
+      mode,
+      activeAgentNodeId,
+      hasInput: !!input 
+    });
 
-    console.log("[Runtime] Iniciando loop", { startNodeId: currentNodeId, hasInput: !!input, waitingForInput: state?.waiting_for_input });
 
     while (currentNodeId && steps++ < 100) {
       const found = findNode(currentNodeId);
@@ -384,7 +398,11 @@ export const TestPanel = ({
       const { node, container } = found;
       const cfg = node.config || {};
       const nodeType = String(node.type || "").toLowerCase();
-      console.log(`[Runtime] Step ${steps} → executando nó:`, { id: node.id, type: nodeType, container: container.id });
+      console.log(`[Runtime] [Node:${nodeType}] Executando: ${node.id}`, {
+        container: container.id,
+        mode
+      });
+
 
       if (nodeType === "wait" || nodeType === "await") {
         waitMs = parseWaitMs(cfg);
@@ -581,6 +599,14 @@ export const TestPanel = ({
         const objective = cfg.objective || cfg.systemPrompt || "assistente virtual";
         const instructions = firstText(cfg.instructions, cfg.prompt, cfg.message) || "Ajude o usuário da melhor forma possível.";
         
+        console.log(`[AI Node] ${isAgent ? 'AGENT' : 'FLOW'} execution:`, {
+          provider: cfg.provider || "openai",
+          model: cfg.model,
+          objective,
+          instructions_length: instructions.length
+        });
+
+        
         // Verificação de intenção de saída (Exit Intents)
         const userMsgContent = String(variables["last_message"] || "").toLowerCase();
         const exitPhrases = ["voltar menu", "sair", "parar", "cancelar", "exit", "stop"];
@@ -670,10 +696,12 @@ export const TestPanel = ({
           activeAgentNodeId = node.id;
           waitingFor = "input-text";
           waitingForCfg = { placeholder: "Converse com o agente..." };
+          console.log("[Runtime] Modo AGENTE ativado: aguardando input do usuário para continuar conversa.");
           break; // Agent pausa o fluxo e assume
         } else {
           // AI Node pontual: continua o fluxo
           const nextId = nextFromNode(node.id, container.id);
+          console.log("[Runtime] AI Node concluído. Avançando para o próximo nó:", nextId);
           if (!nextId) {
             waitingFor = "input-text";
             waitingForCfg = { placeholder: "Digite aqui..." };
@@ -681,6 +709,7 @@ export const TestPanel = ({
           currentNodeId = nextId;
           continue;
         }
+
 
       } else if (nodeType === "set-variable" && cfg.variableName) {
         variables[cfg.variableName] = evaluateSetVariableValue(cfg, variables);
