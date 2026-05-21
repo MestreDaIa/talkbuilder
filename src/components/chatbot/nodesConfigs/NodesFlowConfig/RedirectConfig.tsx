@@ -24,13 +24,26 @@ interface PublishedBot {
   name: string;
 }
 
+// Module-level caches: persistem entre aberturas do diálogo de configuração
+const botsCache = new Map<string, PublishedBot[]>();
+const containersCache = new Map<string, Container[]>();
+const inflight = new Map<string, Promise<any>>();
+
 export const RedirectConfig = ({ config, setConfig }: RedirectConfigProps) => {
-  const [publishedBots, setPublishedBots] = useState<PublishedBot[]>([]);
-  const [targetFlowNodes, setTargetFlowNodes] = useState<Node[]>([]);
+  const { currentWorkspace } = useAuth();
+  const wsId = currentWorkspace?.id;
+
+  const [publishedBots, setPublishedBots] = useState<PublishedBot[]>(
+    () => (wsId && botsCache.get(wsId)) || []
+  );
+  const [targetFlowContainers, setTargetFlowContainers] = useState<Container[]>(
+    () => (config.targetFlow && containersCache.get(config.targetFlow)) || []
+  );
   const [isLoading, setIsLoading] = useState(false);
   const [isLoadingNodes, setIsLoadingNodes] = useState(false);
-  const [loadedWorkspaceId, setLoadedWorkspaceId] = useState<string | null>(null);
-  const { currentWorkspace } = useAuth();
+  const [loadedWorkspaceId, setLoadedWorkspaceId] = useState<string | null>(
+    wsId && botsCache.has(wsId) ? wsId : null
+  );
 
   const selectedBotFallback = config.targetFlow
     ? [{ id: config.targetFlow, name: config.targetFlowName || config.targetFlow }]
