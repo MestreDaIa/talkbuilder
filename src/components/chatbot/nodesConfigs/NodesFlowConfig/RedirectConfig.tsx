@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { NodeConfig, Container, Node } from "@/types/chatbot";
+import { NodeConfig, Container, Node, NodeType } from "@/types/chatbot";
 import { Label } from "@/components/ui/label";
 import {
   Select,
@@ -8,7 +8,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { Info, Loader2 } from "lucide-react";
+import { Info, Loader2, MessageSquare, Database, Share2, Box, HelpCircle } from "lucide-react";
 import { SkillConfig } from "../SkillConfig";
 import { getSupabase } from "@/lib/supabaseClient";
 import { useAuth } from "@/context/AuthContext";
