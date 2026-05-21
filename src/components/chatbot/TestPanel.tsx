@@ -644,11 +644,11 @@ export const TestPanel = ({
           const conditions: ConditionGroup[] = cfg.conditions || [];
           const matchedCondition = conditions.find((condition) => evaluateCondition(condition, variables, replaceVars));
           const conditionHandle = matchedCondition ? `${node.id}-cond-${matchedCondition.id}` : `${node.id}-else`;
-          currentNodeId = nextFromNode(node.id, container.id, conditionHandle, true);
+          currentNodeId = nextFromNodeIn(node.id, container.id, allContainers, edges, conditionHandle, true);
           continue;
         } else if (nodeType === "go-to" && cfg.targetContainerId) {
           console.log(`[node:go-to] Jumping from node ${node.id} to container: ${cfg.targetContainerId}`);
-          const targetNodeId = resolveTarget(cfg.targetContainerId);
+          const targetNodeId = resolveTargetIn(cfg.targetContainerId, allContainers);
           if (targetNodeId && targetNodeId !== node.id) {
             currentNodeId = targetNodeId;
             // Crucial: continue inside the while loop so it processes the target node immediately
@@ -660,7 +660,7 @@ export const TestPanel = ({
         }
 
         // Only reach here if we didn't 'continue' or 'break' above
-        const nextId = nextFromNode(node.id, container.id);
+        const nextId = nextFromNodeIn(node.id, container.id, allContainers, edges);
         console.log(`[node:completed] ${node.id} → next: ${nextId}`);
         currentNodeId = nextId;
       }
