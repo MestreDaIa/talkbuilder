@@ -271,9 +271,17 @@ export const TestPanel = ({
     return condition.logicalOperator === "OR" ? results.some(Boolean) : results.every(Boolean);
   };
 
-    const runLocalFlow = async (state: RuntimeState | null, input?: { message?: string; button_id?: string }) => {
+    const runLocalFlow = async (
+      state: RuntimeState | null, 
+      input?: { message?: string; button_id?: string },
+      containersIn?: Container[],
+      edgesIn?: Edge[],
+      visitedFlows = new Set<string>()
+    ) => {
+      const containers = containersIn || allContainers;
+      const edgesList = edgesIn || edges;
       let mode: RuntimeMode = state?.mode || "flow";
-      let currentNodeId = state?.current_node_id || startContainer?.nodes?.[0]?.id || null;
+      let currentNodeId = state?.current_node_id || containers?.[0]?.nodes?.[0]?.id || null;
       let activeAgentNodeId = state?.active_agent_node_id || null;
       const variables = { ...(state?.variables || {}) };
       const persistentMemory: PersistentMemory = { ...(state?.persistent_memory || {}) };
