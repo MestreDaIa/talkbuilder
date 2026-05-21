@@ -30,6 +30,14 @@ export const RedirectConfig = ({ config, setConfig }: RedirectConfigProps) => {
   const [loadedWorkspaceId, setLoadedWorkspaceId] = useState<string | null>(null);
   const { currentWorkspace } = useAuth();
 
+  const selectedBotFallback = config.targetFlow && config.targetFlowName
+    ? [{ id: config.targetFlow, name: config.targetFlowName }]
+    : [];
+
+  const botOptions = publishedBots.some((bot) => bot.id === config.targetFlow)
+    ? publishedBots
+    : [...selectedBotFallback, ...publishedBots];
+
   const fetchPublishedBots = async () => {
     if (!currentWorkspace?.id || isLoading || loadedWorkspaceId === currentWorkspace.id) {
       return;
@@ -61,10 +69,13 @@ export const RedirectConfig = ({ config, setConfig }: RedirectConfigProps) => {
   };
 
   const handleFlowChange = (value: string) => {
+    const selectedBot = botOptions.find((bot) => bot.id === value);
+
     // Atualiza a configuração diretamente sem usar useEffect para evitar loops
     setConfig({ 
       ...config, 
-      targetFlow: value 
+      targetFlow: value,
+      targetFlowName: selectedBot?.name || value,
     });
   };
 
@@ -78,14 +89,13 @@ export const RedirectConfig = ({ config, setConfig }: RedirectConfigProps) => {
           onOpenChange={(open) => {
             if (open) fetchPublishedBots();
           }}
-          disabled={isLoading}
         >
           <SelectTrigger>
             <SelectValue placeholder={isLoading ? "Carregando fluxos..." : "Selecione um bot/fluxo"} />
           </SelectTrigger>
           <SelectContent>
-            {publishedBots.length > 0 ? (
-              publishedBots.map((bot) => (
+            {botOptions.length > 0 ? (
+              botOptions.map((bot) => (
                 <SelectItem key={bot.id} value={bot.id}>
                   {bot.name}
                 </SelectItem>
