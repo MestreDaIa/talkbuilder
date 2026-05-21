@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo } from "react";
 import { NodeConfig, Container } from "@/types/chatbot";
 import { Label } from "@/components/ui/label";
 import {
@@ -32,64 +32,57 @@ export const RedirectConfig = ({ config, setConfig }: RedirectConfigProps) => {
   const targetFlow = config.targetFlow || "";
 
   useEffect(() => {
+    let isMounted = true;
     async function fetchPublishedBots() {
-      const { data: { user } } = await supabase.auth.getUser();
       const workspaceId = currentWorkspace?.id || localStorage.getItem("currentWorkspaceId");
-      
-      console.log("[RedirectConfig] Buscando bots. User:", user?.id, "WorkspaceId:", workspaceId);
+      console.log("[RedirectConfig] Fetching bots for WorkspaceId:", workspaceId);
 
-      
       try {
         setIsLoading(true);
-        // Usamos chatbot_flows que é onde ficam as definições dos bots/fluxos
-        // Usamos cast para any pois os tipos do Supabase podem estar desatualizados
-        let query = (supabase as any).from("chatbot_flows").select("id, name, workspace_id, is_published");
-
+        // Step 1: Query by workspace_id if available
+        let query = (supabase as any).from("chatbot_flows").select("id, name, workspace_id, is_published").eq("is_published", true);
         
         if (workspaceId) {
           query = query.eq("workspace_id", workspaceId);
         }
         
-        const { data, error } = await query.eq("is_published", true);
+        const { data, error } = await query;
 
-        if (error) {
-          console.error("[RedirectConfig] Erro na query principal:", error);
-          throw error;
-        }
+        if (error) throw error;
 
-        if (data && data.length > 0) {
-          console.log("[RedirectConfig] Bots encontrados no workspace:", data);
-          setPublishedBots(data.map((bot: any) => ({
-            id: bot.id,
-            name: bot.name
-          })));
-        } else {
-          console.log("[RedirectConfig] Nenhum bot encontrado no workspace atual. Tentando busca global para debug...");
-          const { data: globalData, error: globalError } = await (supabase as any)
-            .from("chatbot_flows")
-            .select("id, name, workspace_id, is_published")
-            .eq("is_published", true)
-            .limit(10);
-          
-          if (!globalError && globalData) {
-            console.log("[RedirectConfig] DEBUG - Bots publicados globais encontrados:", globalData);
+        if (isMounted) {
+          if (data && data.length > 0) {
+            console.log("[RedirectConfig] Bots found:", data);
+            setPublishedBots(data.map((bot: any) => ({ id: bot.id, name: bot.name })));
+          } else {
+            console.log("[RedirectConfig] No bots found for workspace. Trying fallback search...");
+            // Fallback: search all published bots just to see if they exist anywhere
+            const { data: fallbackData } = await (supabase as any)
+              .from("chatbot_flows")
+              .select("id, name, workspace_id, is_published")
+              .eq("is_published", true)
+              .limit(20);
+            
+            console.log("[RedirectConfig] Fallback search result (all published):", fallbackData);
+            setPublishedBots([]);
           }
-          setPublishedBots([]);
         }
-
-      } catch (error) {
-        console.error("[RedirectConfig] Erro ao buscar bots:", error);
+      } catch (err) {
+        console.error("[RedirectConfig] Error fetching bots:", err);
       } finally {
-        setIsLoading(false);
+        if (isMounted) setIsLoading(false);
       }
     }
 
     fetchPublishedBots();
-  }, [currentWorkspace?.id]);
+    return () => { isMounted = false; };
+  }, [currentWorkspace?.id]); // Only fetch when workspace changes
 
   const handleValueChange = (value: string) => {
-    console.log("[RedirectConfig] Alterando targetFlow para:", value);
-    setConfig({ ...config, targetFlow: value });
+    if (value !== targetFlow) {
+      console.log("[RedirectConfig] Updating targetFlow:", value);
+      setConfig({ ...config, targetFlow: value });
+    }
   };
 
   return (
