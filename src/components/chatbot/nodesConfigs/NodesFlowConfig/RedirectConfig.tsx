@@ -33,14 +33,20 @@ export const RedirectConfig = ({ config, setConfig }: RedirectConfigProps) => {
 
   useEffect(() => {
     let isMounted = true;
+    const workspaceId = currentWorkspace?.id || localStorage.getItem("currentWorkspaceId");
+    
     async function fetchPublishedBots() {
-      const workspaceId = currentWorkspace?.id || localStorage.getItem("currentWorkspaceId");
+      if (!isMounted) return;
+      
       console.log("[RedirectConfig] Fetching bots for WorkspaceId:", workspaceId);
 
       try {
         setIsLoading(true);
-        // Step 1: Query by workspace_id if available
-        let query = (supabase as any).from("chatbot_flows").select("id, name, workspace_id, is_published").eq("is_published", true);
+        // We use chatbot_flows which is the actual table name found in code
+        let query = supabase
+          .from("chatbot_flows")
+          .select("id, name, workspace_id, is_published")
+          .eq("is_published", true);
         
         if (workspaceId) {
           query = query.eq("workspace_id", workspaceId);
@@ -48,7 +54,10 @@ export const RedirectConfig = ({ config, setConfig }: RedirectConfigProps) => {
         
         const { data, error } = await query;
 
-        if (error) throw error;
+        if (error) {
+          console.error("[RedirectConfig] Supabase error:", error);
+          throw error;
+        }
 
         if (isMounted) {
           if (data && data.length > 0) {
@@ -56,15 +65,20 @@ export const RedirectConfig = ({ config, setConfig }: RedirectConfigProps) => {
             setPublishedBots(data.map((bot: any) => ({ id: bot.id, name: bot.name })));
           } else {
             console.log("[RedirectConfig] No bots found for workspace. Trying fallback search...");
-            // Fallback: search all published bots just to see if they exist anywhere
-            const { data: fallbackData } = await (supabase as any)
+            const { data: fallbackData, error: fallbackError } = await supabase
               .from("chatbot_flows")
               .select("id, name, workspace_id, is_published")
               .eq("is_published", true)
               .limit(20);
             
+            if (fallbackError) console.error("[RedirectConfig] Fallback error:", fallbackError);
             console.log("[RedirectConfig] Fallback search result (all published):", fallbackData);
-            setPublishedBots([]);
+            
+            if (fallbackData && fallbackData.length > 0) {
+              setPublishedBots(fallbackData.map((bot: any) => ({ id: bot.id, name: bot.name })));
+            } else {
+              setPublishedBots([]);
+            }
           }
         }
       } catch (err) {
@@ -74,9 +88,12 @@ export const RedirectConfig = ({ config, setConfig }: RedirectConfigProps) => {
       }
     }
 
-    fetchPublishedBots();
+    if (open) { // Assuming we might want to check if the dialog is open, but this component is usually rendered when open
+       fetchPublishedBots();
+    }
+    
     return () => { isMounted = false; };
-  }, [currentWorkspace?.id]); // Only fetch when workspace changes
+  }, [currentWorkspace?.id]);
 
   const handleValueChange = (value: string) => {
     if (value !== targetFlow) {
