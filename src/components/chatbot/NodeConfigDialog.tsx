@@ -22,15 +22,14 @@ export const NodeConfigDialog = ({ node, open, onClose, onSave, containers = [] 
   const [config, setConfig] = useState<NodeConfig>({});
 
   useEffect(() => {
-    if (node) {
+    if (open && node) {
       // Criamos uma cópia profunda para evitar mutação direta do estado do canvas
       // enquanto o usuário ainda está editando no diálogo.
       setConfig(JSON.parse(JSON.stringify(node.config || {})));
     }
-  }, [node]);
+  }, [open, node?.id]);
 
   const handleSave = () => {
-    console.log("[NodeConfigDialog] Saving config to parent:", config);
     onSave(JSON.parse(JSON.stringify(config)));
     onClose();
   };
@@ -38,7 +37,6 @@ export const NodeConfigDialog = ({ node, open, onClose, onSave, containers = [] 
   if (!node) return null;
 
   const normalizedNodeType = String(node.type).toLowerCase() === "await" ? "wait" : String(node.type).toLowerCase();
-  console.log("[NodeConfigDialog] Rendering component for type:", normalizedNodeType, "Config:", config);
   const ConfigComponent = nodeConfigComponents[normalizedNodeType] || nodeConfigComponents[node.type];
 
   // Complex nodes need larger dialog

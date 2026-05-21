@@ -74,6 +74,9 @@ export const RedirectConfig = ({ config, setConfig }: RedirectConfigProps) => {
         <Select 
           value={config.targetFlow || ""} 
           onValueChange={handleFlowChange} 
+          onOpenChange={(open) => {
+            if (open) fetchPublishedBots();
+          }}
           disabled={isLoading}
         >
           <SelectTrigger>
