@@ -28,7 +28,7 @@ export const ToggleRow = ({ id, title, description, checked, onChange }: ToggleR
 );
 
 interface KBFile { id: string; name: string; content?: string; size?: number; truncated?: boolean; }
-interface KBLink { id: string; url: string; content?: string; }
+interface KBLink { id: string; url: string; content?: string; pagesCount?: number; }
 
 
 const MAX_FILE_CHARS = 100_000; // ~100KB de texto por arquivo
@@ -129,11 +129,13 @@ export const KnowledgeBaseSection = ({ config, setConfig }: { config: NodeConfig
       if (data?.error) throw new Error(data.error);
 
       const content = data?.content || "";
+      const pagesCount = data?.pages_crawled || 1;
+      
       if (!content) throw new Error("Não foi possível extrair conteúdo desta URL.");
 
       setConfig({
         ...config,
-        kbLinks: links.map((l) => (l.id === id ? { ...l, content } : l))
+        kbLinks: links.map((l) => (l.id === id ? { ...l, content, pagesCount } : l))
       });
       
       toast({ title: "Sucesso!", description: "Conteúdo da URL extraído com sucesso." });
@@ -247,7 +249,9 @@ export const KnowledgeBaseSection = ({ config, setConfig }: { config: NodeConfig
                 </div>
                 {l.content && (
                   <p className="text-[10px] text-green-600 px-1 flex items-center gap-1">
-                    <CheckCircle2 className="h-2.5 w-2.5" /> Conteúdo extraído ({l.content.length} caracteres)
+                    <CheckCircle2 className="h-2.5 w-2.5" /> 
+                    Conteúdo extraído {l.pagesCount && l.pagesCount > 1 ? `(${l.pagesCount} páginas, ` : "("}
+                    {l.content.length} caracteres)
                   </p>
                 )}
               </div>
