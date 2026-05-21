@@ -645,7 +645,8 @@ async function runFlow(execution: any, containersIn: any[], edgesIn: any[], inpu
         const redirectResult = await runFlow(
           { 
             ...execution, 
-            current_node_id: null, 
+            current_node_id: cfg.startNodeId || null, 
+
             waiting_for_input: false,
             is_waiting_time: false 
           }, 

@@ -1,5 +1,5 @@
-import { useState } from "react";
-import { NodeConfig, Container } from "@/types/chatbot";
+import { useState, useEffect } from "react";
+import { NodeConfig, Container, Node } from "@/types/chatbot";
 import { Label } from "@/components/ui/label";
 import {
   Select,
@@ -26,7 +26,9 @@ interface PublishedBot {
 
 export const RedirectConfig = ({ config, setConfig }: RedirectConfigProps) => {
   const [publishedBots, setPublishedBots] = useState<PublishedBot[]>([]);
+  const [targetFlowNodes, setTargetFlowNodes] = useState<Node[]>([]);
   const [isLoading, setIsLoading] = useState(false);
+  const [isLoadingNodes, setIsLoadingNodes] = useState(false);
   const [loadedWorkspaceId, setLoadedWorkspaceId] = useState<string | null>(null);
   const { currentWorkspace } = useAuth();
 
@@ -78,15 +80,65 @@ export const RedirectConfig = ({ config, setConfig }: RedirectConfigProps) => {
     }
   };
 
+  const fetchFlowNodes = async (flowId: string) => {
+    if (!flowId) return;
+    setIsLoadingNodes(true);
+    try {
+      const supabase = getSupabase();
+      const { data, error } = await supabase
+        .from("chatbot_flows")
+        .select("published_containers, draft_containers")
+        .eq("id", flowId)
+        .maybeSingle();
+
+      if (error) throw error;
+      if (data) {
+        const containers = data.published_containers || data.draft_containers || [];
+        const allNodes: Node[] = [];
+        containers.forEach((c: any) => {
+          if (c.nodes) {
+            c.nodes.forEach((n: any) => {
+              allNodes.push(n);
+            });
+          }
+        });
+        setTargetFlowNodes(allNodes);
+      }
+    } catch (error) {
+      console.error("Erro ao buscar nodes do fluxo:", error);
+    } finally {
+      setIsLoadingNodes(false);
+    }
+  };
+
+  useEffect(() => {
+    if (config.targetFlow) {
+      fetchFlowNodes(config.targetFlow);
+    }
+  }, [config.targetFlow]);
+
   const handleFlowChange = (value: string) => {
     const selectedBot = botOptions.find((bot) => bot.id === value);
 
-    // Atualiza a configuração diretamente sem usar useEffect para evitar loops
     setConfig({ 
       ...config, 
       targetFlow: value,
       targetFlowName: selectedBot?.name || value,
+      startNodeId: undefined, // Reset start node when flow changes
     });
+  };
+
+  const handleStartNodeChange = (value: string) => {
+    setConfig({
+      ...config,
+      startNodeId: value === "default" ? undefined : value
+    });
+  };
+
+  const getNodeLabel = (node: Node) => {
+    const type = node.type || "node";
+    const label = node.config?.label || node.config?.message || node.config?.text || node.id;
+    return `[${type}] ${String(label).length > 30 ? String(label).substring(0, 30) + "..." : String(label)}`;
   };
 
   return (
@@ -121,11 +173,40 @@ export const RedirectConfig = ({ config, setConfig }: RedirectConfigProps) => {
             )}
           </SelectContent>
         </Select>
+      </div>
+
+      {config.targetFlow && (
+        <div className="space-y-2">
+          <Label>Iniciar a partir do Nó (Opcional)</Label>
+          <Select 
+            value={config.startNodeId || "default"} 
+            onValueChange={handleStartNodeChange}
+          >
+            <SelectTrigger>
+              <SelectValue placeholder={isLoadingNodes ? "Carregando nós..." : "Início padrão"} />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="default">Início padrão (Nó Start)</SelectItem>
+              {targetFlowNodes.map((node) => (
+                <SelectItem key={node.id} value={node.id}>
+                  {getNodeLabel(node)}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+          <p className="text-xs text-muted-foreground">
+            Se não selecionado, o fluxo iniciará normalmente pelo nó de "Start".
+          </p>
+        </div>
+      )}
+
+      <div className="space-y-2">
         <p className="text-xs text-muted-foreground flex items-center gap-1">
           <Info className="h-3 w-3" />
           Direciona o fluxo atual para outro bot publicado.
         </p>
       </div>
+      
       <SkillConfig config={config} setConfig={setConfig} />
     </div>
   );
