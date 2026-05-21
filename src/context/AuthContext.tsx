@@ -154,15 +154,11 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 		setWorkspaces(mapped);
 		console.log("[Auth] Workspaces carregados:", mapped);
 		
-		// Auto-select based on the real URL slug or first available.
-		// The app uses BrowserRouter, so relying only on window.location.hash made
-		// currentWorkspace fall back to the first workspace and broke workspace-scoped queries.
-		const pathSource = window.location.hash?.startsWith('#')
-			? window.location.hash.substring(1)
-			: window.location.pathname;
-		const pathParts = pathSource.split("/").filter(Boolean);
-		const workspaceIndex = pathParts.indexOf("workspace");
-		const pathSlug = workspaceIndex > 0 ? pathParts[workspaceIndex - 1] : pathParts[0];
+		// Auto-select based on URL or first available
+		const hash = window.location.hash || "";
+		const cleanHash = hash.startsWith('#') ? hash.substring(1) : hash;
+		const pathParts = cleanHash.split("/").filter(p => p && p !== "workspace" && p !== "configs");
+		const pathSlug = pathParts[0];
 		
 		const found = mapped.find((w: any) => w.slug === pathSlug);
 		setCurrentWorkspace(found || mapped[0] || null);

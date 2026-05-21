@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useState, useEffect } from "react";
 import { NodeConfig, Container } from "@/types/chatbot";
 import { Label } from "@/components/ui/label";
 import {
@@ -10,9 +10,8 @@ import {
 } from "@/components/ui/select";
 import { Info, Loader2 } from "lucide-react";
 import { SkillConfig } from "../SkillConfig";
-import { getSupabase } from "@/lib/supabaseClient";
+import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/context/AuthContext";
-import { useParams } from "react-router-dom";
 
 interface RedirectConfigProps {
   config: NodeConfig;
@@ -26,115 +25,68 @@ interface PublishedBot {
 }
 
 export const RedirectConfig = ({ config, setConfig }: RedirectConfigProps) => {
+  const [targetFlow, setTargetFlow] = useState(config.targetFlow || "");
   const [publishedBots, setPublishedBots] = useState<PublishedBot[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const { currentWorkspace } = useAuth();
-  const params = useParams();
-
-  const workspaceId = currentWorkspace?.id ?? null;
-  const currentBotItemId = (params.id as string | undefined) ?? null;
-
-  const targetFlow = config.targetFlow || "";
 
   useEffect(() => {
-    let isMounted = true;
-    
     async function fetchPublishedBots() {
-      if (!workspaceId || !currentBotItemId) {
-        if (isMounted) {
-          setPublishedBots([]);
-          setIsLoading(false);
-        }
+      if (!currentWorkspace?.id) {
+        setIsLoading(false);
         return;
       }
 
       try {
-        setIsLoading(true);
+        const { data, error } = await (supabase as any)
+          .from("chatbot_flows")
+          .select("id, name")
+          .eq("workspace_id", currentWorkspace.id)
+          .eq("is_published", true);
 
-        const supabase = getSupabase();
-        const [currentFlowResult, publishedResult] = await Promise.all([
-          supabase
-            .from("chatbot_flows")
-            .select("id")
-            .eq("workspace_id", workspaceId)
-            .eq("workspace_item_id", currentBotItemId)
-            .maybeSingle(),
-          supabase
-            .from("chatbot_flows")
-            .select("id, name, workspace_item_id")
-            .eq("workspace_id", workspaceId)
-            .eq("is_published", true)
-            .neq("workspace_item_id", currentBotItemId)
-            .order("name", { ascending: true }),
-        ]);
+        if (error) throw error;
 
-        if (currentFlowResult.error) throw currentFlowResult.error;
-        if (publishedResult.error) throw publishedResult.error;
-
-        if (!currentFlowResult.data) {
-          setPublishedBots([]);
-          return;
+        if (data) {
+          setPublishedBots(data.map((bot: any) => ({
+            id: bot.id,
+            name: bot.name
+          })));
         }
-
-        const bots = (publishedResult.data ?? [])
-          .filter((bot: any) => bot.workspace_item_id !== currentBotItemId)
-          .map((bot: any) => ({ id: bot.id, name: bot.name }));
-
-        if (isMounted) setPublishedBots(bots);
-      } catch (err) {
-        console.error("[RedirectConfig] Error fetching bots:", err);
-        if (isMounted) setPublishedBots([]);
+      } catch (error) {
+        console.error("Erro ao buscar bots publicados:", error);
       } finally {
-        if (isMounted) setIsLoading(false);
+        setIsLoading(false);
       }
     }
 
     fetchPublishedBots();
-    
-    return () => { isMounted = false; };
-  }, [workspaceId, currentBotItemId]);
+  }, [currentWorkspace?.id]);
 
   useEffect(() => {
-    if (targetFlow && !isLoading && !publishedBots.some((bot) => bot.id === targetFlow)) {
-      setConfig({ ...config, targetFlow: "" });
-    }
-  }, [targetFlow, isLoading, publishedBots, config, setConfig]);
-
-  const botOptions = useMemo(() => publishedBots, [publishedBots]);
-
-  const handleValueChange = (value: string) => {
-    if (value !== targetFlow) {
-      setConfig({ ...config, targetFlow: value });
-    }
-  };
+    setConfig({ ...config, targetFlow });
+  }, [targetFlow]);
 
   return (
     <div className="p-4 space-y-4">
       <div className="space-y-2">
         <Label>Selecionar Fluxo de Destino</Label>
-        <Select value={targetFlow} onValueChange={handleValueChange} disabled={isLoading}>
-          <SelectTrigger className="w-full">
+        <Select value={targetFlow} onValueChange={setTargetFlow} disabled={isLoading}>
+          <SelectTrigger>
             <SelectValue placeholder={isLoading ? "Carregando fluxos..." : "Selecione um bot/fluxo"} />
           </SelectTrigger>
           <SelectContent>
-            {botOptions.length > 0 ? (
-              botOptions.map((bot) => (
+            {publishedBots.length > 0 ? (
+              publishedBots.map((bot) => (
                 <SelectItem key={bot.id} value={bot.id}>
                   {bot.name}
                 </SelectItem>
               ))
             ) : (
-              <div className="p-4 text-center">
+              <div className="p-2 text-xs text-muted-foreground text-center">
                 {isLoading ? (
-                  <div className="flex items-center justify-center gap-2 text-sm text-muted-foreground">
-                    <Loader2 className="h-4 w-4 animate-spin" />
-                    Buscando...
-                  </div>
+                  <Loader2 className="h-4 w-4 animate-spin mx-auto" />
                 ) : (
-                  <div className="text-sm text-muted-foreground">
-                    Nenhum bot publicado encontrado
-                    <p className="text-[10px] mt-1 opacity-70">Só aparecem outros bots publicados neste workspace.</p>
-                  </div>
+                  "Nenhum bot publicado encontrado"
                 )}
               </div>
             )}

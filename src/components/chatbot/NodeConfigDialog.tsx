@@ -7,7 +7,7 @@ import {
   DialogFooter,
 } from "@/components/ui/dialog";
 import { nodeConfigComponents } from "./nodesConfigs";
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useState } from "react";
 import { Button } from "@/components/ui/button";
 
 interface NodeConfigDialogProps {
@@ -20,28 +20,25 @@ interface NodeConfigDialogProps {
 
 export const NodeConfigDialog = ({ node, open, onClose, onSave, containers = [] }: NodeConfigDialogProps) => {
   const [config, setConfig] = useState<NodeConfig>({});
-  const nodeId = node?.id ?? null;
-  const normalizedNodeType = useMemo(
-    () => String(node?.type ?? "").toLowerCase() === "await" ? "wait" : String(node?.type ?? "").toLowerCase(),
-    [node?.type]
-  );
 
   useEffect(() => {
-    if (open && node) {
+    if (node) {
+      // Criamos uma cópia profunda para evitar mutação direta do estado do canvas
+      // enquanto o usuário ainda está editando no diálogo.
       setConfig(JSON.parse(JSON.stringify(node.config || {})));
-    } else if (!open) {
-      setConfig({});
     }
-  }, [open, nodeId]);
-
+  }, [node]);
 
   const handleSave = () => {
+    console.log("[NodeConfigDialog] Saving config to parent:", config);
     onSave(JSON.parse(JSON.stringify(config)));
     onClose();
   };
 
   if (!node) return null;
 
+  const normalizedNodeType = String(node.type).toLowerCase() === "await" ? "wait" : String(node.type).toLowerCase();
+  console.log("[NodeConfigDialog] Rendering component for type:", normalizedNodeType, "Config:", config);
   const ConfigComponent = nodeConfigComponents[normalizedNodeType] || nodeConfigComponents[node.type];
 
   // Complex nodes need larger dialog
