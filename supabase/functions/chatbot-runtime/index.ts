@@ -643,7 +643,12 @@ async function runFlow(execution: any, containersIn: any[], edgesIn: any[], inpu
         }
         // Recursivamente executa o novo fluxo
         const redirectResult = await runFlow(
-          { ...execution, current_node_id: null }, 
+          { 
+            ...execution, 
+            current_node_id: null, 
+            waiting_for_input: false,
+            is_waiting_time: false 
+          }, 
           newContainers, 
           newEdges, 
           null, 
