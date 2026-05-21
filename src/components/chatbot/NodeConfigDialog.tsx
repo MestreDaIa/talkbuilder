@@ -22,12 +22,12 @@ export const NodeConfigDialog = ({ node, open, onClose, onSave, containers = [] 
   const [config, setConfig] = useState<NodeConfig>({});
 
   useEffect(() => {
-    if (node) {
-      // Criamos uma cópia profunda para evitar mutação direta do estado do canvas
-      // enquanto o usuário ainda está editando no diálogo.
+    if (open && node) {
+      console.log("[NodeConfigDialog] Node changed, initializing config:", node.type, node.config);
       setConfig(JSON.parse(JSON.stringify(node.config || {})));
     }
-  }, [node]);
+  }, [open, node?.id]); // Only re-run when dialog opens or selected node ID changes
+
 
   const handleSave = () => {
     console.log("[NodeConfigDialog] Saving config to parent:", config);
