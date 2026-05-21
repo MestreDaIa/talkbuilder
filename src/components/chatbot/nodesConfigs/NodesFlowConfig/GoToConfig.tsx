@@ -22,11 +22,13 @@ export const GoToConfig = ({ config, setConfig, containers }: GoToConfigProps) =
 
   const handleValueChange = (value: string) => {
     const targetContainer = containers.find(c => c.id === value);
-    setConfig({ 
+    const newConfig = { 
       ...config, 
       targetContainerId: value,
       targetContainerName: targetContainer?.nameContainer || `Bloco ${value.slice(-4)}`
-    });
+    };
+    console.log("[GoToConfig] Setting new config:", newConfig);
+    setConfig(newConfig);
   };
 
   return (
