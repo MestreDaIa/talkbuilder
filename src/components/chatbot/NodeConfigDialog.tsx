@@ -23,12 +23,15 @@ export const NodeConfigDialog = ({ node, open, onClose, onSave, containers = [] 
   const [lastNodeId, setLastNodeId] = useState<string | null>(null);
 
   useEffect(() => {
+    // Only update config when the dialog opens OR a different node is selected
     if (open && node && node.id !== lastNodeId) {
       console.log("[NodeConfigDialog] Initializing config for node:", node.id, node.type);
-      setConfig(JSON.parse(JSON.stringify(node.config || {})));
+      // Use a function to ensure we're not causing a re-render loop if config is same
+      const newConfig = JSON.parse(JSON.stringify(node.config || {}));
+      setConfig(newConfig);
       setLastNodeId(node.id);
     }
-  }, [open, node, lastNodeId]);
+  }, [open, node?.id, lastNodeId]); // Reduced dependencies to avoid loops
 
 
   const handleSave = () => {
