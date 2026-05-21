@@ -56,11 +56,21 @@ export const RedirectConfig = ({ config, setConfig }: RedirectConfigProps) => {
 
       if (error) throw error;
 
-      setPublishedBots((data || []).map((bot: any) => ({
+      const bots = (data || []).map((bot: any) => ({
         id: bot.id,
-        name: bot.name
-      })));
+        name: bot.name,
+      }));
+      setPublishedBots(bots);
       setLoadedWorkspaceId(currentWorkspace.id);
+
+      // Sincroniza nome do bot já selecionado (sem useEffect) para corrigir
+      // configurações antigas que só guardaram o ID.
+      if (config.targetFlow) {
+        const match = bots.find((b) => b.id === config.targetFlow);
+        if (match && match.name !== config.targetFlowName) {
+          setConfig({ ...config, targetFlowName: match.name });
+        }
+      }
     } catch (error) {
       console.error("Erro ao buscar bots publicados:", error);
     } finally {
