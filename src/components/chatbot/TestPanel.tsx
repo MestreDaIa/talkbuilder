@@ -639,12 +639,15 @@ export const TestPanel = ({
           const targetNodeId = resolveTarget(cfg.targetContainerId);
           if (targetNodeId && targetNodeId !== node.id) {
             currentNodeId = targetNodeId;
+            // Crucial: continue inside the while loop so it processes the target node immediately
+            // and doesn't fall through to the default nextFromNode logic below.
             continue;
           } else {
             console.warn(`[node:go-to] Target not found or same as current: ${targetNodeId}`);
           }
         }
 
+        // Only reach here if we didn't 'continue' or 'break' above
         const nextId = nextFromNode(node.id, container.id);
         console.log(`[node:completed] ${node.id} → next: ${nextId}`);
         currentNodeId = nextId;
