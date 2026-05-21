@@ -277,7 +277,7 @@ export const TestPanel = ({
       input?: { message?: string; button_id?: string },
       containersIn?: Container[],
       edgesIn?: Edge[],
-      visitedFlows = new Set<string>()
+      visitedRedirects = new Set<string>()
     ): Promise<any> => {
       const containers = containersIn || allContainers;
       const edgesList = edgesIn || edges;
@@ -674,8 +674,9 @@ export const TestPanel = ({
             continue;
           }
 
-          if (visitedFlows.has(targetRef) || targetRef === flowId) {
-            console.warn("[node:redirect] loop detectado", targetRef);
+          const redirectKey = `${node.id}:${targetRef}`;
+          if (visitedRedirects.has(redirectKey)) {
+            console.warn("[node:redirect] loop detectado no node", node.id);
             nextMessages.push({ 
               id: crypto.randomUUID(), 
               conversation_id: conversationId || "temp",
@@ -688,7 +689,7 @@ export const TestPanel = ({
             continue;
           }
 
-          visitedFlows.add(targetRef);
+          visitedRedirects.add(redirectKey);
 
           console.log(`[node:redirect] carregando fluxo ${targetRef}`);
           let targetFlow: any = null;
@@ -760,7 +761,7 @@ export const TestPanel = ({
             undefined,
             newContainers,
             newEdges,
-            visitedFlows
+            visitedRedirects
           );
 
           nextMessages.push(...(redirectResult.messages as Message[]));

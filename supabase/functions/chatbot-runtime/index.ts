@@ -219,8 +219,10 @@ function writeMemoryState(key: string, state: any) {
   runtimeMemory.set(key, { state, expiresAt: now + MEMORY_TTL_MS });
 }
 
-async function runFlow(execution: any, containersIn: any[], edgesIn: any[], input: any, flow: any, supabase: any, visitedFlows = new Set<string>()) {
-  if (flow?.id) visitedFlows.add(flow.id);
+async function runFlow(execution: any, containersIn: any[], edgesIn: any[], input: any, flow: any, supabase: any, visitedRedirects = new Set<string>()) {
+  if (flow?.id) {
+    // We don't block by flow ID anymore to allow A -> B -> A
+  }
   let containers: any[] = containersIn;
   let edges: any[] = edgesIn;
   let currentNodeId: string | null = execution.current_node_id;
@@ -603,12 +605,14 @@ async function runFlow(execution: any, containersIn: any[], edgesIn: any[], inpu
           break;
         }
         console.log(`[node:redirect] carregando fluxo ${targetRef}`);
-        if (visitedFlows.has(targetRef)) {
-          console.warn("[node:redirect] loop detectado", targetRef);
+        const redirectKey = `${node.id}:${targetRef}`;
+        if (visitedRedirects.has(redirectKey)) {
+          console.warn("[node:redirect] loop detectado no node", node.id);
           messages.push({ id: crypto.randomUUID(), type: "bot", content: "⚠️ Loop de redirecionamento detectado." });
           currentNodeId = null;
           break;
         }
+        visitedRedirects.add(redirectKey);
 
         let targetFlow: any = null;
         try {
@@ -655,7 +659,7 @@ async function runFlow(execution: any, containersIn: any[], edgesIn: any[], inpu
           null, 
           targetFlow, 
           supabase,
-          visitedFlows
+          visitedRedirects
         );
 
         messages.push(...redirectResult.messages);
