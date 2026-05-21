@@ -38,7 +38,7 @@ export const RedirectConfig = ({ config, setConfig }: RedirectConfigProps) => {
       }
 
       try {
-        const { data, error } = await supabase
+        const { data, error } = await (supabase as any)
           .from("chatbot_flows")
           .select("id, name")
           .eq("is_published", true);
