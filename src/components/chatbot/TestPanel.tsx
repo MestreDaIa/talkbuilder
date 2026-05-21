@@ -330,21 +330,21 @@ export const TestPanel = ({
         if (mode === "agent" && activeAgentNodeId) {
           currentNodeId = activeAgentNodeId;
         } else if (currentNodeId) {
-          const info = findNode(currentNodeId);
+          const info = findNodeIn(currentNodeId, allContainers);
           if (info) {
             const cfg = info.node.config || {};
             const varName = cfg.variableName || cfg.saveVariable;
             if (varName && userValue !== undefined) variables[varName] = userValue;
             
             if (info.node.type === "go-to" && cfg.targetContainerId) {
-              const targetNodeId = resolveTarget(cfg.targetContainerId);
+              const targetNodeId = resolveTargetIn(cfg.targetContainerId, allContainers);
               if (targetNodeId && targetNodeId !== info.node.id) {
                 currentNodeId = targetNodeId;
               } else {
-                currentNodeId = nextFromNode(info.node.id, info.container.id, input.button_id);
+                currentNodeId = nextFromNodeIn(info.node.id, info.container.id, allContainers, edges, input.button_id);
               }
             } else if (info.node.type !== "ai-agent") {
-              currentNodeId = nextFromNode(info.node.id, info.container.id, input.button_id);
+              currentNodeId = nextFromNodeIn(info.node.id, info.container.id, allContainers, edges, input.button_id);
             }
           }
         }
