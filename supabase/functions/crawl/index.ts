@@ -62,10 +62,22 @@ serve(async (req) => {
 
     console.log(`Crawling URL: ${url} with depth: ${depth}`);
     
+    const baseUrl = new URL(url);
     const visited = new Set<string>();
     const results: { url: string; content: string }[] = [];
     const queue = [{ url, currentDepth: 0 }];
-    const baseUrl = new URL(url);
+
+    // 0. Pré-popular a fila com rotas comuns conhecidas para garantir que não as perderemos
+    const commonRoutes = ["/precos", "/planos", "/pricing", "/plans", "/sobre", "/about", "/recursos", "/features"];
+    for (const route of commonRoutes) {
+      try {
+        const routeUrl = new URL(route, url).href;
+        const cleanRoute = routeUrl.split('#')[0].replace(/\/$/, "");
+        if (cleanRoute !== url.replace(/\/$/, "")) {
+          queue.push({ url: routeUrl, currentDepth: 0 });
+        }
+      } catch { /* ignore */ }
+    }
 
     // Aumentado para 10 páginas para garantir que pegamos sub-páginas de planos
     while (queue.length > 0 && results.length < 10) {
