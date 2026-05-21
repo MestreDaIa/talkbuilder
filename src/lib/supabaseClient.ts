@@ -51,11 +51,14 @@ export function saveSystemSupabaseCreds(creds: SystemCreds): void {
 
 let systemClient: SupabaseClient | null = null;
 
-function buildSystemClient(): SupabaseClient {
+function buildSystemClient(): SupabaseClient | null {
   if (systemClient) return systemClient;
   
   const creds = readSystemCreds();
-  if (!creds) throw new Error("Banco externo não configurado");
+  if (!creds) {
+    console.warn("getSupabase: Banco externo não configurado. Adicione VITE_SUPABASE_URL e VITE_SUPABASE_ANON_KEY.");
+    return null;
+  }
   
   systemClient = createClient(creds.url, creds.anonKey, {
     auth: {
@@ -67,8 +70,8 @@ function buildSystemClient(): SupabaseClient {
   return systemClient;
 }
 
-/** Retorna o client do banco do sistema TalkMap. */
-export function getSupabase(): SupabaseClient {
+/** Retorna o client do banco do sistema TalkMap. Pode retornar null se não configurado. */
+export function getSupabase(): SupabaseClient | null {
   return buildSystemClient();
 }
 
@@ -88,6 +91,13 @@ export function isSupabaseFromEnv(): boolean {
 export const supabaseClient: SupabaseClient = new Proxy({} as SupabaseClient, {
   get(_t, prop, receiver) {
     const client = buildSystemClient();
+    if (!client) {
+      // Retorna uma função dummy que loga o erro para evitar crash imediato
+      return (...args: any[]) => {
+        console.error("Tentativa de usar supabaseClient sem configuração de banco externo.");
+        return Promise.resolve({ data: null, error: { message: "Banco não configurado" } });
+      };
+    }
     const value = Reflect.get(client as object, prop, receiver);
     return typeof value === "function" ? value.bind(client) : value;
   },

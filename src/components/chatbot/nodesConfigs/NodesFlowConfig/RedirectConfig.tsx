@@ -52,6 +52,10 @@ export const RedirectConfig = ({ config, setConfig }: RedirectConfigProps) => {
         setIsLoading(true);
 
         const supabase = getSupabase();
+        if (!supabase) {
+          throw new Error("Banco não configurado");
+        }
+
         const [currentFlowResult, publishedResult] = await Promise.all([
           supabase
             .from("chatbot_flows")
