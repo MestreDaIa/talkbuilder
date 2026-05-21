@@ -50,11 +50,14 @@ const readFileAsText = (file: File): Promise<string> =>
   });
 
 export const KnowledgeBaseSection = ({ config, setConfig }: { config: NodeConfig; setConfig: (c: NodeConfig) => void }) => {
+  const { toast } = useToast();
+  const [fetchingLinks, setFetchingLinks] = useState<Record<string, boolean>>({});
   const kbName: string = config.kbName || "";
   const filesEnabled: boolean = config.kbFilesEnabled ?? false;
   const linksEnabled: boolean = config.kbLinksEnabled ?? false;
   const files: KBFile[] = config.kbFiles || [];
   const links: KBLink[] = config.kbLinks || [];
+
 
   const addFile = () => {
     const input = document.createElement("input");
