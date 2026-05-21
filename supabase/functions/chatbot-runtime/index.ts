@@ -135,7 +135,7 @@ Deno.serve(async (req: Request) => {
     }
 
     // Executar Fluxo
-    const result = await runFlow(execution, containers, edges, payload, flow);
+    const result = await runFlow(execution, containers, edges, payload, flow, supabase);
 
     // Persistir novo estado
     if (execution.id) {
