@@ -30,8 +30,8 @@ export const RedirectConfig = ({ config, setConfig }: RedirectConfigProps) => {
   const [loadedWorkspaceId, setLoadedWorkspaceId] = useState<string | null>(null);
   const { currentWorkspace } = useAuth();
 
-  const selectedBotFallback = config.targetFlow && config.targetFlowName
-    ? [{ id: config.targetFlow, name: config.targetFlowName }]
+  const selectedBotFallback = config.targetFlow
+    ? [{ id: config.targetFlow, name: config.targetFlowName || config.targetFlow }]
     : [];
 
   const botOptions = publishedBots.some((bot) => bot.id === config.targetFlow)
