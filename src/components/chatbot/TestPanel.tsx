@@ -665,6 +665,114 @@ export const TestPanel = ({
             console.warn(`[node:go-to] Target not found or same as current: ${targetNodeId}`);
             // If jump fails, still try to follow normal edges as fallback
           }
+        } else if (nodeType === "redirect") {
+          const targetRef = cfg.targetFlow || cfg.targetFlowId;
+          if (!targetRef) {
+            console.warn("[node:redirect] sem targetFlow", node.id);
+            currentNodeId = nextFromNodeIn(node.id, container.id, containers, edgesList);
+            continue;
+          }
+
+          if (visitedFlows.has(targetRef) || targetRef === flowId) {
+            console.warn("[node:redirect] loop detectado", targetRef);
+            nextMessages.push({ 
+              id: crypto.randomUUID(), 
+              conversation_id: conversationId || "temp",
+              role: "assistant",
+              type: "bot", 
+              content: "⚠️ Loop de redirecionamento detectado.",
+              isHtml: false
+            } as Message);
+            currentNodeId = nextFromNodeIn(node.id, container.id, containers, edgesList);
+            continue;
+          }
+
+          visitedFlows.add(targetRef);
+
+          console.log(`[node:redirect] carregando fluxo ${targetRef}`);
+          let targetFlow: any = null;
+          try {
+            const { data: byId } = await supabase
+              .from("chatbot_flows")
+              .select("*")
+              .eq("id", targetRef)
+              .maybeSingle();
+            targetFlow = byId;
+            if (!targetFlow) {
+              const { data: byPublic } = await supabase
+                .from("chatbot_flows")
+                .select("*")
+                .eq("public_id", targetRef)
+                .maybeSingle();
+              targetFlow = byPublic;
+            }
+          } catch (e) {
+            console.error("[node:redirect] erro ao carregar fluxo", e);
+          }
+
+          if (!targetFlow) {
+            nextMessages.push({ 
+              id: crypto.randomUUID(), 
+              conversation_id: conversationId || "temp",
+              role: "assistant",
+              type: "bot", 
+              content: "⚠️ Fluxo de destino não encontrado.",
+              isHtml: false
+            } as Message);
+            currentNodeId = nextFromNodeIn(node.id, container.id, containers, edgesList);
+            continue;
+          }
+
+          const newContainers = targetFlow.published_containers || targetFlow.draft_containers || [];
+          const newEdges = targetFlow.published_edges || targetFlow.draft_edges || [];
+          
+          if (!newContainers.length) {
+             nextMessages.push({ 
+              id: crypto.randomUUID(), 
+              conversation_id: conversationId || "temp",
+              role: "assistant",
+              type: "bot", 
+              content: "⚠️ Fluxo de destino vazio.",
+              isHtml: false
+            } as Message);
+            currentNodeId = nextFromNodeIn(node.id, container.id, containers, edgesList);
+            continue;
+          }
+
+          // Recursively execute the new flow
+          const redirectResult = await runLocalFlow(
+            { 
+              ...state,
+              mode: "flow",
+              current_node_id: null,
+              variables,
+              message_history: messageHistory,
+              persistent_memory: persistentMemory,
+              visitor_id: visitorId,
+              conversation_id: conversationId
+            },
+            undefined,
+            newContainers,
+            newEdges,
+            visitedFlows
+          );
+
+          nextMessages.push(...(redirectResult.messages as Message[]));
+          if (redirectResult.buttons?.length) nextButtons = redirectResult.buttons;
+          if (redirectResult.waiting_for) {
+            waitingFor = redirectResult.waiting_for;
+            waitingForCfg = redirectResult.waiting_for_config;
+            status = "waiting_input";
+          }
+          
+          return {
+            ...redirectResult,
+            messages: nextMessages,
+            runtime_state: {
+              ...redirectResult.runtime_state,
+              variables: { ...variables, ...redirectResult.runtime_state.variables }
+            }
+          };
         }
 
         // Only reach here if we didn't 'continue' or 'break' above
