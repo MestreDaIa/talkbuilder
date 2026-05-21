@@ -40,11 +40,7 @@ function readSystemCreds(): SystemCreds | null {
     }
   }
 
-  // 3. Fallback final: Banco interno do Lovable (apenas se nada mais existir)
-  const INTERNAL_URL = "https://fwoescubnnagdvwasbjl.supabase.co";
-  const INTERNAL_KEY = "sb_publishable_v58nZwBN4s5_lMASv4S3Iw_L23jPbIK";
-  
-  return { url: INTERNAL_URL, anonKey: INTERNAL_KEY };
+  return null;
 }
 
 export function saveSystemSupabaseCreds(creds: SystemCreds): void {
@@ -58,7 +54,8 @@ let systemClient: SupabaseClient | null = null;
 function buildSystemClient(): SupabaseClient {
   if (systemClient) return systemClient;
   
-  const creds = readSystemCreds()!; // Sempre retorna algo por causa do fallback interno
+  const creds = readSystemCreds();
+  if (!creds) throw new Error("Banco externo não configurado");
   
   systemClient = createClient(creds.url, creds.anonKey, {
     auth: {
@@ -77,7 +74,7 @@ export function getSupabase(): SupabaseClient {
 
 /** True se há credenciais (env OU localStorage OU fallback interno). */
 export function isSupabaseConfigured(): boolean {
-  return true; // Sempre configurado devido ao fallback interno
+  return readSystemCreds() !== null;
 }
 
 /** True somente se veio de variável de ambiente (modo "produção"). */
