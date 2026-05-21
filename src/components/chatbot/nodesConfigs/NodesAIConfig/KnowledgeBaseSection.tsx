@@ -54,6 +54,7 @@ const readFileAsText = (file: File): Promise<string> =>
 export const KnowledgeBaseSection = ({ config, setConfig }: { config: NodeConfig; setConfig: (c: NodeConfig) => void }) => {
   const { toast } = useToast();
   const [fetchingLinks, setFetchingLinks] = useState<Record<string, boolean>>({});
+  const [recentlyFetched, setRecentlyFetched] = useState<Record<string, boolean>>({});
   const [previewContent, setPreviewContent] = useState<{ title: string; content: string } | null>(null);
   const kbName: string = config.kbName || "";
   const filesEnabled: boolean = config.kbFilesEnabled ?? false;
@@ -141,6 +142,11 @@ export const KnowledgeBaseSection = ({ config, setConfig }: { config: NodeConfig
         kbLinks: links.map((l) => (l.id === id ? { ...l, content, pagesCount } : l))
       });
       
+      setRecentlyFetched(prev => ({ ...prev, [id]: true }));
+      setTimeout(() => {
+        setRecentlyFetched(prev => ({ ...prev, [id]: false }));
+      }, 3000);
+
       toast({ title: "Sucesso!", description: "Conteúdo da URL extraído com sucesso." });
     } catch (err: any) {
       console.error("[KB] fetch link failed", err);
@@ -236,7 +242,7 @@ export const KnowledgeBaseSection = ({ config, setConfig }: { config: NodeConfig
                   >
                     {fetchingLinks[l.id] ? (
                       <Loader2 className="h-3.5 w-3.5 animate-spin" />
-                    ) : l.content ? (
+                    ) : recentlyFetched[l.id] ? (
                       <CheckCircle2 className="h-3.5 w-3.5 text-green-500" />
                     ) : (
                       <RefreshCw className="h-3.5 w-3.5" />
