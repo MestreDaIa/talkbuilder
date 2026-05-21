@@ -19,6 +19,7 @@ import { richHtmlFor, richToPlainText } from "@/lib/richText";
 import { type Message as RuntimeMessage, type RuntimeState, type RuntimeMode, type PersistentMemory, type NodeExecutionStatus } from "../../types/runtime";
 import { conversationService } from "../../services/conversationService";
 import { buildAgentContext } from "../../services/aiContextBuilder";
+import { supabase } from "@/integrations/supabase/client";
 
 interface Message extends RuntimeMessage {
   // UI Specific extension
@@ -182,19 +183,20 @@ export const TestPanel = ({
     return container?.nodes?.[0]?.id ?? null;
   };
 
-  const findNode = (nodeId: string | null) => {
+  const findNodeIn = (nodeId: string | null, containers: Container[]) => {
     if (!nodeId) return null;
-    for (const container of allContainers) {
+    for (const container of containers) {
       const node = container.nodes.find((n) => n.id === nodeId);
       if (node) return { node, container };
     }
     return null;
   };
 
-  const resolveTarget = (target: string): string | null => {
+  const resolveTargetIn = (target: string, containers: Container[]): string | null => {
     if (!target) return null;
-    if (findNode(target)) return target;
-    const first = firstNodeOfContainer(target);
+    if (findNodeIn(target, containers)) return target;
+    const container = containers.find((c) => c.id === target);
+    const first = container?.nodes?.[0]?.id ?? null;
     if (first) return first;
     return null;
   };
