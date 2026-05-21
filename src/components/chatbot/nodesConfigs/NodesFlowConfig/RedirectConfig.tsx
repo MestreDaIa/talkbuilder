@@ -93,7 +93,7 @@ export const RedirectConfig = ({ config, setConfig }: RedirectConfigProps) => {
       setLoadedWorkspaceId(id);
 
       if (config.targetFlow) {
-        const match = bots.find((b) => b.id === config.targetFlow);
+        const match = bots.find((b: PublishedBot) => b.id === config.targetFlow);
         if (match && match.name !== config.targetFlowName) {
           setConfig({ ...config, targetFlowName: match.name });
         }
