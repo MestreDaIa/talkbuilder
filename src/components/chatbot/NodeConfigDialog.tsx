@@ -20,13 +20,15 @@ interface NodeConfigDialogProps {
 
 export const NodeConfigDialog = ({ node, open, onClose, onSave, containers = [] }: NodeConfigDialogProps) => {
   const [config, setConfig] = useState<NodeConfig>({});
+  const [lastNodeId, setLastNodeId] = useState<string | null>(null);
 
   useEffect(() => {
-    if (open && node) {
-      console.log("[NodeConfigDialog] Node changed, initializing config:", node.type, node.config);
+    if (open && node && node.id !== lastNodeId) {
+      console.log("[NodeConfigDialog] Initializing config for node:", node.id, node.type);
       setConfig(JSON.parse(JSON.stringify(node.config || {})));
+      setLastNodeId(node.id);
     }
-  }, [open, node?.id]); // Only re-run when dialog opens or selected node ID changes
+  }, [open, node, lastNodeId]);
 
 
   const handleSave = () => {
