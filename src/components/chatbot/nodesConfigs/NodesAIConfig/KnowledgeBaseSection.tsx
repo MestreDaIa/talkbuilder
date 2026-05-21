@@ -113,8 +113,41 @@ export const KnowledgeBaseSection = ({ config, setConfig }: { config: NodeConfig
   const updateLink = (id: string, url: string) =>
     setConfig({ ...config, kbLinks: links.map((l) => (l.id === id ? { ...l, url } : l)) });
 
+  const fetchLinkContent = async (id: string, url: string) => {
+    if (!url || !url.startsWith("http")) {
+      toast({ title: "URL inválida", description: "Por favor, insira uma URL válida começando com http ou https.", variant: "destructive" });
+      return;
+    }
+
+    setFetchingLinks(prev => ({ ...prev, [id]: true }));
+    try {
+      const { data, error } = await supabase.functions.invoke('crawl', {
+        body: { url }
+      });
+
+      if (error) throw error;
+      if (data?.error) throw new Error(data.error);
+
+      const content = data?.content || "";
+      if (!content) throw new Error("Não foi possível extrair conteúdo desta URL.");
+
+      setConfig({
+        ...config,
+        kbLinks: links.map((l) => (l.id === id ? { ...l, content } : l))
+      });
+      
+      toast({ title: "Sucesso!", description: "Conteúdo da URL extraído com sucesso." });
+    } catch (err: any) {
+      console.error("[KB] fetch link failed", err);
+      toast({ title: "Erro ao buscar conteúdo", description: err.message || "Ocorreu um erro ao tentar ler o link.", variant: "destructive" });
+    } finally {
+      setFetchingLinks(prev => ({ ...prev, [id]: false }));
+    }
+  };
+
   const removeLink = (id: string) =>
     setConfig({ ...config, kbLinks: links.filter((l) => l.id !== id) });
+
 
   return (
     <div className="space-y-3 border rounded-lg p-3 bg-muted/20">
