@@ -219,7 +219,8 @@ function writeMemoryState(key: string, state: any) {
   runtimeMemory.set(key, { state, expiresAt: now + MEMORY_TTL_MS });
 }
 
-async function runFlow(execution: any, containersIn: any[], edgesIn: any[], input: any, flow: any, supabase: any) {
+async function runFlow(execution: any, containersIn: any[], edgesIn: any[], input: any, flow: any, supabase: any, visitedFlows = new Set<string>()) {
+  if (flow?.id) visitedFlows.add(flow.id);
   let containers: any[] = containersIn;
   let edges: any[] = edgesIn;
   let currentNodeId: string | null = execution.current_node_id;
