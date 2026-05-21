@@ -354,11 +354,14 @@ export const TestPanel = ({
 
       // 2. Execution Loop
       while (currentNodeId && steps++ < 100) {
-        const found = findNode(currentNodeId);
+        const found = findNodeIn(currentNodeId, allContainers);
         if (!found) {
           console.warn("[node:not_found]", currentNodeId);
-          currentNodeId = firstNodeOfContainer(currentNodeId);
-          if (currentNodeId) continue;
+          const first = allContainers.find(c => c.id === currentNodeId)?.nodes?.[0]?.id;
+          if (first) {
+            currentNodeId = first;
+            continue;
+          }
           break;
         }
 
@@ -372,7 +375,7 @@ export const TestPanel = ({
           waitMs = parseWaitMs(cfg);
           console.log(`[node:paused] Wait ${waitMs}ms`);
           status = "paused";
-          currentNodeId = nextFromNode(node.id, container.id);
+          currentNodeId = nextFromNodeIn(node.id, container.id, allContainers, edges);
           break;
         }
 
