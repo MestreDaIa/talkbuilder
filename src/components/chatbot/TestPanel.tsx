@@ -201,7 +201,7 @@ export const TestPanel = ({
     return null;
   };
 
-  const nextFromNode = (nodeId: string, containerId: string, handle?: string | null, strictHandle = false): string | null => {
+  const nextFromNodeIn = (nodeId: string, containerId: string, containers: Container[], edgesList: Edge[], handle?: string | null, strictHandle = false): string | null => {
     const normalizeHandle = (value?: string | null) => {
       if (!value) return "";
       const raw = String(value);
@@ -214,7 +214,7 @@ export const TestPanel = ({
       !!value && String(value).startsWith(`${nodeId}-`);
     const wantedHandle = normalizeHandle(handle);
     // Only consider edges whose target still exists in the current graph.
-    const validEdges = edges.filter((e) => resolveTarget(e.target) !== null);
+    const validEdges = edgesList.filter((e) => resolveTargetIn(e.target, containers) !== null);
     const fromNode = validEdges.filter(
       (e) => e.source === nodeId || (e.source === containerId && isInnerNodeHandle(e.sourceHandle))
     );
@@ -226,10 +226,10 @@ export const TestPanel = ({
     if (!edge && wantedHandle) edge = fromNode.find((e) => normalizeHandle(e.sourceHandle) === "default");
     if (!edge) edge = fromNode.find((e) => !e.sourceHandle);
     if (!edge) edge = fromNode[0];
-    if (edge) return resolveTarget(edge.target);
+    if (edge) return resolveTargetIn(edge.target, containers);
 
     const containerEdge = validEdges.find((e) => e.source === containerId && !e.sourceHandle);
-    if (containerEdge) return resolveTarget(containerEdge.target);
+    if (containerEdge) return resolveTargetIn(containerEdge.target, containers);
     return null;
   };
 
