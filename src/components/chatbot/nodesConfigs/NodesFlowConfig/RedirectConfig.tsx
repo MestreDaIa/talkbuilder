@@ -33,9 +33,11 @@ export const RedirectConfig = ({ config, setConfig }: RedirectConfigProps) => {
 
   useEffect(() => {
     async function fetchPublishedBots() {
+      const { data: { user } } = await supabase.auth.getUser();
       const workspaceId = currentWorkspace?.id || localStorage.getItem("currentWorkspaceId");
       
-      console.log("[RedirectConfig] Buscando bots. WorkspaceId:", workspaceId);
+      console.log("[RedirectConfig] Buscando bots. User:", user?.id, "WorkspaceId:", workspaceId);
+
       
       try {
         setIsLoading(true);
