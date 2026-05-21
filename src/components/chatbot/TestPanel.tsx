@@ -692,14 +692,18 @@ export const TestPanel = ({
           console.log(`[node:redirect] carregando fluxo ${targetRef}`);
           let targetFlow: any = null;
           try {
-            const { data: byId } = await supabase
+            // IMPORTANTE: usar o client do sistema (getSupabase), onde os flows
+            // realmente vivem. O client de @/integrations/supabase/client aponta
+            // para outro projeto e por isso retornava "não encontrado".
+            const sysSupabase = getSupabase();
+            const { data: byId } = await sysSupabase
               .from("chatbot_flows")
               .select("*")
               .eq("id", targetRef)
               .maybeSingle();
             targetFlow = byId;
             if (!targetFlow) {
-              const { data: byPublic } = await supabase
+              const { data: byPublic } = await sysSupabase
                 .from("chatbot_flows")
                 .select("*")
                 .eq("public_id", targetRef)
