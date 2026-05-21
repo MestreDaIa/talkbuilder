@@ -137,8 +137,8 @@ export const RedirectConfig = ({ config, setConfig }: RedirectConfigProps) => {
 
   const getNodeLabel = (node: Node) => {
     const type = node.type || "node";
-    const label = node.data?.label || node.config?.message || node.config?.text || node.id;
-    return `[${type}] ${label.length > 30 ? label.substring(0, 30) + "..." : label}`;
+    const label = node.config?.label || node.config?.message || node.config?.text || node.id;
+    return `[${type}] ${String(label).length > 30 ? String(label).substring(0, 30) + "..." : String(label)}`;
   };
 
   return (
