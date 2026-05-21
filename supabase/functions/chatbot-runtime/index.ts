@@ -643,15 +643,26 @@ async function runFlow(execution: any, containersIn: any[], edgesIn: any[], inpu
         }
         containers = newContainers;
         edges = newEdges;
-        let startId: string | null = null;
-        for (const c of containers) {
-          const sn = (c.nodes || []).find((n: any) => n.type === "start");
-          if (sn) { startId = sn.id; break; }
-        }
-        if (!startId) startId = containers[0]?.nodes?.[0]?.id ?? null;
-        currentNodeId = startId;
-        console.log(`[node:redirect] iniciando em ${currentNodeId}`);
-        continue;
+        // Recursivamente executa o novo fluxo
+        const redirectResult = await runFlow(
+          { ...execution, current_node_id: null }, 
+          newContainers, 
+          newEdges, 
+          null, 
+          targetFlow, 
+          supabase,
+          visitedFlows
+        );
+
+        messages.push(...redirectResult.messages);
+        if (redirectResult.buttons?.length) buttons = redirectResult.buttons;
+        if (redirectResult.waiting_for) waiting_for = redirectResult.waiting_for;
+        
+        return {
+          ...redirectResult,
+          messages, // Acumula mensagens
+          steps: steps + redirectResult.steps
+        };
       }
     }
 
