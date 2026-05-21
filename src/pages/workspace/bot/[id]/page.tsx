@@ -110,6 +110,10 @@ function BotEditorInner({
   const { variables } = useVariables();
   const lastVariablesRef = useRef(variables);
 
+  const handleGetCenterPosition = useCallback((getter: () => { x: number; y: number }) => {
+    setGetCenter(() => getter);
+  }, [setGetCenter]);
+
   // Sincroniza variáveis do contexto para o estado do BotPage quando mudam
   useEffect(() => {
     if (JSON.stringify(variables) !== JSON.stringify(lastVariablesRef.current)) {
@@ -250,7 +254,7 @@ function BotEditorInner({
               edges={edges}
               onEdgesChange={setEdges}
               onTest={(container: any) => setTestContainer(container)}
-              onGetCenterPosition={(getter: any) => setGetCenter(() => getter)}
+              onGetCenterPosition={handleGetCenterPosition}
             />
           </div>
 
