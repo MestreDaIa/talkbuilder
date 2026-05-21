@@ -11,3 +11,6 @@ verify_jwt = false
 
 [functions.provision-account]
 verify_jwt = false
+
+[functions.crawl]
+verify_jwt = false
