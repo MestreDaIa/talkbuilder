@@ -28,7 +28,8 @@ export const ToggleRow = ({ id, title, description, checked, onChange }: ToggleR
 );
 
 interface KBFile { id: string; name: string; content?: string; size?: number; truncated?: boolean; }
-interface KBLink { id: string; url: string; }
+interface KBLink { id: string; url: string; content?: string; }
+
 
 const MAX_FILE_CHARS = 100_000; // ~100KB de texto por arquivo
 const TEXT_EXT_REGEX = /\.(txt|md|markdown|csv|tsv|json|xml|yaml|yml|html|htm|log|rtf)$/i;
