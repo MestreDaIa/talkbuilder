@@ -8,8 +8,10 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { Info } from "lucide-react";
+import { Info, Loader2 } from "lucide-react";
 import { SkillConfig } from "../SkillConfig";
+import { supabase } from "@/integrations/supabase/client";
+import { useAuth } from "@/context/AuthContext";
 
 interface RedirectConfigProps {
   config: NodeConfig;
@@ -17,8 +19,48 @@ interface RedirectConfigProps {
   containers: Container[];
 }
 
+interface PublishedBot {
+  id: string;
+  name: string;
+}
+
 export const RedirectConfig = ({ config, setConfig }: RedirectConfigProps) => {
   const [targetFlow, setTargetFlow] = useState(config.targetFlow || "");
+  const [publishedBots, setPublishedBots] = useState<PublishedBot[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
+  const { currentWorkspace } = useAuth();
+
+  useEffect(() => {
+    async function fetchPublishedBots() {
+      if (!currentWorkspace?.id) {
+        setIsLoading(false);
+        return;
+      }
+
+      try {
+        const { data, error } = await supabase
+          .from("chatbot_flows")
+          .select("id, name")
+          .eq("workspace_id", currentWorkspace.id)
+          .eq("is_published", true);
+
+        if (error) throw error;
+
+        if (data) {
+          setPublishedBots(data.map(bot => ({
+            id: bot.id,
+            name: bot.name
+          })));
+        }
+      } catch (error) {
+        console.error("Erro ao buscar bots publicados:", error);
+      } finally {
+        setIsLoading(false);
+      }
+    }
+
+    fetchPublishedBots();
+  }, [currentWorkspace?.id]);
 
   useEffect(() => {
     setConfig({ ...config, targetFlow });
@@ -28,19 +70,31 @@ export const RedirectConfig = ({ config, setConfig }: RedirectConfigProps) => {
     <div className="p-4 space-y-4">
       <div className="space-y-2">
         <Label>Selecionar Fluxo de Destino</Label>
-        <Select value={targetFlow} onValueChange={setTargetFlow}>
+        <Select value={targetFlow} onValueChange={setTargetFlow} disabled={isLoading}>
           <SelectTrigger>
-            <SelectValue placeholder="Selecione um bot/fluxo" />
+            <SelectValue placeholder={isLoading ? "Carregando fluxos..." : "Selecione um bot/fluxo"} />
           </SelectTrigger>
           <SelectContent>
-            <SelectItem value="main-flow">Fluxo Principal</SelectItem>
-            <SelectItem value="support-flow">Suporte Técnico</SelectItem>
-            <SelectItem value="sales-flow">Vendas</SelectItem>
+            {publishedBots.length > 0 ? (
+              publishedBots.map((bot) => (
+                <SelectItem key={bot.id} value={bot.id}>
+                  {bot.name}
+                </SelectItem>
+              ))
+            ) : (
+              <div className="p-2 text-xs text-muted-foreground text-center">
+                {isLoading ? (
+                  <Loader2 className="h-4 w-4 animate-spin mx-auto" />
+                ) : (
+                  "Nenhum bot publicado encontrado"
+                )}
+              </div>
+            )}
           </SelectContent>
         </Select>
         <p className="text-xs text-muted-foreground flex items-center gap-1">
           <Info className="h-3 w-3" />
-          Direciona o fluxo atual para outro bot.
+          Direciona o fluxo atual para outro bot publicado.
         </p>
       </div>
       <SkillConfig config={config} setConfig={setConfig} />
