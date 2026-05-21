@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState } from "react";
 import { NodeConfig, Container } from "@/types/chatbot";
 import { Label } from "@/components/ui/label";
 import {
@@ -26,41 +26,38 @@ interface PublishedBot {
 
 export const RedirectConfig = ({ config, setConfig }: RedirectConfigProps) => {
   const [publishedBots, setPublishedBots] = useState<PublishedBot[]>([]);
-  const [isLoading, setIsLoading] = useState(true);
+  const [isLoading, setIsLoading] = useState(false);
+  const [loadedWorkspaceId, setLoadedWorkspaceId] = useState<string | null>(null);
   const { currentWorkspace } = useAuth();
 
-  // Buscar os bots publicados apenas uma vez ao montar o componente ou mudar o workspace
-  useEffect(() => {
-    async function fetchPublishedBots() {
-      if (!currentWorkspace?.id) {
-        setIsLoading(false);
-        return;
-      }
-
-      try {
-        const { data, error } = await supabase
-          .from("chatbot_flows")
-          .select("id, name")
-          .eq("workspace_id", currentWorkspace.id)
-          .eq("is_published", true);
-
-        if (error) throw error;
-
-        if (data) {
-          setPublishedBots(data.map((bot: any) => ({
-            id: bot.id,
-            name: bot.name
-          })));
-        }
-      } catch (error) {
-        console.error("Erro ao buscar bots publicados:", error);
-      } finally {
-        setIsLoading(false);
-      }
+  const fetchPublishedBots = async () => {
+    if (!currentWorkspace?.id || isLoading || loadedWorkspaceId === currentWorkspace.id) {
+      return;
     }
 
-    fetchPublishedBots();
-  }, [currentWorkspace?.id]);
+    setIsLoading(true);
+
+    try {
+      const { data, error } = await supabase
+        .from("chatbot_flows")
+        .select("id, name")
+        .eq("workspace_id", currentWorkspace.id)
+        .eq("is_published", true)
+        .order("name", { ascending: true });
+
+      if (error) throw error;
+
+      setPublishedBots((data || []).map((bot: any) => ({
+        id: bot.id,
+        name: bot.name
+      })));
+      setLoadedWorkspaceId(currentWorkspace.id);
+    } catch (error) {
+      console.error("Erro ao buscar bots publicados:", error);
+    } finally {
+      setIsLoading(false);
+    }
+  };
 
   const handleFlowChange = (value: string) => {
     // Atualiza a configuração diretamente sem usar useEffect para evitar loops
