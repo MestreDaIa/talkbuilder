@@ -36,23 +36,21 @@ export const RedirectConfig = ({ config, setConfig }: RedirectConfigProps) => {
     const workspaceId = currentWorkspace?.id || localStorage.getItem("currentWorkspaceId");
     
     async function fetchPublishedBots() {
-      if (!isMounted) return;
+      if (!isMounted || !workspaceId) {
+        if (!workspaceId) console.log("[RedirectConfig] Missing workspaceId, cannot fetch.");
+        return;
+      }
       
-      console.log("[RedirectConfig] Fetching bots for WorkspaceId:", workspaceId);
+      console.log("[RedirectConfig] Fetching published bots for WorkspaceId:", workspaceId);
 
       try {
         setIsLoading(true);
-        // We use chatbot_flows which is the actual table name found in code
-        let query = supabase
+        // We only fetch published bots from the CURRENT workspace
+        const { data, error } = await supabase
           .from("chatbot_flows")
-          .select("id, name, workspace_id, is_published")
+          .select("id, name")
+          .eq("workspace_id", workspaceId)
           .eq("is_published", true);
-        
-        if (workspaceId) {
-          query = query.eq("workspace_id", workspaceId);
-        }
-        
-        const { data, error } = await query;
 
         if (error) {
           console.error("[RedirectConfig] Supabase error:", error);
@@ -61,24 +59,11 @@ export const RedirectConfig = ({ config, setConfig }: RedirectConfigProps) => {
 
         if (isMounted) {
           if (data && data.length > 0) {
-            console.log("[RedirectConfig] Bots found:", data);
+            console.log("[RedirectConfig] Published bots found:", data.length);
             setPublishedBots(data.map((bot: any) => ({ id: bot.id, name: bot.name })));
           } else {
-            console.log("[RedirectConfig] No bots found for workspace. Trying fallback search...");
-            const { data: fallbackData, error: fallbackError } = await supabase
-              .from("chatbot_flows")
-              .select("id, name, workspace_id, is_published")
-              .eq("is_published", true)
-              .limit(20);
-            
-            if (fallbackError) console.error("[RedirectConfig] Fallback error:", fallbackError);
-            console.log("[RedirectConfig] Fallback search result (all published):", fallbackData);
-            
-            if (fallbackData && fallbackData.length > 0) {
-              setPublishedBots(fallbackData.map((bot: any) => ({ id: bot.id, name: bot.name })));
-            } else {
-              setPublishedBots([]);
-            }
+            console.log("[RedirectConfig] No published bots found in this workspace.");
+            setPublishedBots([]);
           }
         }
       } catch (err) {
@@ -91,7 +76,7 @@ export const RedirectConfig = ({ config, setConfig }: RedirectConfigProps) => {
     fetchPublishedBots();
     
     return () => { isMounted = false; };
-  }, [currentWorkspace?.id]);
+  }, [currentWorkspace?.id]); // Workspace ID is the only dependency needed for the fetch
 
   const handleValueChange = (value: string) => {
     if (value !== targetFlow) {
