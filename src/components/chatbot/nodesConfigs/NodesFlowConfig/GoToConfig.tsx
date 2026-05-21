@@ -18,17 +18,22 @@ interface GoToConfigProps {
 }
 
 export const GoToConfig = ({ config, setConfig, containers }: GoToConfigProps) => {
-  const [targetContainerId, setTargetContainerId] = useState(config.targetContainerId || "");
+  const targetContainerId = config.targetContainerId || "";
 
-  useEffect(() => {
-    setConfig({ ...config, targetContainerId });
-  }, [targetContainerId]);
+  const handleValueChange = (value: string) => {
+    const targetContainer = containers.find(c => c.id === value);
+    setConfig({ 
+      ...config, 
+      targetContainerId: value,
+      targetContainerName: targetContainer?.nameContainer || `Bloco ${value.slice(-4)}`
+    });
+  };
 
   return (
     <div className="p-4 space-y-4">
       <div className="space-y-2">
         <Label>Pular para o Bloco</Label>
-        <Select value={targetContainerId} onValueChange={setTargetContainerId}>
+        <Select value={targetContainerId} onValueChange={handleValueChange}>
           <SelectTrigger>
             <SelectValue placeholder="Selecione o bloco de destino" />
           </SelectTrigger>

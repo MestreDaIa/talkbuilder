@@ -634,6 +634,10 @@ export const TestPanel = ({
           const conditionHandle = matchedCondition ? `${node.id}-cond-${matchedCondition.id}` : `${node.id}-else`;
           currentNodeId = nextFromNode(node.id, container.id, conditionHandle, true);
           continue;
+        } else if (nodeType === "go-to" && cfg.targetContainerId) {
+          console.log(`[node:go-to] Jumping to container: ${cfg.targetContainerId}`);
+          currentNodeId = resolveTarget(cfg.targetContainerId);
+          continue;
         }
 
         const nextId = nextFromNode(node.id, container.id);

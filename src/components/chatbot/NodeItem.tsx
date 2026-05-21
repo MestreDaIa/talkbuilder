@@ -305,7 +305,15 @@ export const NodeItem = ({ node, onClick }: NodeItemProps) => {
           ) : hasGoToPreview ? (
             <div className="mt-2 p-2 bg-green-50 rounded border border-green-200 max-h-[150px] overflow-y-auto">
               <p className="text-xs font-semibold text-green-700">
-                Pular para bloco ID: {node.config.targetContainerId.slice(-4)}
+                Pular para: {(() => {
+                  const target = node.config.targetContainerId;
+                  const found = document.querySelector(`[data-container-id="${target}"]`)?.getAttribute('data-container-name');
+                  // Since we might not have access to the full containers list here easily, 
+                  // we'll try to get it from the DOM or just use the ID as fallback.
+                  // But wait, NodeItem should probably receive containers if it needs to resolve names.
+                  // Let's check how other nodes handle this.
+                  return node.config.targetContainerName || `Bloco ${target?.slice(-4) || ''}`;
+                })()}
               </p>
             </div>
           ) : hasAIPreview ? (
