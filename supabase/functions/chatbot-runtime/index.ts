@@ -667,12 +667,3 @@ async function runFlow(execution: any, containersIn: any[], edgesIn: any[], inpu
   };
 }
 
-function writeMemoryState(key: string, state: any) {
-  const now = Date.now();
-  if (runtimeMemory.size > 1000) {
-    for (const [k, entry] of runtimeMemory.entries()) {
-      if (entry.expiresAt < now) runtimeMemory.delete(k);
-    }
-  }
-  runtimeMemory.set(key, { state, expiresAt: now + MEMORY_TTL_MS });
-}
