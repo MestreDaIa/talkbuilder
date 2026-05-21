@@ -748,7 +748,7 @@ export const TestPanel = ({
           const redirectResult = await runLocalFlow(
             { 
               mode: "flow",
-              current_node_id: null,
+              current_node_id: cfg.startNodeId || null,
               active_agent_node_id: null,
               variables,
               message_history: messageHistory,
