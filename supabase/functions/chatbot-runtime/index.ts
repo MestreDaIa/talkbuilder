@@ -460,7 +460,15 @@ async function runFlow(execution: any, containers: any[], edges: any[], input: a
           .filter((f: any) => f.content)
           .map((f: any) => `### Arquivo: ${f.name}\n${f.content}`)
           .join("\n\n");
-        if (filesContent) kbContext += `\n\n[BASE DE CONHECIMENTO]\n${filesContent}`;
+        if (filesContent) kbContext += `\n\n[CONHECIMENTO - ARQUIVOS]\n${filesContent}`;
+      }
+
+      if (cfg.kbLinksEnabled !== false && cfg.kbLinks?.length) {
+        const linksContent = cfg.kbLinks
+          .filter((l: any) => l.url)
+          .map((l: any) => `### Fonte (URL): ${l.url}\n${l.content ? `Conteúdo:\n${l.content}` : ""}`)
+          .join("\n\n");
+        if (linksContent) kbContext += `\n\n[CONHECIMENTO - LINKS]\n${linksContent}`;
       }
 
       const systemPrompt = `Objetivo: ${objective}\nInstruções: ${instructions}${kbContext}`;
