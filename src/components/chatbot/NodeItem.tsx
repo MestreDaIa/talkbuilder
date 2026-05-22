@@ -433,10 +433,10 @@ export const NodeItem = ({ node, onClick, onDelete, onDuplicate }: NodeItemProps
             </div>
           ) : (
             messageValue && (
-              <div className="mt-1 max-h-[150px] overflow-y-auto scrollbar-thin scrollbar-thumb-gray-300 scrollbar-track-transparent pr-1">
+              <div className="mt-1 overflow-hidden">
                 <RichText
                   as="p"
-                  className="text-xs text-black text-left w-full h-auto leading-relaxed text-wrap py-0 whitespace-pre-wrap break-words rich-bubble-preview"
+                  className="text-xs text-black text-left w-full leading-relaxed py-0 break-all line-clamp-2 rich-bubble-preview"
                   value={messageValue as string}
                   variableClassName="bg-orange-400 px-1 py-0.5 text-white rounded"
                   linkClassName="text-blue-600 underline hover:text-blue-800"
