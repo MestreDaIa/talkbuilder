@@ -31,6 +31,8 @@ export const ButtonGroupNodeItem = ({
   onUpdateButton,
   onDeleteButton,
   nodeIndex,
+  onDelete,
+  onDuplicate,
 }: ButtonGroupNodeItemProps) => {
   const [newButtonLabel, setNewButtonLabel] = useState("");
   const [editingButtonId, setEditingButtonId] = useState<string | null>(null);
