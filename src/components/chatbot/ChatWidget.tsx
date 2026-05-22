@@ -14,8 +14,8 @@ const formatMarkdown = (text: string): string => {
   
   // Bold: **text** or __text__
   // Using a more robust regex that handles leading spaces/stars
-  html = html.replace(/\*\*([^*\n]+?)\*\*/g, "<strong>$1</strong>");
-  html = html.replace(/__([^_\n]+??)__/g, "<strong>$1</strong>");
+  html = html.replace(/\*\*([^*\n]+)\*\*/g, "<strong>$1</strong>");
+  html = html.replace(/__([^_\n]+)__/g, "<strong>$1</strong>");
   
   // Italic: *text* or _text_
   // We exclude cases where it might be part of a bold sequence
@@ -422,7 +422,7 @@ export const ChatWidget = ({
                   <audio src={message.content} controls className="max-w-full" />
                 ) : (
                   <p
-                    className="whitespace-pre-wrap break-words"
+                    className="whitespace-pre-wrap break-words prose prose-sm max-w-none prose-strong:font-bold prose-strong:text-inherit"
                     dangerouslySetInnerHTML={{ __html: formatMarkdown(message.content) }}
                   />
                 )}
