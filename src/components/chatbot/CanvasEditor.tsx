@@ -403,6 +403,8 @@ const CanvasContent = ({
             onTest: () => onTest(container),
             onDuplicate: () => handleDuplicate(container.id),
             onDelete: () => handleDelete(container.id),
+            onDeleteNode: (nodeId: string) => handleDeleteNode(container.id, nodeId),
+            onDuplicateNode: (nodeId: string) => handleDuplicateNode(container.id, nodeId),
             onNodeDrop: handleNodeDrop,
           },
         } as unknown as FlowNode;
