@@ -63,7 +63,10 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 			console.log("[Auth] Evento:", event);
 			setSession(newSession);
 			const newUser = newSession?.user ?? null;
-			setUser(newUser);
+			setUser((prev) => {
+				if (prev?.id === newUser?.id) return prev;
+				return newUser;
+			});
 			
 			if (newUser) {
 				// Evita loader global se for apenas atualização de token ou se o usuário for o mesmo
