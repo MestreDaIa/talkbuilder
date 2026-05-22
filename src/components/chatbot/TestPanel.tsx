@@ -506,7 +506,7 @@ export const TestPanel = ({
             if (cfg.saveVariable) {
               variables[cfg.saveVariable] = aiReply;
             } else {
-              nextMessages.push({ ...botMsg, type: "bot", content: aiReply, isHtml: true } as Message);
+              nextMessages.push({ ...botMsg, type: "bot", content: aiReply, isHtml: false } as Message);
             }
           }
 
