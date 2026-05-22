@@ -107,17 +107,30 @@ function BotEditorInner({
   setGetCenter,
   botVariables
 }: any) {
-  const { variables } = useVariables();
+  const { variables, setVariables } = useVariables();
   const lastVariablesRef = useRef(variables);
 
-  // Sincroniza variáveis do contexto para o estado do BotPage quando mudam
+  // Sync variables from initialVariables/Start node whenever containers change
   useEffect(() => {
-    if (JSON.stringify(variables) !== JSON.stringify(lastVariablesRef.current)) {
-      lastVariablesRef.current = variables;
-      // Adicionamos um pequeno delay ou verificação para evitar loops se necessário,
-      // mas aqui deve estar ok pois o BotPage apenas guarda para o saveDraft
+    const startNode = containers
+      .flatMap((c: any) => c.nodes)
+      .find((n: any) => String(n.type).toLowerCase() === 'start');
+    
+    if (startNode?.config?.initialVariables) {
+      const initialVars = startNode.config.initialVariables;
+      setVariables((prev: Record<string, any>) => {
+        const next = { ...prev };
+        let changed = false;
+        initialVars.forEach((v: any) => {
+          if (v.name && v.name.trim() && next[v.name.trim()] === undefined) {
+            next[v.name.trim()] = v.defaultValue || "";
+            changed = true;
+          }
+        });
+        return changed ? next : prev;
+      });
     }
-  }, [variables]);
+  }, [containers, setVariables]);
 
   // Função de salvar que inclui variáveis
   const handleSaveWithVariables = async () => {

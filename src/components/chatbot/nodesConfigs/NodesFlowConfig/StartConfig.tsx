@@ -12,27 +12,21 @@ interface InitialVariable {
 
 interface StartConfigProps {
   config: {
-    flowName?: string;
-    description?: string;
     initialVariables?: InitialVariable[];
   };
   setConfig: (config: StartConfigProps["config"]) => void;
 }
 
 export const StartConfig = ({ config, setConfig }: StartConfigProps) => {
-  const [flowName, setFlowName] = useState(config.flowName || "");
-  const [description, setDescription] = useState(config.description || "");
   const [initialVariables, setInitialVariables] = useState<InitialVariable[]>(
     config.initialVariables || []
   );
 
   useEffect(() => {
     setConfig({
-      flowName,
-      description,
       initialVariables,
     });
-  }, [flowName, description, initialVariables]);
+  }, [initialVariables]);
 
   const handleAddVariable = () => {
     setInitialVariables([...initialVariables, { name: "", defaultValue: "" }]);
@@ -53,74 +47,66 @@ export const StartConfig = ({ config, setConfig }: StartConfigProps) => {
   };
 
   return (
-    <div className="space-y-4">
-      <div className="space-y-2">
-        <Label htmlFor="flowName">Nome do Fluxo</Label>
-        <Input
-          id="flowName"
-          value={flowName}
-          onChange={(e) => setFlowName(e.target.value)}
-          placeholder="Ex: Atendimento Principal"
-        />
-      </div>
-
-      <div className="space-y-2">
-        <Label htmlFor="description">Descrição (opcional)</Label>
-        <Textarea
-          id="description"
-          value={description}
-          onChange={(e) => setDescription(e.target.value)}
-          placeholder="Descreva o objetivo deste fluxo..."
-          rows={2}
-        />
-      </div>
-
+    <div className="space-y-4 p-4">
       <div className="space-y-2">
         <div className="flex items-center justify-between">
-          <Label>Variáveis Iniciais</Label>
+          <Label className="text-base font-semibold">Variáveis Globais do Bot</Label>
           <Button
             type="button"
             variant="outline"
             size="sm"
             onClick={handleAddVariable}
+            className="h-8 gap-1"
           >
-            <Plus className="h-4 w-4 mr-1" />
+            <Plus className="h-4 w-4" />
             Adicionar
           </Button>
         </div>
 
+        <p className="text-xs text-muted-foreground">
+          Defina variáveis que estarão disponíveis em todo o fluxo do bot.
+        </p>
+
         {initialVariables.length === 0 ? (
-          <p className="text-xs text-muted-foreground">
-            Nenhuma variável inicial definida.
-          </p>
+          <div className="text-center py-8 border-2 border-dashed rounded-lg bg-muted/30">
+            <p className="text-sm text-muted-foreground">
+              Nenhuma variável definida ainda.
+            </p>
+          </div>
         ) : (
-          <div className="space-y-2">
+          <div className="space-y-3 mt-4">
             {initialVariables.map((variable, index) => (
-              <div key={index} className="flex items-center gap-2">
-                <Input
-                  value={variable.name}
-                  onChange={(e) =>
-                    handleVariableChange(index, "name", e.target.value)
-                  }
-                  placeholder="Nome"
-                  className="flex-1"
-                />
-                <Input
-                  value={variable.defaultValue}
-                  onChange={(e) =>
-                    handleVariableChange(index, "defaultValue", e.target.value)
-                  }
-                  placeholder="Valor padrão"
-                  className="flex-1"
-                />
+              <div key={index} className="flex items-center gap-2 p-3 bg-muted/50 rounded-lg border border-border">
+                <div className="flex-1 space-y-1">
+                  <Label className="text-[10px] uppercase text-muted-foreground ml-1">Nome da Variável</Label>
+                  <Input
+                    value={variable.name}
+                    onChange={(e) =>
+                      handleVariableChange(index, "name", e.target.value)
+                    }
+                    placeholder="ex: nome_usuario"
+                    className="h-8 text-sm"
+                  />
+                </div>
+                <div className="flex-1 space-y-1">
+                  <Label className="text-[10px] uppercase text-muted-foreground ml-1">Valor Padrão</Label>
+                  <Input
+                    value={variable.defaultValue}
+                    onChange={(e) =>
+                      handleVariableChange(index, "defaultValue", e.target.value)
+                    }
+                    placeholder="Valor opcional"
+                    className="h-8 text-sm"
+                  />
+                </div>
                 <Button
                   type="button"
                   variant="ghost"
                   size="icon"
                   onClick={() => handleRemoveVariable(index)}
-                  className="flex-shrink-0"
+                  className="h-8 w-8 mt-5 text-destructive hover:text-destructive hover:bg-destructive/10"
                 >
-                  <Trash2 className="h-4 w-4 text-destructive" />
+                  <Trash2 className="h-4 w-4" />
                 </Button>
               </div>
             ))}
@@ -128,11 +114,9 @@ export const StartConfig = ({ config, setConfig }: StartConfigProps) => {
         )}
       </div>
 
-      <div className="bg-muted/50 rounded-lg p-3">
-        <p className="text-xs text-muted-foreground">
-          <strong>Dica:</strong> O node Start é o ponto de entrada do fluxo. Ele
-          será executado primeiro quando o chatbot for iniciado ou quando o
-          botão "Testar" for clicado.
+      <div className="bg-primary/5 rounded-lg p-3 border border-primary/10">
+        <p className="text-xs text-primary/80 leading-relaxed">
+          <strong>Como usar:</strong> Para usar estas variáveis em outros blocos (como em textos ou condições), utilize o formato <code>{`{{nome_da_variavel}}`}</code>.
         </p>
       </div>
     </div>
