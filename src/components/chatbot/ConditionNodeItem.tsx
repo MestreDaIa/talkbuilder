@@ -1,16 +1,24 @@
 import { useState, useRef, useEffect } from "react";
 import { Handle, Position } from "reactflow";
-import { Filter, Settings, Plus, GripVertical, Trash2 } from "lucide-react";
+import { Filter, Settings, Plus, GripVertical, Trash2, MoreVertical, Copy } from "lucide-react";
 import { Node, ConditionGroup, ConditionComparison } from "@/types/chatbot";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 
 interface ConditionNodeItemProps {
   node: Node;
   onGroupClick: () => void;
   onConditionClick: (conditionId: string) => void;
   nodeIndex: number;
+  onDelete?: () => void;
+  onDuplicate?: () => void;
 }
 
 const operatorLabels: Record<string, string> = {
