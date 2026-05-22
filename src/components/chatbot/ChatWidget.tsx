@@ -395,7 +395,10 @@ export const ChatWidget = ({
                 ) : message.isAudio ? (
                   <audio src={message.content} controls className="max-w-full" />
                 ) : (
-                  <p className="whitespace-pre-wrap">{message.content}</p>
+                  <p
+                    className="whitespace-pre-wrap break-words"
+                    dangerouslySetInnerHTML={{ __html: formatMarkdown(message.content) }}
+                  />
                 )}
               </div>
             </div>
