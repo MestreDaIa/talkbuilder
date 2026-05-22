@@ -62,7 +62,7 @@ export const ConditionNodeItem = ({
   const conditions: ConditionGroup[] = node.config.conditions || [];
 
   return (
-    <div className="relative bg-purple-100 border border-purple-300 rounded-lg overflow-visible group" style={{ width: 270 }}>
+    <div className="relative bg-purple-100 border border-purple-300 rounded-lg overflow-visible group" style={{ width: 250 }}>
       {/* Header */}
       <div
         onClick={(e) => {
@@ -175,7 +175,7 @@ export const ConditionNodeItem = ({
               id={`${node.id}-cond-${condition.id}`}
               style={{
                 position: "absolute",
-                right: "-10.5%",
+                right: "-24px",
                 top: "50%",
                 transform: "translate(50%, -50%)",
               }}
@@ -214,7 +214,7 @@ export const ConditionNodeItem = ({
             id={`${node.id}-else`}
             style={{
               position: "absolute",
-              right: "-10.5%",
+              right: "-24px",
               top: "50%",
               transform: "translate(50%, -50%)",
             }}
