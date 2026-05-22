@@ -391,6 +391,15 @@ export const TestPanel = ({
         
         console.log(`[node:start] [${nodeType}] ${node.id}`);
 
+        // Handle initial variables from Start node
+        if (nodeType === "start" && cfg.initialVariables) {
+          cfg.initialVariables.forEach((v: any) => {
+            if (v.name && v.name.trim()) {
+              variables[v.name.trim()] = v.defaultValue || "";
+            }
+          });
+        }
+
         if (nodeType === "wait" || nodeType === "await") {
           waitMs = parseWaitMs(cfg);
           console.log(`[node:paused] Wait ${waitMs}ms`);
