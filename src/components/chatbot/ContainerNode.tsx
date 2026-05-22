@@ -46,6 +46,8 @@ export const ContainerNode = memo(({ data }: NodeProps<ContainerNodeData>) => {
     onTest,
     onDuplicate,
     onDelete,
+    onDeleteNode,
+    onDuplicateNode,
     onNodeDrop,
   } = data;
   const [isDragOver, setIsDragOver] = useState(false);
