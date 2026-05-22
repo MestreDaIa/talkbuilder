@@ -719,8 +719,8 @@ export const TestPanel = ({
           skillCall = skillCall || parseSkillFromText(aiReply);
 
           if (skillCall?.skill_id && skills.some((skill) => skill.id === skillCall?.skill_id)) {
-            if (skillCall.message || aiReply) {
-              const notice = String(skillCall.message || aiReply).trim();
+            if (skillCall.message) {
+              const notice = String(skillCall.message).trim();
               if (notice) nextMessages.push({ id: crypto.randomUUID(), conversation_id: conversationId || "temp", role: "assistant", type: "bot", content: notice, isHtml: false } as Message);
             }
 
