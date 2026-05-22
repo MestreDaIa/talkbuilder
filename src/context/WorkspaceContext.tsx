@@ -197,7 +197,7 @@ export function WorkspaceProvider({
 					});
 			}
 		}
-	}, [user, currentWorkspace]);
+	}, [user?.id, currentWorkspace?.id]);
 
 	return (
 		<WorkspaceContext.Provider
