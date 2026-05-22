@@ -170,7 +170,7 @@ export const ContainerNode = memo(({ data }: NodeProps<ContainerNodeData>) => {
           <Handle type="target" position={Position.Top} className="!bg-green-600 !w-4 !h-4 -top-2" />
         )}
 
-        <div className="flex items-center justify-between mb-4 rounded-md nodrag pointer-events-auto">
+        <div className="flex items-center justify-between gap-2 mb-4 rounded-md nodrag pointer-events-auto min-w-0">
           {isEditingContainerNameNode ? (
             <input
               type="text"
