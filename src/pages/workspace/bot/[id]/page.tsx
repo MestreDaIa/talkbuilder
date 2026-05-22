@@ -107,22 +107,30 @@ function BotEditorInner({
   setGetCenter,
   botVariables
 }: any) {
-  const { variables } = useVariables();
+  const { variables, setVariables } = useVariables();
   const lastVariablesRef = useRef(variables);
 
   // Sync variables from initialVariables/Start node whenever containers change
   useEffect(() => {
     const startNode = containers
-      .flatMap(c => c.nodes)
-      .find(n => String(n.type).toLowerCase() === 'start');
+      .flatMap((c: any) => c.nodes)
+      .find((n: any) => String(n.type).toLowerCase() === 'start');
     
     if (startNode?.config?.initialVariables) {
       const initialVars = startNode.config.initialVariables;
-      const { setVariables } = useVariables(); // This is actually wrong usage inside useEffect without destructuring at top
-      // I'll fix this by using a better approach in the next turn if needed, 
-      // but the intent is to sync the variables context with the start node's config.
+      setVariables((prev: Record<string, any>) => {
+        const next = { ...prev };
+        let changed = false;
+        initialVars.forEach((v: any) => {
+          if (v.name && v.name.trim() && next[v.name.trim()] === undefined) {
+            next[v.name.trim()] = v.defaultValue || "";
+            changed = true;
+          }
+        });
+        return changed ? next : prev;
+      });
     }
-  }, [containers]);
+  }, [containers, setVariables]);
 
   // Função de salvar que inclui variáveis
   const handleSaveWithVariables = async () => {
