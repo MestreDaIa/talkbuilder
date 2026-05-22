@@ -1,9 +1,15 @@
 import { useState, useRef, useEffect } from "react";
 import { Handle, Position } from "reactflow";
-import { Settings, Plus, GripVertical } from "lucide-react";
+import { Settings, Plus, GripVertical, MoreVertical, Copy, Trash2 } from "lucide-react";
 import { Node, ButtonConfig } from "@/types/chatbot";
 import { Input } from "@/components/ui/input";
 import { cn } from "@/lib/utils";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 
 interface ButtonGroupNodeItemProps {
   node: Node;
@@ -13,6 +19,8 @@ interface ButtonGroupNodeItemProps {
   onUpdateButton: (buttonId: string, updates: Partial<ButtonConfig>) => void;
   onDeleteButton: (buttonId: string) => void;
   nodeIndex: number;
+  onDelete?: () => void;
+  onDuplicate?: () => void;
 }
 
 export const ButtonGroupNodeItem = ({
