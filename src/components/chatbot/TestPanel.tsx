@@ -284,6 +284,75 @@ export const TestPanel = ({
     return condition.logicalOperator === "OR" ? results.some(Boolean) : results.every(Boolean);
   };
 
+  const collectAgentSkills = (containersToScan: Container[], agentNodeId?: string | null) => {
+    return containersToScan.flatMap((container) =>
+      (container.nodes || [])
+        .filter((node) => node.id !== agentNodeId && node.config?.isSkill)
+        .map((node) => ({
+          id: node.id,
+          type: node.type,
+          containerId: container.id,
+          containerName: container.nameContainer || `Bloco #${container.id.slice(-4)}`,
+          description: String(node.config?.skillDescription || "Use quando esta ação for útil para atender o usuário."),
+          label: node.type === "redirect"
+            ? `Redirecionar para ${node.config?.targetFlowName || node.config?.targetFlow || "outro fluxo"}`
+            : node.type === "go-to"
+              ? `Ir para ${node.config?.targetContainerName || node.config?.targetContainerId || "outro bloco"}`
+              : String(node.config?.name || node.config?.label || node.type),
+        }))
+    );
+  };
+
+  const buildSkillSystemPrompt = (skills: ReturnType<typeof collectAgentSkills>) => {
+    if (!skills.length) {
+      return "\n\n[SKILLS DISPONÍVEIS]\nNenhuma skill foi habilitada nos outros nodes deste fluxo.";
+    }
+
+    const list = skills.map((skill, index) => (
+      `${index + 1}. ID: ${skill.id}\nTipo: ${skill.type}\nBloco: ${skill.containerName}\nNome: ${skill.label}\nInstrução da skill: ${skill.description}`
+    )).join("\n\n");
+
+    return `\n\n[SKILLS DISPONÍVEIS PARA O AGENTE]\n${list}\n\nQuando a mensagem do usuário combinar com a instrução de uma skill, use a ferramenta use_skill com o ID exato da skill. Se a chamada de ferramenta não estiver disponível, responda apenas com JSON neste formato: {"skill_id":"ID_DA_SKILL","message":"mensagem opcional"}. Não invente perguntas antes de usar uma skill claramente solicitada.`;
+  };
+
+  const buildUseSkillTool = (skills: ReturnType<typeof collectAgentSkills>) => {
+    if (!skills.length) return undefined;
+    return {
+      type: "function",
+      function: {
+        name: "use_skill",
+        description: "Executa um node marcado como Skill/Ferramenta IA no fluxo atual.",
+        parameters: {
+          type: "object",
+          properties: {
+            skill_id: {
+              type: "string",
+              enum: skills.map((skill) => skill.id),
+              description: "ID exato do node skill que deve ser executado."
+            },
+            message: {
+              type: "string",
+              description: "Mensagem curta para avisar o usuário antes de executar a skill."
+            }
+          },
+          required: ["skill_id"]
+        }
+      }
+    };
+  };
+
+  const parseSkillFromText = (reply: string | null) => {
+    if (!reply) return null;
+    const jsonMatch = reply.match(/\{[\s\S]*"skill_id"[\s\S]*\}/);
+    if (!jsonMatch) return null;
+    try {
+      const parsed = JSON.parse(jsonMatch[0]);
+      return parsed?.skill_id ? { skill_id: String(parsed.skill_id), message: parsed.message ? String(parsed.message) : "" } : null;
+    } catch {
+      return null;
+    }
+  };
+
     const runLocalFlow = async (
       state: RuntimeState | null, 
       input?: { message?: string; button_id?: string },
@@ -565,6 +634,8 @@ export const TestPanel = ({
           console.log("[node:ai_generating] Agent", node.id);
           const objective = cfg.objective || "assistente conversacional";
           const instructions = cfg.instructions || "Ajude o usuário de forma natural.";
+          const skills = cfg.toolCallingEnabled === false ? [] : collectAgentSkills(containers, node.id);
+          const useSkillTool = buildUseSkillTool(skills);
           
           const nodeKey = (cfg.apiKey || "").trim();
           const nodeProvider = (cfg.provider || "openai").toLowerCase();
@@ -573,7 +644,7 @@ export const TestPanel = ({
           const selectedProvider = nodeProvider === "gemini" ? "google" : nodeProvider as "openai" | "anthropic" | "google";
 
           const { system, messages: contextMessages } = buildAgentContext({
-            systemPrompt: `Objetivo: ${objective}\nInstruções: ${instructions}`,
+            systemPrompt: `Objetivo: ${objective}\nInstruções: ${instructions}${buildSkillSystemPrompt(skills)}`,
             history: messageHistory,
             persistentMemory,
             variables,
@@ -586,6 +657,7 @@ export const TestPanel = ({
           });
 
           let aiReply: string | null = null;
+          let skillCall: { skill_id: string; message?: string } | null = null;
           if (activeKey) {
             try {
               if (selectedProvider === "openai") {
@@ -595,11 +667,18 @@ export const TestPanel = ({
                   body: JSON.stringify({
                     model: cfg.model || "gpt-4o-mini",
                     messages: [{ role: "system", content: system }, ...contextMessages],
+                    ...(useSkillTool ? { tools: [useSkillTool], tool_choice: "auto" } : {}),
                   }),
                 });
                 if (res.ok) {
                   const data = await res.json();
-                  aiReply = data.choices?.[0]?.message?.content || null;
+                  const msg = data.choices?.[0]?.message;
+                  const toolCall = msg?.tool_calls?.find((call: any) => call?.function?.name === "use_skill");
+                  if (toolCall?.function?.arguments) {
+                    const args = JSON.parse(toolCall.function.arguments);
+                    skillCall = args?.skill_id ? { skill_id: String(args.skill_id), message: args.message } : null;
+                  }
+                  aiReply = msg?.content || null;
                 }
               } else if (selectedProvider === "google") {
                 const model = (cfg.model || "gemini-2.0-flash").trim();
@@ -611,17 +690,67 @@ export const TestPanel = ({
                     contents: contextMessages.map(m => ({
                       role: m.role === "assistant" ? "model" : "user",
                       parts: [{ text: m.content }]
-                    }))
+                    })),
+                    ...(useSkillTool ? {
+                      tools: [{ function_declarations: [{
+                        name: useSkillTool.function.name,
+                        description: useSkillTool.function.description,
+                        parameters: useSkillTool.function.parameters
+                      }] }],
+                      tool_config: { function_calling_config: { mode: "AUTO" } }
+                    } : {})
                   }),
                 });
                 if (res.ok) {
                   const data = await res.json();
-                  aiReply = data.candidates?.[0]?.content?.parts?.[0]?.text || null;
+                  const parts = data.candidates?.[0]?.content?.parts || [];
+                  const fn = parts.find((part: any) => part.functionCall?.name === "use_skill")?.functionCall;
+                  if (fn?.args?.skill_id) {
+                    skillCall = { skill_id: String(fn.args.skill_id), message: fn.args.message };
+                  }
+                  aiReply = parts.map((part: any) => part.text).filter(Boolean).join("\n").trim() || null;
                 }
               }
             } catch (e) {
               console.error("[agent-node] AI call failed", e);
             }
+          }
+
+          skillCall = skillCall || parseSkillFromText(aiReply);
+
+          if (skillCall?.skill_id && skills.some((skill) => skill.id === skillCall?.skill_id)) {
+            if (skillCall.message) {
+              const notice = String(skillCall.message).trim();
+              if (notice) nextMessages.push({ id: crypto.randomUUID(), conversation_id: conversationId || "temp", role: "assistant", type: "bot", content: notice, isHtml: false } as Message);
+            }
+
+            const skillResult = await runLocalFlow(
+              {
+                mode: "flow",
+                current_node_id: skillCall.skill_id,
+                active_agent_node_id: null,
+                variables,
+                message_history: messageHistory,
+                persistent_memory: persistentMemory,
+                visitor_id: visitorId,
+                conversation_id: conversationId,
+                waiting_for_input: false
+              },
+              undefined,
+              containers,
+              edgesList,
+              visitedRedirects
+            );
+
+            nextMessages.push(...(skillResult.messages || []));
+            return {
+              ...skillResult,
+              messages: nextMessages,
+              runtime_state: {
+                ...skillResult.runtime_state,
+                variables: { ...variables, ...(skillResult.runtime_state?.variables || {}) }
+              }
+            };
           }
 
           if (aiReply) {
