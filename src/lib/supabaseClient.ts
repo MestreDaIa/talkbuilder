@@ -1,5 +1,5 @@
 // =============================================================================
-// ZyloFlow — Sistema de banco de dados
+// ZailomFlow — Sistema de banco de dados
 // =============================================================================
 
 import { createClient, type SupabaseClient } from "@supabase/supabase-js";

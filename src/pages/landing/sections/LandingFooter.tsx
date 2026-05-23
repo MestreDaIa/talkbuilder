@@ -9,8 +9,8 @@ export default function LandingFooter() {
 				<div className="grid sm:grid-cols-4 gap-8 mb-10">
 					<div className="sm:col-span-2">
 						<Link to="/" className="flex items-center gap-2 mb-3">
-							<img src={logoMark} alt="ZyloFlow" className="h-8 w-auto" />
-							<img src={logoWordmark} alt="ZyloFlow" className="h-6 w-auto" />
+							<img src={logoMark} alt="ZailomFlow" className="h-8 w-auto" />
+							<img src={logoWordmark} alt="ZailomFlow" className="h-6 w-auto" />
 						</Link>
 						<p className="text-sm text-muted-foreground max-w-sm">
 							O construtor visual de chatbots pra times que querem automatizar
@@ -66,7 +66,7 @@ export default function LandingFooter() {
 				</div>
 
 				<div className="pt-8 border-t border-white/5 flex flex-col sm:flex-row items-center justify-between gap-4 text-xs text-muted-foreground">
-					<p>© {new Date().getFullYear()} ZyloFlow. Todos os direitos reservados.</p>
+					<p>© {new Date().getFullYear()} ZailomFlow. Todos os direitos reservados.</p>
 					<p>Feito com ☕ no Brasil</p>
 				</div>
 			</div>

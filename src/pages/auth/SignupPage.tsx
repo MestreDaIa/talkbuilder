@@ -144,7 +144,7 @@ export default function SignupPage() {
 
 		// Se confirmação de email estiver desativada, já vem com session
 		if (data.session) {
-			toast({ title: "Conta criada!", description: "Bem-vindo ao ZyloFlow." });
+			toast({ title: "Conta criada!", description: "Bem-vindo ao ZailomFlow." });
 			navigate(redirectUrl, { replace: true });
 		} else {
 			toast({
@@ -159,10 +159,10 @@ export default function SignupPage() {
 		<div className="min-h-svh flex items-center justify-center p-6 bg-gradient-to-br from-background to-muted">
 			<Card className="max-w-lg w-full">
 				<CardHeader>
-					<CardTitle className="flex items-center gap-2">Criar sua conta <img src={(new URL("../../assets/logo-wordmark.svg", import.meta.url)).href} alt="ZyloFlow" className="h-5 w-auto inline-block" /></CardTitle>
+					<CardTitle className="flex items-center gap-2">Criar sua conta <img src={(new URL("../../assets/logo-wordmark.svg", import.meta.url)).href} alt="ZailomFlow" className="h-5 w-auto inline-block" /></CardTitle>
 					<CardDescription>
 						Escolha seu @ — ele vira sua URL pública (ex:{" "}
-						<code>zyloflow.com/{slug || "seu-nome"}</code>).
+						<code>zailomflow.com/{slug || "seu-nome"}</code>).
 					</CardDescription>
 				</CardHeader>
 				<CardContent>

@@ -84,7 +84,7 @@ export default function IntegrationsSettings() {
                 )}
               </CardTitle>
               <CardDescription>
-                Avançado — conecte seu próprio Supabase para guardar dados dos seus bots (variáveis, leads, conversas) na sua infraestrutura. Sua conta ZyloFlow continua funcionando independente disso.
+                Avançado — conecte seu próprio Supabase para guardar dados dos seus bots (variáveis, leads, conversas) na sua infraestrutura. Sua conta ZailomFlow continua funcionando independente disso.
               </CardDescription>
             </div>
           </CardHeader>
@@ -118,7 +118,7 @@ export default function IntegrationsSettings() {
               )}
             </div>
             <p className='text-xs text-gray-500'>
-              Sua autenticação no ZyloFlow não depende disso — esse Supabase é só para você guardar os dados que seus bots coletam.
+              Sua autenticação no ZailomFlow não depende disso — esse Supabase é só para você guardar os dados que seus bots coletam.
             </p>
           </CardContent>
         </Card>
@@ -128,8 +128,8 @@ export default function IntegrationsSettings() {
             <SiWhatsapp className='w-5 h-5 text-green-600'/>
           </div>
           <CardHeader className='flex flex-col text-left items-start  w-full'>
-            <CardTitle>Whatsapp</CardTitle>
-            <CardDescription>Conect seu chatbot ao Whatsapp - Ativo</CardDescription>
+            <CardTitle>WhatsApp</CardTitle>
+            <CardDescription>Conect seu chatbot ao WhatsApp - Ativo</CardDescription>
           </CardHeader>
           <CardContent className='flex absolute right-0 h-full'>
             <div className='pt-2 flex flex-col justify-between'>

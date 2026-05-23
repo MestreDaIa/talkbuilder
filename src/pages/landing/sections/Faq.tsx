@@ -4,12 +4,12 @@ import { useGsapContext, gsap } from "../../../hooks/useGsap";
 
 const faqs = [
 	{
-		q: "Preciso saber programar pra usar o ZyloFlow?",
+		q: "Preciso saber programar pra usar o ZailomFlow?",
 		a: "Não. O editor é 100% visual: você arrasta blocos e conecta. Conhecimento técnico só ajuda nas integrações avançadas (webhooks, scripts), mas não é obrigatório.",
 	},
 	{
 		q: "Quais canais já estão funcionando?",
-		a: "Hoje o widget pro seu site já roda. WhatsApp, Instagram e Telegram estão na fila — vamos liberar conforme o produto evolui.",
+		a: "Hoje o WhatsApp e o widget pro seu site já rodam. Instagram e Telegram estão na fila — vamos liberar conforme o produto evolui.",
 	},
 	{
 		q: "Posso testar grátis sem cartão?",
