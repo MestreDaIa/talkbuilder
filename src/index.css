@@ -276,7 +276,7 @@ code {
   --shadow-glow-violet: 0 20px 60px -20px rgba(146, 0, 39, 0.45);
   --shadow-card: 0 8px 32px -12px rgba(0, 0, 0, 0.6);
 
-  background: var(--gradient-hero);
+  background: linear-gradient(95.85deg, #460863 28.20%, #000000 100%);
   color: var(--foreground);
   font-family: "Inter", system-ui, sans-serif;
 }

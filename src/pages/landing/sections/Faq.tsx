@@ -4,7 +4,7 @@ import { useGsapContext, gsap } from "../../../hooks/useGsap";
 
 const faqs = [
 	{
-		q: "Preciso saber programar pra usar o TalkMap?",
+		q: "Preciso saber programar pra usar o ZyloFlow?",
 		a: "Não. O editor é 100% visual: você arrasta blocos e conecta. Conhecimento técnico só ajuda nas integrações avançadas (webhooks, scripts), mas não é obrigatório.",
 	},
 	{
