@@ -21,7 +21,7 @@ const testimonials = [
 		role: "Próximo case de sucesso",
 		initials: "+",
 		color: "#1E0828",
-		text: "Tem espaço aqui pra sua história. Comece grátis e descubra o que dá pra fazer em uma tarde.",
+		text: "Tem espaço aqui pra sua história. Comece agora mesmo e descubra o poder do ZailomFLow.",
 	},
 ];
 

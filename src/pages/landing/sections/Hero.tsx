@@ -116,12 +116,23 @@ export default function Hero() {
 					</a>
 				</div>
 
-				<p
+				<div
 					data-hero-meta
-					className="text-xs text-muted-foreground/70"
+					className="flex items-center justify-center gap-4 sm:gap-8 text-[10px] sm:text-xs font-semibold tracking-widest text-white/70"
 				>
-					Sem cartão de crédito · Plano grátis pra sempre
-				</p>
+					<div className="flex items-center gap-2">
+						<div className="w-2 h-2 bg-[#920027] rounded-[2px]" />
+						CRIE FLUXOS
+					</div>
+					<div className="flex items-center gap-2">
+						<div className="w-2 h-2 bg-[#460863] rounded-[2px]" />
+						AUTOMATIZE
+					</div>
+					<div className="flex items-center gap-2">
+						<div className="w-2 h-2 bg-white/30 rounded-[2px]" />
+						CONECTE
+					</div>
+				</div>
 
 				<div data-hero-mockup className="mt-20 relative">
 					<div className="absolute -inset-x-20 -inset-y-10 bg-gradient-to-b from-transparent via-[#460863]/10 to-transparent blur-3xl" />
