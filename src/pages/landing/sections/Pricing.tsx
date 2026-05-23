@@ -13,7 +13,7 @@ const plans: {
 }[] = [
   {
     id: "starter",
-    price: "49",
+    price: "R$ 49",
     tagline: "Pra começar e validar",
     features: [
       "1 chatbot",
