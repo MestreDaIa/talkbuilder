@@ -21,7 +21,7 @@ export default function Header() {
   }
 
   return (
-    <div className="relative top-0 left-0 w-full bg-gray-800 text-white flex items-center justify-between py-2 px-4 sm:px-9 z-[99] gap-3">
+    <div className="relative top-0 left-0 w-full bg-[#08060d] border-b border-white/5 text-white flex items-center justify-between py-2 px-4 sm:px-9 z-[99] gap-3">
       <button
         type="button"
         className="cursor-pointer shrink-0 flex items-center gap-2"
@@ -50,14 +50,14 @@ export default function Header() {
             >
               {flags.showProfile && (
                 <DropdownMenu.Item
-                  className="select-none outline-none cursor-pointer px-3 py-1.5 rounded-md data-[highlighted]:bg-gray-100 data-[highlighted]:text-green-500"
+                  className="select-none outline-none cursor-pointer px-3 py-1.5 rounded-md data-[highlighted]:bg-gray-100 data-[highlighted]:text-[#920027]"
                   onClick={() => navigate(perfilRoute(slug))}
                 >
                   PERFIL
                 </DropdownMenu.Item>
               )}
               <DropdownMenu.Item
-                className="select-none outline-none cursor-pointer px-3 py-1.5 rounded-md data-[highlighted]:bg-gray-100 data-[highlighted]:text-green-500"
+                className="select-none outline-none cursor-pointer px-3 py-1.5 rounded-md data-[highlighted]:bg-gray-100 data-[highlighted]:text-[#920027]"
                 onClick={() => navigate(configsRoute(slug))}
               >
                 CONFIGURAÇÕES
