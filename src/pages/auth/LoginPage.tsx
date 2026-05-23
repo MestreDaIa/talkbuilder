@@ -125,7 +125,7 @@ export default function LoginPage() {
 		<div className="min-h-svh flex items-center justify-center p-6 bg-gradient-to-br from-background to-muted">
 			<Card className="max-w-md w-full">
 				<CardHeader>
-					<CardTitle>Entrar no TalkMap</CardTitle>
+					<CardTitle className="flex items-center gap-2">Entrar no <img src={(new URL("../../assets/logo-wordmark.svg", import.meta.url)).href} alt="ZyloFlow" className="h-5 w-auto inline-block" /></CardTitle>
 					<CardDescription>
 						Use seu email e senha pra acessar sua conta.
 					</CardDescription>

@@ -1,4 +1,6 @@
 import { Link } from "react-router-dom";
+import logoMark from "../../../assets/logo-mark.svg";
+import logoWordmark from "../../../assets/logo-wordmark.svg";
 
 export default function LandingFooter() {
 	return (
@@ -7,12 +9,8 @@ export default function LandingFooter() {
 				<div className="grid sm:grid-cols-4 gap-8 mb-10">
 					<div className="sm:col-span-2">
 						<Link to="/" className="flex items-center gap-2 mb-3">
-							<div className="w-8 h-8 rounded-lg bg-gradient-to-br from-[oklch(0.65_0.22_295)] to-[oklch(0.68_0.20_350)] flex items-center justify-center font-bold text-white text-sm">
-								T
-							</div>
-							<span className="font-display text-lg font-semibold tracking-tight">
-								TalkMap
-							</span>
+							<img src={logoMark} alt="ZyloFlow" className="h-8 w-auto" />
+							<img src={logoWordmark} alt="ZyloFlow" className="h-6 w-auto" />
 						</Link>
 						<p className="text-sm text-muted-foreground max-w-sm">
 							O construtor visual de chatbots pra times que querem automatizar

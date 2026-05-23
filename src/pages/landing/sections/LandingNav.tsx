@@ -1,6 +1,8 @@
 import { Link } from "react-router-dom";
 import { Button } from "../../../components/ui/button";
 import { useEffect, useState } from "react";
+import logoMark from "../../../assets/logo-mark.svg";
+import logoWordmark from "../../../assets/logo-wordmark.svg";
 
 export default function LandingNav() {
 	const [scrolled, setScrolled] = useState(false);
@@ -22,12 +24,8 @@ export default function LandingNav() {
 		>
 			<div className="max-w-6xl mx-auto px-6 h-16 flex items-center justify-between">
 				<Link to="/" className="flex items-center gap-2">
-					<div className="w-8 h-8 rounded-lg bg-gradient-to-br from-[oklch(0.65_0.22_295)] to-[oklch(0.68_0.20_350)] flex items-center justify-center font-bold text-white text-sm">
-						T
-					</div>
-					<span className="font-display text-lg font-semibold tracking-tight">
-						TalkMap
-					</span>
+					<img src={logoMark} alt="ZyloFlow" className="h-8 w-auto" />
+					<img src={logoWordmark} alt="ZyloFlow" className="h-6 w-auto" />
 				</Link>
 
 				<nav className="hidden md:flex items-center gap-8 text-sm text-muted-foreground">

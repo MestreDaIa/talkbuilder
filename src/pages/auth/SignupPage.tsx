@@ -159,7 +159,7 @@ export default function SignupPage() {
 		<div className="min-h-svh flex items-center justify-center p-6 bg-gradient-to-br from-background to-muted">
 			<Card className="max-w-lg w-full">
 				<CardHeader>
-					<CardTitle>Criar sua conta TalkMap</CardTitle>
+					<CardTitle className="flex items-center gap-2">Criar sua conta <img src={(new URL("../../assets/logo-wordmark.svg", import.meta.url)).href} alt="ZyloFlow" className="h-5 w-auto inline-block" /></CardTitle>
 					<CardDescription>
 						Escolha seu @ — ele vira sua URL pública (ex:{" "}
 						<code>talkmap.com.br/{slug || "seu-nome"}</code>).
