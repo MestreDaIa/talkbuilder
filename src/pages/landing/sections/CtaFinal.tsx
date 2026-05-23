@@ -35,7 +35,7 @@ export default function CtaFinal() {
 							e começar a <span className="text-gradient-violet">vender</span>?
 						</h2>
 						<p className="text-muted-foreground text-lg max-w-xl mx-auto mb-10">
-							Crie sua conta agora. Em 10 minutos seu primeiro bot tá no ar.
+							Em poucos minutos seu primeiro bot tá no ar.
 						</p>
 						<div className="flex items-center justify-center gap-3 flex-wrap">
 							<Link to="/signup">
@@ -43,7 +43,7 @@ export default function CtaFinal() {
 									size="lg"
 									className="px-8 h-12 text-base bg-[#920027] text-white hover:bg-[#b00030] border-0 font-semibold group"
 								>
-									Começar grátis agora
+									Comece agora
 									<ArrowRight className="ml-2 w-4 h-4 transition-transform group-hover:translate-x-1" />
 								</Button>
 							</Link>

@@ -12,10 +12,6 @@ const faqs = [
 		a: "Hoje o WhatsApp e o widget pro seu site já rodam. Instagram e Telegram estão na fila — vamos liberar conforme o produto evolui.",
 	},
 	{
-		q: "Posso testar grátis sem cartão?",
-		a: "Sim. O plano Starter é grátis pra sempre, sem pedir cartão na criação da conta. Você só atualiza se quiser mais bots ou mensagens.",
-	},
-	{
 		q: "Meus dados ficam seguros?",
 		a: "Sim. Usamos infraestrutura com criptografia em trânsito e em repouso, autenticação isolada por workspace e backups automáticos.",
 	},
@@ -25,7 +21,7 @@ const faqs = [
 	},
 	{
 		q: "E se eu precisar de mais mensagens que o plano oferece?",
-		a: "Você pode subir de plano a qualquer momento ou contratar pacotes adicionais. Sem multa, sem fidelidade.",
+		a: "Você pode subir de plano a qualquer momento de forma simples e rápida. Sem multa, sem fidelidade.",
 	},
 ];
 

@@ -75,7 +75,7 @@ export default function Pricing() {
         <div className="text-center mb-14">
           <p className="text-xs uppercase tracking-[0.2em] text-[#920027] mb-4 font-medium">Planos</p>
           <h2 className="font-display text-4xl sm:text-5xl font-bold tracking-tight">
-            Comece grátis. <span className="text-gradient-violet">Cresça quando quiser.</span>
+            Impulsione seu negócio <br /> <span className="text-gradient-violet">com o ZailomFlow.</span>
           </h2>
           <p className="text-muted-foreground mt-4">Sem letras miúdas. Cancele a qualquer momento.</p>
         </div>
