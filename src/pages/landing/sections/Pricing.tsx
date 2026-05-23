@@ -13,20 +13,26 @@ const plans: {
 }[] = [
   {
     id: "starter",
-    price: "Grátis",
+    price: "49",
     tagline: "Pra começar e validar",
-    features: ["1 chatbot", "1.000 mensagens/mês", "Editor visual completo", "Widget pro site"],
+    features: [
+      "1 chatbot", 
+      "1.000 mensagens/mês",
+      "1 instancia para Whatsapp",
+      "Editor visual completo",
+      "Widget pro site",
+    ],
   },
   {
     id: "pro",
-    price: "R$ 49",
+    price: "R$ 97",
     tagline: "Pra times que escalam",
-    highlight: true,
     features: [
       "3 chatbots",
       "10.000 mensagens/mês",
-      "Integrações WhatsApp/IG",
-      "Webhooks ilimitados",
+      "3 instancia para Whatsapp",
+      "API de Integrações",
+      "Fluxos avançados",
       "Suporte por email",
     ],
   },
@@ -34,7 +40,17 @@ const plans: {
     id: "business",
     price: "R$ 149",
     tagline: "Pra operações sérias",
-    features: ["Bots ilimitados", "50.000 mensagens/mês", "Templates premium", "Suporte prioritário", "Onboarding 1:1"],
+    highlight: true,
+    features: [
+      "Bots ilimitados",
+      "50.000 mensagens/mês",
+      "Até 10 instancias para Whatsapp",
+      "Múltiplos atendentes",
+      "Templates premium",
+      "API completa"
+      "Onboarding 1:1",
+      "Suporte prioritário",
+    ],
   },
 ];
 
@@ -77,7 +93,7 @@ export default function Pricing() {
             >
               {p.highlight && (
                 <div className="relative -top-4 left-1/2 -translate-x-1/2 z-10 inline-flex items-center justify-center text-center gap-1 text-[10px] uppercase tracking-wider px-3 py-1.5 rounded-full bg-gradient-to-r from-[#460863] to-[#920027] text-white font-semibold shadow-lg whitespace-nowrap">
-                  <Sparkles className="w-3 h-3" /> Mais escolhido
+                  <Sparkles className="w-3 h-3" /> Melhor custo-benefício
                 </div>
               )}
               <div className="mb-6">
