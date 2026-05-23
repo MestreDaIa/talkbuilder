@@ -15,14 +15,24 @@ export default function LandingPage() {
 		<div className="landing-page relative min-h-svh overflow-x-hidden">
 			<LandingNav />
 			<main>
-				<Hero />
+				<section id="hero">
+					<Hero />
+				</section>
 				<Channels />
-				<FeaturesBento />
-				<HowItWorks />
+				<section id="features">
+					<FeaturesBento />
+				</section>
+				<section id="how">
+					<HowItWorks />
+				</section>
 				<EditorReveal />
 				<SocialProof />
-				<Pricing />
-				<Faq />
+				<section id="pricing">
+					<Pricing />
+				</section>
+				<section id="faq">
+					<Faq />
+				</section>
 				<CtaFinal />
 			</main>
 			<LandingFooter />

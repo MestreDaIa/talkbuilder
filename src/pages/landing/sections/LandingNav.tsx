@@ -29,16 +29,44 @@ export default function LandingNav() {
 				</Link>
 
 				<nav className="hidden md:flex items-center gap-8 text-sm text-muted-foreground">
-					<a href="#features" className="hover:text-foreground transition-colors">
+					<a
+						href="#features"
+						onClick={(e) => {
+							e.preventDefault();
+							document.querySelector("#features")?.scrollIntoView({ behavior: "smooth" });
+						}}
+						className="hover:text-foreground transition-colors"
+					>
 						Recursos
 					</a>
-					<a href="#how" className="hover:text-foreground transition-colors">
+					<a
+						href="#how"
+						onClick={(e) => {
+							e.preventDefault();
+							document.querySelector("#how")?.scrollIntoView({ behavior: "smooth" });
+						}}
+						className="hover:text-foreground transition-colors"
+					>
 						Como funciona
 					</a>
-					<a href="#pricing" className="hover:text-foreground transition-colors">
+					<a
+						href="#pricing"
+						onClick={(e) => {
+							e.preventDefault();
+							document.querySelector("#pricing")?.scrollIntoView({ behavior: "smooth" });
+						}}
+						className="hover:text-foreground transition-colors"
+					>
 						Planos
 					</a>
-					<a href="#faq" className="hover:text-foreground transition-colors">
+					<a
+						href="#faq"
+						onClick={(e) => {
+							e.preventDefault();
+							document.querySelector("#faq")?.scrollIntoView({ behavior: "smooth" });
+						}}
+						className="hover:text-foreground transition-colors"
+					>
 						FAQ
 					</a>
 				</nav>
