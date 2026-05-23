@@ -66,7 +66,7 @@ export default function LandingFooter() {
 				</div>
 
 				<div className="pt-8 border-t border-white/5 flex flex-col sm:flex-row items-center justify-between gap-4 text-xs text-muted-foreground">
-					<p>© {new Date().getFullYear()} TalkMap. Todos os direitos reservados.</p>
+					<p>© {new Date().getFullYear()} ZyloFlow. Todos os direitos reservados.</p>
 					<p>Feito com ☕ no Brasil</p>
 				</div>
 			</div>
