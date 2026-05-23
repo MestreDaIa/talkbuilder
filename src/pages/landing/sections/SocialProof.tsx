@@ -63,7 +63,7 @@ export default function SocialProof() {
 								{Array.from({ length: 5 }).map((_, i) => (
 									<Star
 										key={i}
-										className="w-4 h-4 fill-[oklch(0.78_0.18_85)] text-[oklch(0.78_0.18_85)]"
+										className="w-4 h-4 fill-[#920027] text-[#920027]"
 									/>
 								))}
 							</div>
