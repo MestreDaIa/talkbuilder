@@ -76,7 +76,7 @@ export default function Pricing() {
               }`}
             >
               {p.highlight && (
-                <div className="relative -top-4 left-1/2 -translate-x-1/2 z-10 inline-flex items-center gap-1 text-[10px] uppercase tracking-wider px-3 py-1.5 rounded-full bg-gradient-to-r from-[#460863] to-[#920027] text-white font-semibold shadow-lg whitespace-nowrap">
+                <div className="relative -top-4 left-1/2 -translate-x-1/2 z-10 inline-flex items-center justify-center text-center gap-1 text-[10px] uppercase tracking-wider px-3 py-1.5 rounded-full bg-gradient-to-r from-[#460863] to-[#920027] text-white font-semibold shadow-lg whitespace-nowrap">
                   <Sparkles className="w-3 h-3" /> Mais escolhido
                 </div>
               )}
