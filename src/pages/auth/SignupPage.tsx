@@ -144,7 +144,7 @@ export default function SignupPage() {
 
 		// Se confirmação de email estiver desativada, já vem com session
 		if (data.session) {
-			toast({ title: "Conta criada!", description: "Bem-vindo ao TalkMap." });
+			toast({ title: "Conta criada!", description: "Bem-vindo ao ZyloFlow." });
 			navigate(redirectUrl, { replace: true });
 		} else {
 			toast({
@@ -162,7 +162,7 @@ export default function SignupPage() {
 					<CardTitle className="flex items-center gap-2">Criar sua conta <img src={(new URL("../../assets/logo-wordmark.svg", import.meta.url)).href} alt="ZyloFlow" className="h-5 w-auto inline-block" /></CardTitle>
 					<CardDescription>
 						Escolha seu @ — ele vira sua URL pública (ex:{" "}
-						<code>talkmap.com.br/{slug || "seu-nome"}</code>).
+						<code>zyloflow.com/{slug || "seu-nome"}</code>).
 					</CardDescription>
 				</CardHeader>
 				<CardContent>

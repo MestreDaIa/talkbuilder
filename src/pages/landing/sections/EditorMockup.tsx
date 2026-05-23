@@ -12,28 +12,28 @@ type Props = {
  */
 export default function EditorMockup({ className, animateNodes }: Props) {
 	const nodeBase =
-		"absolute rounded-xl border border-white/10 bg-[oklch(0.22_0.018_270)]/95 backdrop-blur shadow-[0_8px_24px_-8px_rgba(0,0,0,0.6)] px-3 py-2.5 text-xs text-left";
+		"absolute rounded-xl border border-white/10 bg-[#1E0828]/95 backdrop-blur shadow-[0_8px_24px_-8px_rgba(0,0,0,0.6)] px-3 py-2.5 text-xs text-left";
 
 	return (
 		<div
 			className={cn(
-				"mx-auto w-full max-w-5xl aspect-[16/9] rounded-2xl border border-white/10 bg-[oklch(0.18_0.014_270)] overflow-hidden",
+				"mx-auto w-full max-w-5xl aspect-[16/9] rounded-2xl border border-white/10 bg-[#1E0828] overflow-hidden",
 				"shadow-[0_30px_80px_-30px_rgba(0,0,0,0.8),0_0_0_1px_rgba(255,255,255,0.04)]",
 				className,
 			)}
 		>
 			{/* Toolbar */}
-			<div className="h-9 border-b border-white/5 bg-[oklch(0.20_0.016_270)] flex items-center px-3 gap-1.5">
-				<span className="w-2.5 h-2.5 rounded-full bg-[oklch(0.65_0.22_25)]" />
-				<span className="w-2.5 h-2.5 rounded-full bg-[oklch(0.75_0.18_85)]" />
-				<span className="w-2.5 h-2.5 rounded-full bg-[oklch(0.7_0.18_150)]" />
+			<div className="h-9 border-b border-white/5 bg-[#1E0828] flex items-center px-3 gap-1.5">
+				<span className="w-2.5 h-2.5 rounded-full bg-[#920027]" />
+				<span className="w-2.5 h-2.5 rounded-full bg-[#460863]" />
+				<span className="w-2.5 h-2.5 rounded-full bg-white/20" />
 				<span className="ml-3 text-[10px] text-muted-foreground font-mono">
-					talkmap.app/bot/atendimento
+					zyloflow.com/bot/atendimento
 				</span>
 			</div>
 
 			{/* Canvas with grid */}
-			<div className="relative h-[calc(100%-2.25rem)] bg-[radial-gradient(circle_at_1px_1px,oklch(0.30_0.02_270)_1px,transparent_0)] [background-size:18px_18px]">
+			<div className="relative h-[calc(100%-2.25rem)] bg-[radial-gradient(circle_at_1px_1px,rgba(255,255,255,0.05)_1px,transparent_0)] [background-size:18px_18px]">
 				{/* Connections SVG */}
 				<svg
 					className="absolute inset-0 w-full h-full pointer-events-none"
@@ -41,8 +41,8 @@ export default function EditorMockup({ className, animateNodes }: Props) {
 				>
 					<defs>
 						<linearGradient id="line-grad" x1="0" x2="1">
-							<stop offset="0%" stopColor="oklch(0.65 0.22 295)" />
-							<stop offset="100%" stopColor="oklch(0.68 0.20 350)" />
+							<stop offset="0%" stopColor="#460863" />
+							<stop offset="100%" stopColor="#920027" />
 						</linearGradient>
 					</defs>
 					<path
@@ -79,7 +79,7 @@ export default function EditorMockup({ className, animateNodes }: Props) {
 					data-node
 					className={cn(nodeBase, "left-[6%] top-[24%] w-[12%] min-w-[110px]")}
 				>
-					<div className="flex items-center gap-1.5 mb-1 text-[oklch(0.7_0.18_150)] font-medium">
+					<div className="flex items-center gap-1.5 mb-1 text-[#920027] font-medium">
 						<Zap className="w-3 h-3" />
 						Início
 					</div>
@@ -93,7 +93,7 @@ export default function EditorMockup({ className, animateNodes }: Props) {
 					data-node
 					className={cn(nodeBase, "left-[38%] top-[47%] w-[20%] min-w-[160px]")}
 				>
-					<div className="flex items-center gap-1.5 mb-1 text-[oklch(0.7_0.18_240)] font-medium">
+					<div className="flex items-center gap-1.5 mb-1 text-[#460863] font-medium">
 						<MessageSquare className="w-3 h-3" />
 						Mensagem
 					</div>
@@ -107,7 +107,7 @@ export default function EditorMockup({ className, animateNodes }: Props) {
 					data-node
 					className={cn(nodeBase, "left-[78%] top-[22%] w-[18%] min-w-[140px]")}
 				>
-					<div className="flex items-center gap-1.5 mb-1 text-[oklch(0.7_0.18_50)] font-medium">
+					<div className="flex items-center gap-1.5 mb-1 text-[#920027] font-medium">
 						<Type className="w-3 h-3" />
 						Pergunta
 					</div>
@@ -121,7 +121,7 @@ export default function EditorMockup({ className, animateNodes }: Props) {
 					data-node
 					className={cn(nodeBase, "left-[78%] top-[70%] w-[18%] min-w-[140px]")}
 				>
-					<div className="flex items-center gap-1.5 mb-1 text-[oklch(0.72_0.22_295)] font-medium">
+					<div className="flex items-center gap-1.5 mb-1 text-[#460863] font-medium">
 						<GitBranch className="w-3 h-3" />
 						Condição
 					</div>

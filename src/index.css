@@ -253,39 +253,30 @@ code {
    Landing page scope: bento/3D dark with violet glow
    ========================================================== */
 .landing-page {
-  --background: oklch(0.14 0.014 270);
-  --foreground: oklch(0.98 0.005 270);
-  --card: oklch(0.20 0.016 270);
-  --card-foreground: oklch(0.98 0.005 270);
-  --muted: oklch(0.26 0.014 270);
-  --muted-foreground: oklch(0.72 0.012 270);
-  --border: oklch(0.32 0.02 270);
-  --primary: oklch(0.65 0.22 295);
-  --primary-foreground: oklch(0.99 0 0);
-  --accent: oklch(0.68 0.20 350);
+  --background: #1E0828;
+  --foreground: #FFFFFF;
+  --card: #2A0B38;
+  --card-foreground: #FFFFFF;
+  --muted: #460863;
+  --muted-foreground: rgba(255, 255, 255, 0.7);
+  --border: rgba(255, 255, 255, 0.1);
+  --primary: #460863;
+  --primary-foreground: #FFFFFF;
+  --accent: #920027;
 
-  --landing-violet: oklch(0.65 0.22 295);
-  --landing-pink: oklch(0.68 0.20 350);
-  --landing-blue: oklch(0.65 0.18 250);
-  --landing-glow: 170 100 255;
+  --landing-violet: #460863;
+  --landing-pink: #920027;
+  --landing-blue: #1E0828;
+  --landing-glow: 146, 0, 39;
 
-  --gradient-hero: radial-gradient(
-      ellipse 80% 60% at 50% 0%,
-      oklch(0.35 0.18 295 / 0.35),
-      transparent 60%
-    ),
-    linear-gradient(180deg, oklch(0.14 0.014 270) 0%, oklch(0.10 0.010 270) 100%);
+  --gradient-hero: linear-gradient(95.85deg, #460863 28.20%, #000000 100%);
 
-  --gradient-violet-pink: linear-gradient(
-    135deg,
-    oklch(0.65 0.22 295),
-    oklch(0.68 0.20 350)
-  );
+  --gradient-violet-pink: linear-gradient(265.16deg, #920027 0%, #1E0828 90.97%);
 
-  --shadow-glow-violet: 0 20px 60px -20px rgba(170, 100, 255, 0.45);
+  --shadow-glow-violet: 0 20px 60px -20px rgba(146, 0, 39, 0.45);
   --shadow-card: 0 8px 32px -12px rgba(0, 0, 0, 0.6);
 
-  background: var(--gradient-hero);
+  background: linear-gradient(95.85deg, #460863 28.20%, #000000 100%);
   color: var(--foreground);
   font-family: "Inter", system-ui, sans-serif;
 }
@@ -382,9 +373,9 @@ code {
 .text-gradient-violet {
   background: linear-gradient(
     135deg,
-    oklch(0.78 0.18 295) 0%,
-    oklch(0.72 0.20 320) 50%,
-    oklch(0.78 0.18 350) 100%
+    #920027 0%,
+    #460863 50%,
+    #920027 100%
   );
   -webkit-background-clip: text;
   background-clip: text;

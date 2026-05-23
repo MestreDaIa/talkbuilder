@@ -2,10 +2,10 @@ import { Globe, Instagram, MessageCircle, Send } from "lucide-react";
 import { useGsapContext, gsap } from "../../../hooks/useGsap";
 
 const channels = [
-	{ icon: MessageCircle, label: "WhatsApp", soon: true, color: "oklch(0.7 0.18 150)" },
-	{ icon: Send, label: "Telegram", soon: true, color: "oklch(0.7 0.18 240)" },
-	{ icon: Instagram, label: "Instagram", soon: true, color: "oklch(0.68 0.22 350)" },
-	{ icon: Globe, label: "Web Widget", soon: false, color: "oklch(0.72 0.18 295)" },
+	{ icon: MessageCircle, label: "WhatsApp", soon: true, color: "#920027" },
+	{ icon: Send, label: "Telegram", soon: true, color: "#460863" },
+	{ icon: Instagram, label: "Instagram", soon: true, color: "#1E0828" },
+	{ icon: Globe, label: "Web Widget", soon: false, color: "#920027" },
 ];
 
 export default function Channels() {

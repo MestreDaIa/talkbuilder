@@ -22,10 +22,10 @@ export default function CtaFinal() {
 			<div className="max-w-5xl mx-auto px-6">
 				<div
 					data-cta-content
-					className="relative overflow-hidden rounded-3xl border border-white/10 p-10 sm:p-16 text-center bg-gradient-to-br from-[oklch(0.30_0.18_295)] via-[oklch(0.22_0.12_295)] to-[oklch(0.30_0.18_350)]"
+					className="relative overflow-hidden rounded-3xl border border-white/10 p-10 sm:p-16 text-center bg-gradient-to-br from-[#1E0828] via-[#460863] to-[#920027]"
 				>
-					<div className="absolute -top-20 -left-20 w-80 h-80 bg-[oklch(0.65_0.22_295)] rounded-full blur-3xl opacity-40" />
-					<div className="absolute -bottom-20 -right-20 w-80 h-80 bg-[oklch(0.68_0.20_350)] rounded-full blur-3xl opacity-40" />
+					<div className="absolute -top-20 -left-20 w-80 h-80 bg-[#460863] rounded-full blur-3xl opacity-40" />
+					<div className="absolute -bottom-20 -right-20 w-80 h-80 bg-[#920027] rounded-full blur-3xl opacity-40" />
 
 					<div className="relative">
 						<h2 className="font-display text-4xl sm:text-6xl font-bold tracking-tight leading-[1.05] mb-6">
@@ -41,7 +41,7 @@ export default function CtaFinal() {
 							<Link to="/signup">
 								<Button
 									size="lg"
-									className="px-8 h-12 text-base bg-white text-[oklch(0.20_0.10_295)] hover:bg-white/90 border-0 font-semibold group"
+									className="px-8 h-12 text-base bg-white text-[#460863] hover:bg-white/90 border-0 font-semibold group"
 								>
 									Começar grátis agora
 									<ArrowRight className="ml-2 w-4 h-4 transition-transform group-hover:translate-x-1" />

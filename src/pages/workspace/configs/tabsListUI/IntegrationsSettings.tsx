@@ -84,7 +84,7 @@ export default function IntegrationsSettings() {
                 )}
               </CardTitle>
               <CardDescription>
-                Avançado — conecte seu próprio Supabase para guardar dados dos seus bots (variáveis, leads, conversas) na sua infraestrutura. Sua conta TalkMap continua funcionando independente disso.
+                Avançado — conecte seu próprio Supabase para guardar dados dos seus bots (variáveis, leads, conversas) na sua infraestrutura. Sua conta ZyloFlow continua funcionando independente disso.
               </CardDescription>
             </div>
           </CardHeader>
@@ -118,7 +118,7 @@ export default function IntegrationsSettings() {
               )}
             </div>
             <p className='text-xs text-gray-500'>
-              Sua autenticação no TalkMap não depende disso — esse Supabase é só para você guardar os dados que seus bots coletam.
+              Sua autenticação no ZyloFlow não depende disso — esse Supabase é só para você guardar os dados que seus bots coletam.
             </p>
           </CardContent>
         </Card>

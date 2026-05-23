@@ -4,7 +4,7 @@ import { useGsapContext, gsap } from "../../../hooks/useGsap";
 
 const faqs = [
 	{
-		q: "Preciso saber programar pra usar o TalkMap?",
+		q: "Preciso saber programar pra usar o ZyloFlow?",
 		a: "Não. O editor é 100% visual: você arrasta blocos e conecta. Conhecimento técnico só ajuda nas integrações avançadas (webhooks, scripts), mas não é obrigatório.",
 	},
 	{
@@ -88,7 +88,7 @@ export default function Faq() {
 		<section id="faq" ref={ref} className="relative py-28">
 			<div className="max-w-3xl mx-auto px-6">
 				<div className="text-center mb-12">
-					<p className="text-xs uppercase tracking-[0.2em] text-[oklch(0.78_0.18_295)] mb-4 font-medium">
+					<p className="text-xs uppercase tracking-[0.2em] text-[#920027] mb-4 font-medium">
 						FAQ
 					</p>
 					<h2 className="font-display text-4xl sm:text-5xl font-bold tracking-tight">

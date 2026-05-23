@@ -1,5 +1,5 @@
 // =============================================================================
-// TalkMap — Sistema de banco de dados
+// ZyloFlow — Sistema de banco de dados
 // =============================================================================
 
 import { createClient, type SupabaseClient } from "@supabase/supabase-js";

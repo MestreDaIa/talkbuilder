@@ -68,7 +68,7 @@ export default function Pricing() {
 		<section id="pricing" ref={ref} className="relative py-28">
 			<div className="max-w-6xl mx-auto px-6">
 				<div className="text-center mb-14">
-					<p className="text-xs uppercase tracking-[0.2em] text-[oklch(0.78_0.18_295)] mb-4 font-medium">
+					<p className="text-xs uppercase tracking-[0.2em] text-[#920027] mb-4 font-medium">
 						Planos
 					</p>
 					<h2 className="font-display text-4xl sm:text-5xl font-bold tracking-tight">
@@ -86,12 +86,12 @@ export default function Pricing() {
 							data-plan
 							className={`bento-card p-7 flex flex-col relative ${
 								p.highlight
-									? "md:scale-105 md:-my-2 border-[oklch(0.55_0.20_295)] shadow-[0_30px_80px_-20px_rgba(170,100,255,0.45)]"
+									? "md:scale-105 md:-my-2 border-[#460863] shadow-[0_30px_80px_-20px_rgba(146,0,39,0.45)]"
 									: ""
 							}`}
 						>
 							{p.highlight && (
-								<div className="absolute -top-3 left-1/2 -translate-x-1/2 inline-flex items-center gap-1 text-[10px] uppercase tracking-wider px-3 py-1 rounded-full bg-gradient-to-r from-[oklch(0.65_0.22_295)] to-[oklch(0.68_0.20_350)] text-white font-semibold shadow-lg">
+								<div className="absolute -top-3 left-1/2 -translate-x-1/2 inline-flex items-center gap-1 text-[10px] uppercase tracking-wider px-3 py-1 rounded-full bg-gradient-to-r from-[#460863] to-[#920027] text-white font-semibold shadow-lg">
 									<Sparkles className="w-3 h-3" /> Mais escolhido
 								</div>
 							)}
@@ -112,7 +112,7 @@ export default function Pricing() {
 							<ul className="space-y-3 mb-8 flex-1">
 								{p.features.map((f) => (
 									<li key={f} className="flex items-start gap-2.5 text-sm">
-										<Check className="w-4 h-4 text-[oklch(0.78_0.18_295)] mt-0.5 shrink-0" />
+										<Check className="w-4 h-4 text-[#920027] mt-0.5 shrink-0" />
 										<span className="text-foreground/90">{f}</span>
 									</li>
 								))}
@@ -121,7 +121,7 @@ export default function Pricing() {
 								<Button
 									className={`w-full h-11 ${
 										p.highlight
-											? "bg-gradient-to-r from-[oklch(0.65_0.22_295)] to-[oklch(0.68_0.20_350)] hover:opacity-90 text-white border-0"
+											? "bg-gradient-to-r from-[#460863] to-[#920027] hover:opacity-90 text-white border-0"
 											: "bg-white/5 hover:bg-white/10 border border-white/10 text-foreground"
 									}`}
 								>

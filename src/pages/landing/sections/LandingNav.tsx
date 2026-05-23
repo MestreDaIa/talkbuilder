@@ -52,7 +52,7 @@ export default function LandingNav() {
 					<Link to="/signup">
 						<Button
 							size="sm"
-							className="bg-gradient-to-r from-[oklch(0.65_0.22_295)] to-[oklch(0.68_0.20_350)] hover:opacity-90 text-white border-0 shadow-[0_4px_20px_-4px_rgba(170,100,255,0.6)]"
+							className="bg-gradient-to-r from-[#460863] to-[#920027] hover:opacity-90 text-white border-0 shadow-[0_4px_20px_-4px_rgba(146,0,39,0.6)]"
 						>
 							Começar grátis
 						</Button>

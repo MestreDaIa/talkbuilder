@@ -47,7 +47,7 @@ export default function Hero() {
 		});
 	}, []);
 
-	const headline = ["Construa", "chatbots", "que", "vendem", "por", "você."];
+	const headline = ["crie", "fluxos.", "automatize.", "conecte."];
 
 	return (
 		<section
@@ -57,11 +57,11 @@ export default function Hero() {
 			<div className="absolute inset-0 landing-grid pointer-events-none" />
 			<div
 				data-hero-blob-1
-				className="landing-blob w-[500px] h-[500px] -top-20 -left-32 bg-[oklch(0.55_0.25_295)]"
+				className="landing-blob w-[500px] h-[500px] -top-20 -left-32 bg-[#460863]"
 			/>
 			<div
 				data-hero-blob-2
-				className="landing-blob w-[400px] h-[400px] top-40 -right-20 bg-[oklch(0.55_0.22_350)]"
+				className="landing-blob w-[400px] h-[400px] top-40 -right-20 bg-[#920027]"
 			/>
 
 			<div className="relative max-w-6xl mx-auto px-6 text-center">
@@ -69,7 +69,7 @@ export default function Hero() {
 					data-hero-badge
 					className="inline-flex items-center gap-2 px-4 py-1.5 rounded-full bg-white/5 border border-white/10 backdrop-blur text-xs font-medium text-foreground/80 mb-8"
 				>
-					<Sparkles className="w-3.5 h-3.5 text-[oklch(0.78_0.18_295)]" />
+					<Sparkles className="w-3.5 h-3.5 text-[#920027]" />
 					Editor visual de chatbots — sem código
 				</div>
 
@@ -79,7 +79,7 @@ export default function Hero() {
 							<span
 								data-hero-word
 								className={`inline-block mr-3 ${
-									w === "vendem" || w === "por"
+									w === "fluxos." || w === "automatize." || w === "conecte."
 										? "text-gradient-violet"
 										: ""
 								}`}
@@ -102,7 +102,7 @@ export default function Hero() {
 					<Link to="/signup" data-hero-cta>
 						<Button
 							size="lg"
-							className="px-8 h-12 text-base bg-gradient-to-r from-[oklch(0.65_0.22_295)] to-[oklch(0.68_0.20_350)] hover:opacity-90 text-white border-0 shadow-[0_10px_40px_-10px_rgba(170,100,255,0.7)] group"
+							className="px-8 h-12 text-base bg-gradient-to-r from-[#920027] to-[#460863] hover:opacity-90 text-white border-0 shadow-[0_10px_40px_-10px_rgba(146,0,39,0.7)] group"
 						>
 							Começar grátis
 							<ArrowRight className="ml-2 w-4 h-4 transition-transform group-hover:translate-x-1" />
@@ -127,7 +127,7 @@ export default function Hero() {
 				</p>
 
 				<div data-hero-mockup className="mt-20 relative">
-					<div className="absolute -inset-x-20 -inset-y-10 bg-gradient-to-b from-transparent via-[oklch(0.65_0.22_295/0.15)] to-transparent blur-3xl" />
+					<div className="absolute -inset-x-20 -inset-y-10 bg-gradient-to-b from-transparent via-[#460863/15] to-transparent blur-3xl" />
 					<EditorMockup className="relative" />
 				</div>
 			</div>

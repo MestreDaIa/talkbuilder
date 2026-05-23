@@ -65,7 +65,7 @@ export default function FeaturesBento() {
 		>
 			<div className="max-w-6xl mx-auto px-6">
 				<div className="text-center mb-16">
-					<p className="text-xs uppercase tracking-[0.2em] text-[oklch(0.78_0.18_295)] mb-4 font-medium">
+					<p className="text-xs uppercase tracking-[0.2em] text-[#920027] mb-4 font-medium">
 						Recursos
 					</p>
 					<h2 className="font-display text-4xl sm:text-5xl font-bold tracking-tight max-w-2xl mx-auto leading-tight">
@@ -82,7 +82,7 @@ export default function FeaturesBento() {
 						className="bento-card md:col-span-2 md:row-span-2 p-7 flex flex-col"
 					>
 						<div className="flex items-center gap-3 mb-4">
-							<div className="w-10 h-10 rounded-xl bg-gradient-to-br from-[oklch(0.65_0.22_295)] to-[oklch(0.68_0.20_350)] flex items-center justify-center shadow-lg">
+							<div className="w-10 h-10 rounded-xl bg-gradient-to-br from-[#460863] to-[#920027] flex items-center justify-center shadow-lg">
 								<Workflow className="w-5 h-5 text-white" />
 							</div>
 							<div>
@@ -107,7 +107,7 @@ export default function FeaturesBento() {
 							className={`bento-card p-6 ${span}`}
 						>
 							<div className="w-10 h-10 rounded-xl bg-white/5 border border-white/10 flex items-center justify-center mb-4">
-								<Icon className="w-5 h-5 text-[oklch(0.78_0.18_295)]" />
+								<Icon className="w-5 h-5 text-[#920027]" />
 							</div>
 							<h3 className="font-display text-lg font-semibold mb-2">
 								{title}

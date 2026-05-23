@@ -6,21 +6,21 @@ const testimonials = [
 		name: "Marina Costa",
 		role: "Founder · Loja Bem-me-quer",
 		initials: "MC",
-		color: "oklch(0.68 0.22 350)",
+		color: "#920027",
 		text: "Em uma tarde montei um bot de qualificação que substituiu um formulário de 8 campos. Conversão dobrou.",
 	},
 	{
 		name: "Rafael Tavares",
 		role: "Marketing · AgênciaFlux",
 		initials: "RT",
-		color: "oklch(0.65 0.22 295)",
+		color: "#460863",
 		text: "Saímos de planilhas pra fluxos automatizados pra todos os clientes. O editor é o mais intuitivo que testei.",
 	},
 	{
 		name: "Você?",
 		role: "Próximo case de sucesso",
 		initials: "+",
-		color: "oklch(0.7 0.18 240)",
+		color: "#1E0828",
 		text: "Tem espaço aqui pra sua história. Comece grátis e descubra o que dá pra fazer em uma tarde.",
 	},
 ];
@@ -44,7 +44,7 @@ export default function SocialProof() {
 		<section ref={ref} className="relative py-28">
 			<div className="max-w-6xl mx-auto px-6">
 				<div className="text-center mb-14">
-					<p className="text-xs uppercase tracking-[0.2em] text-[oklch(0.78_0.18_295)] mb-4 font-medium">
+					<p className="text-xs uppercase tracking-[0.2em] text-[#920027] mb-4 font-medium">
 						Quem já usa
 					</p>
 					<h2 className="font-display text-4xl sm:text-5xl font-bold tracking-tight">
@@ -63,7 +63,7 @@ export default function SocialProof() {
 								{Array.from({ length: 5 }).map((_, i) => (
 									<Star
 										key={i}
-										className="w-4 h-4 fill-[oklch(0.78_0.18_85)] text-[oklch(0.78_0.18_85)]"
+										className="w-4 h-4 fill-[#920027] text-[#920027]"
 									/>
 								))}
 							</div>

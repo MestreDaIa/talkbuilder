@@ -41,7 +41,7 @@ export default function HowItWorks() {
 		<section id="how" ref={ref} className="relative py-28">
 			<div className="max-w-6xl mx-auto px-6">
 				<div className="text-center mb-16">
-					<p className="text-xs uppercase tracking-[0.2em] text-[oklch(0.78_0.18_295)] mb-4 font-medium">
+					<p className="text-xs uppercase tracking-[0.2em] text-[#920027] mb-4 font-medium">
 						Como funciona
 					</p>
 					<h2 className="font-display text-4xl sm:text-5xl font-bold tracking-tight">
@@ -60,7 +60,7 @@ export default function HowItWorks() {
 							data-step
 							className="relative bento-card p-7 text-center"
 						>
-							<div className="mx-auto w-14 h-14 rounded-2xl bg-gradient-to-br from-[oklch(0.65_0.22_295)] to-[oklch(0.68_0.20_350)] flex items-center justify-center mb-4 shadow-[0_8px_24px_-8px_rgba(170,100,255,0.6)]">
+							<div className="mx-auto w-14 h-14 rounded-2xl bg-gradient-to-br from-[#460863] to-[#920027] flex items-center justify-center mb-4 shadow-[0_8px_24px_-8px_rgba(146,0,39,0.6)]">
 								<Icon className="w-6 h-6 text-white" />
 							</div>
 							<div className="text-xs font-mono text-muted-foreground/60 mb-2">
