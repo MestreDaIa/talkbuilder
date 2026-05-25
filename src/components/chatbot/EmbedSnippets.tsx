@@ -1,19 +1,25 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import {
   Code2,
   Copy,
   Check,
-  Lock,
   Globe,
   FileCode,
   Boxes,
   ShoppingBag,
+  Loader2,
+  Link2,
+  Unlink,
+  RefreshCw,
 } from 'lucide-react';
+import { SiWhatsapp } from '@icons-pack/react-simple-icons';
 import { Button } from '@/components/ui/button';
 import { Label } from '@/components/ui/label';
 import { Input } from '@/components/ui/input';
 import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs';
 import { toast } from 'sonner';
+import { supabase } from '@/integrations/supabase/client';
+import { evoApi } from '@/services/evolutionApi';
 
 interface EmbedSnippetsProps {
   /** URL pública completa do bot, ex: https://app.com/#/slug/flow/publicId */
@@ -35,7 +41,6 @@ interface PlatformDef {
   id: Platform;
   label: string;
   icon: React.ComponentType<{ className?: string }>;
-  locked?: boolean;
 }
 
 const PLATFORMS: PlatformDef[] = [
@@ -45,111 +50,28 @@ const PLATFORMS: PlatformDef[] = [
   { id: 'iframe', label: 'Iframe', icon: Code2 },
   { id: 'next', label: 'Next.js', icon: Boxes },
   { id: 'react', label: 'React', icon: Boxes },
-  { id: 'whatsapp', label: 'WhatsApp', icon: Lock, locked: true },
+  { id: 'whatsapp', label: 'WhatsApp', icon: SiWhatsapp as any },
 ];
 
-/**
- * Snippets de embed por plataforma.
- * Todos os formatos abrem o bot publicado em um iframe (ou janela embutida)
- * apontando para `publicUrl`. O usuário só precisa colar o snippet.
- */
 function buildSnippet(platform: Platform, publicUrl: string, botName: string): string {
   const safeName = botName.replace(/`/g, '');
   const title = `Chatbot - ${safeName}`;
 
   switch (platform) {
     case 'wordpress':
-      // HTML que pode ser colado num bloco "HTML personalizado" do Gutenberg
-      // ou em widget de rodapé do WordPress. Abre como botão flutuante.
-      return `<!-- TalkBuilder Chatbot - cole este código num bloco HTML personalizado -->
-<div id="talkbuilder-chatbot"></div>
-<style>
-  #talkbuilder-fab {
-    position: fixed; bottom: 24px; right: 24px; z-index: 9999;
-    width: 60px; height: 60px; border-radius: 50%;
-    background: #7c3aed; color: #fff; border: none; cursor: pointer;
-    box-shadow: 0 8px 24px rgba(0,0,0,.2);
-    display: flex; align-items: center; justify-content: center;
-    font-size: 28px;
-  }
-  #talkbuilder-frame {
-    position: fixed; bottom: 96px; right: 24px; z-index: 9999;
-    width: 380px; height: 600px; max-width: calc(100vw - 32px);
-    max-height: calc(100vh - 120px);
-    border: 0; border-radius: 16px; overflow: hidden;
-    box-shadow: 0 16px 48px rgba(0,0,0,.25);
-    display: none; background: #fff;
-  }
-  #talkbuilder-frame.open { display: block; }
-</style>
-<button id="talkbuilder-fab" aria-label="Abrir chat">💬</button>
-<iframe id="talkbuilder-frame" src="${publicUrl}" title="${title}"></iframe>
-<script>
-  (function () {
-    var fab = document.getElementById('talkbuilder-fab');
-    var frame = document.getElementById('talkbuilder-frame');
-    fab.addEventListener('click', function () {
-      frame.classList.toggle('open');
-    });
-  })();
-</script>`;
-
     case 'shopify':
-      // Shopify: cole em theme.liquid antes de </body> ou em um snippet.
-      return `{% comment %} TalkBuilder Chatbot - cole antes de </body> em theme.liquid {% endcomment %}
-<div id="talkbuilder-chatbot"></div>
-<style>
-  #talkbuilder-fab {
-    position: fixed; bottom: 24px; right: 24px; z-index: 9999;
-    width: 60px; height: 60px; border-radius: 50%;
-    background: #7c3aed; color: #fff; border: none; cursor: pointer;
-    box-shadow: 0 8px 24px rgba(0,0,0,.2);
-    display: flex; align-items: center; justify-content: center;
-    font-size: 28px;
-  }
-  #talkbuilder-frame {
-    position: fixed; bottom: 96px; right: 24px; z-index: 9999;
-    width: 380px; height: 600px; max-width: calc(100vw - 32px);
-    max-height: calc(100vh - 120px);
-    border: 0; border-radius: 16px; overflow: hidden;
-    box-shadow: 0 16px 48px rgba(0,0,0,.25);
-    display: none; background: #fff;
-  }
-  #talkbuilder-frame.open { display: block; }
-</style>
-<button id="talkbuilder-fab" aria-label="Abrir chat">💬</button>
-<iframe id="talkbuilder-frame" src="${publicUrl}" title="${title}"></iframe>
-<script>
-  (function () {
-    var fab = document.getElementById('talkbuilder-fab');
-    var frame = document.getElementById('talkbuilder-frame');
-    fab.addEventListener('click', function () {
-      frame.classList.toggle('open');
-    });
-  })();
-</script>`;
-
     case 'html':
-      // HTML + JS standalone (qualquer site)
-      return `<!-- TalkBuilder Chatbot - cole no seu HTML -->
+      return `<!-- TalkBuilder Chatbot -->
 <div id="talkbuilder-chatbot"></div>
 <style>
-  #talkbuilder-fab {
-    position: fixed; bottom: 24px; right: 24px; z-index: 9999;
-    width: 60px; height: 60px; border-radius: 50%;
-    background: #7c3aed; color: #fff; border: none; cursor: pointer;
-    box-shadow: 0 8px 24px rgba(0,0,0,.2);
-    display: flex; align-items: center; justify-content: center;
-    font-size: 28px;
-  }
-  #talkbuilder-frame {
-    position: fixed; bottom: 96px; right: 24px; z-index: 9999;
-    width: 380px; height: 600px; max-width: calc(100vw - 32px);
-    max-height: calc(100vh - 120px);
-    border: 0; border-radius: 16px; overflow: hidden;
-    box-shadow: 0 16px 48px rgba(0,0,0,.25);
-    display: none; background: #fff;
-  }
+  #talkbuilder-fab { position: fixed; bottom: 24px; right: 24px; z-index: 9999;
+    width: 60px; height: 60px; border-radius: 50%; background: #7c3aed;
+    color: #fff; border: none; cursor: pointer; box-shadow: 0 8px 24px rgba(0,0,0,.2);
+    display: flex; align-items: center; justify-content: center; font-size: 28px; }
+  #talkbuilder-frame { position: fixed; bottom: 96px; right: 24px; z-index: 9999;
+    width: 380px; height: 600px; max-width: calc(100vw - 32px); max-height: calc(100vh - 120px);
+    border: 0; border-radius: 16px; overflow: hidden; box-shadow: 0 16px 48px rgba(0,0,0,.25);
+    display: none; background: #fff; }
   #talkbuilder-frame.open { display: block; }
 </style>
 <button id="talkbuilder-fab" aria-label="Abrir chat">💬</button>
@@ -158,14 +80,11 @@ function buildSnippet(platform: Platform, publicUrl: string, botName: string): s
   (function () {
     var fab = document.getElementById('talkbuilder-fab');
     var frame = document.getElementById('talkbuilder-frame');
-    fab.addEventListener('click', function () {
-      frame.classList.toggle('open');
-    });
+    fab.addEventListener('click', function () { frame.classList.toggle('open'); });
   })();
 </script>`;
 
     case 'iframe':
-      // Iframe puro, fixo na página
       return `<iframe
   src="${publicUrl}"
   title="${title}"
@@ -176,56 +95,211 @@ function buildSnippet(platform: Platform, publicUrl: string, botName: string): s
 ></iframe>`;
 
     case 'next':
-      // Componente Next.js (App Router) que renderiza um iframe full embed
       return `// app/components/TalkBuilderChat.tsx
-// Componente de embed do chatbot TalkBuilder para Next.js (App Router).
 'use client';
-
 export default function TalkBuilderChat() {
   return (
     <iframe
       src="${publicUrl}"
       title="${title}"
-      style={{
-        width: '100%',
-        height: '600px',
-        border: 0,
-        borderRadius: 12,
-        overflow: 'hidden',
-      }}
-      allow="clipboard-write; microphone; camera"
-    />
-  );
-}
-
-// Uso:
-// import TalkBuilderChat from '@/app/components/TalkBuilderChat';
-// <TalkBuilderChat />`;
-
-    case 'react':
-      // Componente React puro
-      return `// TalkBuilderChat.jsx
-// Componente React de embed do chatbot TalkBuilder.
-export default function TalkBuilderChat() {
-  return (
-    <iframe
-      src="${publicUrl}"
-      title="${title}"
-      style={{
-        width: '100%',
-        height: 600,
-        border: 0,
-        borderRadius: 12,
-        overflow: 'hidden',
-      }}
+      style={{ width: '100%', height: '600px', border: 0, borderRadius: 12, overflow: 'hidden' }}
       allow="clipboard-write; microphone; camera"
     />
   );
 }`;
 
+    case 'react':
+      return `// TalkBuilderChat.jsx
+export default function TalkBuilderChat() {
+  return (
+    <iframe
+      src="${publicUrl}"
+      title="${title}"
+      style={{ width: '100%', height: 600, border: 0, borderRadius: 12, overflow: 'hidden' }}
+      allow="clipboard-write; microphone; camera"
+    />
+  );
+}`;
     case 'whatsapp':
-      return '// Em breve. Integração com WhatsApp Business API.';
+      return '';
   }
+}
+
+interface EvoInstance {
+  name?: string;
+  instanceName?: string;
+  instance?: { instanceName?: string; state?: string };
+  connectionStatus?: string;
+  state?: string;
+}
+
+function WhatsappBindPanel({ botPublicId }: { botPublicId: string }) {
+  const [instances, setInstances] = useState<EvoInstance[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [busy, setBusy] = useState<string | null>(null);
+  const [boundInstance, setBoundInstance] = useState<string | null>(null);
+  const [selected, setSelected] = useState<string>('');
+
+  const webhookUrl = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/whatsapp-webhook`;
+
+  const loadAll = async () => {
+    setLoading(true);
+    try {
+      const [list, binding] = await Promise.all([
+        evoApi.fetchInstances(),
+        supabase
+          .from('whatsapp_bindings' as any)
+          .select('instance_name')
+          .eq('bot_public_id', botPublicId)
+          .maybeSingle(),
+      ]);
+      const arr = Array.isArray(list) ? list : [];
+      setInstances(arr);
+      const bound = (binding as any)?.data?.instance_name || null;
+      setBoundInstance(bound);
+      if (bound) setSelected(bound);
+      else if (arr.length && !selected) {
+        const first = arr[0]?.name || arr[0]?.instance?.instanceName || arr[0]?.instanceName || '';
+        setSelected(first);
+      }
+    } catch (e) {
+      console.error(e);
+      toast.error('Erro ao carregar instâncias do WhatsApp');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    loadAll();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [botPublicId]);
+
+  const handleBind = async () => {
+    if (!selected) return;
+    setBusy('bind');
+    try {
+      await evoApi.setWebhook(selected, webhookUrl);
+      const { error } = await supabase
+        .from('whatsapp_bindings' as any)
+        .upsert({ instance_name: selected, bot_public_id: botPublicId, updated_at: new Date().toISOString() });
+      if (error) throw error;
+      setBoundInstance(selected);
+      toast.success('Bot vinculado a esta instância do WhatsApp!');
+    } catch (e: any) {
+      toast.error(e?.message || 'Erro ao vincular');
+    } finally {
+      setBusy(null);
+    }
+  };
+
+  const handleUnbind = async () => {
+    if (!boundInstance) return;
+    setBusy('unbind');
+    try {
+      await supabase.from('whatsapp_bindings' as any).delete().eq('instance_name', boundInstance);
+      try { await evoApi.setWebhook(boundInstance, ''); } catch {}
+      setBoundInstance(null);
+      toast.success('Vínculo removido.');
+    } catch (e: any) {
+      toast.error(e?.message || 'Erro ao desvincular');
+    } finally {
+      setBusy(null);
+    }
+  };
+
+  const getInstanceName = (i: EvoInstance) =>
+    i?.name || i?.instance?.instanceName || i?.instanceName || '';
+  const getInstanceState = (i: EvoInstance) =>
+    i?.connectionStatus || i?.state || i?.instance?.state || '';
+
+  if (loading) {
+    return (
+      <div className="flex items-center justify-center py-10">
+        <Loader2 className="w-5 h-5 animate-spin text-green-600" />
+      </div>
+    );
+  }
+
+  if (!instances.length) {
+    return (
+      <div className="rounded-lg border border-dashed p-6 text-center text-sm space-y-2">
+        <SiWhatsapp className="w-6 h-6 mx-auto text-green-600" />
+        <p className="font-medium">Nenhuma instância do WhatsApp encontrada</p>
+        <p className="text-xs text-muted-foreground">
+          Vá em <strong>Configurações → Integrações</strong> e crie/conecte uma instância antes de vincular ao bot.
+        </p>
+      </div>
+    );
+  }
+
+  return (
+    <div className="space-y-3">
+      <div className="rounded-lg border bg-green-50/50 dark:bg-green-950/20 p-3 flex items-start gap-3">
+        <SiWhatsapp className="w-5 h-5 text-green-600 mt-0.5" />
+        <div className="text-xs leading-relaxed">
+          <p className="font-medium text-green-900 dark:text-green-100 mb-0.5">
+            Vincule esse bot a um número de WhatsApp
+          </p>
+          <p className="text-green-800/80 dark:text-green-100/70">
+            As mensagens recebidas no número serão respondidas automaticamente por este fluxo.
+          </p>
+        </div>
+      </div>
+
+      <div className="space-y-2">
+        <Label className="text-xs">Instância</Label>
+        <div className="flex gap-2">
+          <select
+            value={selected}
+            onChange={(e) => setSelected(e.target.value)}
+            className="flex-1 h-9 px-3 text-sm border rounded-md bg-background"
+          >
+            {instances.map((i, idx) => {
+              const n = getInstanceName(i);
+              const s = getInstanceState(i);
+              return (
+                <option key={n || idx} value={n}>
+                  {n} {s ? `· ${s}` : ''}
+                </option>
+              );
+            })}
+          </select>
+          <Button variant="outline" size="icon" onClick={loadAll} className="h-9 w-9">
+            <RefreshCw className="w-3.5 h-3.5" />
+          </Button>
+        </div>
+      </div>
+
+      {boundInstance && (
+        <div className="text-xs flex items-center gap-2 px-3 py-2 rounded-md bg-emerald-100 dark:bg-emerald-900/30 text-emerald-800 dark:text-emerald-200">
+          <Check className="w-3.5 h-3.5" />
+          Bot vinculado à instância <strong>{boundInstance}</strong>
+        </div>
+      )}
+
+      <div className="flex gap-2">
+        <Button
+          onClick={handleBind}
+          disabled={!selected || busy !== null || boundInstance === selected}
+          className="bg-green-600 hover:bg-green-700"
+        >
+          {busy === 'bind' ? <Loader2 className="w-4 h-4 animate-spin mr-2" /> : <Link2 className="w-4 h-4 mr-2" />}
+          {boundInstance === selected ? 'Já vinculado' : 'Vincular este bot'}
+        </Button>
+        {boundInstance && (
+          <Button variant="outline" onClick={handleUnbind} disabled={busy !== null}>
+            {busy === 'unbind' ? <Loader2 className="w-4 h-4 animate-spin mr-2" /> : <Unlink className="w-4 h-4 mr-2" />}
+            Desvincular
+          </Button>
+        )}
+      </div>
+
+      <p className="text-[11px] text-muted-foreground leading-relaxed pt-1">
+        Webhook configurado automaticamente para: <code className="text-[10px] break-all">{webhookUrl}</code>
+      </p>
+    </div>
+  );
 }
 
 export function EmbedSnippets({ publicUrl, botName = 'Bot' }: EmbedSnippetsProps) {
@@ -233,11 +307,6 @@ export function EmbedSnippets({ publicUrl, botName = 'Bot' }: EmbedSnippetsProps
   const [copiedPlatform, setCopiedPlatform] = useState<Platform | null>(null);
 
   const handleCopy = async (platform: Platform) => {
-    const def = PLATFORMS.find((p) => p.id === platform);
-    if (def?.locked) {
-      toast.info('Em breve disponível.');
-      return;
-    }
     const snippet = buildSnippet(platform, publicUrl, botName);
     try {
       await navigator.clipboard.writeText(snippet);
@@ -273,62 +342,41 @@ export function EmbedSnippets({ publicUrl, botName = 'Bot' }: EmbedSnippetsProps
               >
                 <Icon className="w-4 h-4" />
                 <span className="leading-none">{p.label}</span>
-                {p.locked && <Lock className="w-2.5 h-2.5 text-muted-foreground" />}
               </TabsTrigger>
             );
           })}
         </TabsList>
 
         {PLATFORMS.map((p) => {
+          if (p.id === 'whatsapp') {
+            return (
+              <TabsContent key={p.id} value={p.id} className="mt-3">
+                <WhatsappBindPanel botPublicId={botName} />
+              </TabsContent>
+            );
+          }
           const snippet = buildSnippet(p.id, publicUrl, botName);
           const isCopied = copiedPlatform === p.id;
           return (
             <TabsContent key={p.id} value={p.id} className="mt-3 space-y-2">
-              {p.locked ? (
-                <div className="rounded-lg border border-dashed border-border bg-muted/30 p-6 text-center text-sm text-muted-foreground">
-                  <Lock className="w-5 h-5 mx-auto mb-2" />
-                  Integração com {p.label} em breve.
-                </div>
-              ) : (
-                <>
-                  <div className="relative">
-                    <pre className="text-[11px] leading-relaxed bg-muted rounded-md p-3 max-h-64 overflow-auto whitespace-pre-wrap break-all border border-border">
-                      <code>{snippet}</code>
-                    </pre>
-                    <Button
-                      type="button"
-                      size="sm"
-                      variant="secondary"
-                      onClick={() => handleCopy(p.id)}
-                      className="absolute top-2 right-2 h-7 gap-1 text-xs"
-                    >
-                      {isCopied ? (
-                        <>
-                          <Check className="w-3 h-3 text-green-500" /> Copiado
-                        </>
-                      ) : (
-                        <>
-                          <Copy className="w-3 h-3" /> Copiar
-                        </>
-                      )}
-                    </Button>
-                  </div>
-                  <p className="text-[11px] text-muted-foreground">
-                    {p.id === 'wordpress' &&
-                      'Cole em um bloco "HTML Personalizado" do editor Gutenberg ou em um widget de rodapé.'}
-                    {p.id === 'shopify' &&
-                      'Cole no seu theme.liquid antes de </body> ou crie um snippet e renderize no layout.'}
-                    {p.id === 'html' &&
-                      'Cole antes de </body> em qualquer página HTML.'}
-                    {p.id === 'iframe' &&
-                      'Iframe simples — adicione onde quiser exibir o bot embutido.'}
-                    {p.id === 'next' &&
-                      'Salve como componente em app/components/ e importe onde precisar.'}
-                    {p.id === 'react' &&
-                      'Salve como componente .jsx/.tsx no seu projeto React.'}
-                  </p>
-                </>
-              )}
+              <div className="relative">
+                <pre className="text-[11px] leading-relaxed bg-muted rounded-md p-3 max-h-64 overflow-auto whitespace-pre-wrap break-all border border-border">
+                  <code>{snippet}</code>
+                </pre>
+                <Button
+                  type="button"
+                  size="sm"
+                  variant="secondary"
+                  onClick={() => handleCopy(p.id)}
+                  className="absolute top-2 right-2 h-7 gap-1 text-xs"
+                >
+                  {isCopied ? (
+                    <><Check className="w-3 h-3 text-green-500" /> Copiado</>
+                  ) : (
+                    <><Copy className="w-3 h-3" /> Copiar</>
+                  )}
+                </Button>
+              </div>
             </TabsContent>
           );
         })}

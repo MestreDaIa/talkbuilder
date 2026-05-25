@@ -7,6 +7,15 @@ const EVO_BASE_URL = 'https://evo.zailom.com';
 const EVO_GLOBAL_KEY = 'e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855';
 
 export const evoApi = {
+  async fetchInstances() {
+    const response = await fetch(`${EVO_BASE_URL}/instance/fetchInstances`, {
+      method: 'GET',
+      headers: { 'apikey': EVO_GLOBAL_KEY },
+    });
+    if (!response.ok) return [];
+    return response.json();
+  },
+
   /**
    * Cria uma nova instância na Evolution API
    */
@@ -119,5 +128,53 @@ export const evoApi = {
     });
     
     return response.ok;
-  }
+  },
+
+  /**
+   * Configura webhook da instância para receber mensagens recebidas
+   */
+  async setWebhook(instanceName: string, webhookUrl: string) {
+    const response = await fetch(`${EVO_BASE_URL}/webhook/set/${instanceName}`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'apikey': EVO_GLOBAL_KEY,
+      },
+      body: JSON.stringify({
+        webhook: {
+          enabled: true,
+          url: webhookUrl,
+          byEvents: false,
+          base64: false,
+          events: ['MESSAGES_UPSERT'],
+        },
+      }),
+    });
+    if (!response.ok) {
+      const data = await response.json().catch(() => ({}));
+      throw new Error(data.message || data.error || 'Erro ao configurar webhook');
+    }
+    return response.json();
+  },
+
+  async getWebhook(instanceName: string) {
+    const response = await fetch(`${EVO_BASE_URL}/webhook/find/${instanceName}`, {
+      method: 'GET',
+      headers: { 'apikey': EVO_GLOBAL_KEY },
+    });
+    if (!response.ok) return null;
+    return response.json();
+  },
+
+  async sendText(instanceName: string, number: string, text: string) {
+    const response = await fetch(`${EVO_BASE_URL}/message/sendText/${instanceName}`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'apikey': EVO_GLOBAL_KEY,
+      },
+      body: JSON.stringify({ number, text }),
+    });
+    return response.ok;
+  },
 };
