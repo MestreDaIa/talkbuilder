@@ -8,8 +8,8 @@ import { createClient, type SupabaseClient } from "@supabase/supabase-js";
 // PROJECT DB (Supabase principal do projeto — via env)
 // -----------------------------------------------------------------------------
 
-const ENV_URL = import.meta.env.VITE_TALKMAP_SUPABASE_URL || import.meta.env.VITE_SUPABASE_URL;
-const ENV_KEY = import.meta.env.VITE_TALKMAP_SUPABASE_ANON_KEY || import.meta.env.VITE_SUPABASE_ANON_KEY;
+const ENV_URL = import.meta.env.VITE_SUPABASE_URL;
+const ENV_KEY = import.meta.env.VITE_SUPABASE_ANON_KEY || import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY;
 
 // Fallback manual via localStorage para o sistema
 const SYSTEM_FALLBACK_KEY = "talkmap_system_supabase";
@@ -40,11 +40,11 @@ function readSystemCreds(): SystemCreds | null {
     }
   }
 
-  // 3. Fallback final: Banco interno do Lovable (apenas se nada mais existir)
-  const INTERNAL_URL = "https://fwoescubnnagdvwasbjl.supabase.co";
-  const INTERNAL_KEY = "sb_publishable_v58nZwBN4s5_lMASv4S3Iw_L23jPbIK";
-  
-  return { url: INTERNAL_URL, anonKey: INTERNAL_KEY };
+  // 3. Fallback final: Banco do projeto (via VITE_SUPABASE_URL)
+  return { 
+    url: import.meta.env.VITE_SUPABASE_URL || "", 
+    anonKey: import.meta.env.VITE_SUPABASE_ANON_KEY || import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY || "" 
+  };
 }
 
 export function saveSystemSupabaseCreds(creds: SystemCreds): void {
