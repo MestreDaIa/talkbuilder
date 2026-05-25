@@ -20,9 +20,9 @@ export const evoApi = {
         },
         body: JSON.stringify({
           instanceName,
-          token: '', // Deixa vazio para gerar automaticamente ou defina um
+          token: '', 
           qrcode: true,
-          number: '',
+          integration: 'WHATSAPP-BAILEYS'
         })
       });
       
