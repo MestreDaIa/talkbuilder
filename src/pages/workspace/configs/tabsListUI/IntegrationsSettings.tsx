@@ -114,12 +114,13 @@ export default function IntegrationsSettings() {
     try {
       const result = await evoApi.createInstance(instanceName);
       
-      // Tenta inserir no banco. O erro 'settings' column será resolvido pelo SQL que passarei ao usuário.
+      // Tenta inserir no banco usando 'instance_name' para a coluna 'name' se necessário
       const { error } = await supabase.from("whatsapp_connections").insert({
         workspace_id: currentWorkspace?.id,
         instance_name: instanceName,
+        name: instanceName, // Adicionado para evitar erro de NOT NULL na coluna 'name'
         status: "disconnected",
-        settings: result.instance || result, // Garantindo que salvamos algo se a coluna existir
+        settings: result.instance || result,
       });
 
       if (error) {
