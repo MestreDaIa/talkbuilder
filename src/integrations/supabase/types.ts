@@ -171,6 +171,27 @@ export type Database = {
           },
         ]
       }
+      whatsapp_bindings: {
+        Row: {
+          bot_public_id: string
+          created_at: string
+          instance_name: string
+          updated_at: string
+        }
+        Insert: {
+          bot_public_id: string
+          created_at?: string
+          instance_name: string
+          updated_at?: string
+        }
+        Update: {
+          bot_public_id?: string
+          created_at?: string
+          instance_name?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
     }
     Views: {
       [_ in never]: never
