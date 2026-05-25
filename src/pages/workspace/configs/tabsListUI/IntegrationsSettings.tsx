@@ -302,11 +302,11 @@ export default function IntegrationsSettings() {
               </div>
               <div className='flex-1'>
                 <CardTitle className='flex items-center gap-2 text-base'>
-                  Banco de dados Supabase (opcional)
+                  Infraestrutura de Dados (opcional)
                   {connected && <CheckCircle2 className='w-3.5 h-3.5 text-emerald-600'/>}
                 </CardTitle>
                 <CardDescription className="text-xs">
-                  Conecte seu próprio Supabase para guardar dados dos seus bots na sua infraestrutura.
+                  Conecte seu próprio banco de dados Supabase para manter total controle sobre os dados dos seus bots.
                 </CardDescription>
               </div>
             </CardHeader>
