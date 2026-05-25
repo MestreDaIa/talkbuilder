@@ -7,6 +7,15 @@ const EVO_BASE_URL = 'https://evo.zailom.com';
 const EVO_GLOBAL_KEY = 'e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855';
 
 export const evoApi = {
+  async fetchInstances() {
+    const response = await fetch(`${EVO_BASE_URL}/instance/fetchInstances`, {
+      method: 'GET',
+      headers: { 'apikey': EVO_GLOBAL_KEY },
+    });
+    if (!response.ok) return [];
+    return response.json();
+  },
+
   /**
    * Cria uma nova instância na Evolution API
    */
