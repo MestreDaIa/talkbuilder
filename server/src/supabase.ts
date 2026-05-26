@@ -16,6 +16,6 @@ export const supabase = createClient(supabaseUrl, supabaseServiceRoleKey, {
     persistSession: false,
   },
   realtime: {
-    transport: ws,
+    transport: ws as any,
   },
 });
