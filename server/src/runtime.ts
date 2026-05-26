@@ -328,6 +328,13 @@ async function runFlow(execution: any, containersIn: any[], edgesIn: any[], inpu
     return condition?.logicalOperator === "OR" ? results.some(Boolean) : results.every(Boolean);
   };
 
+  const getPublicImageUrl = (path: string) => {
+    if (!path) return "";
+    if (path.startsWith("http")) return path;
+    const bucket = "chatbot-assets";
+    return `${supabase.storage.from(bucket).getPublicUrl(path).data.publicUrl}`;
+  };
+
   // Execution Loop
   if (input && (input.message !== undefined || input.button_id !== undefined)) {
     const userValue = input.message ?? input.button_id;
@@ -402,9 +409,19 @@ async function runFlow(execution: any, containersIn: any[], edgesIn: any[], inpu
         if (text) messages.push({ id: (crypto as any).randomUUID(), type: "bot", content: text });
         break;
       }
-      case "bubble-image":
-        messages.push({ id: crypto.randomUUID(), type: "bot", content: cfg.ImageURL || cfg.imageUrl || cfg.url || cfg.src, isImage: true, alt: cfg.ImageAlt || cfg.alt });
+      case "bubble-image": {
+        const url = getPublicImageUrl(cfg.ImageURL || cfg.imageUrl || cfg.url || cfg.src || "");
+        if (url) {
+          messages.push({ 
+            id: crypto.randomUUID(), 
+            type: "bot", 
+            content: url, 
+            isImage: true, 
+            alt: cfg.ImageAlt || cfg.alt 
+          });
+        }
         break;
+      }
       case "set-variable":
         if (cfg.variableName) variables[cfg.variableName] = replaceVars(String(cfg.value || ""));
         break;
