@@ -146,10 +146,18 @@ function WhatsappBindPanel({ botPublicId }: { botPublicId: string }) {
   const [selected, setSelected] = useState<string>('');
   const [missingTable, setMissingTable] = useState(false);
 
-  // Webhook URL: configurável pelo cliente. Salvamos a última usada em localStorage.
+  // Webhook URL: sugerimos a URL da função no seu Supabase externo
   const [webhookUrl, setWebhookUrl] = useState<string>(() => {
     if (typeof window === 'undefined') return '';
-    return window.localStorage.getItem('whatsapp_webhook_url') || '';
+    const stored = window.localStorage.getItem('whatsapp_webhook_url');
+    if (stored) return stored;
+    
+    // Tenta construir a URL baseada no Supabase do cliente
+    const sbUrl = (supabaseClient as any).supabaseUrl;
+    if (sbUrl) {
+      return `${sbUrl}/functions/v1/whatsapp-webhook`;
+    }
+    return '';
   });
 
   const loadAll = async () => {
@@ -279,7 +287,8 @@ function WhatsappBindPanel({ botPublicId }: { botPublicId: string }) {
             Vincule esse bot a um número de WhatsApp
           </p>
           <p className="text-green-800/80 dark:text-green-100/70">
-            As mensagens recebidas na instância serão enviadas para o webhook informado abaixo, que deve repassá-las ao runtime do bot.
+            As mensagens recebidas no WhatsApp serão enviadas para o webhook abaixo, que as processará usando o runtime do bot.
+            A função de webhook já está disponível na pasta <code>supabase/functions/whatsapp-webhook</code>.
           </p>
         </div>
       </div>
