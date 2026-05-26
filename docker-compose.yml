@@ -23,8 +23,9 @@ services:
       context: .
       dockerfile: Dockerfile.frontend
       args:
-        - VITE_TALKMAP_SUPABASE_URL=${VITE_TALKMAP_SUPABASE_URL}
-        - VITE_TALKMAP_SUPABASE_ANON_KEY=${VITE_TALKMAP_SUPABASE_ANON_KEY}
+        - VITE_SUPABASE_URL=${VITE_SUPABASE_URL}
+        - VITE_SUPABASE_ANON_KEY=${VITE_SUPABASE_ANON_KEY}
+        - VITE_SUPABASE_PROJECT_ID=${VITE_SUPABASE_PROJECT_ID}
         - VITE_RUNTIME_URL=${VITE_RUNTIME_URL}
         - VITE_BACKEND_URL=${VITE_BACKEND_URL}
     container_name: chatbot-frontend
