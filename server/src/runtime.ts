@@ -12,24 +12,31 @@ export async function processRuntime(body: any) {
   }
 
   // 1. Resolve Flow
+  console.log(`[runtime] Resolvendo fluxo: ${flowRef}`);
   let flow: any = null;
   {
-    const { data } = await supabase
+    const { data, error } = await supabase
       .from("chatbot_flows")
       .select("*")
       .eq("public_id", flowRef)
       .maybeSingle();
+    if (error) console.error("[runtime] Erro ao buscar fluxo por public_id:", error);
     flow = data;
   }
   if (!flow && /^[0-9a-f-]{36}$/i.test(flowRef)) {
-    const { data } = await supabase
+    const { data, error } = await supabase
       .from("chatbot_flows")
       .select("*")
       .eq("id", flowRef)
       .maybeSingle();
+    if (error) console.error("[runtime] Erro ao buscar fluxo por id:", error);
     flow = data;
   }
-  if (!flow) throw new Error(`Flow não encontrado: ${flowRef}`);
+  if (!flow) {
+    console.error(`[runtime] Fluxo não encontrado: ${flowRef}`);
+    throw new Error(`Flow não encontrado: ${flowRef}`);
+  }
+  console.log(`[runtime] Fluxo encontrado: ${flow.name} (${flow.id})`);
 
   const containers = flow.published_containers || flow.draft_containers || [];
   const edges = flow.published_edges || flow.draft_edges || [];
