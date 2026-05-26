@@ -3,8 +3,8 @@ import cors from "cors";
 import morgan from "morgan";
 import bodyParser from "body-parser";
 import dotenv from "dotenv";
-import { handleWhatsAppWebhook } from "./whatsapp";
-import { processRuntime } from "./runtime";
+import { handleWhatsAppWebhook } from "./whatsapp.js";
+import { processRuntime } from "./runtime.js";
 
 dotenv.config();
 
@@ -89,4 +89,3 @@ app.listen(port, () => {
   console.log(`[${new Date().toISOString()}] Ouvindo na porta ${port}`);
   console.log(`[${new Date().toISOString()}] Modo: ${process.env.NODE_ENV || 'development'}`);
 });
-

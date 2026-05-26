@@ -1,6 +1,6 @@
-import { supabase } from "./supabase";
-import { processRuntime } from "./runtime";
-import { evolutionApi } from "./evolution";
+import { supabase } from "./supabase.js";
+import { processRuntime } from "./runtime.js";
+import { evolutionApi } from "./evolution.js";
 
 export async function handleWhatsAppWebhook(payload: any) {
   console.log("Recebendo webhook WhatsApp:", JSON.stringify(payload, null, 2));
