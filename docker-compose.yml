@@ -1,0 +1,38 @@
+services:
+  server:
+    build: ./server
+    container_name: chatbot-server
+    restart: always
+    environment:
+      - SUPABASE_URL=${SUPABASE_URL}
+      - SUPABASE_SERVICE_ROLE_KEY=${SUPABASE_SERVICE_ROLE_KEY}
+      - EVO_BASE_URL=${EVO_BASE_URL}
+      - EVO_GLOBAL_KEY=${EVO_GLOBAL_KEY}
+      - PORT=3000
+    networks:
+      - proxy
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.chatbot-server.rule=Host(`${SERVER_DOMAIN}`)"
+      - "traefik.http.routers.chatbot-server.entrypoints=websecure"
+      - "traefik.http.routers.chatbot-server.tls.certresolver=myresolver"
+      - "traefik.http.services.chatbot-server.loadbalancer.server.port=3000"
+
+  frontend:
+    build:
+      context: .
+      dockerfile: Dockerfile.frontend
+    container_name: chatbot-frontend
+    restart: always
+    networks:
+      - proxy
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.chatbot-frontend.rule=Host(`${FRONTEND_DOMAIN}`)"
+      - "traefik.http.routers.chatbot-frontend.entrypoints=websecure"
+      - "traefik.http.routers.chatbot-frontend.tls.certresolver=myresolver"
+      - "traefik.http.services.chatbot-frontend.loadbalancer.server.port=80"
+
+networks:
+  proxy:
+    external: true
