@@ -1,5 +1,6 @@
 services:
   server:
+    image: talkbuilder-server:latest
     build: ./server
     container_name: chatbot-server
     restart: always
@@ -20,6 +21,7 @@ services:
       - "traefik.docker.network=talkbuilder_net"
 
   frontend:
+    image: talkbuilder-frontend:latest
     build:
       context: .
       dockerfile: Dockerfile.frontend
@@ -44,4 +46,4 @@ services:
 
 networks:
   talkbuilder_net:
-    driver: bridge
+    external: true
