@@ -11,7 +11,7 @@ services:
       - SUPABASE_SERVICE_ROLE_KEY=${SUPABASE_SERVICE_ROLE_KEY}
       - EVO_BASE_URL=${EVO_BASE_URL}
       - EVO_GLOBAL_KEY=${EVO_GLOBAL_KEY}
-      - PORT=3000
+      - PORT=80
     networks:
       - builderchat_net
     labels:
