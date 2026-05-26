@@ -12,12 +12,16 @@ const app = express();
 const port = process.env.PORT || 80;
 
 // Configuração de CORS usando o pacote 'cors'
-app.use(cors({
+const corsOptions = {
   origin: "*",
   methods: ["GET", "POST", "PUT", "DELETE", "OPTIONS"],
   allowedHeaders: ["Origin", "X-Requested-With", "Content-Type", "Accept", "Authorization"],
-  credentials: true
-}));
+  credentials: false,
+  optionsSuccessStatus: 204,
+};
+app.use(cors(corsOptions));
+// Responder explicitamente a TODOS os preflight (OPTIONS) — evita travar atrás do Traefik
+app.options(/.*/, cors(corsOptions));
 
 
 app.use(morgan("dev"));
