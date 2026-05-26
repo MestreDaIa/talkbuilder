@@ -26,8 +26,10 @@ app.use(express.json());
 // Log de todas as requisições para depuração no servidor
 app.use((req, res, next) => {
   console.log(`[${new Date().toISOString()}] ${req.method} ${req.url}`);
+  console.log('Headers:', JSON.stringify(req.headers));
   next();
 });
+
 
 // Rota GET auxiliar para testar se o endpoint existe via navegador
 app.get("/webhook/whatsapp", (req, res) => {
