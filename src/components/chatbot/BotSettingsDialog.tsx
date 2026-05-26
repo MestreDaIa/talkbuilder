@@ -589,6 +589,11 @@ function WhatsAppBindingSection({ botPublicId }: { botPublicId: string }) {
     setTestingWebhook(instanceName);
     try {
       const backend = (import.meta.env.VITE_BACKEND_URL as string | undefined)?.replace(/\/$/, '') || '';
+      if (!backend) {
+        toast.error("VITE_BACKEND_URL não configurado no frontend!");
+        setTestingWebhook(null);
+        return;
+      }
       const response = await fetch(`${backend}/webhook/whatsapp`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
