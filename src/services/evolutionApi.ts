@@ -8,6 +8,44 @@ const EVO_GLOBAL_KEY = 'e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b
 
 export const evoApi = {
   /**
+   * Lista todas as instâncias existentes na Evolution API
+   */
+  async fetchInstances() {
+    const response = await fetch(`${EVO_BASE_URL}/instance/fetchInstances`, {
+      method: 'GET',
+      headers: { 'apikey': EVO_GLOBAL_KEY },
+    });
+    if (!response.ok) return [];
+    return response.json();
+  },
+
+  /**
+   * Configura webhook da instância (apontando para um endpoint que receberá as mensagens)
+   */
+  async setWebhook(instanceName: string, webhookUrl: string) {
+    const response = await fetch(`${EVO_BASE_URL}/webhook/set/${instanceName}`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'apikey': EVO_GLOBAL_KEY,
+      },
+      body: JSON.stringify({
+        webhook: {
+          enabled: !!webhookUrl,
+          url: webhookUrl,
+          byEvents: false,
+          base64: false,
+          events: webhookUrl ? ['MESSAGES_UPSERT'] : [],
+        },
+      }),
+    });
+    if (!response.ok) {
+      const data = await response.json().catch(() => ({}));
+      throw new Error(data.message || data.error || 'Erro ao configurar webhook');
+    }
+    return response.json();
+  },
+  /**
    * Cria uma nova instância na Evolution API
    */
   async createInstance(instanceName: string) {
