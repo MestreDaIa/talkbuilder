@@ -390,8 +390,13 @@ async function runFlow(execution: any, containersIn: any[], edgesIn: any[], inpu
     // Nodes types
     switch (nodeType) {
       case "bubble-text":
-        const text = replaceVars(cfg.message || cfg.content || cfg.text || "");
+      case "bubble-number": {
+        const text = replaceVars(cfg.message || cfg.content || cfg.text || cfg.number || "");
         if (text) messages.push({ id: crypto.randomUUID(), type: "bot", content: text });
+        break;
+      }
+      case "bubble-image":
+        messages.push({ id: crypto.randomUUID(), type: "bot", content: cfg.ImageURL || cfg.imageUrl || cfg.url || cfg.src, isImage: true, alt: cfg.ImageAlt || cfg.alt });
         break;
       case "set-variable":
         if (cfg.variableName) variables[cfg.variableName] = replaceVars(String(cfg.value || ""));
@@ -402,7 +407,46 @@ async function runFlow(execution: any, containersIn: any[], edgesIn: any[], inpu
         currentNodeId = nextFromNode(node.id, container, handle, true);
         continue;
       }
-      // Add more cases as needed based on the full function content
+      case "ai-node": {
+        const userMessage = String(variables["last_message"] || "").trim();
+        const provider = (cfg.provider || "openai").toLowerCase();
+        const activeKey = flow?.settings?.aiKeys?.[`${provider}Key`] || cfg.apiKey;
+        
+        if (activeKey && userMessage) {
+          try {
+            let aiReply = "";
+            if (provider === "openai") {
+              const res = await fetch("https://api.openai.com/v1/chat/completions", {
+                method: "POST",
+                headers: { "Authorization": `Bearer ${activeKey}`, "Content-Type": "application/json" },
+                body: JSON.stringify({
+                  model: cfg.model || "gpt-4o-mini",
+                  messages: [{ role: "system", content: cfg.instructions || "Você é um assistente." }, { role: "user", content: userMessage }],
+                }),
+              });
+              if (res.ok) {
+                const data: any = await res.json();
+                aiReply = data.choices?.[0]?.message?.content || "";
+              }
+            }
+            if (aiReply) {
+              messages.push({ id: crypto.randomUUID(), type: "bot", content: aiReply });
+              if (cfg.saveVariable) variables[cfg.saveVariable] = aiReply;
+            }
+          } catch (e) {
+            console.error("[ai-node] failed", e);
+          }
+        }
+        break;
+      }
+      case "redirect": {
+        const targetRef = cfg.targetFlow || cfg.targetFlowId;
+        if (targetRef) {
+          // Simplified redirect for now
+          messages.push({ id: crypto.randomUUID(), type: "bot", content: "Redirecionando fluxo..." });
+        }
+        break;
+      }
     }
 
     currentNodeId = nextFromNode(node.id, container);
