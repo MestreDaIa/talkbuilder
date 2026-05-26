@@ -3,17 +3,28 @@ import { processRuntime } from "./runtime";
 import { evolutionApi } from "./evolution";
 
 export async function handleWhatsAppWebhook(payload: any) {
+  console.log("Recebendo webhook WhatsApp:", JSON.stringify(payload, null, 2));
+  
   const isUpsert = payload.event === "MESSAGES_UPSERT" || payload.event === "messages.upsert";
-  if (!isUpsert) return { status: "ignored_event" };
+  if (!isUpsert) {
+    console.log("Evento ignorado:", payload.event);
+    return { status: "ignored_event" };
+  }
 
   const messageData = payload.data;
-  if (!messageData?.key) return { error: "invalid_payload" };
+  if (!messageData?.key) {
+    console.error("Payload inválido: faltando messageData.key");
+    return { error: "invalid_payload" };
+  }
 
   const instanceName = payload.instance;
   const remoteJid = messageData.key.remoteJid;
   const fromMe = messageData.key.fromMe;
 
+  console.log(`Mensagem de ${remoteJid} na instância ${instanceName}. FromMe: ${fromMe}`);
+
   if (fromMe || remoteJid.endsWith("@g.us")) {
+    console.log("Mensagem ignorada (enviada por mim ou grupo)");
     return { status: "ignored" };
   }
 
@@ -34,7 +45,12 @@ export async function handleWhatsAppWebhook(payload: any) {
     .eq("instance_name", instanceName)
     .maybeSingle();
 
-  if (!binding) return { error: "binding_not_found" };
+  if (!binding) {
+    console.error(`Binding não encontrado para a instância: ${instanceName}`);
+    return { error: "binding_not_found" };
+  }
+  
+  console.log(`Flow ID encontrado: ${binding.bot_public_id}`);
 
   // 2. Process via Runtime
   const runtimeResult = await processRuntime({
