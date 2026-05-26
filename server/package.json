@@ -6,7 +6,7 @@
   "scripts": {
     "start": "node dist/index.js",
     "dev": "tsx watch src/index.ts",
-    "build": "tsc"
+    "build": "rm -rf dist && tsc && ls -la dist/index.js"
   },
   "dependencies": {
     "@supabase/supabase-js": "^2.45.4",
