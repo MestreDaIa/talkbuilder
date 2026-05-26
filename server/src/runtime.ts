@@ -1,4 +1,4 @@
-import { supabase } from "./supabase";
+import { supabase } from "./supabase.js";
 import * as crypto from "node:crypto";
 
 const runtimeMemory = new Map<string, { state: any; expiresAt: number }>();
