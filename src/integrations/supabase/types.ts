@@ -201,6 +201,30 @@ export type Database = {
         }
         Relationships: []
       }
+      whatsapp_bindings: {
+        Row: {
+          bot_public_id: string
+          created_at: string
+          instance_name: string
+          updated_at: string
+          webhook_url: string | null
+        }
+        Insert: {
+          bot_public_id: string
+          created_at?: string
+          instance_name: string
+          updated_at?: string
+          webhook_url?: string | null
+        }
+        Update: {
+          bot_public_id?: string
+          created_at?: string
+          instance_name?: string
+          updated_at?: string
+          webhook_url?: string | null
+        }
+        Relationships: []
+      }
       whatsapp_connections: {
         Row: {
           created_at: string
