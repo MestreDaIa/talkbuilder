@@ -1,5 +1,5 @@
 import { supabase } from "./supabase";
-import { crypto } from "node:crypto";
+import * as crypto from "node:crypto";
 
 const runtimeMemory = new Map<string, { state: any; expiresAt: number }>();
 const MEMORY_TTL_MS = 1000 * 60 * 60 * 6;
