@@ -19,7 +19,7 @@ services:
       - "traefik.http.routers.chatbot-server.rule=Host(`${SERVER_DOMAIN}`)"
       - "traefik.http.routers.chatbot-server.entrypoints=websecure"
       - "traefik.http.routers.chatbot-server.tls=true"
-      - "traefik.http.routers.chatbot-server.tls.certresolver=letsencrypt"
+      - "traefik.http.routers.chatbot-server.tls.certresolver=${TRAEFIK_CERTRESOLVER:-letsencrypt}"
       - "traefik.http.services.chatbot-server.loadbalancer.server.port=3000"
       - "traefik.docker.network=builderchat_net"
 
@@ -45,7 +45,7 @@ services:
       - "traefik.http.routers.chatbot-frontend.rule=Host(`${FRONTEND_DOMAIN}`)"
       - "traefik.http.routers.chatbot-frontend.entrypoints=websecure"
       - "traefik.http.routers.chatbot-frontend.tls=true"
-      - "traefik.http.routers.chatbot-frontend.tls.certresolver=letsencrypt"
+      - "traefik.http.routers.chatbot-frontend.tls.certresolver=${TRAEFIK_CERTRESOLVER:-letsencrypt}"
       # Router HTTP (Redirecionamento para HTTPS)
       - "traefik.http.routers.chatbot-frontend-http.rule=Host(`${FRONTEND_DOMAIN}`)"
       - "traefik.http.routers.chatbot-frontend-http.entrypoints=web"
