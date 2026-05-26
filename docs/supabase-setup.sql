@@ -145,3 +145,49 @@ DROP POLICY IF EXISTS "wb read all" ON public.whatsapp_bindings;
 CREATE POLICY "wb read all"  ON public.whatsapp_bindings FOR SELECT USING (true);
 DROP POLICY IF EXISTS "wb write all" ON public.whatsapp_bindings;
 CREATE POLICY "wb write all" ON public.whatsapp_bindings FOR ALL    USING (true) WITH CHECK (true);
+
+-- 8) Tabela whatsapp_connections + RLS (resolve "new row violates row-level security policy")
+CREATE TABLE IF NOT EXISTS public.whatsapp_connections (
+  id            UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  workspace_id  UUID REFERENCES public.workspaces(id) ON DELETE CASCADE,
+  instance_name TEXT NOT NULL,
+  name          TEXT,
+  status        TEXT DEFAULT 'disconnected',
+  settings      JSONB,
+  created_at    TIMESTAMPTZ NOT NULL DEFAULT now(),
+  updated_at    TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+
+ALTER TABLE public.whatsapp_connections ENABLE ROW LEVEL SECURITY;
+
+DROP POLICY IF EXISTS "wc select members" ON public.whatsapp_connections;
+CREATE POLICY "wc select members" ON public.whatsapp_connections
+  FOR SELECT USING (
+    workspace_id IS NULL
+    OR EXISTS (SELECT 1 FROM public.workspaces w WHERE w.id = workspace_id AND w.owner_id = auth.uid())
+    OR EXISTS (SELECT 1 FROM public.workspace_members m WHERE m.workspace_id = whatsapp_connections.workspace_id AND m.user_id = auth.uid())
+  );
+
+DROP POLICY IF EXISTS "wc insert members" ON public.whatsapp_connections;
+CREATE POLICY "wc insert members" ON public.whatsapp_connections
+  FOR INSERT WITH CHECK (
+    workspace_id IS NULL
+    OR EXISTS (SELECT 1 FROM public.workspaces w WHERE w.id = workspace_id AND w.owner_id = auth.uid())
+    OR EXISTS (SELECT 1 FROM public.workspace_members m WHERE m.workspace_id = whatsapp_connections.workspace_id AND m.user_id = auth.uid())
+  );
+
+DROP POLICY IF EXISTS "wc update members" ON public.whatsapp_connections;
+CREATE POLICY "wc update members" ON public.whatsapp_connections
+  FOR UPDATE USING (
+    workspace_id IS NULL
+    OR EXISTS (SELECT 1 FROM public.workspaces w WHERE w.id = workspace_id AND w.owner_id = auth.uid())
+    OR EXISTS (SELECT 1 FROM public.workspace_members m WHERE m.workspace_id = whatsapp_connections.workspace_id AND m.user_id = auth.uid())
+  );
+
+DROP POLICY IF EXISTS "wc delete members" ON public.whatsapp_connections;
+CREATE POLICY "wc delete members" ON public.whatsapp_connections
+  FOR DELETE USING (
+    workspace_id IS NULL
+    OR EXISTS (SELECT 1 FROM public.workspaces w WHERE w.id = workspace_id AND w.owner_id = auth.uid())
+    OR EXISTS (SELECT 1 FROM public.workspace_members m WHERE m.workspace_id = whatsapp_connections.workspace_id AND m.user_id = auth.uid())
+  );
