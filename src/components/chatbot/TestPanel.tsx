@@ -20,7 +20,6 @@ import { normalizeMarkdown } from "@/lib/markdown";
 import { type Message as RuntimeMessage, type RuntimeState, type RuntimeMode, type PersistentMemory, type NodeExecutionStatus } from "../../types/runtime";
 import { conversationService } from "../../services/conversationService";
 import { buildAgentContext } from "../../services/aiContextBuilder";
-import { supabase } from "@/integrations/supabase/client";
 import { getSupabase } from "@/lib/supabaseClient";
 
 interface Message extends RuntimeMessage {

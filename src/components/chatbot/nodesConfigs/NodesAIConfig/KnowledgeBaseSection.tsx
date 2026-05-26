@@ -5,7 +5,7 @@ import { Switch } from "@/components/ui/switch";
 import { Plus, Trash2, Upload, Link as LinkIcon, Loader2, RefreshCw, CheckCircle2, Eye } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { useState } from "react";
-import { supabase } from "@/integrations/supabase/client";
+import { getSupabase } from "@/lib/supabaseClient";
 import { useToast } from "@/hooks/use-toast";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { ScrollArea } from "@/components/ui/scroll-area";
@@ -125,6 +125,7 @@ export const KnowledgeBaseSection = ({ config, setConfig }: { config: NodeConfig
 
     setFetchingLinks(prev => ({ ...prev, [id]: true }));
     try {
+      const supabase = getSupabase();
       const { data, error } = await supabase.functions.invoke('crawl', {
         body: { url }
       });
