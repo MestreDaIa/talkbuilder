@@ -85,5 +85,8 @@ app.use((req, res) => {
 });
 
 app.listen(port, () => {
-  console.log(`Servidor rodando na porta ${port}`);
+  console.log(`[${new Date().toISOString()}] Servidor inicializado com sucesso!`);
+  console.log(`[${new Date().toISOString()}] Ouvindo na porta ${port}`);
+  console.log(`[${new Date().toISOString()}] Modo: ${process.env.NODE_ENV || 'development'}`);
 });
+
