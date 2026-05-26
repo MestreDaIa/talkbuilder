@@ -3,6 +3,11 @@
 -- Rode este SQL no SQL Editor do seu Supabase
 -- ============================================================
 
+-- Primeiro, limpar se já existir algo com estrutura diferente
+-- DROP TABLE IF EXISTS public.whatsapp_bindings;
+-- DROP TABLE IF EXISTS public.workspace_members;
+-- DROP TABLE IF EXISTS public.workspaces;
+
 -- 1) Tabela de Workspaces (multi-tenant)
 CREATE TABLE IF NOT EXISTS public.workspaces (
   id         UUID PRIMARY KEY DEFAULT gen_random_uuid(),
