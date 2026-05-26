@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { SiWhatsapp } from '@icons-pack/react-simple-icons';
 import { GradientPicker } from './GradientPicker';
 import { Settings, Palette, Type, FileText, Upload, Download, Copy, Image as ImageIcon, MessageCircle, X, Loader2, Key } from 'lucide-react';
 import {
@@ -15,6 +16,7 @@ import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { supabaseClient } from '@/lib/supabaseClient';
+import { evoApi } from '@/services/evolutionApi';
 import { toast } from 'sonner';
 
 interface BotSettingsDialogProps {
@@ -194,6 +196,10 @@ export function BotSettingsDialog({
             <TabsTrigger value="ai">
               <Key className="h-4 w-4 mr-2" />
               IA & Chaves
+            </TabsTrigger>
+            <TabsTrigger value="whatsapp">
+              <SiWhatsapp className="h-4 w-4 mr-2" />
+              WhatsApp
             </TabsTrigger>
           </TabsList>
 
@@ -446,6 +452,22 @@ export function BotSettingsDialog({
             </div>
           </TabsContent>
 
+          <TabsContent value="whatsapp" className="space-y-4 py-4">
+            <div className="p-4 border rounded-lg bg-emerald-50/50 border-emerald-100">
+               <div className="flex items-center gap-3 mb-4">
+                  <div className="p-2 bg-emerald-100 rounded-lg">
+                    <SiWhatsapp className="w-5 h-5 text-emerald-600" />
+                  </div>
+                  <div>
+                    <h4 className="font-semibold text-emerald-900">Configuração WhatsApp</h4>
+                    <p className="text-xs text-emerald-700">Vincule este bot a uma instância da Evolution API</p>
+                  </div>
+               </div>
+               
+               <WhatsAppBindingSection botPublicId={settings.public_id || flowId} />
+            </div>
+          </TabsContent>
+
           <TabsContent value="ai" className="space-y-6 py-4">
             <div className="space-y-4">
               <div className="p-3 bg-primary/5 border border-primary/10 rounded-lg">
@@ -512,5 +534,84 @@ export function BotSettingsDialog({
         </DialogFooter>
       </DialogContent>
     </Dialog>
+  );
+}
+function WhatsAppBindingSection({ botPublicId }: { botPublicId: string }) {
+  const [instances, setInstances] = useState<any[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [binding, setBinding] = useState<string | null>(null);
+
+  useEffect(() => {
+    async function load() {
+      try {
+        const [insts, { data: bind }] = await Promise.all([
+          evoApi.fetchInstances(),
+          supabaseClient.from("whatsapp_bindings").select("instance_name").eq("bot_public_id", botPublicId).maybeSingle()
+        ]);
+        setInstances(insts);
+        if (bind) setBinding(bind.instance_name);
+      } catch (err) {
+        console.error("Erro ao carregar instâncias:", err);
+      } finally {
+        setLoading(false);
+      }
+    }
+    load();
+  }, [botPublicId]);
+
+  const handleBind = async (instanceName: string) => {
+    try {
+      // 1. Remove qualquer vínculo anterior deste bot
+      await supabaseClient.from("whatsapp_bindings").delete().eq("bot_public_id", botPublicId);
+      
+      // 2. Cria novo vínculo
+      const { error } = await supabaseClient.from("whatsapp_bindings").insert({
+        bot_public_id: botPublicId,
+        instance_name: instanceName
+      });
+
+      if (error) throw error;
+
+      // 3. Configura o Webhook na Evolution API
+      const webhookUrl = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/whatsapp-webhook`;
+      await evoApi.setWebhook(instanceName, webhookUrl);
+
+      setBinding(instanceName);
+      toast.success(`Bot vinculado à instância ${instanceName}`);
+    } catch (err) {
+      toast.error("Erro ao vincular bot");
+    }
+  };
+
+  if (loading) return <div className="flex justify-center p-4"><Loader2 className="w-6 h-6 animate-spin text-emerald-600" /></div>;
+
+  return (
+    <div className="space-y-3">
+      {instances.length === 0 ? (
+        <p className="text-sm text-muted-foreground">Nenhuma instância encontrada na Evolution API. Crie uma nas configurações de integrações.</p>
+      ) : (
+        <div className="grid grid-cols-1 gap-2">
+          {instances.map((inst: any) => (
+            <div key={inst.instanceName} className="flex items-center justify-between p-3 border rounded-lg bg-white">
+              <div className="flex items-center gap-2">
+                <span className="font-medium text-sm">{inst.instanceName}</span>
+                {binding === inst.instanceName && (
+                  <span className="text-[10px] bg-emerald-100 text-emerald-700 px-2 py-0.5 rounded-full font-bold">VINCULADO</span>
+                )}
+              </div>
+              <Button 
+                size="sm" 
+                variant={binding === inst.instanceName ? "outline" : "default"}
+                onClick={() => handleBind(inst.instanceName)}
+                disabled={binding === inst.instanceName}
+                className={binding !== inst.instanceName ? "bg-emerald-600 hover:bg-emerald-700" : ""}
+              >
+                {binding === inst.instanceName ? "Vinculado" : "Vincular"}
+              </Button>
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
   );
 }
