@@ -6,59 +6,87 @@ const corsHeaders = {
   "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
 };
 
-const EVO_BASE_URL = "https://evo.zailom.com";
-const EVO_GLOBAL_KEY = "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855";
+// Configurações da Evolution API (Prioriza variáveis de ambiente)
+const EVO_BASE_URL = Deno.env.get("EVO_BASE_URL") ?? "https://evo.zailom.com";
+const EVO_GLOBAL_KEY = Deno.env.get("EVO_GLOBAL_KEY") ?? "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855";
+
 
 Deno.serve(async (req: Request) => {
   if (req.method === "OPTIONS") return new Response(null, { headers: corsHeaders });
 
   try {
     const body = await req.json();
-    console.log("[whatsapp-webhook] Received event:", body.event);
+    console.log(`[whatsapp-webhook] Evento recebido: ${body.event} da instância: ${body.instance}`);
 
-    if (body.event !== "MESSAGES_UPSERT") {
-      return new Response(JSON.stringify({ status: "ignored_event" }), { headers: { "Content-Type": "application/json" } });
+    // Alguns servidores mandam em lowercase ou prefixado
+    const isUpsert = body.event === "MESSAGES_UPSERT" || body.event === "messages.upsert";
+
+    if (!isUpsert) {
+      console.log("[whatsapp-webhook] Evento ignorado (não é MESSAGES_UPSERT)");
+      return new Response(JSON.stringify({ status: "ignored_event", event: body.event }), { headers: { "Content-Type": "application/json" } });
     }
 
     const messageData = body.data;
-    const instanceName = body.instance;
-    const isGroup = messageData.key.remoteJid.endsWith("@g.us");
-    const sender = messageData.key.remoteJid;
-    const fromMe = messageData.key.fromMe;
-
-    if (fromMe || isGroup) {
-      return new Response(JSON.stringify({ status: "ignored_message" }), { headers: { "Content-Type": "application/json" } });
+    if (!messageData || !messageData.key) {
+      console.error("[whatsapp-webhook] Payload inválido: falta 'data' ou 'key'");
+      return new Response(JSON.stringify({ error: "invalid_payload" }), { status: 400 });
     }
 
-    // Extract text from Evolution API payload
+    const instanceName = body.instance;
+    const remoteJid = messageData.key.remoteJid;
+    const isGroup = remoteJid.endsWith("@g.us");
+    const fromMe = messageData.key.fromMe;
+
+    if (fromMe) {
+      console.log("[whatsapp-webhook] Mensagem ignorada (enviada pelo próprio bot)");
+      return new Response(JSON.stringify({ status: "ignored_self_message" }), { headers: { "Content-Type": "application/json" } });
+    }
+
+    if (isGroup) {
+      console.log("[whatsapp-webhook] Mensagem ignorada (grupo)");
+      return new Response(JSON.stringify({ status: "ignored_group_message" }), { headers: { "Content-Type": "application/json" } });
+    }
+
+    // Extrair texto da mensagem
     const text = messageData.message?.conversation || 
                  messageData.message?.extendedTextMessage?.text || 
                  messageData.message?.buttonsResponseMessage?.selectedButtonId ||
+                 messageData.message?.templateButtonReplyMessage?.selectedId ||
                  "";
 
+    console.log(`[whatsapp-webhook] Mensagem de ${remoteJid}: "${text}"`);
+
     if (!text && !messageData.message?.buttonsResponseMessage) {
+      console.log("[whatsapp-webhook] Mensagem sem texto, ignorando.");
       return new Response(JSON.stringify({ status: "no_text" }), { headers: { "Content-Type": "application/json" } });
     }
 
-    // Initialize Supabase Client (External)
+    // Inicializar Supabase Client (usando credenciais do projeto atual)
     const supabase = createClient(
       Deno.env.get("SUPABASE_URL") ?? "",
       Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? ""
     );
 
-    // 1. Find Bot linked to this instance
+    // 1. Buscar Bot vinculado a esta instância
     const { data: binding, error: bindingError } = await supabase
       .from("whatsapp_bindings")
       .select("bot_public_id")
       .eq("instance_name", instanceName)
       .maybeSingle();
 
-    if (bindingError || !binding) {
-      console.error("[whatsapp-webhook] No binding found for instance:", instanceName, bindingError);
-      return new Response(JSON.stringify({ status: "no_binding" }), { headers: { "Content-Type": "application/json" } });
+    if (bindingError) {
+      console.error("[whatsapp-webhook] Erro ao buscar vínculo no banco:", bindingError);
+      return new Response(JSON.stringify({ error: "db_error" }), { status: 500 });
     }
 
-    // 2. Call Chatbot Runtime
+    if (!binding) {
+      console.error(`[whatsapp-webhook] NENHUM VÍNCULO ENCONTRADO para a instância: ${instanceName}. Certifique-se de clicar em 'Vincular este bot' no painel.`);
+      return new Response(JSON.stringify({ status: "no_binding", instance: instanceName }), { headers: { "Content-Type": "application/json" } });
+    }
+
+    console.log(`[whatsapp-webhook] Bot identificado: ${binding.bot_public_id}. Chamando runtime...`);
+
+    // 2. Chamar Chatbot Runtime
     const runtimeUrl = `${Deno.env.get("SUPABASE_URL")}/functions/v1/chatbot-runtime`;
     const runtimeResponse = await fetch(runtimeUrl, {
       method: "POST",
@@ -69,26 +97,27 @@ Deno.serve(async (req: Request) => {
       body: JSON.stringify({
         action: "message",
         flow_id: binding.bot_public_id,
-        contact_id: sender,
+        contact_id: remoteJid,
         channel: "whatsapp",
         payload: {
           message: text,
-          button_id: messageData.message?.buttonsResponseMessage?.selectedButtonId
+          button_id: messageData.message?.buttonsResponseMessage?.selectedButtonId || messageData.message?.templateButtonReplyMessage?.selectedId
         }
       })
     });
 
     if (!runtimeResponse.ok) {
       const errorText = await runtimeResponse.text();
-      console.error("[whatsapp-webhook] Runtime error:", errorText);
-      return new Response(JSON.stringify({ status: "runtime_error" }), { status: 500 });
+      console.error("[whatsapp-webhook] Erro no Chatbot Runtime:", errorText);
+      return new Response(JSON.stringify({ status: "runtime_error", details: errorText }), { status: 500 });
     }
 
     const runtimeData = await runtimeResponse.json();
-    console.log("[whatsapp-webhook] Runtime responded with messages:", runtimeData.messages?.length);
+    const responseMessages = runtimeData.messages || [];
+    console.log(`[whatsapp-webhook] Runtime respondeu com ${responseMessages.length} mensagens.`);
 
-    // 3. Send messages back via Evolution API
-    for (const msg of (runtimeData.messages || [])) {
+    // 3. Enviar mensagens de volta via Evolution API
+    for (const msg of responseMessages) {
       if (!msg.text) continue;
 
       const buttons = runtimeData.buttons || [];
@@ -97,7 +126,7 @@ Deno.serve(async (req: Request) => {
       const endpoint = hasButtons ? "message/sendButtons" : "message/sendText";
       const payload = hasButtons 
         ? {
-            number: sender,
+            number: remoteJid,
             title: "Escolha uma opção:",
             description: msg.text,
             footer: "Bot",
@@ -108,11 +137,12 @@ Deno.serve(async (req: Request) => {
             }))
           }
         : {
-            number: sender,
+            number: remoteJid,
             text: msg.text
           };
 
-      await fetch(`${EVO_BASE_URL}/${endpoint}/${instanceName}`, {
+      console.log(`[whatsapp-webhook] Enviando resposta via Evolution (${endpoint})...`);
+      const sendResponse = await fetch(`${EVO_BASE_URL}/${endpoint}/${instanceName}`, {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
@@ -120,12 +150,19 @@ Deno.serve(async (req: Request) => {
         },
         body: JSON.stringify(payload)
       });
+
+      if (!sendResponse.ok) {
+        const sendError = await sendResponse.text();
+        console.error("[whatsapp-webhook] Erro ao enviar mensagem via Evolution:", sendError);
+      } else {
+        console.log("[whatsapp-webhook] Resposta enviada com sucesso!");
+      }
     }
 
     return new Response(JSON.stringify({ status: "success" }), { headers: { "Content-Type": "application/json" } });
 
   } catch (err) {
-    console.error("[whatsapp-webhook] Fatal error:", err);
+    console.error("[whatsapp-webhook] Erro fatal:", err);
     return new Response(JSON.stringify({ error: err.message }), { status: 500, headers: { "Content-Type": "application/json" } });
   }
 });
