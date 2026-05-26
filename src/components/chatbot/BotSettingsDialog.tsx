@@ -540,6 +540,7 @@ function WhatsAppBindingSection({ botPublicId }: { botPublicId: string }) {
   const [instances, setInstances] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [binding, setBinding] = useState<string | null>(null);
+  const [testingWebhook, setTestingWebhook] = useState<string | null>(null);
 
   useEffect(() => {
     async function load() {
@@ -584,6 +585,49 @@ function WhatsAppBindingSection({ botPublicId }: { botPublicId: string }) {
     }
   };
 
+  const handleTestWebhook = async (instanceName: string) => {
+    setTestingWebhook(instanceName);
+    try {
+      const backend = (import.meta.env.VITE_BACKEND_URL as string | undefined)?.replace(/\/$/, '') || '';
+      const response = await fetch(`${backend}/webhook/whatsapp`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          event: "MESSAGES_UPSERT",
+          instance: instanceName,
+          data: {
+            key: {
+              remoteJid: "test_number@s.whatsapp.net",
+              fromMe: false,
+              id: "TEST_" + Date.now()
+            },
+            message: {
+              conversation: "Oi, teste de webhook"
+            },
+            messageTimestamp: Math.floor(Date.now() / 1000)
+          }
+        })
+      });
+
+      const result = await response.json();
+      
+      if (response.ok) {
+        if (result.error === "binding_not_found") {
+          toast.error(`Erro: Instância ${instanceName} não está vinculada a este bot no banco de dados.`);
+        } else {
+          toast.success("Webhook disparado com sucesso! Verifique os logs do servidor.");
+          console.log("Resultado do teste:", result);
+        }
+      } else {
+        toast.error(`Erro no servidor (${response.status}): ${result.error || 'Erro desconhecido'}`);
+      }
+    } catch (err: any) {
+      toast.error("Erro ao conectar com o servidor: " + err.message);
+    } finally {
+      setTestingWebhook(null);
+    }
+  };
+
   if (loading) return <div className="flex justify-center p-4"><Loader2 className="w-6 h-6 animate-spin text-emerald-600" /></div>;
 
   return (
@@ -593,22 +637,35 @@ function WhatsAppBindingSection({ botPublicId }: { botPublicId: string }) {
       ) : (
         <div className="grid grid-cols-1 gap-2">
           {instances.map((inst: any) => (
-            <div key={inst.instanceName} className="flex items-center justify-between p-3 border rounded-lg bg-white">
-              <div className="flex items-center gap-2">
-                <span className="font-medium text-sm">{inst.instanceName}</span>
-                {binding === inst.instanceName && (
-                  <span className="text-[10px] bg-emerald-100 text-emerald-700 px-2 py-0.5 rounded-full font-bold">VINCULADO</span>
-                )}
+            <div key={inst.instanceName} className="flex flex-col p-3 border rounded-lg bg-white gap-3">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-2">
+                  <span className="font-medium text-sm">{inst.instanceName}</span>
+                  {binding === inst.instanceName && (
+                    <span className="text-[10px] bg-emerald-100 text-emerald-700 px-2 py-0.5 rounded-full font-bold">VINCULADO</span>
+                  )}
+                </div>
+                <div className="flex gap-2">
+                  <Button 
+                    size="sm"
+                    variant="outline"
+                    onClick={() => handleTestWebhook(inst.instanceName)}
+                    disabled={testingWebhook === inst.instanceName}
+                    title="Enviar mensagem de teste para este webhook"
+                  >
+                    {testingWebhook === inst.instanceName ? <Loader2 className="w-4 h-4 animate-spin" /> : "Testar Webhook"}
+                  </Button>
+                  <Button 
+                    size="sm" 
+                    variant={binding === inst.instanceName ? "secondary" : "default"}
+                    onClick={() => handleBind(inst.instanceName)}
+                    disabled={binding === inst.instanceName}
+                    className={binding !== inst.instanceName ? "bg-emerald-600 hover:bg-emerald-700" : ""}
+                  >
+                    {binding === inst.instanceName ? "Vinculado" : "Vincular"}
+                  </Button>
+                </div>
               </div>
-              <Button 
-                size="sm" 
-                variant={binding === inst.instanceName ? "outline" : "default"}
-                onClick={() => handleBind(inst.instanceName)}
-                disabled={binding === inst.instanceName}
-                className={binding !== inst.instanceName ? "bg-emerald-600 hover:bg-emerald-700" : ""}
-              >
-                {binding === inst.instanceName ? "Vinculado" : "Vincular"}
-              </Button>
             </div>
           ))}
         </div>
