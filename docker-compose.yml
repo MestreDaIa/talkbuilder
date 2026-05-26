@@ -10,14 +10,14 @@ services:
       - EVO_GLOBAL_KEY=${EVO_GLOBAL_KEY}
       - PORT=3000
     networks:
-      - evolutionapi2_default
+      - talkbuilder_net
     labels:
       - "traefik.enable=true"
       - "traefik.http.routers.chatbot-server.rule=Host(`${SERVER_DOMAIN}`)"
       - "traefik.http.routers.chatbot-server.entrypoints=web,websecure"
       - "traefik.http.routers.chatbot-server.tls.certresolver=myresolver"
       - "traefik.http.services.chatbot-server.loadbalancer.server.port=3000"
-      - "traefik.docker.network=evolutionapi2_default"
+      - "traefik.docker.network=talkbuilder_net"
 
   frontend:
     build:
@@ -33,15 +33,15 @@ services:
     container_name: chatbot-frontend
     restart: always
     networks:
-      - evolutionapi2_default
+      - talkbuilder_net
     labels:
       - "traefik.enable=true"
       - "traefik.http.routers.chatbot-frontend.rule=Host(`${FRONTEND_DOMAIN}`)"
       - "traefik.http.routers.chatbot-frontend.entrypoints=web,websecure"
       - "traefik.http.routers.chatbot-frontend.tls.certresolver=myresolver"
       - "traefik.http.services.chatbot-frontend.loadbalancer.server.port=80"
-      - "traefik.docker.network=evolutionapi2_default"
+      - "traefik.docker.network=talkbuilder_net"
 
 networks:
-  evolutionapi2_default:
-    external: true
+  talkbuilder_net:
+    driver: bridge
