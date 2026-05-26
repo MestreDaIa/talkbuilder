@@ -1,5 +1,6 @@
 import { createClient } from "@supabase/supabase-js";
 import dotenv from "dotenv";
+import ws from "ws";
 
 dotenv.config();
 
@@ -10,4 +11,11 @@ if (!supabaseUrl || !supabaseServiceRoleKey) {
   console.error("ERRO: SUPABASE_URL ou SUPABASE_SERVICE_ROLE_KEY não configurados.");
 }
 
-export const supabase = createClient(supabaseUrl, supabaseServiceRoleKey);
+export const supabase = createClient(supabaseUrl, supabaseServiceRoleKey, {
+  auth: {
+    persistSession: false,
+  },
+  realtime: {
+    transport: ws,
+  },
+});
