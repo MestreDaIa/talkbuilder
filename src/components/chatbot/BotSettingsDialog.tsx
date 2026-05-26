@@ -572,8 +572,9 @@ function WhatsAppBindingSection({ botPublicId }: { botPublicId: string }) {
 
       if (error) throw error;
 
-      // 3. Configura o Webhook na Evolution API
-      const webhookUrl = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/whatsapp-webhook`;
+      // 3. Configura o Webhook na Evolution API apontando para o servidor próprio
+      const backend = (import.meta.env.VITE_BACKEND_URL as string | undefined)?.replace(/\/$/, '') || '';
+      const webhookUrl = `${backend}/webhook/whatsapp`;
       await evoApi.setWebhook(instanceName, webhookUrl);
 
       setBinding(instanceName);
