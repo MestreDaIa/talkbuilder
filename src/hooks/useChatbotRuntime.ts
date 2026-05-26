@@ -19,7 +19,7 @@ interface RuntimeState {
   is_waiting_time: boolean;
 }
 
-const RUNTIME_URL = `${import.meta.env.VITE_SUPABASE_URL || "https://fwoescubnnagdvwasbjl.supabase.co"}/functions/v1/chatbot-runtime`;
+const RUNTIME_URL = import.meta.env.VITE_RUNTIME_URL || `${import.meta.env.VITE_SUPABASE_URL || "https://fwoescubnnagdvwasbjl.supabase.co"}/functions/v1/chatbot-runtime`;
 
 export function useChatbotRuntime(flowId?: string) {
   const [messages, setMessages] = useState<Message[]>([]);

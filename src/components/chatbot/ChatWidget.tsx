@@ -70,6 +70,7 @@ export const ChatWidget = ({
   const waitTimerRef = useRef<number | null>(null);
 
   const getRuntimeUrl = () => {
+    if (import.meta.env.VITE_RUNTIME_URL) return import.meta.env.VITE_RUNTIME_URL;
     const baseUrl = import.meta.env.VITE_SUPABASE_URL || "https://fwoescubnnagdvwasbjl.supabase.co";
     return `${baseUrl}/functions/v1/chatbot-runtime`;
   };
