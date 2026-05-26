@@ -392,7 +392,7 @@ async function runFlow(execution: any, containersIn: any[], edgesIn: any[], inpu
       case "bubble-text":
       case "bubble-number": {
         const text = replaceVars(cfg.message || cfg.content || cfg.text || cfg.number || "");
-        if (text) messages.push({ id: crypto.randomUUID(), type: "bot", content: text });
+        if (text) messages.push({ id: (crypto as any).randomUUID(), type: "bot", content: text });
         break;
       }
       case "bubble-image":
@@ -443,7 +443,7 @@ async function runFlow(execution: any, containersIn: any[], edgesIn: any[], inpu
         const targetRef = cfg.targetFlow || cfg.targetFlowId;
         if (targetRef) {
           // Simplified redirect for now
-          messages.push({ id: crypto.randomUUID(), type: "bot", content: "Redirecionando fluxo..." });
+          messages.push({ id: (crypto as any).randomUUID(), type: "bot", content: "Redirecionando fluxo..." });
         }
         break;
       }
