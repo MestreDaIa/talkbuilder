@@ -609,7 +609,12 @@ function WhatsAppBindingSection({ botPublicId }: { botPublicId: string }) {
         })
       });
 
-      const result = await response.json();
+      let result: any = {};
+      try {
+        result = await response.json();
+      } catch (e) {
+        console.warn("Could not parse JSON response from server");
+      }
       
       if (response.ok) {
         if (result.error === "binding_not_found") {
@@ -619,10 +624,16 @@ function WhatsAppBindingSection({ botPublicId }: { botPublicId: string }) {
           console.log("Resultado do teste:", result);
         }
       } else {
-        toast.error(`Erro no servidor (${response.status}): ${result.error || 'Erro desconhecido'}`);
+        const errorMsg = result.message || result.error || 'Erro desconhecido';
+        toast.error(`Erro no servidor (${response.status}): ${errorMsg}`);
       }
     } catch (err: any) {
-      toast.error("Erro ao conectar com o servidor: " + err.message);
+      console.error("Erro no teste de webhook:", err);
+      if (err.name === 'TypeError' && err.message === 'Failed to fetch') {
+        toast.error("Erro de conexão (CORS ou Servidor Offline). Verifique se o servidor está rodando e o SSL é válido.");
+      } else {
+        toast.error("Erro ao conectar com o servidor: " + err.message);
+      }
     } finally {
       setTestingWebhook(null);
     }
