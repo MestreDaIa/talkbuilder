@@ -50,11 +50,20 @@ export default function WhatsAppInstanceSettings({ instanceName, isOpen, onClose
   const [savingWebhook, setSavingWebhook] = useState(false);
   const [savingSettings, setSavingSettings] = useState(false);
   const [savingBot, setSavingBot] = useState(false);
+  
+  // Bots list for linking
+  const [availableBots, setAvailableBots] = useState<any[]>([]);
+  const [selectedBotId, setSelectedBotId] = useState<string>("");
 
   // Webhook State
   const [webhookByEvents, setWebhookByEvents] = useState(true);
   const [webhookBase64, setWebhookBase64] = useState(false);
   const [selectedEvents, setSelectedEvents] = useState<string[]>(["MESSAGES_UPSERT"]);
+  // Detect current project URL for the webhook
+  const currentProjectUrl = window.location.origin.includes("lovable.app") 
+    ? `https://xllkibdddlmcdbrhzedu.supabase.co/functions/v1/whatsapp-webhook` 
+    : `${window.location.origin}/functions/v1/whatsapp-webhook`;
+    
   const fixedWebhookUrl = "https://api-flowbuilder.zailom.com/webhook/whatsapp";
 
   // Instance Settings State
@@ -72,7 +81,7 @@ export default function WhatsAppInstanceSettings({ instanceName, isOpen, onClose
   const [botSettings, setBotSettings] = useState({
     enabled: false,
     description: "Evolution Bot Settings",
-    apiUrl: "",
+    apiUrl: currentProjectUrl,
     apiKey: "",
     triggerType: "Keyword",
     triggerKeyword: "",
