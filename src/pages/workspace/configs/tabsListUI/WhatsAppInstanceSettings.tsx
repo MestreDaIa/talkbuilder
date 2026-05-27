@@ -65,7 +65,8 @@ export default function WhatsAppInstanceSettings({ instanceName, isOpen, onClose
     ? `https://xllkibdddlmcdbrhzedu.supabase.co/functions/v1/whatsapp-webhook` 
     : `${window.location.origin}/functions/v1/whatsapp-webhook`;
     
-  const fixedWebhookUrl = "https://api-flowbuilder.zailom.com/webhook/whatsapp";
+  // const fixedWebhookUrl = "https://api-flowbuilder.zailom.com/webhook/whatsapp";
+  const [webhookUrl, setWebhookUrl] = useState(currentProjectUrl);
 
   // Instance Settings State
   const [settings, setSettings] = useState({
@@ -138,6 +139,9 @@ export default function WhatsAppInstanceSettings({ instanceName, isOpen, onClose
         setWebhookBase64(w.base64 ?? false);
         const events = w.events || [];
         setSelectedEvents(events.length > 0 ? events : ["MESSAGES_UPSERT"]);
+        if (w.url) {
+          setWebhookUrl(w.url);
+        }
       }
 
       if (settingsData) {
@@ -189,7 +193,7 @@ export default function WhatsAppInstanceSettings({ instanceName, isOpen, onClose
     try {
       await evoApi.setWebhook(instanceName, {
         enabled: true,
-        url: fixedWebhookUrl,
+        url: webhookUrl,
         byEvents: webhookByEvents,
         base64: webhookBase64,
         events: selectedEvents,
@@ -328,12 +332,23 @@ export default function WhatsAppInstanceSettings({ instanceName, isOpen, onClose
                     <div className="p-4 bg-green-50/50 dark:bg-green-950/20 rounded-xl border border-green-100 dark:border-green-900/30 space-y-2">
                       <Label className="text-[10px] uppercase font-bold text-green-800 dark:text-green-300 mb-1 block">URL Webhook Destino</Label>
                       <div className="flex items-center gap-2">
-                        <code className="flex-1 text-xs break-all text-green-700 dark:text-green-400 font-mono bg-white dark:bg-background p-2 rounded border">
-                          {fixedWebhookUrl}
-                        </code>
+                        <Input 
+                          value={webhookUrl}
+                          onChange={(e) => setWebhookUrl(e.target.value)}
+                          className="flex-1 text-xs break-all text-green-700 dark:text-green-400 font-mono bg-white dark:bg-background h-9"
+                          placeholder="https://..."
+                        />
+                        <Button 
+                          size="xs" 
+                          variant="outline" 
+                          className="h-9 px-3"
+                          onClick={() => setWebhookUrl(currentProjectUrl)}
+                        >
+                          Reset
+                        </Button>
                       </div>
                       <p className="text-[10px] text-green-600/80 dark:text-green-400/60 italic">
-                        * Esta URL é configurada automaticamente para o seu servidor.
+                        * Use a URL do seu Supabase Edge Function para processar o bot.
                       </p>
                     </div>
 
