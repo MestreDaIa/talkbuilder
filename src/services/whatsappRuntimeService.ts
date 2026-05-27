@@ -47,16 +47,18 @@ export const whatsappRuntime = {
     const supabase = getSupabase();
 
     // 1. Identifica o Bot vinculado à instância (Multitenancy)
-    const { data: binding, error: bindingError } = await supabase
+    const { data: bindings, error: bindingError } = await supabase
       .from("whatsapp_bindings")
       .select("bot_public_id")
       .eq("instance_name", instanceName)
-      .maybeSingle();
+      .limit(1);
 
-    if (bindingError || !binding) {
+    if (bindingError || !bindings || bindings.length === 0) {
       console.error("[WhatsAppRuntime] Vínculo não encontrado para instância:", instanceName);
       return { error: "binding_not_found" };
     }
+    
+    const binding = bindings[0];
 
     // 2. Chama o Runtime (Aqui usamos a URL do runtime do sistema ou a lógica interna)
     // Para manter a promessa de NÃO usar lovable cloud/edge functions, 

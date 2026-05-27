@@ -580,16 +580,15 @@ function WhatsAppBindingSection({ botPublicId }: { botPublicId: string }) {
         const normalizedInstances = Array.isArray(insts)
           ? insts.filter((inst: any) => Boolean(getEvolutionInstanceName(inst)))
           : [];
-        const { data: bind, error } = await supabaseClient
+        const { data: binds, error } = await supabaseClient
           .from("whatsapp_bindings")
           .select("instance_name")
           .eq("bot_public_id", botPublicId)
-          .limit(1)
-          .maybeSingle();
+          .limit(1);
 
         if (error) throw error;
         setInstances(normalizedInstances);
-        if (bind) setBinding(bind.instance_name);
+        if (binds && binds.length > 0) setBinding(binds[0].instance_name);
       } catch (err) {
         console.error("Erro ao carregar instâncias:", err);
         toast.error("Erro ao carregar instâncias do WhatsApp.");

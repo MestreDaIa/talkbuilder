@@ -48,7 +48,7 @@ export async function processRuntime(body: any) {
   // 2. Session
   let session: any = null;
   try {
-    const { data: existing } = await supabase
+    const { data: existingSessions } = await supabase
       .from("conversation_sessions")
       .select("*")
       .eq("flow_id", flow.id)
@@ -56,9 +56,8 @@ export async function processRuntime(body: any) {
       .eq("channel_id", channel)
       .eq("status", "active")
       .order("last_interaction_at", { ascending: false })
-      .limit(1)
-      .maybeSingle();
-    session = existing;
+      .limit(1);
+    session = existingSessions && existingSessions.length > 0 ? existingSessions[0] : null;
     if (!session) {
       const { data: created } = await supabase
         .from("conversation_sessions")
@@ -80,13 +79,14 @@ export async function processRuntime(body: any) {
   let execution: any = null;
   if (action === "start") {
     try {
-      const { data: existing } = await supabase
+      const { data: executions } = await supabase
         .from("flow_executions")
         .select("*")
         .eq("flow_id", flow.id)
         .eq("contact_id", contact_id)
         .eq("channel_id", channel)
-        .maybeSingle();
+        .limit(1);
+      const existing = executions && executions.length > 0 ? executions[0] : null;
       if (existing) {
         await supabase
           .from("flow_executions")
@@ -106,14 +106,14 @@ export async function processRuntime(body: any) {
     }
   } else {
     try {
-      const { data: existing } = await supabase
+      const { data: executions } = await supabase
         .from("flow_executions")
         .select("*")
         .eq("flow_id", flow.id)
         .eq("contact_id", contact_id)
         .eq("channel_id", channel)
-        .maybeSingle();
-      execution = existing;
+        .limit(1);
+      execution = executions && executions.length > 0 ? executions[0] : null;
     } catch {}
   }
 
