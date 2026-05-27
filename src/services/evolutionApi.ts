@@ -51,6 +51,7 @@ export const evoApi = {
    */
   async setSettings(instanceName: string, settings: {
     reject_call?: boolean;
+    msg_call?: string;
     groups_ignore?: boolean;
     always_online?: boolean;
     read_messages?: boolean;
@@ -65,7 +66,7 @@ export const evoApi = {
       },
       body: JSON.stringify({
         rejectCall: !!settings.reject_call,
-        msgCall: "",
+        msgCall: settings.msg_call || "",
         groupsIgnore: !!settings.groups_ignore,
         alwaysOnline: !!settings.always_online,
         readMessages: !!settings.read_messages,
@@ -77,6 +78,18 @@ export const evoApi = {
       const data = await response.json().catch(() => ({}));
       throw new Error(data.message || data.error || 'Erro ao atualizar configurações');
     }
+    return response.json();
+  },
+
+  /**
+   * Busca as configurações específicas de uma instância
+   */
+  async fetchSettings(instanceName: string) {
+    const response = await fetch(`${EVO_BASE_URL}/settings/find/${instanceName}`, {
+      method: 'GET',
+      headers: { 'apikey': EVO_GLOBAL_KEY },
+    });
+    if (!response.ok) return null;
     return response.json();
   },
 
