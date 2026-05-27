@@ -320,10 +320,18 @@ async function runFlow(execution: any, containersIn: any[], edgesIn: any[], inpu
   };
 
   // Execution Loop
-  if (input && (input.message !== undefined || input.button_id !== undefined)) {
-    const userValue = input.message ?? input.button_id;
-    variables["last_message"] = userValue;
+  const hasUserInput = !!(input && (input.message !== undefined || input.button_id !== undefined));
+  // Só tratar a mensagem recebida como RESPOSTA a um input se o fluxo realmente estava aguardando.
+  // Caso contrário, a primeira mensagem do usuário seria "consumida" por um input lá na frente
+  // sem o bot ter perguntado nada.
+  const isResponseToInput = hasUserInput && (execution.waiting_for_input === true || (mode === "agent" && !!activeAgentNodeId));
+  let inputConsumed = !isResponseToInput; // se não é resposta, já marca como consumido para que inputs pausem
 
+  if (hasUserInput) {
+    variables["last_message"] = input.message ?? input.button_id;
+  }
+
+  if (isResponseToInput) {
     if (mode === "agent" && activeAgentNodeId) {
       currentNodeId = activeAgentNodeId;
     } else if (currentNodeId) {
@@ -331,10 +339,12 @@ async function runFlow(execution: any, containersIn: any[], edgesIn: any[], inpu
       if (info) {
         const cfg = info.node.config || {};
         const varName = cfg.variableName || cfg.saveVariable;
+        const userValue = input.message ?? input.button_id;
         if (varName && userValue !== undefined) variables[varName] = userValue;
         if (info.node.type !== "ai-agent") {
            currentNodeId = nextFromNode(info.node.id, info.container, input.button_id);
         }
+        inputConsumed = true;
       }
     }
   }
@@ -387,7 +397,7 @@ async function runFlow(execution: any, containersIn: any[], edgesIn: any[], inpu
     }
 
     if (nodeType.startsWith("input-")) {
-      if (!input || (input.message === undefined && input.button_id === undefined)) {
+      if (!inputConsumed) {
         waiting_for = nodeType === "input-buttons" ? "buttons" : "text";
         if (nodeType === "input-buttons") {
           buttons = (cfg.buttons || []).map((b: any) => ({
