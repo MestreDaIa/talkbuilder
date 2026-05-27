@@ -534,11 +534,45 @@ export default function WhatsAppInstanceSettings({ instanceName, isOpen, onClose
                             <option value="All">All</option>
                           </select>
                         </div>
+                        {botSettings.triggerType === "Keyword" && (
+                          <>
+                            <div className="space-y-2">
+                              <Label className="text-xs font-bold uppercase text-muted-foreground">Trigger Operator</Label>
+                              <select 
+                                className="flex h-9 w-full rounded-md border border-input bg-transparent px-3 py-1 text-xs shadow-sm focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
+                                value={botSettings.triggerOperator}
+                                onChange={(e) => setBotSettings(s => ({...s, triggerOperator: e.target.value}))}
+                              >
+                                <option value="Contains">Contains</option>
+                                <option value="Equals">Equals</option>
+                                <option value="Starts With">Starts With</option>
+                              </select>
+                            </div>
+                            <div className="space-y-2">
+                              <Label className="text-xs font-bold uppercase text-muted-foreground">Trigger Keyword</Label>
+                              <Input 
+                                value={botSettings.triggerKeyword}
+                                onChange={(e) => setBotSettings(s => ({...s, triggerKeyword: e.target.value}))}
+                                placeholder="Palavra-chave"
+                                className="text-xs"
+                              />
+                            </div>
+                          </>
+                        )}
                       </div>
 
                       <Separator />
 
-                      <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+                      <div className="grid grid-cols-1 sm:grid-cols-4 gap-4">
+                        <div className="space-y-2">
+                          <Label className="text-xs font-bold uppercase text-muted-foreground">Keyword Finish</Label>
+                          <Input 
+                            value={botSettings.keywordFinish}
+                            onChange={(e) => setBotSettings(s => ({...s, keywordFinish: e.target.value}))}
+                            placeholder="ex: sair"
+                            className="text-xs"
+                          />
+                        </div>
                         <div className="space-y-2">
                           <Label className="text-xs font-bold uppercase text-muted-foreground">Expire (minutos)</Label>
                           <Input 
