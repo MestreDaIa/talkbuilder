@@ -142,8 +142,8 @@ export default function WhatsAppInstanceSettings({ instanceName, isOpen, onClose
 
   return (
     <Dialog open={isOpen} onOpenChange={(open) => !open && onClose()}>
-      <DialogContent className="sm:max-w-[650px] h-[85vh] flex flex-col p-0">
-        <DialogHeader className="p-6 pb-2">
+      <DialogContent className="sm:max-w-[650px] h-[85vh] flex flex-col p-0 overflow-hidden">
+        <DialogHeader className="p-6 pb-2 shrink-0">
           <DialogTitle className="flex items-center gap-2 text-xl">
             <Settings className="w-5 h-5 text-green-600" />
             Configurações da Instância

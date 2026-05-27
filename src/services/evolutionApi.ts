@@ -63,7 +63,14 @@ export const evoApi = {
         'Content-Type': 'application/json',
         'apikey': EVO_GLOBAL_KEY,
       },
-      body: JSON.stringify(settings),
+      body: JSON.stringify({
+        reject_call: settings.reject_call,
+        groups_ignore: settings.groups_ignore,
+        always_online: settings.always_online,
+        read_messages: settings.read_messages,
+        read_status: settings.read_status,
+        sync_full_history: settings.sync_full_history
+      }),
     });
     if (!response.ok) {
       const data = await response.json().catch(() => ({}));
