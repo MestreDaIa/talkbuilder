@@ -202,6 +202,14 @@ export default function WhatsAppInstanceSettings({ instanceName, isOpen, onClose
   };
 
   const handleSaveBot = async () => {
+    if (!botSettings.apiUrl?.trim()) {
+      toast({ title: "API URL é obrigatória", description: "Informe a API URL do Evolution Bot antes de salvar.", variant: "destructive" });
+      return;
+    }
+    if ((botSettings.triggerType || '').toLowerCase() === 'keyword' && !botSettings.triggerKeyword?.trim()) {
+      toast({ title: "Trigger obrigatório", description: "Informe a palavra-chave (Trigger) ou mude o Trigger Type.", variant: "destructive" });
+      return;
+    }
     setSavingBot(true);
     try {
       await evoApi.setEvolutionBot(instanceName, botSettings);
