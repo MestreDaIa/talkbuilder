@@ -223,12 +223,31 @@ export default function WhatsAppInstanceSettings({ instanceName, isOpen, onClose
       toast({ title: "Trigger obrigatório", description: "Informe a palavra-chave (Trigger) ou mude o Trigger Type.", variant: "destructive" });
       return;
     }
+    if (!selectedBotId) {
+      toast({ title: "Vínculo obrigatório", description: "Selecione um Bot do Flow Builder para vincular a esta instância.", variant: "destructive" });
+      return;
+    }
+
     setSavingBot(true);
     try {
+      // 1. Salvar no Evolution API
       await evoApi.setEvolutionBot(instanceName, botSettings);
-      toast({ title: "Evolution Bot atualizado com sucesso!" });
+
+      // 2. Salvar Vínculo no Supabase
+      const { error: bindError } = await supabase
+        .from("whatsapp_bindings")
+        .upsert({
+          instance_name: instanceName,
+          bot_public_id: selectedBotId,
+          updated_at: new Date().toISOString()
+        }, { onConflict: 'instance_name' });
+
+      if (bindError) throw bindError;
+
+      toast({ title: "Evolution Bot e Vínculo atualizados com sucesso!" });
     } catch (err: any) {
-      toast({ title: "Erro ao salvar Evolution Bot", description: err.message, variant: "destructive" });
+      console.error("Erro ao salvar bot/vínculo:", err);
+      toast({ title: "Erro ao salvar", description: err.message, variant: "destructive" });
     } finally {
       setSavingBot(false);
     }
