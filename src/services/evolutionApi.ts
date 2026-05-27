@@ -273,5 +273,41 @@ export const evoApi = {
       })
     });
     return response.json();
+  },
+
+  /**
+   * Evolution Bot Settings
+   */
+  async fetchEvolutionBot(instanceName: string) {
+    const response = await fetch(`${EVO_BASE_URL}/evolutionBot/find/${instanceName}`, {
+      method: 'GET',
+      headers: { 'apikey': EVO_GLOBAL_KEY },
+    });
+    if (!response.ok) return null;
+    return response.json();
+  },
+
+  async setEvolutionBot(instanceName: string, data: any) {
+    const response = await fetch(`${EVO_BASE_URL}/evolutionBot/create/${instanceName}`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'apikey': EVO_GLOBAL_KEY,
+      },
+      body: JSON.stringify(data),
+    });
+    if (!response.ok) {
+      const errorData = await response.json().catch(() => ({}));
+      throw new Error(errorData.message || errorData.error || 'Erro ao salvar Evolution Bot');
+    }
+    return response.json();
+  },
+
+  async deleteEvolutionBot(instanceName: string) {
+    const response = await fetch(`${EVO_BASE_URL}/evolutionBot/delete/${instanceName}`, {
+      method: 'DELETE',
+      headers: { 'apikey': EVO_GLOBAL_KEY },
+    });
+    return response.ok;
   }
 };

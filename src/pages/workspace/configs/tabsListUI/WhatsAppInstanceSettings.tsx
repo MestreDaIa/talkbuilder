@@ -9,7 +9,7 @@ import { Separator } from "../../../../components/ui/separator";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "../../../../components/ui/tabs";
 import { evoApi } from "../../../../services/evolutionApi";
 import { useToast } from "../../../../hooks/use-toast";
-import { Loader2, Settings, Globe, Bell, CheckCircle2, MessageSquare } from "lucide-react";
+import { Loader2, Settings, Globe, Bell, CheckCircle2, MessageSquare, Bot, Plus, Trash2 } from "lucide-react";
 
 interface WhatsAppInstanceSettingsProps {
   instanceName: string;
@@ -49,6 +49,7 @@ export default function WhatsAppInstanceSettings({ instanceName, isOpen, onClose
   const [loading, setLoading] = useState(true);
   const [savingWebhook, setSavingWebhook] = useState(false);
   const [savingSettings, setSavingSettings] = useState(false);
+  const [savingBot, setSavingBot] = useState(false);
 
   // Webhook State
   const [webhookByEvents, setWebhookByEvents] = useState(true);
@@ -67,6 +68,27 @@ export default function WhatsAppInstanceSettings({ instanceName, isOpen, onClose
     read_status: false,
   });
 
+  // Evolution Bot State
+  const [botSettings, setBotSettings] = useState({
+    enabled: false,
+    description: "Evolution Bot Settings",
+    apiUrl: "",
+    apiKey: "",
+    triggerType: "Keyword",
+    triggerKeyword: "",
+    triggerOperator: "Contains",
+    expire: 300,
+    keywordFinish: "bye",
+    delayMessage: 1000,
+    unknownMessage: "Sorry, I dont understand",
+    listeningFromMe: false,
+    stopBotFromMe: false,
+    keepOpen: false,
+    debounceTime: 1,
+    splitMessages: false,
+    ignoreJids: "",
+  });
+
   useEffect(() => {
     if (isOpen && instanceName) {
       loadInstanceData();
@@ -77,15 +99,17 @@ export default function WhatsAppInstanceSettings({ instanceName, isOpen, onClose
     setLoading(true);
     try {
       // Fetch all needed data in parallel
-      const [instanceData, settingsData, webhookData] = await Promise.all([
+      const [instanceData, settingsData, webhookData, botData] = await Promise.all([
         evoApi.fetchInstance(instanceName),
         evoApi.fetchSettings(instanceName),
-        evoApi.fetchWebhook(instanceName)
+        evoApi.fetchWebhook(instanceName),
+        evoApi.fetchEvolutionBot(instanceName)
       ]);
 
       console.log("Instance data:", instanceData);
       console.log("Settings data:", settingsData);
       console.log("Webhook data:", webhookData);
+      console.log("Bot data:", botData);
 
       // Load Webhook info (Prioritize data from webhook/find)
       const webhook = webhookData || (instanceData && instanceData.webhook);
@@ -114,6 +138,29 @@ export default function WhatsAppInstanceSettings({ instanceName, isOpen, onClose
           read_messages: s.readMessages ?? s.read_messages ?? false,
           sync_full_history: s.syncFullHistory ?? s.sync_full_history ?? false,
           read_status: s.readStatus ?? s.read_status ?? false,
+        });
+      }
+
+      if (botData) {
+        const b = botData.evolutionBot || botData;
+        setBotSettings({
+          enabled: b.enabled ?? false,
+          description: b.description ?? "Evolution Bot Settings",
+          apiUrl: b.apiUrl ?? "",
+          apiKey: b.apiKey ?? "",
+          triggerType: b.triggerType ?? "Keyword",
+          triggerKeyword: b.triggerKeyword ?? "",
+          triggerOperator: b.triggerOperator ?? "Contains",
+          expire: b.expire ?? 300,
+          keywordFinish: b.keywordFinish ?? "bye",
+          delayMessage: b.delayMessage ?? 1000,
+          unknownMessage: b.unknownMessage ?? "Sorry, I dont understand",
+          listeningFromMe: b.listeningFromMe ?? false,
+          stopBotFromMe: b.stopBotFromMe ?? false,
+          keepOpen: b.keepOpen ?? false,
+          debounceTime: b.debounceTime ?? 1,
+          splitMessages: b.splitMessages ?? false,
+          ignoreJids: b.ignoreJids ?? "",
         });
       }
     } catch (err) {
@@ -154,6 +201,32 @@ export default function WhatsAppInstanceSettings({ instanceName, isOpen, onClose
     }
   };
 
+  const handleSaveBot = async () => {
+    setSavingBot(true);
+    try {
+      await evoApi.setEvolutionBot(instanceName, botSettings);
+      toast({ title: "Evolution Bot atualizado com sucesso!" });
+    } catch (err: any) {
+      toast({ title: "Erro ao salvar Evolution Bot", description: err.message, variant: "destructive" });
+    } finally {
+      setSavingBot(false);
+    }
+  };
+
+  const handleDeleteBot = async () => {
+    if (!confirm("Tem certeza que deseja remover o Evolution Bot?")) return;
+    setSavingBot(true);
+    try {
+      await evoApi.deleteEvolutionBot(instanceName);
+      toast({ title: "Evolution Bot removido com sucesso!" });
+      setBotSettings(prev => ({ ...prev, enabled: false }));
+    } catch (err: any) {
+      toast({ title: "Erro ao remover Evolution Bot", description: err.message, variant: "destructive" });
+    } finally {
+      setSavingBot(false);
+    }
+  };
+
   const toggleEvent = (event: string) => {
     setSelectedEvents(prev => 
       prev.includes(event) ? prev.filter(e => e !== event) : [...prev, event]
@@ -181,7 +254,7 @@ export default function WhatsAppInstanceSettings({ instanceName, isOpen, onClose
         ) : (
           <Tabs defaultValue="events" className="flex-1 flex flex-col overflow-hidden">
             <div className="px-6">
-              <TabsList className="grid w-full grid-cols-2">
+              <TabsList className="grid w-full grid-cols-3">
                 <TabsTrigger value="events" className="flex items-center gap-2">
                   <Globe className="w-4 h-4" />
                   Eventos e Webhook
@@ -189,6 +262,10 @@ export default function WhatsAppInstanceSettings({ instanceName, isOpen, onClose
                 <TabsTrigger value="settings" className="flex items-center gap-2">
                   <Bell className="w-4 h-4" />
                   Geral e Settings
+                </TabsTrigger>
+                <TabsTrigger value="bot" className="flex items-center gap-2">
+                  <Bot className="w-4 h-4" />
+                  Evolution Bot
                 </TabsTrigger>
               </TabsList>
             </div>
@@ -402,6 +479,196 @@ export default function WhatsAppInstanceSettings({ instanceName, isOpen, onClose
                         {savingSettings && <Loader2 className="w-3 h-3 animate-spin mr-2" />}
                         SALVAR CONFIGS
                       </Button>
+                    </div>
+                  </div>
+                </TabsContent>
+
+                <TabsContent value="bot" className="mt-0 space-y-6 focus-visible:outline-none focus-visible:ring-0">
+                  <div className="space-y-4 p-6">
+                    <div className="flex items-center justify-between border-b pb-2">
+                      <div className="flex items-center gap-2 text-xs font-bold uppercase tracking-wider text-muted-foreground">
+                        <Bot className="w-3.5 h-3.5" />
+                        Evolution Bot Settings
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <Switch 
+                          checked={botSettings.enabled} 
+                          onCheckedChange={(val) => setBotSettings(s => ({...s, enabled: val}))} 
+                        />
+                        <Label className="text-xs font-medium">Habilitar Bot</Label>
+                      </div>
+                    </div>
+
+                    <div className="space-y-4">
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                        <div className="space-y-2">
+                          <Label className="text-xs font-bold uppercase text-muted-foreground">Descrição</Label>
+                          <Input 
+                            value={botSettings.description}
+                            onChange={(e) => setBotSettings(s => ({...s, description: e.target.value}))}
+                            className="text-xs"
+                          />
+                        </div>
+                        <div className="space-y-2">
+                          <Label className="text-xs font-bold uppercase text-muted-foreground">API URL</Label>
+                          <Input 
+                            value={botSettings.apiUrl}
+                            onChange={(e) => setBotSettings(s => ({...s, apiUrl: e.target.value}))}
+                            placeholder="https://sua-api.com/bot"
+                            className="text-xs"
+                          />
+                        </div>
+                        <div className="space-y-2">
+                          <Label className="text-xs font-bold uppercase text-muted-foreground">API Key</Label>
+                          <Input 
+                            type="password"
+                            value={botSettings.apiKey}
+                            onChange={(e) => setBotSettings(s => ({...s, apiKey: e.target.value}))}
+                            className="text-xs"
+                          />
+                        </div>
+                        <div className="space-y-2">
+                          <Label className="text-xs font-bold uppercase text-muted-foreground">Trigger Type</Label>
+                          <select 
+                            className="flex h-9 w-full rounded-md border border-input bg-transparent px-3 py-1 text-xs shadow-sm focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
+                            value={botSettings.triggerType}
+                            onChange={(e) => setBotSettings(s => ({...s, triggerType: e.target.value}))}
+                          >
+                            <option value="Keyword">Keyword</option>
+                            <option value="All">All</option>
+                          </select>
+                        </div>
+                        {botSettings.triggerType === "Keyword" && (
+                          <>
+                            <div className="space-y-2">
+                              <Label className="text-xs font-bold uppercase text-muted-foreground">Trigger Operator</Label>
+                              <select 
+                                className="flex h-9 w-full rounded-md border border-input bg-transparent px-3 py-1 text-xs shadow-sm focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
+                                value={botSettings.triggerOperator}
+                                onChange={(e) => setBotSettings(s => ({...s, triggerOperator: e.target.value}))}
+                              >
+                                <option value="Contains">Contains</option>
+                                <option value="Equals">Equals</option>
+                                <option value="Starts With">Starts With</option>
+                              </select>
+                            </div>
+                            <div className="space-y-2">
+                              <Label className="text-xs font-bold uppercase text-muted-foreground">Trigger Keyword</Label>
+                              <Input 
+                                value={botSettings.triggerKeyword}
+                                onChange={(e) => setBotSettings(s => ({...s, triggerKeyword: e.target.value}))}
+                                placeholder="Palavra-chave"
+                                className="text-xs"
+                              />
+                            </div>
+                          </>
+                        )}
+                      </div>
+
+                      <Separator />
+
+                      <div className="grid grid-cols-1 sm:grid-cols-4 gap-4">
+                        <div className="space-y-2">
+                          <Label className="text-xs font-bold uppercase text-muted-foreground">Keyword Finish</Label>
+                          <Input 
+                            value={botSettings.keywordFinish}
+                            onChange={(e) => setBotSettings(s => ({...s, keywordFinish: e.target.value}))}
+                            placeholder="ex: sair"
+                            className="text-xs"
+                          />
+                        </div>
+                        <div className="space-y-2">
+                          <Label className="text-xs font-bold uppercase text-muted-foreground">Expire (minutos)</Label>
+                          <Input 
+                            type="number"
+                            value={botSettings.expire}
+                            onChange={(e) => setBotSettings(s => ({...s, expire: parseInt(e.target.value) || 0}))}
+                            className="text-xs"
+                          />
+                        </div>
+                        <div className="space-y-2">
+                          <Label className="text-xs font-bold uppercase text-muted-foreground">Delay (ms)</Label>
+                          <Input 
+                            type="number"
+                            value={botSettings.delayMessage}
+                            onChange={(e) => setBotSettings(s => ({...s, delayMessage: parseInt(e.target.value) || 0}))}
+                            className="text-xs"
+                          />
+                        </div>
+                        <div className="space-y-2">
+                          <Label className="text-xs font-bold uppercase text-muted-foreground">Debounce (s)</Label>
+                          <Input 
+                            type="number"
+                            value={botSettings.debounceTime}
+                            onChange={(e) => setBotSettings(s => ({...s, debounceTime: parseInt(e.target.value) || 0}))}
+                            className="text-xs"
+                          />
+                        </div>
+                      </div>
+
+                      <div className="space-y-2">
+                        <Label className="text-xs font-bold uppercase text-muted-foreground">Mensagem Desconhecida</Label>
+                        <Input 
+                          value={botSettings.unknownMessage}
+                          onChange={(e) => setBotSettings(s => ({...s, unknownMessage: e.target.value}))}
+                          className="text-xs"
+                        />
+                      </div>
+
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-2">
+                        <div className="flex items-center justify-between p-3 border rounded-lg bg-card shadow-sm">
+                          <Label className="text-xs font-medium">Ouvir minhas mensagens</Label>
+                          <Switch 
+                            checked={botSettings.listeningFromMe} 
+                            onCheckedChange={(val) => setBotSettings(s => ({...s, listeningFromMe: val}))} 
+                          />
+                        </div>
+                        <div className="flex items-center justify-between p-3 border rounded-lg bg-card shadow-sm">
+                          <Label className="text-xs font-medium">Parar bot de mim</Label>
+                          <Switch 
+                            checked={botSettings.stopBotFromMe} 
+                            onCheckedChange={(val) => setBotSettings(s => ({...s, stopBotFromMe: val}))} 
+                          />
+                        </div>
+                        <div className="flex items-center justify-between p-3 border rounded-lg bg-card shadow-sm">
+                          <Label className="text-xs font-medium">Manter Aberto</Label>
+                          <Switch 
+                            checked={botSettings.keepOpen} 
+                            onCheckedChange={(val) => setBotSettings(s => ({...s, keepOpen: val}))} 
+                          />
+                        </div>
+                        <div className="flex items-center justify-between p-3 border rounded-lg bg-card shadow-sm">
+                          <Label className="text-xs font-medium">Dividir Mensagens</Label>
+                          <Switch 
+                            checked={botSettings.splitMessages} 
+                            onCheckedChange={(val) => setBotSettings(s => ({...s, splitMessages: val}))} 
+                          />
+                        </div>
+                      </div>
+
+                      <div className="space-y-2">
+                        <Label className="text-xs font-bold uppercase text-muted-foreground">Ignorar JIDs (separados por vírgula)</Label>
+                        <Input 
+                          value={botSettings.ignoreJids}
+                          onChange={(e) => setBotSettings(s => ({...s, ignoreJids: e.target.value}))}
+                          placeholder="ex: 123@s.whatsapp.net, 456@g.us"
+                          className="text-xs"
+                        />
+                      </div>
+                    </div>
+
+                    <div className="flex justify-between items-center pt-4 sticky bottom-0 bg-background/80 backdrop-blur-sm py-2 border-t mt-4">
+                      <Button variant="outline" size="sm" onClick={handleDeleteBot} className="text-destructive hover:bg-destructive/10">
+                        <Trash2 className="w-4 h-4 mr-2" />
+                        REMOVER BOT
+                      </Button>
+                      <div className="flex gap-2">
+                        <Button variant="ghost" size="sm" onClick={onClose}>CANCELAR</Button>
+                        <Button size="sm" onClick={handleSaveBot} disabled={savingBot} className="bg-green-600 hover:bg-green-700">
+                          {savingBot && <Loader2 className="w-3 h-3 animate-spin mr-2" />}
+                          SALVAR BOT
+                        </Button>
+                      </div>
                     </div>
                   </div>
                 </TabsContent>
