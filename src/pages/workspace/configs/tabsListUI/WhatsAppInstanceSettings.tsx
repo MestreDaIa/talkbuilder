@@ -527,11 +527,12 @@ export default function WhatsAppInstanceSettings({ instanceName, isOpen, onClose
                           />
                         </div>
                         <div className="space-y-2">
-                          <Label className="text-xs font-bold uppercase text-muted-foreground">API Key</Label>
+                          <Label className="text-xs font-bold uppercase text-muted-foreground">API Key (Bot/Externo)</Label>
                           <Input 
                             type="password"
                             value={botSettings.apiKey}
                             onChange={(e) => setBotSettings(s => ({...s, apiKey: e.target.value}))}
+                            placeholder="Key do Typebot ou API externa"
                             className="text-xs"
                           />
                         </div>
