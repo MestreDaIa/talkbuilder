@@ -85,6 +85,8 @@ export default function WhatsAppInstanceSettings({ instanceName, isOpen, onClose
     stopBotFromMe: false,
     keepOpen: false,
     debounceTime: 1,
+    splitMessages: false,
+    ignoreJids: "",
   });
 
   useEffect(() => {
@@ -157,6 +159,8 @@ export default function WhatsAppInstanceSettings({ instanceName, isOpen, onClose
           stopBotFromMe: b.stopBotFromMe ?? false,
           keepOpen: b.keepOpen ?? false,
           debounceTime: b.debounceTime ?? 1,
+          splitMessages: b.splitMessages ?? false,
+          ignoreJids: b.ignoreJids ?? "",
         });
       }
     } catch (err) {
@@ -633,6 +637,23 @@ export default function WhatsAppInstanceSettings({ instanceName, isOpen, onClose
                             onCheckedChange={(val) => setBotSettings(s => ({...s, keepOpen: val}))} 
                           />
                         </div>
+                        <div className="flex items-center justify-between p-3 border rounded-lg bg-card shadow-sm">
+                          <Label className="text-xs font-medium">Dividir Mensagens</Label>
+                          <Switch 
+                            checked={botSettings.splitMessages} 
+                            onCheckedChange={(val) => setBotSettings(s => ({...s, splitMessages: val}))} 
+                          />
+                        </div>
+                      </div>
+
+                      <div className="space-y-2">
+                        <Label className="text-xs font-bold uppercase text-muted-foreground">Ignorar JIDs (separados por vírgula)</Label>
+                        <Input 
+                          value={botSettings.ignoreJids}
+                          onChange={(e) => setBotSettings(s => ({...s, ignoreJids: e.target.value}))}
+                          placeholder="ex: 123@s.whatsapp.net, 456@g.us"
+                          className="text-xs"
+                        />
                       </div>
                     </div>
 
