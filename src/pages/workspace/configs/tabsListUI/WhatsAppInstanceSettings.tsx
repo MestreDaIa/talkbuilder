@@ -193,7 +193,7 @@ export default function WhatsAppInstanceSettings({ instanceName, isOpen, onClose
     try {
       await evoApi.setWebhook(instanceName, {
         enabled: true,
-        url: fixedWebhookUrl,
+        url: webhookUrl,
         byEvents: webhookByEvents,
         base64: webhookBase64,
         events: selectedEvents,
