@@ -3,10 +3,10 @@ import { processRuntime } from "./runtime.js";
 import { evolutionApi } from "./evolution.js";
 
 export async function handleWhatsAppWebhook(payload: any) {
-  console.log("Recebendo webhook WhatsApp:", JSON.stringify(payload, null, 2));
+  // console.log("Recebendo webhook WhatsApp:", JSON.stringify(payload, null, 2));
   
   // Suporte a ambos formatos: com ou sem o wrapper de evento da Evolution API
-  const eventName = payload.event || payload.eventType || "";
+  const eventName: string = payload.event || payload.eventType || "";
   const isUpsert = eventName === "MESSAGES_UPSERT" || eventName === "messages.upsert" || (!eventName && payload.data?.key);
   
   if (!isUpsert && eventName) {
@@ -22,9 +22,9 @@ export async function handleWhatsAppWebhook(payload: any) {
     return { error: "invalid_payload" };
   }
 
-  const instanceName = payload.instance;
-  const remoteJid = messageData.key.remoteJid;
-  const fromMe = messageData.key.fromMe;
+  const instanceName: string = payload.instance;
+  const remoteJid: string = messageData.key.remoteJid;
+  const fromMe: boolean = !!messageData.key.fromMe;
 
   console.log(`Mensagem de ${remoteJid} na instância ${instanceName}. FromMe: ${fromMe}`);
 
@@ -33,11 +33,11 @@ export async function handleWhatsAppWebhook(payload: any) {
     return { status: "ignored" };
   }
 
-  const text = messageData.message?.conversation || 
-               messageData.message?.extendedTextMessage?.text || 
-               messageData.message?.buttonsResponseMessage?.selectedButtonId ||
-               messageData.message?.templateButtonReplyMessage?.selectedId ||
-               "";
+  const text: string = messageData.message?.conversation || 
+                       messageData.message?.extendedTextMessage?.text || 
+                       messageData.message?.buttonsResponseMessage?.selectedButtonId ||
+                       messageData.message?.templateButtonReplyMessage?.selectedId ||
+                       "";
 
   if (!text && !messageData.message?.buttonsResponseMessage) {
     return { status: "no_text" };
@@ -70,29 +70,31 @@ export async function handleWhatsAppWebhook(payload: any) {
   });
 
   // 3. Send Responses (and also return them for Evolution Bot compatibility)
-  const botResponses = [];
-  for (const msg of runtimeResult.messages) {
-    if (!msg.content) continue;
-    
-    // Preparar para o retorno da Evolution Bot (caso seja chamada via API de Bot)
-    if (runtimeResult.buttons?.length > 0) {
-      botResponses.push({
-        buttons: {
-          text: msg.content,
-          buttons: runtimeResult.buttons.map(b => ({
-            buttonId: b.id,
-            buttonText: { displayText: b.label },
-            type: 1
-          })),
-          footer: "Bot"
-        }
-      });
-      // Também enviamos via API para garantir (Webhook mode)
-      await evolutionApi.sendButtons(instanceName, remoteJid, msg.content, runtimeResult.buttons);
-    } else {
-      botResponses.push({ text: msg.content });
-      // Também enviamos via API para garantir (Webhook mode)
-      await evolutionApi.sendText(instanceName, remoteJid, msg.content);
+  const botResponses: any[] = [];
+  if (runtimeResult && runtimeResult.messages) {
+    for (const msg of runtimeResult.messages) {
+      if (!msg.content) continue;
+      
+      // Preparar para o retorno da Evolution Bot (caso seja chamada via API de Bot)
+      if (runtimeResult.buttons && runtimeResult.buttons.length > 0) {
+        botResponses.push({
+          buttons: {
+            text: msg.content,
+            buttons: runtimeResult.buttons.map((b: any) => ({
+              buttonId: b.id,
+              buttonText: { displayText: b.label },
+              type: 1
+            })),
+            footer: "Bot"
+          }
+        });
+        // Também enviamos via API para garantir (Webhook mode)
+        await evolutionApi.sendButtons(instanceName, remoteJid, msg.content, runtimeResult.buttons);
+      } else {
+        botResponses.push({ text: msg.content });
+        // Também enviamos via API para garantir (Webhook mode)
+        await evolutionApi.sendText(instanceName, remoteJid, msg.content);
+      }
     }
   }
 
