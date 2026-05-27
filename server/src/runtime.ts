@@ -407,18 +407,16 @@ async function runFlow(execution: any, containersIn: any[], edgesIn: any[], inpu
     }
 
     if (nodeType.startsWith("input-")) {
-      if (!inputConsumed) {
-        waiting_for = nodeType === "input-buttons" ? "buttons" : "text";
-        if (nodeType === "input-buttons") {
-          buttons = (cfg.buttons || []).map((b: any) => ({
-            id: b.id,
-            label: b.label || b.text || b.value || "",
-            value: b.value,
-          }));
-        }
-        status = "waiting_input";
-        break;
+      waiting_for = nodeType === "input-buttons" ? "buttons" : "text";
+      if (nodeType === "input-buttons") {
+        buttons = (cfg.buttons || []).map((b: any) => ({
+          id: b.id,
+          label: b.label || b.text || b.value || "",
+          value: b.value,
+        }));
       }
+      status = "waiting_input";
+      break;
     }
 
     // Nodes types
