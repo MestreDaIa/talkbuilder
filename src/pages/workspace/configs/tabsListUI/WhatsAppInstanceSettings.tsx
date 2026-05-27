@@ -61,14 +61,24 @@ export default function WhatsAppInstanceSettings({ instanceName, isOpen, onClose
   const [webhookBase64, setWebhookBase64] = useState(false);
   const [selectedEvents, setSelectedEvents] = useState<string[]>(["MESSAGES_UPSERT"]);
   // Detect current project URL for the webhook
-  const currentProjectUrl = import.meta.env.VITE_BACKEND_URL 
-    ? `${import.meta.env.VITE_BACKEND_URL}/webhook/whatsapp`
-    : window.location.origin.includes("lovable.app") 
-      ? `https://xllkibdddlmcdbrhzedu.supabase.co/functions/v1/whatsapp-webhook` 
-      : `${window.location.origin}/webhook/whatsapp`;
+  const getWebhookUrlWithBot = (botId?: string) => {
+    const backend = import.meta.env.VITE_BACKEND_URL 
+      ? `${import.meta.env.VITE_BACKEND_URL.replace(/\/$/, '')}/webhook/whatsapp`
+      : window.location.origin.includes("lovable.app") 
+        ? `https://xllkibdddlmcdbrhzedu.supabase.co/functions/v1/whatsapp-webhook` 
+        : `${window.location.origin}/webhook/whatsapp`;
     
-  // const fixedWebhookUrl = "https://api-flowbuilder.zailom.com/webhook/whatsapp";
-  const [webhookUrl, setWebhookUrl] = useState(currentProjectUrl);
+    return botId ? `${backend}?bot_id=${botId}` : backend;
+  };
+
+  const [webhookUrl, setWebhookUrl] = useState(getWebhookUrlWithBot(selectedBotId));
+
+  // Update webhookUrl when selectedBotId changes
+  useEffect(() => {
+    if (selectedBotId) {
+      setWebhookUrl(getWebhookUrlWithBot(selectedBotId));
+    }
+  }, [selectedBotId]);
 
   // Instance Settings State
   const [settings, setSettings] = useState({
@@ -85,7 +95,7 @@ export default function WhatsAppInstanceSettings({ instanceName, isOpen, onClose
   const [botSettings, setBotSettings] = useState({
     enabled: false,
     description: "Evolution Bot Settings",
-    apiUrl: currentProjectUrl,
+    apiUrl: getWebhookUrlWithBot(selectedBotId),
     apiKey: "",
     triggerType: "Keyword",
     triggerKeyword: "",
@@ -165,7 +175,7 @@ export default function WhatsAppInstanceSettings({ instanceName, isOpen, onClose
         setBotSettings({
           enabled: b.enabled ?? false,
           description: b.description ?? "Evolution Bot Settings",
-          apiUrl: b.apiUrl || currentProjectUrl,
+          apiUrl: b.apiUrl || getWebhookUrlWithBot(selectedBotId),
           apiKey: b.apiKey ?? "",
           triggerType: b.triggerType || "Keyword",
           triggerKeyword: b.triggerKeyword || b.triggerValue || "",
@@ -344,7 +354,7 @@ export default function WhatsAppInstanceSettings({ instanceName, isOpen, onClose
                           size="xs" 
                           variant="outline" 
                           className="h-9 px-3"
-                          onClick={() => setWebhookUrl(currentProjectUrl)}
+                          onClick={() => setWebhookUrl(getWebhookUrlWithBot(selectedBotId))}
                         >
                           Reset
                         </Button>

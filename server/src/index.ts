@@ -60,7 +60,7 @@ app.get("/webhook/whatsapp", (req: Request, res: Response) => {
 app.post("/webhook/whatsapp*", async (req: Request, res: Response) => {
   try {
     console.log(`[WEBHOOK] Recebido na rota: ${req.url}`);
-    const result = await handleWhatsAppWebhook(req.body);
+    const result = await handleWhatsAppWebhook(req.body, req.query);
     res.json(result);
   } catch (error: any) {
     console.error("Erro no webhook WhatsApp:", error);

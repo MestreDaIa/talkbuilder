@@ -558,9 +558,11 @@ function getEvolutionInstanceState(instance: any): string {
   ).toLowerCase();
 }
 
-function getWhatsAppWebhookUrl(): string {
+function getWhatsAppWebhookUrl(botPublicId?: string): string {
   const backend = (import.meta.env.VITE_BACKEND_URL as string | undefined)?.replace(/\/$/, '') || '';
-  return backend ? `${backend}/webhook/whatsapp` : '';
+  if (!backend) return '';
+  const url = `${backend}/webhook/whatsapp`;
+  return botPublicId ? `${url}?bot_id=${botPublicId}` : url;
 }
 
 function WhatsAppBindingSection({ botPublicId }: { botPublicId: string }) {
@@ -605,7 +607,7 @@ function WhatsAppBindingSection({ botPublicId }: { botPublicId: string }) {
         toast.error("Nome da instância é obrigatório.");
         return;
       }
-      const webhookUrl = getWhatsAppWebhookUrl();
+      const webhookUrl = getWhatsAppWebhookUrl(botPublicId);
       if (!webhookUrl) {
         toast.error("URL do servidor não configurada. Configure VITE_BACKEND_URL.");
         return;
@@ -660,7 +662,7 @@ function WhatsAppBindingSection({ botPublicId }: { botPublicId: string }) {
   const handleTestWebhook = async (instanceName: string) => {
     setTestingWebhook(instanceName);
     try {
-      const webhookUrl = getWhatsAppWebhookUrl();
+      const webhookUrl = getWhatsAppWebhookUrl(botPublicId);
       if (!webhookUrl) {
         toast.error("URL do servidor não configurada. Configure VITE_BACKEND_URL.");
         return;
