@@ -8,6 +8,7 @@ import { ScrollArea } from "../../../../components/ui/scroll-area";
 import { Separator } from "../../../../components/ui/separator";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "../../../../components/ui/tabs";
 import { evoApi } from "../../../../services/evolutionApi";
+import { supabaseClient as supabase } from "../../../../lib/supabaseClient";
 import { useToast } from "../../../../hooks/use-toast";
 import { Loader2, Settings, Globe, Bell, CheckCircle2, MessageSquare, Bot, Plus, Trash2 } from "lucide-react";
 
@@ -50,11 +51,20 @@ export default function WhatsAppInstanceSettings({ instanceName, isOpen, onClose
   const [savingWebhook, setSavingWebhook] = useState(false);
   const [savingSettings, setSavingSettings] = useState(false);
   const [savingBot, setSavingBot] = useState(false);
+  
+  // Bots list for linking
+  const [availableBots, setAvailableBots] = useState<any[]>([]);
+  const [selectedBotId, setSelectedBotId] = useState<string>("");
 
   // Webhook State
   const [webhookByEvents, setWebhookByEvents] = useState(true);
   const [webhookBase64, setWebhookBase64] = useState(false);
   const [selectedEvents, setSelectedEvents] = useState<string[]>(["MESSAGES_UPSERT"]);
+  // Detect current project URL for the webhook
+  const currentProjectUrl = window.location.origin.includes("lovable.app") 
+    ? `https://xllkibdddlmcdbrhzedu.supabase.co/functions/v1/whatsapp-webhook` 
+    : `${window.location.origin}/functions/v1/whatsapp-webhook`;
+    
   const fixedWebhookUrl = "https://api-flowbuilder.zailom.com/webhook/whatsapp";
 
   // Instance Settings State
@@ -72,7 +82,7 @@ export default function WhatsAppInstanceSettings({ instanceName, isOpen, onClose
   const [botSettings, setBotSettings] = useState({
     enabled: false,
     description: "Evolution Bot Settings",
-    apiUrl: "",
+    apiUrl: currentProjectUrl,
     apiKey: "",
     triggerType: "Keyword",
     triggerKeyword: "",
@@ -99,12 +109,19 @@ export default function WhatsAppInstanceSettings({ instanceName, isOpen, onClose
     setLoading(true);
     try {
       // Fetch all needed data in parallel
-      const [instanceData, settingsData, webhookData, botData] = await Promise.all([
+      const [instanceData, settingsData, webhookData, botData, { data: flows }, { data: binding }] = await Promise.all([
         evoApi.fetchInstance(instanceName),
         evoApi.fetchSettings(instanceName),
         evoApi.fetchWebhook(instanceName),
-        evoApi.fetchEvolutionBot(instanceName)
+        evoApi.fetchEvolutionBot(instanceName),
+        supabase.from("chatbot_flows").select("id, name, public_id, is_published").eq("is_published", true),
+        supabase.from("whatsapp_bindings").select("*").eq("instance_name", instanceName).maybeSingle()
       ]);
+
+      setAvailableBots(flows || []);
+      if (binding) {
+        setSelectedBotId(binding.bot_public_id);
+      }
 
       console.log("Instance data:", instanceData);
       console.log("Settings data:", settingsData);
@@ -112,7 +129,7 @@ export default function WhatsAppInstanceSettings({ instanceName, isOpen, onClose
       console.log("Bot data:", botData);
 
       // Load Webhook info (Prioritize data from webhook/find)
-      const webhook = webhookData || (instanceData && instanceData.webhook);
+      const webhook = webhookData?.webhook || webhookData || (instanceData && instanceData.webhook);
       
       if (webhook) {
         // Handle different possible structures from API
@@ -121,10 +138,6 @@ export default function WhatsAppInstanceSettings({ instanceName, isOpen, onClose
         setWebhookBase64(w.base64 ?? false);
         const events = w.events || [];
         setSelectedEvents(events.length > 0 ? events : ["MESSAGES_UPSERT"]);
-      } else {
-        setWebhookByEvents(true);
-        setWebhookBase64(false);
-        setSelectedEvents(["MESSAGES_UPSERT"]);
       }
 
       if (settingsData) {
@@ -146,21 +159,21 @@ export default function WhatsAppInstanceSettings({ instanceName, isOpen, onClose
         setBotSettings({
           enabled: b.enabled ?? false,
           description: b.description ?? "Evolution Bot Settings",
-          apiUrl: b.apiUrl ?? "",
+          apiUrl: b.apiUrl || currentProjectUrl,
           apiKey: b.apiKey ?? "",
-          triggerType: b.triggerType ?? "Keyword",
-          triggerKeyword: b.triggerKeyword ?? "",
-          triggerOperator: b.triggerOperator ?? "Contains",
+          triggerType: b.triggerType || "Keyword",
+          triggerKeyword: b.triggerKeyword || b.triggerValue || "",
+          triggerOperator: b.triggerOperator || "Contains",
           expire: b.expire ?? 300,
           keywordFinish: b.keywordFinish ?? "bye",
           delayMessage: b.delayMessage ?? 1000,
           unknownMessage: b.unknownMessage ?? "Sorry, I dont understand",
-          listeningFromMe: b.listeningFromMe ?? false,
-          stopBotFromMe: b.stopBotFromMe ?? false,
-          keepOpen: b.keepOpen ?? false,
+          listeningFromMe: !!b.listeningFromMe,
+          stopBotFromMe: !!b.stopBotFromMe,
+          keepOpen: !!b.keepOpen,
           debounceTime: b.debounceTime ?? 1,
-          splitMessages: b.splitMessages ?? false,
-          ignoreJids: b.ignoreJids ?? "",
+          splitMessages: !!b.splitMessages,
+          ignoreJids: b.ignoreJids ? (Array.isArray(b.ignoreJids) ? b.ignoreJids.join(", ") : b.ignoreJids) : "",
         });
       }
     } catch (err) {
@@ -210,12 +223,31 @@ export default function WhatsAppInstanceSettings({ instanceName, isOpen, onClose
       toast({ title: "Trigger obrigatório", description: "Informe a palavra-chave (Trigger) ou mude o Trigger Type.", variant: "destructive" });
       return;
     }
+    if (!selectedBotId) {
+      toast({ title: "Vínculo obrigatório", description: "Selecione um Bot do Flow Builder para vincular a esta instância.", variant: "destructive" });
+      return;
+    }
+
     setSavingBot(true);
     try {
+      // 1. Salvar no Evolution API
       await evoApi.setEvolutionBot(instanceName, botSettings);
-      toast({ title: "Evolution Bot atualizado com sucesso!" });
+
+      // 2. Salvar Vínculo no Supabase
+      const { error: bindError } = await supabase
+        .from("whatsapp_bindings")
+        .upsert({
+          instance_name: instanceName,
+          bot_public_id: selectedBotId,
+          updated_at: new Date().toISOString()
+        }, { onConflict: 'instance_name' });
+
+      if (bindError) throw bindError;
+
+      toast({ title: "Evolution Bot e Vínculo atualizados com sucesso!" });
     } catch (err: any) {
-      toast({ title: "Erro ao salvar Evolution Bot", description: err.message, variant: "destructive" });
+      console.error("Erro ao salvar bot/vínculo:", err);
+      toast({ title: "Erro ao salvar", description: err.message, variant: "destructive" });
     } finally {
       setSavingBot(false);
     }
@@ -225,9 +257,15 @@ export default function WhatsAppInstanceSettings({ instanceName, isOpen, onClose
     if (!confirm("Tem certeza que deseja remover o Evolution Bot?")) return;
     setSavingBot(true);
     try {
+      // 1. Remover do Evolution API
       await evoApi.deleteEvolutionBot(instanceName);
-      toast({ title: "Evolution Bot removido com sucesso!" });
+      
+      // 2. Remover do Supabase
+      await supabase.from("whatsapp_bindings").delete().eq("instance_name", instanceName);
+
+      toast({ title: "Evolution Bot e Vínculo removidos com sucesso!" });
       setBotSettings(prev => ({ ...prev, enabled: false }));
+      setSelectedBotId("");
     } catch (err: any) {
       toast({ title: "Erro ao remover Evolution Bot", description: err.message, variant: "destructive" });
     } finally {
@@ -508,6 +546,33 @@ export default function WhatsAppInstanceSettings({ instanceName, isOpen, onClose
                     </div>
 
                     <div className="space-y-4">
+                      <div className="p-4 bg-blue-50/50 dark:bg-blue-950/20 rounded-xl border border-blue-100 dark:border-blue-900/30 space-y-3">
+                        <Label className="text-[10px] uppercase font-bold text-blue-800 dark:text-blue-300 flex items-center gap-1.5">
+                          <CheckCircle2 className="w-3 h-3" />
+                          Vincular ao Flow Builder
+                        </Label>
+                        <div className="space-y-2">
+                          <Label className="text-xs text-muted-foreground">Escolha qual Bot este WhatsApp deve executar:</Label>
+                          <select 
+                            className="flex h-9 w-full rounded-md border border-input bg-background px-3 py-1 text-xs shadow-sm focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
+                            value={selectedBotId}
+                            onChange={(e) => setSelectedBotId(e.target.value)}
+                          >
+                            <option value="">Selecione um Bot publicado...</option>
+                            {availableBots.map(bot => (
+                              <option key={bot.id} value={bot.public_id || bot.id}>
+                                {bot.name} ({bot.public_id || "Sem ID"})
+                              </option>
+                            ))}
+                          </select>
+                          {availableBots.length === 0 && (
+                            <p className="text-[10px] text-amber-600 font-medium">
+                              * Nenhum bot publicado encontrado. Publique um bot no Flow Builder primeiro.
+                            </p>
+                          )}
+                        </div>
+                      </div>
+
                       <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                         <div className="space-y-2">
                           <Label className="text-xs font-bold uppercase text-muted-foreground">Descrição</Label>
@@ -525,6 +590,9 @@ export default function WhatsAppInstanceSettings({ instanceName, isOpen, onClose
                             placeholder="https://sua-api.com/bot"
                             className="text-xs"
                           />
+                          <p className="text-[9px] text-muted-foreground">
+                            Use esta URL para que o bot use seu Flow Builder.
+                          </p>
                         </div>
                         <div className="space-y-2">
                           <Label className="text-xs font-bold uppercase text-muted-foreground">API Key (Bot/Externo)</Label>

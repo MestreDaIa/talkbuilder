@@ -16,26 +16,49 @@ Deno.serve(async (req: Request) => {
 
   try {
     const body = await req.json();
-    console.log(`[whatsapp-webhook] Evento recebido: ${body.event} da instância: ${body.instance}`);
+    console.log(`[whatsapp-webhook] Evento recebido: ${body.event || "EvolutionBot"} da instância: ${body.instance}`);
 
-    // Alguns servidores mandam em lowercase ou prefixado
+    let instanceName = body.instance;
+    let remoteJid: string | null = null;
+    let text: string | null = null;
+    let isGroup = false;
+    let fromMe = false;
+    let buttonId: string | null = null;
+
+    // 1. Verificar se é um evento padrão (MESSAGES_UPSERT) ou chamada direta do EvolutionBot
     const isUpsert = body.event === "MESSAGES_UPSERT" || body.event === "messages.upsert";
 
-    if (!isUpsert) {
-      console.log("[whatsapp-webhook] Evento ignorado (não é MESSAGES_UPSERT)");
+    if (isUpsert) {
+      const messageData = body.data;
+      if (!messageData || !messageData.key) {
+        console.error("[whatsapp-webhook] Payload inválido: falta 'data' ou 'key'");
+        return new Response(JSON.stringify({ error: "invalid_payload" }), { status: 400 });
+      }
+
+      remoteJid = messageData.key.remoteJid;
+      isGroup = remoteJid?.endsWith("@g.us") || false;
+      fromMe = messageData.key.fromMe || false;
+
+      // Extrair texto da mensagem
+      text = messageData.message?.conversation || 
+             messageData.message?.extendedTextMessage?.text || 
+             messageData.message?.buttonsResponseMessage?.selectedButtonId ||
+             messageData.message?.templateButtonReplyMessage?.selectedId ||
+             "";
+      
+      buttonId = messageData.message?.buttonsResponseMessage?.selectedButtonId || 
+                 messageData.message?.templateButtonReplyMessage?.selectedId;
+    } else if (body.remoteJid && body.content !== undefined) {
+      // Formato do Evolution Bot (chamada direta)
+      remoteJid = body.remoteJid;
+      text = body.content || "";
+      isGroup = body.isGroup || false;
+      fromMe = body.isMe || false;
+      console.log(`[whatsapp-webhook] Processando via Evolution Bot Direct Call: ${remoteJid}`);
+    } else {
+      console.log("[whatsapp-webhook] Evento ignorado (não reconhecido ou não é MESSAGES_UPSERT)");
       return new Response(JSON.stringify({ status: "ignored_event", event: body.event }), { headers: { "Content-Type": "application/json" } });
     }
-
-    const messageData = body.data;
-    if (!messageData || !messageData.key) {
-      console.error("[whatsapp-webhook] Payload inválido: falta 'data' ou 'key'");
-      return new Response(JSON.stringify({ error: "invalid_payload" }), { status: 400 });
-    }
-
-    const instanceName = body.instance;
-    const remoteJid = messageData.key.remoteJid;
-    const isGroup = remoteJid.endsWith("@g.us");
-    const fromMe = messageData.key.fromMe;
 
     if (fromMe) {
       console.log("[whatsapp-webhook] Mensagem ignorada (enviada pelo próprio bot)");
@@ -47,17 +70,8 @@ Deno.serve(async (req: Request) => {
       return new Response(JSON.stringify({ status: "ignored_group_message" }), { headers: { "Content-Type": "application/json" } });
     }
 
-    // Extrair texto da mensagem
-    const text = messageData.message?.conversation || 
-                 messageData.message?.extendedTextMessage?.text || 
-                 messageData.message?.buttonsResponseMessage?.selectedButtonId ||
-                 messageData.message?.templateButtonReplyMessage?.selectedId ||
-                 "";
-
-    console.log(`[whatsapp-webhook] Mensagem de ${remoteJid}: "${text}"`);
-
-    if (!text && !messageData.message?.buttonsResponseMessage) {
-      console.log("[whatsapp-webhook] Mensagem sem texto, ignorando.");
+    if (!text && !buttonId) {
+      console.log("[whatsapp-webhook] Mensagem sem texto ou botão, ignorando.");
       return new Response(JSON.stringify({ status: "no_text" }), { headers: { "Content-Type": "application/json" } });
     }
 
@@ -84,7 +98,7 @@ Deno.serve(async (req: Request) => {
       return new Response(JSON.stringify({ status: "no_binding", instance: instanceName }), { headers: { "Content-Type": "application/json" } });
     }
 
-    console.log(`[whatsapp-webhook] Bot identificado: ${binding.bot_public_id}. Chamando runtime...`);
+    console.log(`[whatsapp-webhook] Bot identificado: ${binding.bot_public_id}. Chamando runtime para ${remoteJid}...`);
 
     // 2. Chamar Chatbot Runtime
     const runtimeUrl = `${Deno.env.get("SUPABASE_URL")}/functions/v1/chatbot-runtime`;
@@ -101,7 +115,7 @@ Deno.serve(async (req: Request) => {
         channel: "whatsapp",
         payload: {
           message: text,
-          button_id: messageData.message?.buttonsResponseMessage?.selectedButtonId || messageData.message?.templateButtonReplyMessage?.selectedId
+          button_id: buttonId
         }
       })
     });
