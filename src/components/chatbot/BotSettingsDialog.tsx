@@ -567,6 +567,7 @@ function WhatsAppBindingSection({ botPublicId }: { botPublicId: string }) {
   const [instances, setInstances] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [binding, setBinding] = useState<string | null>(null);
+  const [bindingBusy, setBindingBusy] = useState<string | null>(null);
   const [testingWebhook, setTestingWebhook] = useState<string | null>(null);
 
   useEffect(() => {
@@ -598,22 +599,37 @@ function WhatsAppBindingSection({ botPublicId }: { botPublicId: string }) {
   }, [botPublicId]);
 
   const handleBind = async (instanceName: string) => {
+    setBindingBusy(instanceName);
     try {
       if (!instanceName) {
         toast.error("Nome da instância é obrigatório.");
+        return;
+      }
+      const webhookUrl = getWhatsAppWebhookUrl();
+      if (!webhookUrl) {
+        toast.error("URL do servidor não configurada. Configure VITE_BACKEND_URL.");
         return;
       }
       
       console.log("[WhatsApp] Vinculando bot:", botPublicId, "à instância:", instanceName);
 
       // 1. Remove qualquer vínculo anterior deste bot
-      await supabaseClient.from("whatsapp_bindings").delete().eq("bot_public_id", botPublicId);
+      const { error: deleteError } = await supabaseClient
+        .from("whatsapp_bindings")
+        .delete()
+        .eq("bot_public_id", botPublicId);
+      if (deleteError) throw deleteError;
       
       // 2. Cria novo vínculo
-      const { error, data } = await supabaseClient.from("whatsapp_bindings").insert({
-        instance_name: instanceName,
-        bot_public_id: botPublicId
-      }).select();
+      const { error, data } = await supabaseClient
+        .from("whatsapp_bindings")
+        .insert({
+          instance_name: instanceName,
+          bot_public_id: botPublicId,
+          webhook_url: webhookUrl,
+          updated_at: new Date().toISOString(),
+        })
+        .select();
 
       if (error) {
         console.error("[WhatsApp] Erro ao inserir no banco:", error);
@@ -623,8 +639,6 @@ function WhatsAppBindingSection({ botPublicId }: { botPublicId: string }) {
       console.log("[WhatsApp] Vínculo criado com sucesso:", data);
 
       // 3. Configura o Webhook na Evolution API apontando para o servidor próprio
-      const backend = (import.meta.env.VITE_BACKEND_URL as string | undefined)?.replace(/\/$/, '') || '';
-      const webhookUrl = `${backend}/webhook/whatsapp`;
       await evoApi.setWebhook(instanceName, webhookUrl);
 
       setBinding(instanceName);
@@ -632,6 +646,8 @@ function WhatsAppBindingSection({ botPublicId }: { botPublicId: string }) {
     } catch (err: any) {
       console.error("Erro ao vincular bot:", err);
       toast.error(`Erro ao vincular bot: ${err?.message || err?.details || 'desconhecido'}`);
+    } finally {
+      setBindingBusy(null);
     }
   };
 
