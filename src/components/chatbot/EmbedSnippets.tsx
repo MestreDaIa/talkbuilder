@@ -211,17 +211,23 @@ function WhatsappBindPanel({ botPublicId }: { botPublicId: string }) {
     setBusy('bind');
     try {
       await evoApi.setWebhook(selected, webhookUrl);
+
+      // Remove qualquer vínculo anterior deste bot (a PK é composta:
+      // instance_name + bot_public_id, então upsert por instance_name falha com 400).
+      const { error: delErr } = await (supabaseClient as any)
+        .from('whatsapp_bindings')
+        .delete()
+        .eq('bot_public_id', botPublicId);
+      if (delErr) throw delErr;
+
       const { error } = await (supabaseClient as any)
         .from('whatsapp_bindings')
-        .upsert(
-          {
-            instance_name: selected,
-            bot_public_id: botPublicId,
-            webhook_url: webhookUrl,
-            updated_at: new Date().toISOString(),
-          },
-          { onConflict: 'instance_name' }
-        );
+        .insert({
+          instance_name: selected,
+          bot_public_id: botPublicId,
+          webhook_url: webhookUrl,
+          updated_at: new Date().toISOString(),
+        });
       if (error) {
         if (/relation .* does not exist|whatsapp_bindings/i.test(error.message || '')) {
           setMissingTable(true);
