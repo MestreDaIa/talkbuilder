@@ -571,15 +571,25 @@ function WhatsAppBindingSection({ botPublicId }: { botPublicId: string }) {
 
   useEffect(() => {
     async function load() {
+      setLoading(true);
       try {
-        const [insts, { data: bind }] = await Promise.all([
-          evoApi.fetchInstances(),
-          supabaseClient.from("whatsapp_bindings").select("instance_name").eq("bot_public_id", botPublicId).maybeSingle()
-        ]);
-        setInstances(insts);
+        const insts = await evoApi.fetchInstances();
+        const normalizedInstances = Array.isArray(insts)
+          ? insts.filter((inst: any) => Boolean(getEvolutionInstanceName(inst)))
+          : [];
+        const { data: bind, error } = await supabaseClient
+          .from("whatsapp_bindings")
+          .select("instance_name")
+          .eq("bot_public_id", botPublicId)
+          .limit(1)
+          .maybeSingle();
+
+        if (error) throw error;
+        setInstances(normalizedInstances);
         if (bind) setBinding(bind.instance_name);
       } catch (err) {
         console.error("Erro ao carregar instâncias:", err);
+        toast.error("Erro ao carregar instâncias do WhatsApp.");
       } finally {
         setLoading(false);
       }
