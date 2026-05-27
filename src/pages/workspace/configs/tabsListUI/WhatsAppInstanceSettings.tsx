@@ -3,12 +3,13 @@ import { Button } from "../../../../components/ui/button";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from "../../../../components/ui/dialog";
 import { Switch } from "../../../../components/ui/switch";
 import { Label } from "../../../../components/ui/label";
+import { Input } from "../../../../components/ui/input";
 import { ScrollArea } from "../../../../components/ui/scroll-area";
 import { Separator } from "../../../../components/ui/separator";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "../../../../components/ui/tabs";
 import { evoApi } from "../../../../services/evolutionApi";
 import { useToast } from "../../../../hooks/use-toast";
-import { Loader2, Settings, Globe, Bell, CheckCircle2 } from "lucide-react";
+import { Loader2, Settings, Globe, Bell, CheckCircle2, MessageSquare } from "lucide-react";
 
 interface WhatsAppInstanceSettingsProps {
   instanceName: string;
