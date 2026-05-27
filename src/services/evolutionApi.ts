@@ -94,6 +94,18 @@ export const evoApi = {
   },
 
   /**
+   * Busca as configurações de webhook de uma instância
+   */
+  async fetchWebhook(instanceName: string) {
+    const response = await fetch(`${EVO_BASE_URL}/webhook/find/${instanceName}`, {
+      method: 'GET',
+      headers: { 'apikey': EVO_GLOBAL_KEY },
+    });
+    if (!response.ok) return null;
+    return response.json();
+  },
+
+  /**
    * Busca as configurações atuais da instância
    */
   async fetchInstance(instanceName: string) {
