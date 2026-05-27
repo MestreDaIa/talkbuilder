@@ -89,7 +89,7 @@ export async function handleWhatsAppWebhook(payload: any, query?: any) {
   // 3. Send Responses (and also return them for Evolution Bot compatibility)
   console.log(`[WHATSAPP] Resultado do runtime: ${JSON.stringify({ 
     msgCount: runtimeResult?.messages?.length, 
-    status: runtimeResult?.status,
+    status: runtimeResult?.debug?.status,
     next_node: runtimeResult?.debug?.node
   })}`);
 
