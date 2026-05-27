@@ -18,8 +18,10 @@ export const evolutionApi = {
         body: JSON.stringify({
           number,
           text,
-          linkPreview: false
+          linkPreview: false,
+          delay: 1000
         })
+
       });
       const data: any = await response.json();
       console.log("Resposta Evolution (sendText):", JSON.stringify(data));

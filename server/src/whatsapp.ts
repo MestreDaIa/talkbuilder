@@ -126,8 +126,10 @@ export async function handleWhatsAppWebhook(payload: any, query?: any) {
     }
   }
 
+  console.log(`[WHATSAPP] Resposta final para Evolution: ${JSON.stringify(botResponses)}`);
   return { 
     status: "success",
     messages: botResponses 
   };
+
 }
