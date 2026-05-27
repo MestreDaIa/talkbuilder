@@ -607,7 +607,7 @@ function WhatsAppBindingSection({ botPublicId }: { botPublicId: string }) {
         toast.error("Nome da instância é obrigatório.");
         return;
       }
-      const webhookUrl = getWhatsAppWebhookUrl();
+      const webhookUrl = getWhatsAppWebhookUrl(botPublicId);
       if (!webhookUrl) {
         toast.error("URL do servidor não configurada. Configure VITE_BACKEND_URL.");
         return;
