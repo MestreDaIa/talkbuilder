@@ -76,32 +76,34 @@ export default function WhatsAppInstanceSettings({ instanceName, isOpen, onClose
   const loadInstanceData = async () => {
     setLoading(true);
     try {
-      // Fetch both instance (for webhook) and specific settings
-      const [instanceData, settingsData] = await Promise.all([
+      // Fetch all needed data in parallel
+      const [instanceData, settingsData, webhookData] = await Promise.all([
         evoApi.fetchInstance(instanceName),
-        evoApi.fetchSettings(instanceName)
+        evoApi.fetchSettings(instanceName),
+        evoApi.fetchWebhook(instanceName)
       ]);
 
-      if (instanceData) {
-        // Load Webhook info
-        const webhook = instanceData.webhook;
-        if (webhook) {
-          setWebhookByEvents(webhook.byEvents ?? true);
-          setWebhookBase64(webhook.base64 ?? false);
-          // If events is null/undefined or empty, default to MESSAGES_UPSERT
-          const events = webhook.events || [];
-          setSelectedEvents(events.length > 0 ? events : ["MESSAGES_UPSERT"]);
-        } else {
-          // If no webhook object exists, set defaults
-          setWebhookByEvents(true);
-          setWebhookBase64(false);
-          setSelectedEvents(["MESSAGES_UPSERT"]);
-        }
+      console.log("Instance data:", instanceData);
+      console.log("Settings data:", settingsData);
+      console.log("Webhook data:", webhookData);
+
+      // Load Webhook info (Prioritize data from webhook/find)
+      const webhook = webhookData || (instanceData && instanceData.webhook);
+      
+      if (webhook) {
+        // Handle different possible structures from API
+        const w = webhook.webhook || webhook;
+        setWebhookByEvents(w.byEvents ?? true);
+        setWebhookBase64(w.base64 ?? false);
+        const events = w.events || [];
+        setSelectedEvents(events.length > 0 ? events : ["MESSAGES_UPSERT"]);
+      } else {
+        setWebhookByEvents(true);
+        setWebhookBase64(false);
+        setSelectedEvents(["MESSAGES_UPSERT"]);
       }
 
       if (settingsData) {
-        // Load Settings info with priority to settingsData
-        // Evolution API v2 might return data wrapped in 'settings' or directly
         const s = settingsData.settings || settingsData;
         
         setSettings({
