@@ -200,15 +200,12 @@ function writeMemoryState(key: string, state: any) {
   runtimeMemory.set(key, { state, expiresAt: now + MEMORY_TTL_MS });
 }
 
-// ... include runFlow and all its helpers here ...
-// (I will simplify and include only the necessary ones for brevity but complete for functionality)
-
-async function runFlow(execution: any, containersIn: any[], edgesIn: any[], input: any, flow: any, supabase: any, visitedRedirects = new Set<string>()): Promise<any> {
-  let containers: any[] = containersIn;
-  let edges: any[] = edgesIn;
+async function runFlow(execution: any, containersIn: any[], edgesIn: any[], input: any, flow: any, supabase: any, _visitedRedirects = new Set<string>()): Promise<any> {
+  const containers: any[] = containersIn;
+  const edges: any[] = edgesIn;
   let currentNodeId: string | null = execution.current_node_id;
-  let activeAgentNodeId: string | null = execution.active_agent_node_id || null;
-  let mode: string = execution.runtime_mode || "flow";
+  const activeAgentNodeId: string | null = execution.active_agent_node_id || null;
+  const mode: string = execution.runtime_mode || "flow";
   const variables: Record<string, any> = { ...(execution.variables || {}) };
   const messages: any[] = [];
   let waiting_for: string | null = null;
@@ -283,24 +280,6 @@ async function runFlow(execution: any, containersIn: any[], edgesIn: any[], inpu
 
   const replaceVars = (text: string) =>
     !text ? text : decodeText(text).replace(/{{(.*?)}}/g, (_, k) => variables[k.trim()] ?? `{{${k}}}`);
-
-  // Helpers for Agent skills
-  const collectAgentSkills = (agentNodeId?: string | null) => containers.flatMap((container: any) =>
-    (container.nodes || [])
-      .filter((node: any) => node.id !== agentNodeId && node.config?.isSkill)
-      .map((node: any) => ({
-        id: node.id,
-        type: node.type,
-        containerId: container.id,
-        containerName: container.nameContainer || `Bloco #${String(container.id).slice(-4)}`,
-        description: String(node.config?.skillDescription || "Use quando esta ação for útil para atender o usuário."),
-        label: node.type === "redirect"
-          ? `Redirecionar para ${node.config?.targetFlowName || node.config?.targetFlow || "outro fluxo"}`
-          : node.type === "go-to"
-            ? `Ir para ${node.config?.targetContainerName || node.config?.targetContainerId || "outro bloco"}`
-            : String(node.config?.name || node.config?.label || node.type),
-      }))
-  );
 
   const evaluateComparison = (comparison: any) => {
     const key = String(comparison?.variableName || "").trim().replace(/^{{\s*/, "").replace(/\s*}}$/, "");
@@ -406,7 +385,7 @@ async function runFlow(execution: any, containersIn: any[], edgesIn: any[], inpu
       case "bubble-text":
       case "bubble-number": {
         const text = replaceVars(cfg.message || cfg.content || cfg.text || cfg.number || "");
-        if (text) messages.push({ id: (crypto as any).randomUUID(), type: "bot", content: text });
+        if (text) messages.push({ id: crypto.randomUUID(), type: "bot", content: text });
         break;
       }
       case "bubble-image": {
@@ -466,8 +445,7 @@ async function runFlow(execution: any, containersIn: any[], edgesIn: any[], inpu
       case "redirect": {
         const targetRef = cfg.targetFlow || cfg.targetFlowId;
         if (targetRef) {
-          // Simplified redirect for now
-          messages.push({ id: (crypto as any).randomUUID(), type: "bot", content: "Redirecionando fluxo..." });
+          messages.push({ id: crypto.randomUUID(), type: "bot", content: "Redirecionando fluxo..." });
         }
         break;
       }
