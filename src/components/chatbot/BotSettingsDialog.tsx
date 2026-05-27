@@ -679,9 +679,13 @@ function WhatsAppBindingSection({ botPublicId }: { botPublicId: string }) {
       if (bindError) throw bindError;
       setBinding(instanceName);
 
+      console.log("[WhatsApp] Disparando teste para:", webhookUrl);
       const response = await fetch(webhookUrl, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: { 
+          'Content-Type': 'application/json',
+          'Accept': 'application/json'
+        },
         body: JSON.stringify({
           event: "MESSAGES_UPSERT",
           instance: instanceName,
