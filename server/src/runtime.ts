@@ -434,7 +434,7 @@ async function runFlow(execution: any, containersIn: any[], edgesIn: any[], inpu
       case "ai-node": {
         const userMessage = String(variables["last_message"] || "").trim();
         const provider = (cfg.provider || "openai").toLowerCase();
-        const activeKey = flow?.settings?.aiKeys?.[`${provider}Key`] || cfg.apiKey;
+        const activeKey = flow?.settings?.aiKeys?.[`${provider}Key`] || flow?.settings?.[`${provider}_key`] || cfg.apiKey;
         
         if (activeKey && userMessage) {
           try {

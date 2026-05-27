@@ -5,13 +5,18 @@ import { evolutionApi } from "./evolution.js";
 export async function handleWhatsAppWebhook(payload: any) {
   console.log("Recebendo webhook WhatsApp:", JSON.stringify(payload, null, 2));
   
-  const isUpsert = payload.event === "MESSAGES_UPSERT" || payload.event === "messages.upsert";
-  if (!isUpsert) {
-    console.log("Evento ignorado:", payload.event);
-    return { status: "ignored_event" };
+  // Suporte a ambos formatos: com ou sem o wrapper de evento da Evolution API
+  const eventName = payload.event || payload.eventType || "";
+  const isUpsert = eventName === "MESSAGES_UPSERT" || eventName === "messages.upsert" || (!eventName && payload.data?.key);
+  
+  if (!isUpsert && eventName) {
+    console.log("Evento ignorado:", eventName);
+    return { status: "ignored_event", event: eventName };
   }
 
-  const messageData = payload.data;
+  // Se byEvents estiver false, a Evolution manda o objeto direto no payload.
+  // Se estiver true, manda dentro de payload.data.
+  const messageData = payload.data || (payload.key ? payload : null);
   if (!messageData?.key) {
     console.error("Payload inválido: faltando messageData.key");
     return { error: "invalid_payload" };

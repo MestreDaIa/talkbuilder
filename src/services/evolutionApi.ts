@@ -33,7 +33,7 @@ export const evoApi = {
         webhook: {
           enabled: !!webhookUrl,
           url: webhookUrl,
-          byEvents: false,
+          byEvents: true,
           base64: false,
           events: webhookUrl ? ['MESSAGES_UPSERT'] : [],
         },
