@@ -345,8 +345,17 @@ async function runFlow(execution: any, containersIn: any[], edgesIn: any[], inpu
       if (startNode) {
         currentNodeId = startNode.id;
         break;
+    }
+    if (!currentNodeId) {
+      console.log(`[runtime] NENHUM NODE DE START ENCONTRADO nos ${containers.length} containers.`);
+      // Se não houver start, tenta pegar o primeiro node do primeiro container como fallback
+      if (containers.length > 0 && containers[0].nodes?.length > 0) {
+        currentNodeId = containers[0].nodes[0].id;
+        console.log(`[runtime] Usando fallback: primeiro node do primeiro container (${currentNodeId})`);
       }
     }
+  }
+
   }
 
   console.log(`[runtime] Node atual: ${currentNodeId}. Steps: ${steps}`);
