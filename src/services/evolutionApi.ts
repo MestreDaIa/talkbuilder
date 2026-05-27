@@ -20,9 +20,15 @@ export const evoApi = {
   },
 
   /**
-   * Configura webhook da instância (apontando para um endpoint que receberá as mensagens)
+   * Configura webhook da instância
    */
-  async setWebhook(instanceName: string, webhookUrl: string) {
+  async setWebhook(instanceName: string, webhookData: {
+    enabled: boolean;
+    url: string;
+    byEvents: boolean;
+    base64: boolean;
+    events: string[];
+  }) {
     const response = await fetch(`${EVO_BASE_URL}/webhook/set/${instanceName}`, {
       method: 'POST',
       headers: {
@@ -30,13 +36,7 @@ export const evoApi = {
         'apikey': EVO_GLOBAL_KEY,
       },
       body: JSON.stringify({
-        webhook: {
-          enabled: !!webhookUrl,
-          url: webhookUrl,
-          byEvents: true,
-          base64: false,
-          events: webhookUrl ? ['MESSAGES_UPSERT'] : [],
-        },
+        webhook: webhookData
       }),
     });
     if (!response.ok) {
@@ -44,6 +44,45 @@ export const evoApi = {
       throw new Error(data.message || data.error || 'Erro ao configurar webhook');
     }
     return response.json();
+  },
+
+  /**
+   * Atualiza as configurações da instância
+   */
+  async setSettings(instanceName: string, settings: {
+    reject_call?: boolean;
+    groups_ignore?: boolean;
+    always_online?: boolean;
+    read_messages?: boolean;
+    sync_full_history?: boolean;
+    read_status?: boolean;
+  }) {
+    const response = await fetch(`${EVO_BASE_URL}/settings/set/${instanceName}`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'apikey': EVO_GLOBAL_KEY,
+      },
+      body: JSON.stringify(settings),
+    });
+    if (!response.ok) {
+      const data = await response.json().catch(() => ({}));
+      throw new Error(data.message || data.error || 'Erro ao atualizar configurações');
+    }
+    return response.json();
+  },
+
+  /**
+   * Busca as configurações atuais da instância
+   */
+  async fetchInstance(instanceName: string) {
+    const response = await fetch(`${EVO_BASE_URL}/instance/fetchInstances?instanceName=${instanceName}`, {
+      method: 'GET',
+      headers: { 'apikey': EVO_GLOBAL_KEY },
+    });
+    if (!response.ok) return null;
+    const instances = await response.json();
+    return Array.isArray(instances) ? instances.find((i: any) => i.instanceName === instanceName) : instances;
   },
   /**
    * Cria uma nova instância na Evolution API

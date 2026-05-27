@@ -639,7 +639,13 @@ function WhatsAppBindingSection({ botPublicId }: { botPublicId: string }) {
       console.log("[WhatsApp] Vínculo criado com sucesso:", data);
 
       // 3. Configura o Webhook na Evolution API apontando para o servidor próprio
-      await evoApi.setWebhook(instanceName, webhookUrl);
+      await evoApi.setWebhook(instanceName, {
+        enabled: true,
+        url: webhookUrl,
+        byEvents: true,
+        base64: false,
+        events: ['MESSAGES_UPSERT']
+      });
 
       setBinding(instanceName);
       toast.success(`Bot vinculado à instância ${instanceName}`);

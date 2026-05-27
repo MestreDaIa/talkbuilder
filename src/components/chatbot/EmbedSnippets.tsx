@@ -210,7 +210,13 @@ function WhatsappBindPanel({ botPublicId }: { botPublicId: string }) {
     }
     setBusy('bind');
     try {
-      await evoApi.setWebhook(selected, webhookUrl);
+      await evoApi.setWebhook(selected, {
+        enabled: true,
+        url: webhookUrl,
+        byEvents: true,
+        base64: false,
+        events: ['MESSAGES_UPSERT']
+      });
 
       // Remove qualquer vínculo anterior deste bot (a PK é composta:
       // instance_name + bot_public_id, então upsert por instance_name falha com 400).
@@ -248,7 +254,15 @@ function WhatsappBindPanel({ botPublicId }: { botPublicId: string }) {
     if (!boundInstance) return;
     setBusy('unbind');
     try {
-      try { await evoApi.setWebhook(boundInstance, ''); } catch {}
+      try { 
+        await evoApi.setWebhook(boundInstance, {
+          enabled: false,
+          url: '',
+          byEvents: false,
+          base64: false,
+          events: []
+        }); 
+      } catch {}
       await (supabaseClient as any)
         .from('whatsapp_bindings')
         .delete()

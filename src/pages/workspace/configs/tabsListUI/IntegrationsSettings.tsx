@@ -3,7 +3,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '../..
 import { Button } from '../../../../components/ui/button'
 import { Input } from '../../../../components/ui/input'
 import { Label } from '../../../../components/ui/label'
-import { CalendarCheck2, Database, Ellipsis, CheckCircle2, XCircle, RefreshCw, Trash2, Loader2, QrCode } from 'lucide-react'
+import { CalendarCheck2, Database, Ellipsis, CheckCircle2, XCircle, RefreshCw, Trash2, Loader2, QrCode, Settings } from 'lucide-react'
 import { useEmbed } from '../../../../context/EmbedContext'
 import { useState, useEffect } from 'react'
 import {
@@ -23,6 +23,8 @@ import {
   DialogTitle,
 } from "../../../../components/ui/dialog"
 
+import WhatsAppInstanceSettings from './WhatsAppInstanceSettings'
+
 export default function IntegrationsSettings() {
   const { flags } = useEmbed();
   const { toast } = useToast();
@@ -41,6 +43,7 @@ export default function IntegrationsSettings() {
   const [instanceName, setInstanceName] = useState("");
   const [showQrModal, setShowQrModal] = useState(false);
   const [pollInterval, setPollInterval] = useState<NodeJS.Timeout | null>(null);
+  const [selectedInstanceForConfig, setSelectedInstanceForConfig] = useState<string | null>(null);
 
   useEffect(() => {
     const cfg = getSupabaseConfig();
@@ -267,7 +270,10 @@ export default function IntegrationsSettings() {
                     </span>
                   </div>
                   <div className="flex items-center gap-1">
-                     <Button variant="ghost" size="icon" onClick={() => handleRefreshWhatsappStatus(conn.instance_name)} className="h-8 w-8 text-gray-500">
+                      <Button variant="ghost" size="icon" onClick={() => setSelectedInstanceForConfig(conn.instance_name)} className="h-8 w-8 text-gray-500 hover:text-green-600" title="Configurações">
+                        <Settings className="w-3.5 h-3.5" />
+                      </Button>
+                      <Button variant="ghost" size="icon" onClick={() => handleRefreshWhatsappStatus(conn.instance_name)} className="h-8 w-8 text-gray-500">
                         <RefreshCw className="w-3.5 h-3.5" />
                       </Button>
                       {conn.status !== "connected" && (
@@ -412,6 +418,12 @@ export default function IntegrationsSettings() {
           </div>
         </DialogContent>
       </Dialog>
+
+      <WhatsAppInstanceSettings 
+        instanceName={selectedInstanceForConfig || ""} 
+        isOpen={!!selectedInstanceForConfig} 
+        onClose={() => setSelectedInstanceForConfig(null)} 
+      />
     </div>
   )
 }
