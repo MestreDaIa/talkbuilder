@@ -69,15 +69,35 @@ export async function handleWhatsAppWebhook(payload: any) {
     }
   });
 
-  // 3. Send Responses
+  // 3. Send Responses (and also return them for Evolution Bot compatibility)
+  const botResponses = [];
   for (const msg of runtimeResult.messages) {
     if (!msg.content) continue;
+    
+    // Preparar para o retorno da Evolution Bot (caso seja chamada via API de Bot)
     if (runtimeResult.buttons?.length > 0) {
+      botResponses.push({
+        buttons: {
+          text: msg.content,
+          buttons: runtimeResult.buttons.map(b => ({
+            buttonId: b.id,
+            buttonText: { displayText: b.label },
+            type: 1
+          })),
+          footer: "Bot"
+        }
+      });
+      // Também enviamos via API para garantir (Webhook mode)
       await evolutionApi.sendButtons(instanceName, remoteJid, msg.content, runtimeResult.buttons);
     } else {
+      botResponses.push({ text: msg.content });
+      // Também enviamos via API para garantir (Webhook mode)
       await evolutionApi.sendText(instanceName, remoteJid, msg.content);
     }
   }
 
-  return { status: "success" };
+  return { 
+    status: "success",
+    messages: botResponses 
+  };
 }

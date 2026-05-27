@@ -59,7 +59,8 @@ app.get("/webhook/whatsapp", (req, res) => {
 });
 
 // Endpoint para Webhook da Evolution API
-app.post("/webhook/whatsapp", async (req, res) => {
+// Usando :event? e curinga * para suportar o modo byEvents da Evolution API
+app.post("/webhook/whatsapp/:event?*", async (req, res) => {
   try {
     const result = await handleWhatsAppWebhook(req.body);
     res.json(result);
