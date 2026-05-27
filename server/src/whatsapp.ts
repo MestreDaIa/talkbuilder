@@ -47,14 +47,20 @@ export async function handleWhatsAppWebhook(payload: any, query?: any) {
   let botPublicId = query?.bot_id || query?.flow_id;
 
   if (!botPublicId) {
-    const { data: binding } = await supabase
+    // Usamos select().eq() em vez de maybeSingle() para evitar erro caso existam múltiplos bindings (como visto nos logs)
+    const { data: bindings, error: bindingError } = await supabase
       .from("whatsapp_bindings")
       .select("bot_public_id")
-      .eq("instance_name", instanceName)
-      .maybeSingle();
+      .eq("instance_name", instanceName);
 
-    if (binding) {
-      botPublicId = binding.bot_public_id;
+    if (bindingError) {
+      console.error(`Erro ao buscar binding para ${instanceName}:`, bindingError);
+    }
+
+    if (bindings && bindings.length > 0) {
+      // Se houver múltiplos, pegamos o primeiro cadastrado
+      botPublicId = bindings[0].bot_public_id;
+      console.log(`Binding encontrado via banco de dados para a instância ${instanceName}: ${botPublicId}`);
     }
   }
 
