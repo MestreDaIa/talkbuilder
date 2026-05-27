@@ -59,6 +59,7 @@ export default function WhatsAppInstanceSettings({ instanceName, isOpen, onClose
   // Instance Settings State
   const [settings, setSettings] = useState({
     reject_call: false,
+    msg_call: "",
     groups_ignore: false,
     always_online: false,
     read_messages: false,
