@@ -536,23 +536,61 @@ export function BotSettingsDialog({
     </Dialog>
   );
 }
+
+function getEvolutionInstanceName(instance: any): string {
+  return String(
+    instance?.instanceName ||
+    instance?.instance?.instanceName ||
+    instance?.name ||
+    instance?.instance?.name ||
+    ''
+  ).trim();
+}
+
+function getEvolutionInstanceState(instance: any): string {
+  return String(
+    instance?.status ||
+    instance?.connectionStatus ||
+    instance?.state ||
+    instance?.instance?.state ||
+    instance?.instance?.status ||
+    ''
+  ).toLowerCase();
+}
+
+function getWhatsAppWebhookUrl(): string {
+  const backend = (import.meta.env.VITE_BACKEND_URL as string | undefined)?.replace(/\/$/, '') || '';
+  return backend ? `${backend}/webhook/whatsapp` : '';
+}
+
 function WhatsAppBindingSection({ botPublicId }: { botPublicId: string }) {
   const [instances, setInstances] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [binding, setBinding] = useState<string | null>(null);
+  const [bindingBusy, setBindingBusy] = useState<string | null>(null);
   const [testingWebhook, setTestingWebhook] = useState<string | null>(null);
 
   useEffect(() => {
     async function load() {
+      setLoading(true);
       try {
-        const [insts, { data: bind }] = await Promise.all([
-          evoApi.fetchInstances(),
-          supabaseClient.from("whatsapp_bindings").select("instance_name").eq("bot_public_id", botPublicId).maybeSingle()
-        ]);
-        setInstances(insts);
+        const insts = await evoApi.fetchInstances();
+        const normalizedInstances = Array.isArray(insts)
+          ? insts.filter((inst: any) => Boolean(getEvolutionInstanceName(inst)))
+          : [];
+        const { data: bind, error } = await supabaseClient
+          .from("whatsapp_bindings")
+          .select("instance_name")
+          .eq("bot_public_id", botPublicId)
+          .limit(1)
+          .maybeSingle();
+
+        if (error) throw error;
+        setInstances(normalizedInstances);
         if (bind) setBinding(bind.instance_name);
       } catch (err) {
         console.error("Erro ao carregar instâncias:", err);
+        toast.error("Erro ao carregar instâncias do WhatsApp.");
       } finally {
         setLoading(false);
       }
@@ -561,22 +599,37 @@ function WhatsAppBindingSection({ botPublicId }: { botPublicId: string }) {
   }, [botPublicId]);
 
   const handleBind = async (instanceName: string) => {
+    setBindingBusy(instanceName);
     try {
       if (!instanceName) {
         toast.error("Nome da instância é obrigatório.");
+        return;
+      }
+      const webhookUrl = getWhatsAppWebhookUrl();
+      if (!webhookUrl) {
+        toast.error("URL do servidor não configurada. Configure VITE_BACKEND_URL.");
         return;
       }
       
       console.log("[WhatsApp] Vinculando bot:", botPublicId, "à instância:", instanceName);
 
       // 1. Remove qualquer vínculo anterior deste bot
-      await supabaseClient.from("whatsapp_bindings").delete().eq("bot_public_id", botPublicId);
+      const { error: deleteError } = await supabaseClient
+        .from("whatsapp_bindings")
+        .delete()
+        .eq("bot_public_id", botPublicId);
+      if (deleteError) throw deleteError;
       
       // 2. Cria novo vínculo
-      const { error, data } = await supabaseClient.from("whatsapp_bindings").insert({
-        instance_name: instanceName,
-        bot_public_id: botPublicId
-      }).select();
+      const { error, data } = await supabaseClient
+        .from("whatsapp_bindings")
+        .insert({
+          instance_name: instanceName,
+          bot_public_id: botPublicId,
+          webhook_url: webhookUrl,
+          updated_at: new Date().toISOString(),
+        })
+        .select();
 
       if (error) {
         console.error("[WhatsApp] Erro ao inserir no banco:", error);
@@ -586,8 +639,6 @@ function WhatsAppBindingSection({ botPublicId }: { botPublicId: string }) {
       console.log("[WhatsApp] Vínculo criado com sucesso:", data);
 
       // 3. Configura o Webhook na Evolution API apontando para o servidor próprio
-      const backend = (import.meta.env.VITE_BACKEND_URL as string | undefined)?.replace(/\/$/, '') || '';
-      const webhookUrl = `${backend}/webhook/whatsapp`;
       await evoApi.setWebhook(instanceName, webhookUrl);
 
       setBinding(instanceName);
@@ -595,19 +646,39 @@ function WhatsAppBindingSection({ botPublicId }: { botPublicId: string }) {
     } catch (err: any) {
       console.error("Erro ao vincular bot:", err);
       toast.error(`Erro ao vincular bot: ${err?.message || err?.details || 'desconhecido'}`);
+    } finally {
+      setBindingBusy(null);
     }
   };
 
   const handleTestWebhook = async (instanceName: string) => {
     setTestingWebhook(instanceName);
     try {
-      const backend = (import.meta.env.VITE_BACKEND_URL as string | undefined)?.replace(/\/$/, '') || '';
-      if (!backend) {
-        toast.error("VITE_BACKEND_URL não configurado no frontend!");
-        setTestingWebhook(null);
+      const webhookUrl = getWhatsAppWebhookUrl();
+      if (!webhookUrl) {
+        toast.error("URL do servidor não configurada. Configure VITE_BACKEND_URL.");
         return;
       }
-      const response = await fetch(`${backend}/webhook/whatsapp`, {
+
+      // Garante que o teste encontre o bot no servidor, mesmo se o usuário clicar em testar antes de vincular.
+      const { error: cleanupError } = await supabaseClient
+        .from("whatsapp_bindings")
+        .delete()
+        .eq("bot_public_id", botPublicId);
+      if (cleanupError) throw cleanupError;
+
+      const { error: bindError } = await supabaseClient
+        .from("whatsapp_bindings")
+        .insert({
+          instance_name: instanceName,
+          bot_public_id: botPublicId,
+          webhook_url: webhookUrl,
+          updated_at: new Date().toISOString(),
+        });
+      if (bindError) throw bindError;
+      setBinding(instanceName);
+
+      const response = await fetch(webhookUrl, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -668,18 +739,25 @@ function WhatsAppBindingSection({ botPublicId }: { botPublicId: string }) {
         </div>
       ) : (
         <div className="grid grid-cols-1 gap-3">
-          {instances.map((inst: any) => (
-            <div key={inst.instanceName} className="flex flex-col p-4 border rounded-xl bg-white shadow-sm hover:shadow-md transition-shadow gap-4">
+          {instances.map((inst: any) => {
+            const instanceName = getEvolutionInstanceName(inst);
+            const instanceState = getEvolutionInstanceState(inst);
+            const isConnected = instanceState === 'open' || instanceState === 'connected';
+            const isBound = binding === instanceName;
+            const isBindingThis = bindingBusy === instanceName;
+
+            return (
+            <div key={instanceName} className="flex flex-col p-4 border rounded-xl bg-white shadow-sm hover:shadow-md transition-shadow gap-4">
               <div className="flex items-center justify-between">
                 <div className="flex items-center gap-3">
-                  <div className={`w-3 h-3 rounded-full ${inst.status === 'open' ? 'bg-emerald-500 animate-pulse' : 'bg-gray-300'}`} />
+                  <div className={`w-3 h-3 rounded-full ${isConnected ? 'bg-emerald-500 animate-pulse' : 'bg-gray-300'}`} />
                   <div>
-                    <span className="font-bold text-base text-gray-900">{inst.instanceName}</span>
+                    <span className="font-bold text-base text-gray-900">{instanceName}</span>
                     <p className="text-[10px] text-muted-foreground uppercase tracking-wider font-semibold">
-                      {inst.status === 'open' ? 'Conectado' : 'Desconectado'}
+                      {isConnected ? 'Conectado' : 'Desconectado'}
                     </p>
                   </div>
-                  {binding === inst.instanceName && (
+                  {isBound && (
                     <span className="text-[10px] bg-emerald-100 text-emerald-700 px-2.5 py-1 rounded-full font-bold border border-emerald-200">
                       BOT VINCULADO
                     </span>
@@ -690,22 +768,23 @@ function WhatsAppBindingSection({ botPublicId }: { botPublicId: string }) {
               <div className="grid grid-cols-2 gap-2">
                 <Button 
                   size="sm" 
-                  variant={binding === inst.instanceName ? "secondary" : "default"}
-                  onClick={() => handleBind(inst.instanceName)}
-                  disabled={binding === inst.instanceName}
-                  className={`w-full h-10 ${binding !== inst.instanceName ? "bg-emerald-600 hover:bg-emerald-700 text-white font-bold" : ""}`}
+                  variant={isBound ? "secondary" : "default"}
+                  onClick={() => handleBind(instanceName)}
+                  disabled={isBound || Boolean(bindingBusy)}
+                  className={`w-full h-10 ${!isBound ? "bg-emerald-600 hover:bg-emerald-700 text-white font-bold" : ""}`}
                 >
-                  {binding === inst.instanceName ? "✓ Já Vinculado" : "Vincular Este Bot"}
+                  {isBindingThis ? <Loader2 className="w-4 h-4 animate-spin mr-2" /> : null}
+                  {isBound ? "✓ Já Vinculado" : "Vincular Este Bot"}
                 </Button>
 
                 <Button 
                   size="sm"
                   variant="outline"
-                  onClick={() => handleTestWebhook(inst.instanceName)}
-                  disabled={testingWebhook === inst.instanceName}
+                  onClick={() => handleTestWebhook(instanceName)}
+                  disabled={testingWebhook === instanceName}
                   className="w-full h-10 border-emerald-200 hover:bg-emerald-50 text-emerald-700 font-semibold"
                 >
-                  {testingWebhook === inst.instanceName ? (
+                  {testingWebhook === instanceName ? (
                     <>
                       <Loader2 className="w-4 h-4 animate-spin mr-2" />
                       Testando...
@@ -716,13 +795,14 @@ function WhatsAppBindingSection({ botPublicId }: { botPublicId: string }) {
                 </Button>
               </div>
 
-              {testingWebhook === inst.instanceName && (
+              {testingWebhook === instanceName && (
                 <div className="text-[10px] text-center text-muted-foreground animate-pulse">
                   Enviando sinal de teste para o servidor...
                 </div>
               )}
             </div>
-          ))}
+            );
+          })}
         </div>
       )}
     </div>
