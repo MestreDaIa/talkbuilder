@@ -232,9 +232,27 @@ export default function WhatsAppInstanceSettings({ instanceName, isOpen, onClose
                           <CheckCircle2 className="w-3.5 h-3.5" />
                           Eventos Disponíveis
                         </Label>
-                        <span className="text-[10px] bg-muted px-2 py-0.5 rounded-full font-medium">
-                          {selectedEvents.length} selecionados
-                        </span>
+                        <div className="flex items-center gap-2">
+                          <Button 
+                            variant="outline" 
+                            size="xs" 
+                            className="text-[9px] h-6 px-2 font-bold border-green-200 text-green-700 hover:bg-green-50"
+                            onClick={() => setSelectedEvents([...WHATSAPP_EVENTS])}
+                          >
+                            HABILITAR TODOS
+                          </Button>
+                          <Button 
+                            variant="outline" 
+                            size="xs" 
+                            className="text-[9px] h-6 px-2 font-bold text-destructive hover:text-destructive hover:bg-destructive/5"
+                            onClick={() => setSelectedEvents([])}
+                          >
+                            DESABILITAR TODOS
+                          </Button>
+                          <span className="text-[10px] bg-muted px-2 py-0.5 rounded-full font-medium ml-1">
+                            {selectedEvents.length} selecionados
+                          </span>
+                        </div>
                       </div>
                       
                       <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
