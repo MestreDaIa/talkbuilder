@@ -64,12 +64,13 @@ export const evoApi = {
         'apikey': EVO_GLOBAL_KEY,
       },
       body: JSON.stringify({
-        reject_call: settings.reject_call,
-        groups_ignore: settings.groups_ignore,
-        always_online: settings.always_online,
-        read_messages: settings.read_messages,
-        read_status: settings.read_status,
-        sync_full_history: settings.sync_full_history
+        rejectCall: !!settings.reject_call,
+        msgCall: "",
+        groupsIgnore: !!settings.groups_ignore,
+        alwaysOnline: !!settings.always_online,
+        readMessages: !!settings.read_messages,
+        readStatus: !!settings.read_status,
+        syncFullHistory: !!settings.sync_full_history,
       }),
     });
     if (!response.ok) {

@@ -88,12 +88,12 @@ export default function WhatsAppInstanceSettings({ instanceName, isOpen, onClose
         // Note: The structure might vary depending on the API response
         const apiSettings = data.settings || {};
         setSettings({
-          reject_call: apiSettings.reject_call ?? false,
-          groups_ignore: apiSettings.groups_ignore ?? false,
-          always_online: apiSettings.always_online ?? false,
-          read_messages: apiSettings.read_messages ?? false,
-          sync_full_history: apiSettings.sync_full_history ?? false,
-          read_status: apiSettings.read_status ?? false,
+          reject_call: apiSettings.rejectCall ?? apiSettings.reject_call ?? false,
+          groups_ignore: apiSettings.groupsIgnore ?? apiSettings.groups_ignore ?? false,
+          always_online: apiSettings.alwaysOnline ?? apiSettings.always_online ?? false,
+          read_messages: apiSettings.readMessages ?? apiSettings.read_messages ?? false,
+          sync_full_history: apiSettings.syncFullHistory ?? apiSettings.sync_full_history ?? false,
+          read_status: apiSettings.readStatus ?? apiSettings.read_status ?? false,
         });
       }
     } catch (err) {
