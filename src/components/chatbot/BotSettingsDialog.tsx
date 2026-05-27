@@ -536,6 +536,33 @@ export function BotSettingsDialog({
     </Dialog>
   );
 }
+
+function getEvolutionInstanceName(instance: any): string {
+  return String(
+    instance?.instanceName ||
+    instance?.instance?.instanceName ||
+    instance?.name ||
+    instance?.instance?.name ||
+    ''
+  ).trim();
+}
+
+function getEvolutionInstanceState(instance: any): string {
+  return String(
+    instance?.status ||
+    instance?.connectionStatus ||
+    instance?.state ||
+    instance?.instance?.state ||
+    instance?.instance?.status ||
+    ''
+  ).toLowerCase();
+}
+
+function getWhatsAppWebhookUrl(): string {
+  const backend = (import.meta.env.VITE_BACKEND_URL as string | undefined)?.replace(/\/$/, '') || '';
+  return backend ? `${backend}/webhook/whatsapp` : '';
+}
+
 function WhatsAppBindingSection({ botPublicId }: { botPublicId: string }) {
   const [instances, setInstances] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
