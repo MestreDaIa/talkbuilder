@@ -118,7 +118,9 @@ Deno.serve(async (req: Request) => {
 
     // 3. Enviar mensagens de volta via Evolution API
     for (const msg of responseMessages) {
-      if (!msg.text) continue;
+      const msgText = msg.content || msg.text;
+      if (!msgText) continue;
+
 
       const buttons = runtimeData.buttons || [];
       const hasButtons = buttons.length > 0;
@@ -128,7 +130,7 @@ Deno.serve(async (req: Request) => {
         ? {
             number: remoteJid,
             title: "Escolha uma opção:",
-            description: msg.text,
+            description: msgText,
             footer: "Bot",
             buttons: buttons.map(b => ({
               buttonId: b.id,
@@ -138,8 +140,9 @@ Deno.serve(async (req: Request) => {
           }
         : {
             number: remoteJid,
-            text: msg.text
+            text: msgText
           };
+
 
       console.log(`[whatsapp-webhook] Enviando resposta via Evolution (${endpoint})...`);
       const sendResponse = await fetch(`${EVO_BASE_URL}/${endpoint}/${instanceName}`, {
