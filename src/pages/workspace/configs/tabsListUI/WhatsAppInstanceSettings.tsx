@@ -142,181 +142,222 @@ export default function WhatsAppInstanceSettings({ instanceName, isOpen, onClose
 
   return (
     <Dialog open={isOpen} onOpenChange={(open) => !open && onClose()}>
-      <DialogContent className="sm:max-w-[600px] max-h-[90vh] flex flex-col p-0 overflow-hidden">
-        <DialogHeader className="p-6 pb-0">
-          <DialogTitle className="flex items-center gap-2">
-            <Settings className="w-5 h-5" />
-            Configurações: {instanceName}
+      <DialogContent className="sm:max-w-[650px] h-[85vh] flex flex-col p-0">
+        <DialogHeader className="p-6 pb-2">
+          <DialogTitle className="flex items-center gap-2 text-xl">
+            <Settings className="w-5 h-5 text-green-600" />
+            Configurações da Instância
           </DialogTitle>
           <DialogDescription>
-            Personalize o comportamento e os eventos do webhook para esta instância.
+            Gerencie a instância <span className="font-bold text-foreground">{instanceName}</span> da Evolution API.
           </DialogDescription>
         </DialogHeader>
 
         {loading ? (
-          <div className="flex flex-col items-center justify-center py-20 gap-3">
+          <div className="flex-1 flex flex-col items-center justify-center gap-3">
             <Loader2 className="w-8 h-8 animate-spin text-green-600" />
             <p className="text-sm text-muted-foreground">Carregando configurações...</p>
           </div>
         ) : (
-          <ScrollArea className="flex-1 px-6">
-            <div className="space-y-8 py-6">
-              {/* Webhook & Events Section */}
-              <div className="space-y-4">
-                <div className="flex items-center gap-2 text-sm font-bold uppercase tracking-wider text-muted-foreground">
+          <Tabs defaultValue="events" className="flex-1 flex flex-col overflow-hidden">
+            <div className="px-6">
+              <TabsList className="grid w-full grid-cols-2">
+                <TabsTrigger value="events" className="flex items-center gap-2">
                   <Globe className="w-4 h-4" />
-                  Secção de Eventos e Webhook
-                </div>
-                
-                <div className="p-3 bg-muted/50 rounded-lg border">
-                  <Label className="text-[10px] uppercase font-bold text-muted-foreground mb-1 block">URL Webhook Fixada</Label>
-                  <code className="text-xs break-all text-green-700 font-mono">{fixedWebhookUrl}</code>
-                </div>
-
-                <div className="space-y-3 pt-2">
-                  <div className="flex items-center justify-between">
-                    <div className="space-y-0.5">
-                      <Label>Webhook by Events</Label>
-                      <p className="text-xs text-muted-foreground">Create a route for each event by adding the event name to the end of the URL</p>
-                    </div>
-                    <Switch 
-                      checked={webhookByEvents} 
-                      onCheckedChange={setWebhookByEvents} 
-                    />
-                  </div>
-
-                  <div className="flex items-center justify-between">
-                    <div className="space-y-0.5">
-                      <Label>Webhook Base64</Label>
-                      <p className="text-xs text-muted-foreground">Send media base64 data in webhook</p>
-                    </div>
-                    <Switch 
-                      checked={webhookBase64} 
-                      onCheckedChange={setWebhookBase64} 
-                    />
-                  </div>
-                </div>
-
-                <div className="space-y-3 pt-4">
-                  <Label className="text-sm font-semibold">Events:</Label>
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
-                    {WHATSAPP_EVENTS.map(event => (
-                      <div key={event} className="flex items-center space-x-2 p-2 rounded hover:bg-muted/30 transition-colors border border-transparent hover:border-border">
-                        <Switch 
-                          id={`event-${event}`}
-                          checked={selectedEvents.includes(event)}
-                          onCheckedChange={() => toggleEvent(event)}
-                        />
-                        <Label htmlFor={`event-${event}`} className="text-[10px] font-mono cursor-pointer flex-1">
-                          {event}
-                        </Label>
-                      </div>
-                    ))}
-                  </div>
-                </div>
-
-                <div className="flex justify-end gap-2 pt-2">
-                  <Button variant="ghost" size="sm" onClick={onClose}>CANCELAR</Button>
-                  <Button size="sm" onClick={handleSaveWebhook} disabled={savingWebhook}>
-                    {savingWebhook && <Loader2 className="w-3 h-3 animate-spin mr-2" />}
-                    SALVAR WEBHOOK
-                  </Button>
-                </div>
-              </div>
-
-              <Separator />
-
-              {/* Instance Settings Section */}
-              <div className="space-y-4">
-                <div className="flex items-center gap-2 text-sm font-bold uppercase tracking-wider text-muted-foreground">
+                  Eventos e Webhook
+                </TabsTrigger>
+                <TabsTrigger value="settings" className="flex items-center gap-2">
                   <Bell className="w-4 h-4" />
-                  Sessão de Configs Instância
-                </div>
-
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                  <div className="flex items-center justify-between p-2 border rounded-lg">
-                    <div className="space-y-0.5">
-                      <Label className="text-sm">Reject Calls</Label>
-                      <p className="text-[10px] text-muted-foreground">Reject all incoming calls</p>
-                    </div>
-                    <Switch 
-                      checked={settings.reject_call} 
-                      onCheckedChange={(val) => setSettings(s => ({...s, reject_call: val}))} 
-                    />
-                  </div>
-
-                  <div className="flex items-center justify-between p-2 border rounded-lg">
-                    <div className="space-y-0.5">
-                      <Label className="text-sm">Ignore Groups</Label>
-                      <p className="text-[10px] text-muted-foreground">Ignore all messages from groups</p>
-                    </div>
-                    <Switch 
-                      checked={settings.groups_ignore} 
-                      onCheckedChange={(val) => setSettings(s => ({...s, groups_ignore: val}))} 
-                    />
-                  </div>
-
-                  <div className="flex items-center justify-between p-2 border rounded-lg">
-                    <div className="space-y-0.5">
-                      <Label className="text-sm">Always Online</Label>
-                      <p className="text-[10px] text-muted-foreground">Keep the whatsapp always online</p>
-                    </div>
-                    <Switch 
-                      checked={settings.always_online} 
-                      onCheckedChange={(val) => setSettings(s => ({...s, always_online: val}))} 
-                    />
-                  </div>
-
-                  <div className="flex items-center justify-between p-2 border rounded-lg">
-                    <div className="space-y-0.5">
-                      <Label className="text-sm">Read Messages</Label>
-                      <p className="text-[10px] text-muted-foreground">Mark all messages as read</p>
-                    </div>
-                    <Switch 
-                      checked={settings.read_messages} 
-                      onCheckedChange={(val) => setSettings(s => ({...s, read_messages: val}))} 
-                    />
-                  </div>
-
-                  <div className="flex items-center justify-between p-2 border rounded-lg">
-                    <div className="space-y-0.5">
-                      <Label className="text-sm">Sync Full History</Label>
-                      <p className="text-[10px] text-muted-foreground">Sync all complete chat history</p>
-                    </div>
-                    <Switch 
-                      checked={settings.sync_full_history} 
-                      onCheckedChange={(val) => setSettings(s => ({...s, sync_full_history: val}))} 
-                    />
-                  </div>
-
-                  <div className="flex items-center justify-between p-2 border rounded-lg">
-                    <div className="space-y-0.5">
-                      <Label className="text-sm">Read Status</Label>
-                      <p className="text-[10px] text-muted-foreground">Mark all statuses as read</p>
-                    </div>
-                    <Switch 
-                      checked={settings.read_status} 
-                      onCheckedChange={(val) => setSettings(s => ({...s, read_status: val}))} 
-                    />
-                  </div>
-                </div>
-
-                <div className="flex justify-end gap-2 pt-2">
-                  <Button variant="ghost" size="sm" onClick={onClose}>CANCELAR</Button>
-                  <Button size="sm" onClick={handleSaveSettings} disabled={savingSettings}>
-                    {savingSettings && <Loader2 className="w-3 h-3 animate-spin mr-2" />}
-                    SALVAR CONFIGS
-                  </Button>
-                </div>
-              </div>
+                  Configurações Gerais
+                </TabsTrigger>
+              </TabsList>
             </div>
-          </ScrollArea>
+
+            <ScrollArea className="flex-1">
+              <div className="p-6 pt-4">
+                <TabsContent value="events" className="mt-0 space-y-6 focus-visible:outline-none focus-visible:ring-0">
+                  <div className="space-y-4">
+                    <div className="flex items-center gap-2 text-xs font-bold uppercase tracking-wider text-muted-foreground border-b pb-2">
+                      <Globe className="w-3.5 h-3.5" />
+                      Configuração de Webhook
+                    </div>
+                    
+                    <div className="p-4 bg-green-50/50 dark:bg-green-950/20 rounded-xl border border-green-100 dark:border-green-900/30 space-y-2">
+                      <Label className="text-[10px] uppercase font-bold text-green-800 dark:text-green-300 mb-1 block">URL Webhook Destino</Label>
+                      <div className="flex items-center gap-2">
+                        <code className="flex-1 text-xs break-all text-green-700 dark:text-green-400 font-mono bg-white dark:bg-background p-2 rounded border">
+                          {fixedWebhookUrl}
+                        </code>
+                      </div>
+                      <p className="text-[10px] text-green-600/80 dark:text-green-400/60 italic">
+                        * Esta URL é configurada automaticamente para o seu servidor.
+                      </p>
+                    </div>
+
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 pt-2">
+                      <div className="flex items-center justify-between p-3 border rounded-lg bg-card shadow-sm">
+                        <div className="space-y-0.5">
+                          <Label className="text-sm font-medium">Webhook por Eventos</Label>
+                          <p className="text-[10px] text-muted-foreground leading-tight">Cria uma rota específica para cada evento</p>
+                        </div>
+                        <Switch 
+                          checked={webhookByEvents} 
+                          onCheckedChange={setWebhookByEvents} 
+                        />
+                      </div>
+
+                      <div className="flex items-center justify-between p-3 border rounded-lg bg-card shadow-sm">
+                        <div className="space-y-0.5">
+                          <Label className="text-sm font-medium">Webhook Base64</Label>
+                          <p className="text-[10px] text-muted-foreground leading-tight">Envia arquivos de mídia em base64</p>
+                        </div>
+                        <Switch 
+                          checked={webhookBase64} 
+                          onCheckedChange={setWebhookBase64} 
+                        />
+                      </div>
+                    </div>
+
+                    <div className="space-y-3 pt-4">
+                      <div className="flex items-center justify-between border-b pb-2">
+                        <Label className="text-sm font-bold uppercase tracking-wider text-muted-foreground flex items-center gap-2">
+                          <CheckCircle2 className="w-3.5 h-3.5" />
+                          Eventos Disponíveis
+                        </Label>
+                        <span className="text-[10px] bg-muted px-2 py-0.5 rounded-full font-medium">
+                          {selectedEvents.length} selecionados
+                        </span>
+                      </div>
+                      
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                        {WHATSAPP_EVENTS.map(event => (
+                          <div 
+                            key={event} 
+                            className={`flex items-center space-x-2 p-2 rounded-lg transition-all border ${
+                              selectedEvents.includes(event) 
+                                ? 'bg-green-50/50 border-green-200 dark:bg-green-900/10 dark:border-green-800' 
+                                : 'hover:bg-muted/50 border-transparent'
+                            }`}
+                          >
+                            <Switch 
+                              id={`event-${event}`}
+                              checked={selectedEvents.includes(event)}
+                              onCheckedChange={() => toggleEvent(event)}
+                              className="scale-75"
+                            />
+                            <Label htmlFor={`event-${event}`} className="text-[10px] font-mono cursor-pointer flex-1 truncate py-1">
+                              {event}
+                            </Label>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+
+                    <div className="flex justify-end gap-2 pt-4 sticky bottom-0 bg-background/80 backdrop-blur-sm py-2 border-t mt-4">
+                      <Button variant="ghost" size="sm" onClick={onClose}>CANCELAR</Button>
+                      <Button size="sm" onClick={handleSaveWebhook} disabled={savingWebhook} className="bg-green-600 hover:bg-green-700">
+                        {savingWebhook && <Loader2 className="w-3 h-3 animate-spin mr-2" />}
+                        SALVAR WEBHOOK
+                      </Button>
+                    </div>
+                  </div>
+                </TabsContent>
+
+                <TabsContent value="settings" className="mt-0 space-y-6 focus-visible:outline-none focus-visible:ring-0">
+                  <div className="space-y-4">
+                    <div className="flex items-center gap-2 text-xs font-bold uppercase tracking-wider text-muted-foreground border-b pb-2">
+                      <Bell className="w-3.5 h-3.5" />
+                      Configurações da Instância
+                    </div>
+
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-2">
+                      <div className="flex items-center justify-between p-4 border rounded-xl bg-card shadow-sm hover:border-green-200 transition-colors">
+                        <div className="space-y-0.5">
+                          <Label className="text-sm font-semibold">Recusar Chamadas</Label>
+                          <p className="text-[10px] text-muted-foreground">Rejeitar todas as chamadas recebidas</p>
+                        </div>
+                        <Switch 
+                          checked={settings.reject_call} 
+                          onCheckedChange={(val) => setSettings(s => ({...s, reject_call: val}))} 
+                        />
+                      </div>
+
+                      <div className="flex items-center justify-between p-4 border rounded-xl bg-card shadow-sm hover:border-green-200 transition-colors">
+                        <div className="space-y-0.5">
+                          <Label className="text-sm font-semibold">Ignorar Grupos</Label>
+                          <p className="text-[10px] text-muted-foreground">Ignorar mensagens vindas de grupos</p>
+                        </div>
+                        <Switch 
+                          checked={settings.groups_ignore} 
+                          onCheckedChange={(val) => setSettings(s => ({...s, groups_ignore: val}))} 
+                        />
+                      </div>
+
+                      <div className="flex items-center justify-between p-4 border rounded-xl bg-card shadow-sm hover:border-green-200 transition-colors">
+                        <div className="space-y-0.5">
+                          <Label className="text-sm font-semibold">Sempre Online</Label>
+                          <p className="text-[10px] text-muted-foreground">Manter o WhatsApp sempre online</p>
+                        </div>
+                        <Switch 
+                          checked={settings.always_online} 
+                          onCheckedChange={(val) => setSettings(s => ({...s, always_online: val}))} 
+                        />
+                      </div>
+
+                      <div className="flex items-center justify-between p-4 border rounded-xl bg-card shadow-sm hover:border-green-200 transition-colors">
+                        <div className="space-y-0.5">
+                          <Label className="text-sm font-semibold">Ler Mensagens</Label>
+                          <p className="text-[10px] text-muted-foreground">Marcar mensagens como lidas</p>
+                        </div>
+                        <Switch 
+                          checked={settings.read_messages} 
+                          onCheckedChange={(val) => setSettings(s => ({...s, read_messages: val}))} 
+                        />
+                      </div>
+
+                      <div className="flex items-center justify-between p-4 border rounded-xl bg-card shadow-sm hover:border-green-200 transition-colors">
+                        <div className="space-y-0.5">
+                          <Label className="text-sm font-semibold">Sincronizar Histórico</Label>
+                          <p className="text-[10px] text-muted-foreground">Sincronizar todo o histórico ao escanear</p>
+                        </div>
+                        <Switch 
+                          checked={settings.sync_full_history} 
+                          onCheckedChange={(val) => setSettings(s => ({...s, sync_full_history: val}))} 
+                        />
+                      </div>
+
+                      <div className="flex items-center justify-between p-4 border rounded-xl bg-card shadow-sm hover:border-green-200 transition-colors">
+                        <div className="space-y-0.5">
+                          <Label className="text-sm font-semibold">Ler Status</Label>
+                          <p className="text-[10px] text-muted-foreground">Marcar todos os status como lidos</p>
+                        </div>
+                        <Switch 
+                          checked={settings.read_status} 
+                          onCheckedChange={(val) => setSettings(s => ({...s, read_status: val}))} 
+                        />
+                      </div>
+                    </div>
+
+                    <div className="flex justify-end gap-2 pt-4 sticky bottom-0 bg-background/80 backdrop-blur-sm py-2 border-t mt-4">
+                      <Button variant="ghost" size="sm" onClick={onClose}>CANCELAR</Button>
+                      <Button size="sm" onClick={handleSaveSettings} disabled={savingSettings} className="bg-green-600 hover:bg-green-700">
+                        {savingSettings && <Loader2 className="w-3 h-3 animate-spin mr-2" />}
+                        SALVAR CONFIGS
+                      </Button>
+                    </div>
+                  </div>
+                </TabsContent>
+              </div>
+            </ScrollArea>
+          </Tabs>
         )}
 
-        <DialogFooter className="p-4 bg-muted/30 border-t">
-          <Button variant="outline" onClick={onClose} className="w-full sm:w-auto">FECHAR</Button>
+        <DialogFooter className="p-4 bg-muted/30 border-t shrink-0">
+          <Button variant="outline" onClick={onClose} className="w-full sm:w-auto">FECHAR PAINEL</Button>
         </DialogFooter>
       </DialogContent>
     </Dialog>
+  );
+}
   );
 }
