@@ -1,0 +1,1 @@
+ALTER TABLE public.whatsapp_bindings ADD CONSTRAINT whatsapp_bindings_instance_name_key UNIQUE (instance_name);
