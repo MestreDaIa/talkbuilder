@@ -350,7 +350,7 @@ export default function WhatsAppInstanceSettings({ instanceName, isOpen, onClose
                         </Button>
                       </div>
                       <p className="text-[10px] text-green-600/80 dark:text-green-400/60 italic">
-                        * Use a URL do seu Supabase Edge Function para processar o bot.
+                        * Use a URL do seu servidor de API para processar o bot e os eventos.
                       </p>
                     </div>
 
