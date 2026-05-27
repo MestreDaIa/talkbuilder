@@ -118,7 +118,9 @@ Deno.serve(async (req: Request) => {
 
     // 3. Enviar mensagens de volta via Evolution API
     for (const msg of responseMessages) {
-      if (!msg.text) continue;
+      const msgText = msg.content || msg.text;
+      if (!msgText) continue;
+
 
       const buttons = runtimeData.buttons || [];
       const hasButtons = buttons.length > 0;
