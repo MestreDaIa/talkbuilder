@@ -288,17 +288,58 @@ export const evoApi = {
   },
 
   async setEvolutionBot(instanceName: string, data: any) {
+    // Normalize ignoreJids to array (Evolution API expects array)
+    const ignoreJidsArr = Array.isArray(data.ignoreJids)
+      ? data.ignoreJids
+      : typeof data.ignoreJids === 'string' && data.ignoreJids.trim()
+        ? data.ignoreJids.split(',').map((s: string) => s.trim()).filter(Boolean)
+        : [];
+
+    const payload: any = {
+      enabled: !!data.enabled,
+      description: data.description || 'Evolution Bot',
+      apiUrl: data.apiUrl || '',
+      apiKey: data.apiKey || '',
+      triggerType: data.triggerType || 'keyword',
+      triggerOperator: data.triggerOperator || 'contains',
+      triggerValue: data.triggerValue ?? data.triggerKeyword ?? '',
+      expire: Number(data.expire) || 0,
+      keywordFinish: data.keywordFinish || '',
+      delayMessage: Number(data.delayMessage) || 0,
+      unknownMessage: data.unknownMessage || '',
+      listeningFromMe: !!data.listeningFromMe,
+      stopBotFromMe: !!data.stopBotFromMe,
+      keepOpen: !!data.keepOpen,
+      debounceTime: Number(data.debounceTime) || 0,
+      splitMessages: !!data.splitMessages,
+      timePerChar: Number(data.timePerChar) || 0,
+      ignoreJids: ignoreJidsArr,
+    };
+
+    // Evolution API expects lowercase enum values for triggerType/triggerOperator
+    payload.triggerType = String(payload.triggerType).toLowerCase();
+    payload.triggerOperator = String(payload.triggerOperator).toLowerCase();
+
+    // Required: when triggerType is 'all', triggerOperator/triggerValue shouldn't be required
+    if (payload.triggerType === 'all' || payload.triggerType === 'none') {
+      delete payload.triggerOperator;
+      delete payload.triggerValue;
+    }
+
     const response = await fetch(`${EVO_BASE_URL}/evolutionBot/create/${instanceName}`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
         'apikey': EVO_GLOBAL_KEY,
       },
-      body: JSON.stringify(data),
+      body: JSON.stringify(payload),
     });
     if (!response.ok) {
       const errorData = await response.json().catch(() => ({}));
-      throw new Error(errorData.message || errorData.error || 'Erro ao salvar Evolution Bot');
+      console.error('Evolution Bot error:', errorData);
+      const msg = errorData?.response?.message || errorData?.message || errorData?.error;
+      const msgStr = Array.isArray(msg) ? msg.join(', ') : (typeof msg === 'string' ? msg : JSON.stringify(errorData));
+      throw new Error(msgStr || 'Erro ao salvar Evolution Bot');
     }
     return response.json();
   },
