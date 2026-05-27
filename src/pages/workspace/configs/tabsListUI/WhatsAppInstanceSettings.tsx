@@ -3,12 +3,13 @@ import { Button } from "../../../../components/ui/button";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from "../../../../components/ui/dialog";
 import { Switch } from "../../../../components/ui/switch";
 import { Label } from "../../../../components/ui/label";
+import { Input } from "../../../../components/ui/input";
 import { ScrollArea } from "../../../../components/ui/scroll-area";
 import { Separator } from "../../../../components/ui/separator";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "../../../../components/ui/tabs";
 import { evoApi } from "../../../../services/evolutionApi";
 import { useToast } from "../../../../hooks/use-toast";
-import { Loader2, Settings, Globe, Bell, CheckCircle2 } from "lucide-react";
+import { Loader2, Settings, Globe, Bell, CheckCircle2, MessageSquare } from "lucide-react";
 
 interface WhatsAppInstanceSettingsProps {
   instanceName: string;
@@ -58,6 +59,7 @@ export default function WhatsAppInstanceSettings({ instanceName, isOpen, onClose
   // Instance Settings State
   const [settings, setSettings] = useState({
     reject_call: false,
+    msg_call: "",
     groups_ignore: false,
     always_online: false,
     read_messages: false,
@@ -74,26 +76,32 @@ export default function WhatsAppInstanceSettings({ instanceName, isOpen, onClose
   const loadInstanceData = async () => {
     setLoading(true);
     try {
-      const data = await evoApi.fetchInstance(instanceName);
-      if (data) {
+      // Fetch both instance (for webhook) and specific settings
+      const [instanceData, settingsData] = await Promise.all([
+        evoApi.fetchInstance(instanceName),
+        evoApi.fetchSettings(instanceName)
+      ]);
+
+      if (instanceData) {
         // Load Webhook info
-        const webhook = data.webhook;
+        const webhook = instanceData.webhook;
         if (webhook) {
           setWebhookByEvents(webhook.byEvents ?? true);
           setWebhookBase64(webhook.base64 ?? false);
           setSelectedEvents(webhook.events || ["MESSAGES_UPSERT"]);
         }
+      }
 
-        // Load Settings info
-        // Note: The structure might vary depending on the API response
-        const apiSettings = data.settings || {};
+      if (settingsData) {
+        // Load Settings info with priority to settingsData
         setSettings({
-          reject_call: apiSettings.rejectCall ?? apiSettings.reject_call ?? false,
-          groups_ignore: apiSettings.groupsIgnore ?? apiSettings.groups_ignore ?? false,
-          always_online: apiSettings.alwaysOnline ?? apiSettings.always_online ?? false,
-          read_messages: apiSettings.readMessages ?? apiSettings.read_messages ?? false,
-          sync_full_history: apiSettings.syncFullHistory ?? apiSettings.sync_full_history ?? false,
-          read_status: apiSettings.readStatus ?? apiSettings.read_status ?? false,
+          reject_call: settingsData.rejectCall ?? settingsData.reject_call ?? false,
+          msg_call: settingsData.msgCall ?? settingsData.msg_call ?? "",
+          groups_ignore: settingsData.groupsIgnore ?? settingsData.groups_ignore ?? false,
+          always_online: settingsData.alwaysOnline ?? settingsData.always_online ?? false,
+          read_messages: settingsData.readMessages ?? settingsData.read_messages ?? false,
+          sync_full_history: settingsData.syncFullHistory ?? settingsData.sync_full_history ?? false,
+          read_status: settingsData.readStatus ?? settingsData.read_status ?? false,
         });
       }
     } catch (err) {
@@ -271,15 +279,35 @@ export default function WhatsAppInstanceSettings({ instanceName, isOpen, onClose
                     </div>
 
                     <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-2">
-                      <div className="flex items-center justify-between p-4 border rounded-xl bg-card shadow-sm hover:border-green-200 transition-colors">
-                        <div className="space-y-0.5">
-                          <Label className="text-sm font-semibold">Recusar Chamadas</Label>
-                          <p className="text-[10px] text-muted-foreground">Rejeitar todas as chamadas recebidas</p>
+                      <div className="sm:col-span-2 space-y-3 p-4 border rounded-xl bg-card shadow-sm hover:border-green-200 transition-colors">
+                        <div className="flex items-center justify-between">
+                          <div className="space-y-0.5">
+                            <Label className="text-sm font-semibold">Recusar Chamadas</Label>
+                            <p className="text-[10px] text-muted-foreground">Rejeitar todas as chamadas recebidas</p>
+                          </div>
+                          <Switch 
+                            checked={settings.reject_call} 
+                            onCheckedChange={(val) => setSettings(s => ({...s, reject_call: val}))} 
+                          />
                         </div>
-                        <Switch 
-                          checked={settings.reject_call} 
-                          onCheckedChange={(val) => setSettings(s => ({...s, reject_call: val}))} 
-                        />
+
+                        {settings.reject_call && (
+                          <div className="space-y-2 pt-2 animate-in fade-in slide-in-from-top-2 duration-300">
+                            <Label className="text-[10px] uppercase font-bold text-muted-foreground flex items-center gap-1.5">
+                              <MessageSquare className="w-3 h-3" />
+                              Mensagem de Rejeição
+                            </Label>
+                            <Input 
+                              placeholder="Ex: Não aceitamos ligações por este número..." 
+                              value={settings.msg_call}
+                              onChange={(e) => setSettings(s => ({...s, msg_call: e.target.value}))}
+                              className="text-xs h-8"
+                            />
+                            <p className="text-[9px] text-muted-foreground italic">
+                              * Esta mensagem será enviada automaticamente ao recusar uma chamada.
+                            </p>
+                          </div>
+                        )}
                       </div>
 
                       <div className="flex items-center justify-between p-4 border rounded-xl bg-card shadow-sm hover:border-green-200 transition-colors">
