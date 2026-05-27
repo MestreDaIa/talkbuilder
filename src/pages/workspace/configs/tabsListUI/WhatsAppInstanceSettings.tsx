@@ -108,11 +108,13 @@ export default function WhatsAppInstanceSettings({ instanceName, isOpen, onClose
     setLoading(true);
     try {
       // Fetch all needed data in parallel
-      const [instanceData, settingsData, webhookData, botData] = await Promise.all([
+      const [instanceData, settingsData, webhookData, botData, flowsData, bindingData] = await Promise.all([
         evoApi.fetchInstance(instanceName),
         evoApi.fetchSettings(instanceName),
         evoApi.fetchWebhook(instanceName),
-        evoApi.fetchEvolutionBot(instanceName)
+        evoApi.fetchEvolutionBot(instanceName),
+        evoApi.fetchChatbotFlows(), // Need to implement this or use supabase directly
+        evoApi.fetchBinding(instanceName) // Need to implement this
       ]);
 
       console.log("Instance data:", instanceData);
