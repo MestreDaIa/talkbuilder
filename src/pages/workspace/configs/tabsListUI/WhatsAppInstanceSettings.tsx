@@ -61,9 +61,11 @@ export default function WhatsAppInstanceSettings({ instanceName, isOpen, onClose
   const [webhookBase64, setWebhookBase64] = useState(false);
   const [selectedEvents, setSelectedEvents] = useState<string[]>(["MESSAGES_UPSERT"]);
   // Detect current project URL for the webhook
-  const currentProjectUrl = window.location.origin.includes("lovable.app") 
-    ? `https://xllkibdddlmcdbrhzedu.supabase.co/functions/v1/whatsapp-webhook` 
-    : `${window.location.origin}/functions/v1/whatsapp-webhook`;
+  const currentProjectUrl = import.meta.env.VITE_BACKEND_URL 
+    ? `${import.meta.env.VITE_BACKEND_URL}/webhook/whatsapp`
+    : window.location.origin.includes("lovable.app") 
+      ? `https://xllkibdddlmcdbrhzedu.supabase.co/functions/v1/whatsapp-webhook` 
+      : `${window.location.origin}/webhook/whatsapp`;
     
   // const fixedWebhookUrl = "https://api-flowbuilder.zailom.com/webhook/whatsapp";
   const [webhookUrl, setWebhookUrl] = useState(currentProjectUrl);
