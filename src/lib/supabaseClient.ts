@@ -22,6 +22,7 @@ interface SystemCreds {
 function readSystemCreds(): SystemCreds | null {
   // 1. Prioridade: Variáveis de Ambiente
   if (ENV_URL && ENV_KEY) {
+    console.log("[Supabase] Usando credenciais das variáveis de ambiente:", ENV_URL);
     return { url: ENV_URL, anonKey: ENV_KEY };
   }
   
@@ -32,6 +33,7 @@ function readSystemCreds(): SystemCreds | null {
       if (raw) {
         const parsed = JSON.parse(raw) as Partial<SystemCreds>;
         if (parsed.url && parsed.anonKey) {
+          console.log("[Supabase] Usando credenciais do LocalStorage:", parsed.url);
           return { url: parsed.url, anonKey: parsed.anonKey };
         }
       }
@@ -40,10 +42,11 @@ function readSystemCreds(): SystemCreds | null {
     }
   }
 
-  // 3. Fallback final: Banco interno do Lovable (apenas se nada mais existir)
+  // 3. Fallback final: Banco externo Zailom (fwoe...)
   const INTERNAL_URL = "https://fwoescubnnagdvwasbjl.supabase.co";
-  const INTERNAL_KEY = "sb_publishable_v58nZwBN4s5_lMASv4S3Iw_L23jPbIK";
+  const INTERNAL_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImZ3b2VzY3Vibm5hZ2R2d2FzYmpsIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzY5NzA1OTYsImV4cCI6MjA5MjU0NjU5Nn0.IetF2dz-c_D8gY_KWkhTXBO3wuQz4fm4h_kAhfUOxJA";
   
+  console.log("[Supabase] Usando fallback interno (fwoe):", INTERNAL_URL);
   return { url: INTERNAL_URL, anonKey: INTERNAL_KEY };
 }
 
