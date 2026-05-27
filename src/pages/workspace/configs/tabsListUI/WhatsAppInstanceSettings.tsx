@@ -8,6 +8,7 @@ import { ScrollArea } from "../../../../components/ui/scroll-area";
 import { Separator } from "../../../../components/ui/separator";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "../../../../components/ui/tabs";
 import { evoApi } from "../../../../services/evolutionApi";
+import { supabaseClient as supabase } from "../../../../lib/supabaseClient";
 import { useToast } from "../../../../hooks/use-toast";
 import { Loader2, Settings, Globe, Bell, CheckCircle2, MessageSquare, Bot, Plus, Trash2 } from "lucide-react";
 
