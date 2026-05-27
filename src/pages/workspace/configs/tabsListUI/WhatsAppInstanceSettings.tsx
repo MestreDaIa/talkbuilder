@@ -95,87 +95,12 @@ export default function WhatsAppInstanceSettings({ instanceName, isOpen, onClose
   const [botSettings, setBotSettings] = useState({
     enabled: false,
     description: "Evolution Bot Settings",
-    apiUrl: currentProjectUrl,
-    apiKey: "",
-    triggerType: "Keyword",
-    triggerKeyword: "",
-    triggerOperator: "Contains",
-    expire: 300,
-    keywordFinish: "bye",
-    delayMessage: 1000,
-    unknownMessage: "Sorry, I dont understand",
-    listeningFromMe: false,
-    stopBotFromMe: false,
-    keepOpen: false,
-    debounceTime: 1,
-    splitMessages: false,
-    ignoreJids: "",
-  });
-
-  useEffect(() => {
-    if (isOpen && instanceName) {
-      loadInstanceData();
-    }
-  }, [isOpen, instanceName]);
-
-  const loadInstanceData = async () => {
-    setLoading(true);
-    try {
-      // Fetch all needed data in parallel
-      const [instanceData, settingsData, webhookData, botData, { data: flows }, { data: binding }] = await Promise.all([
-        evoApi.fetchInstance(instanceName),
-        evoApi.fetchSettings(instanceName),
-        evoApi.fetchWebhook(instanceName),
-        evoApi.fetchEvolutionBot(instanceName),
-        supabase.from("chatbot_flows").select("id, name, public_id, is_published").eq("is_published", true),
-        supabase.from("whatsapp_bindings").select("*").eq("instance_name", instanceName).maybeSingle()
-      ]);
-
-      setAvailableBots(flows || []);
-      if (binding) {
-        setSelectedBotId(binding.bot_public_id);
-      }
-
-      console.log("Instance data:", instanceData);
-      console.log("Settings data:", settingsData);
-      console.log("Webhook data:", webhookData);
-      console.log("Bot data:", botData);
-
-      // Load Webhook info (Prioritize data from webhook/find)
-      const webhook = webhookData?.webhook || webhookData || (instanceData && instanceData.webhook);
-      
-      if (webhook) {
-        // Handle different possible structures from API
-        const w = webhook.webhook || webhook;
-        setWebhookByEvents(w.byEvents ?? true);
-        setWebhookBase64(w.base64 ?? false);
-        const events = w.events || [];
-        setSelectedEvents(events.length > 0 ? events : ["MESSAGES_UPSERT"]);
-        if (w.url) {
-          setWebhookUrl(w.url);
-        }
-      }
-
-      if (settingsData) {
-        const s = settingsData.settings || settingsData;
-        
-        setSettings({
-          reject_call: s.rejectCall ?? s.reject_call ?? false,
-          msg_call: s.msgCall ?? s.msg_call ?? "",
-          groups_ignore: s.groupsIgnore ?? s.groups_ignore ?? false,
-          always_online: s.alwaysOnline ?? s.always_online ?? false,
-          read_messages: s.readMessages ?? s.read_messages ?? false,
-          sync_full_history: s.syncFullHistory ?? s.sync_full_history ?? false,
-          read_status: s.readStatus ?? s.read_status ?? false,
-        });
-      }
-
-      if (botData) {
-        const b = botData.evolutionBot || botData;
+    apiUrl: getWebhookUrlWithBot(selectedBotId),
+...
         setBotSettings({
           enabled: b.enabled ?? false,
           description: b.description ?? "Evolution Bot Settings",
-          apiUrl: b.apiUrl || currentProjectUrl,
+          apiUrl: b.apiUrl || getWebhookUrlWithBot(selectedBotId),
           apiKey: b.apiKey ?? "",
           triggerType: b.triggerType || "Keyword",
           triggerKeyword: b.triggerKeyword || b.triggerValue || "",
