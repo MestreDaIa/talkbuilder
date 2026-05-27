@@ -98,7 +98,7 @@ Deno.serve(async (req: Request) => {
       return new Response(JSON.stringify({ status: "no_binding", instance: instanceName }), { headers: { "Content-Type": "application/json" } });
     }
 
-    console.log(`[whatsapp-webhook] Bot identificado: ${binding.bot_public_id}. Chamando runtime...`);
+    console.log(`[whatsapp-webhook] Bot identificado: ${binding.bot_public_id}. Chamando runtime para ${remoteJid}...`);
 
     // 2. Chamar Chatbot Runtime
     const runtimeUrl = `${Deno.env.get("SUPABASE_URL")}/functions/v1/chatbot-runtime`;
@@ -115,7 +115,7 @@ Deno.serve(async (req: Request) => {
         channel: "whatsapp",
         payload: {
           message: text,
-          button_id: messageData.message?.buttonsResponseMessage?.selectedButtonId || messageData.message?.templateButtonReplyMessage?.selectedId
+          button_id: buttonId
         }
       })
     });
