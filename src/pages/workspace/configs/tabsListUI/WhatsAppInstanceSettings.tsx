@@ -359,5 +359,3 @@ export default function WhatsAppInstanceSettings({ instanceName, isOpen, onClose
     </Dialog>
   );
 }
-  );
-}
