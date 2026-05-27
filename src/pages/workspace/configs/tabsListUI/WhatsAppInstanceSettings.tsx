@@ -122,18 +122,18 @@ export default function WhatsAppInstanceSettings({ instanceName, isOpen, onClose
     setLoading(true);
     try {
       // Fetch all needed data in parallel
-      const [instanceData, settingsData, webhookData, botData, { data: flows }, { data: binding }] = await Promise.all([
+      const [instanceData, settingsData, webhookData, botData, { data: flows }, { data: bindings }] = await Promise.all([
         evoApi.fetchInstance(instanceName),
         evoApi.fetchSettings(instanceName),
         evoApi.fetchWebhook(instanceName),
         evoApi.fetchEvolutionBot(instanceName),
         supabase.from("chatbot_flows").select("id, name, public_id, is_published").eq("is_published", true),
-        supabase.from("whatsapp_bindings").select("*").eq("instance_name", instanceName).maybeSingle()
+        supabase.from("whatsapp_bindings").select("*").eq("instance_name", instanceName).limit(1)
       ]);
 
       setAvailableBots(flows || []);
-      if (binding) {
-        setSelectedBotId(binding.bot_public_id);
+      if (bindings && bindings.length > 0) {
+        setSelectedBotId(bindings[0].bot_public_id);
       }
 
       console.log("Instance data:", instanceData);
