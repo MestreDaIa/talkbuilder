@@ -104,9 +104,6 @@ export async function processRuntime(body: any) {
     } catch (e) {
       console.warn("[runtime] execution table missing", e);
     }
-    } catch (e) {
-      console.warn("[runtime] execution table missing", e);
-    }
   } else {
     try {
       const { data: executions } = await supabase
@@ -124,31 +121,9 @@ export async function processRuntime(body: any) {
   const clientState = payload?.runtime_state || body?.runtime_state || readMemoryState(memoryKey);
 
   if (!execution) {
-    execution = {
-      ...normalizeClientState(clientState),
-      flow_id: flow.id,
-      contact_id,
-      channel_id: channel,
-      workspace_id: flow.user_id
-    };
-    
-    try {
-      const { data: created } = await supabase
-        .from("flow_executions")
-        .upsert({ 
-          workspace_id: flow.user_id, 
-          flow_id: flow.id, 
-          contact_id, 
-          channel_id: channel,
-          variables: execution.variables || {}
-        }, { onConflict: 'flow_id,contact_id,channel_id' })
-        .select()
-        .single();
-      if (created) execution = created;
-    } catch (e) {
-      console.warn("[runtime] falha ao auto-criar execution no banco", e);
-    }
+    execution = normalizeClientState(clientState);
   } else if (action !== "start" && clientState?.current_node_id) {
+    // Apenas sobrescreve se o estado for válido
     const newState = normalizeClientState(clientState);
     if (newState.current_node_id) {
        execution = { ...execution, ...newState, id: execution.id };
@@ -156,9 +131,10 @@ export async function processRuntime(body: any) {
   }
 
   // Executar Fluxo
-  console.log(`[runtime] Iniciando execução do fluxo. Flow: ${flow.name}. Node Atual: ${execution.current_node_id}. Input: ${JSON.stringify(payload || body?.payload)}`);
+  console.log(`[runtime] Iniciando execução do fluxo. Input: ${JSON.stringify(payload || body?.payload)}`);
   const result = await runFlow(execution, containers, edges, payload || body?.payload, flow, supabase);
-  console.log(`[runtime] Execução finalizada. Status: ${result.status}. Próximo Node: ${result.next_node_id}. Mensagens: ${result.messages?.length || 0}`);
+  console.log(`[runtime] Execução finalizada. Status: ${result.status}. Mensagens geradas: ${result.messages?.length || 0}`);
+
 
   // Persistir novo estado
   if (execution.id) {

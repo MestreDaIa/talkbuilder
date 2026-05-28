@@ -71,7 +71,7 @@ export const ChatWidget = ({
 
   const getRuntimeUrl = () => {
     if (import.meta.env.VITE_RUNTIME_URL) return import.meta.env.VITE_RUNTIME_URL;
-    const baseUrl = import.meta.env.VITE_SUPABASE_URL || "https://xllkibdddlmcdbrhzedu.supabase.co";
+    const baseUrl = import.meta.env.VITE_SUPABASE_URL || "https://fwoescubnnagdvwasbjl.supabase.co";
     return `${baseUrl}/functions/v1/chatbot-runtime`;
   };
 

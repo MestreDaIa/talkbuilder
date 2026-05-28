@@ -90,7 +90,7 @@ Deno.serve(async (req: Request) => {
 
     // Inicializar Supabase Client (usando credenciais do projeto externo fixo para garantir)
     const supabase = createClient(
-      Deno.env.get("EXTERNAL_SUPABASE_URL") ?? Deno.env.get("SUPABASE_URL") ?? "https://xllkibdddlmcdbrhzedu.supabase.co",
+      Deno.env.get("EXTERNAL_SUPABASE_URL") ?? Deno.env.get("SUPABASE_URL") ?? "https://fwoescubnnagdvwasbjl.supabase.co",
       Deno.env.get("EXTERNAL_SUPABASE_SERVICE_ROLE_KEY") ?? Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? ""
     );
 
