@@ -431,7 +431,7 @@ async function runFlow(execution: any, containersIn: any[], edgesIn: any[], inpu
 
     const { node, container } = info;
     const cfg = node.config || {};
-    const nodeType = (node.type || "").toLowerCase();
+    const nodeType = String(node.type || "").toLowerCase().trim();
 
     if (nodeType === "wait" || nodeType === "await") {
       if (!execution.is_waiting_time) {
@@ -449,6 +449,7 @@ async function runFlow(execution: any, containersIn: any[], edgesIn: any[], inpu
     if (nodeType.startsWith("input-")) {
       // Se ainda temos input não consumido (ex: mensagem inicial do usuário), processamos ele aqui
       if (input && (input.message !== undefined || input.button_id !== undefined)) {
+          console.log(`[runtime:input] processando entrada para node ${node.id} (${nodeType})`);
           const userValue = input.message ?? input.button_id;
           const buttonId = input.button_id;
           const varName = cfg.variableName || cfg.saveVariable;
@@ -489,7 +490,15 @@ async function runFlow(execution: any, containersIn: any[], edgesIn: any[], inpu
       case "condition": {
         const matchedCondition = (cfg.conditions || []).find(evaluateCondition);
         const handle = matchedCondition ? `${node.id}-cond-${matchedCondition.id}` : `${node.id}-else`;
-        currentNodeId = nextFromNode(node.id, container, handle, true);
+        console.log(`[runtime:condition] node ${node.id}: ${matchedCondition ? `condição "${matchedCondition.id}" satisfeita` : "nenhuma condição satisfeita (indo para else)"}`);
+        
+        const nextId = nextFromNode(node.id, container, handle, true);
+        if (nextId) {
+          currentNodeId = nextId;
+        } else {
+          console.log(`[runtime:condition] fallback: nenhum edge encontrado para o handle "${handle}", tentando saída padrão`);
+          currentNodeId = nextFromNode(node.id, container); // Fallback para sequential/container exit
+        }
         continue;
       }
       case "ai-node": {
