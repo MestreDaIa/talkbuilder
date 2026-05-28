@@ -439,7 +439,7 @@ async function runFlow(execution: any, containersIn: any[], edgesIn: any[], inpu
 
     if (mode === "agent" && activeAgentNodeId) {
       currentNodeId = activeAgentNodeId;
-    } else if (currentNodeId) {
+    } else if (currentNodeId && execution.waiting_for_input) {
       const info = findNode(currentNodeId);
       if (info) {
         const cfg = info.node.config || {};
@@ -449,15 +449,14 @@ async function runFlow(execution: any, containersIn: any[], edgesIn: any[], inpu
 
         // Se o nó estava aguardando, agora podemos avançar (exceto para agentes)
         if (nodeType !== "ai-agent") {
-           currentNodeId = nextFromNode(info.node.id, info.container, input.button_id);
-           // Consumimos a entrada: próximos input nodes devem aguardar nova mensagem
-           if (nodeType.startsWith("input-")) {
-             inputConsumed = true;
-             input = null;
-           }
+            currentNodeId = nextFromNode(info.node.id, info.container, input.button_id);
+            // Consumimos a entrada: o loop não deve usá-la novamente para o próximo input
+            inputConsumed = true;
+            input = null; 
         }
       }
     }
+
   }
 
 
