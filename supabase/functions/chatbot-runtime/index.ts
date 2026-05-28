@@ -254,15 +254,20 @@ async function runFlow(execution: any, containersIn: any[], edgesIn: any[], inpu
   const normalizeHandle = (value?: string | null) => {
     if (!value) return "";
     let raw = String(value);
-    // Remove prefixo de ID de node se existir (ex: node-123-cond-abc -> cond-abc)
-    if (raw.includes("-cond-")) raw = "cond-" + raw.split("-cond-")[1];
-    else if (raw.includes("-btn-")) raw = "btn-" + raw.split("-btn-")[1];
-    else if (raw.endsWith("-else")) raw = "else";
-    else if (raw.endsWith("-default")) raw = "default";
     
-    // Legacy mapping para botões
-    const buttonMatch = raw.match(/btn-(.+)$/);
-    if (buttonMatch?.[1]) return buttonMatch[1];
+    // Se for um handle de condição ou botão, extraímos a parte final para comparação flexível
+    if (raw.includes("-cond-")) {
+      const parts = raw.split("-cond-");
+      return parts[parts.length - 1];
+    }
+    if (raw.includes("-btn-")) {
+      const parts = raw.split("-btn-");
+      return parts[parts.length - 1];
+    }
+    
+    if (raw.endsWith("-else")) return "else";
+    if (raw.endsWith("-default")) return "default";
+    
     return raw;
   };
 
@@ -270,31 +275,44 @@ async function runFlow(execution: any, containersIn: any[], edgesIn: any[], inpu
     const isInnerNodeHandle = (value?: string | null) =>
       !!value && (String(value) === nodeId || String(value).startsWith(`${nodeId}-`));
 
-    
     const wantedHandle = handle || "";
+    const normalizedWanted = normalizeHandle(wantedHandle);
+    
+    console.log(`[runtime:nextFromNode] node=${nodeId} wanted=${wantedHandle} normalized=${normalizedWanted} strict=${strictHandle}`);
+
     const fromNode = edges.filter(
       (e: any) => e.source === nodeId || (e.source === container.id && isInnerNodeHandle(e.sourceHandle))
     );
 
-    // 1. Tenta match exato ou normalizado
-    let edge = fromNode.find((e: any) => 
-      wantedHandle && (e.sourceHandle === wantedHandle || normalizeHandle(e.sourceHandle) === normalizeHandle(wantedHandle))
-    );
+    // 1. Tenta match exato
+    let edge = fromNode.find((e: any) => e.sourceHandle === wantedHandle);
 
-    // 2. Fallbacks
+    // 2. Tenta match normalizado
+    if (!edge && normalizedWanted) {
+      edge = fromNode.find((e: any) => normalizeHandle(e.sourceHandle) === normalizedWanted);
+    }
+
+    // 3. Fallbacks para não-strict
     if (!edge && !strictHandle) {
-      edge = fromNode.find((e: any) => normalizeHandle(e.sourceHandle) === "default" || normalizeHandle(e.sourceHandle) === "else");
+      edge = fromNode.find((e: any) => {
+        const h = normalizeHandle(e.sourceHandle);
+        return h === "default" || h === "else";
+      });
       if (!edge) edge = fromNode.find((e: any) => !e.sourceHandle);
+      if (!edge) edge = fromNode[0];
     }
 
     if (edge) {
+      console.log(`[runtime:nextFromNode] Edge encontrado! target=${edge.target}`);
       if (findNode(edge.target)) return edge.target;
       const first = firstNodeOfContainer(edge.target);
       if (first) return first;
       return edge.target;
     }
+
+    console.log(`[runtime:nextFromNode] Nenhum edge encontrado. Voltando fallback sequencial.`);
+    
     // Fallback: avançar para o próximo node dentro do mesmo bloco (ordem do array).
-    // Nodes internos não possuem edges entre si — são sequenciais.
     if (container?.nodes?.length) {
       const idx = container.nodes.findIndex((n: any) => n.id === nodeId);
       if (idx >= 0 && idx < container.nodes.length - 1) {
@@ -387,11 +405,17 @@ async function runFlow(execution: any, containersIn: any[], edgesIn: any[], inpu
   };
 
   const evaluateComparison = (comparison: any) => {
-    const rawValue = getVariableValue(comparison?.variableName);
+    const rawVar = comparison?.variableName;
+    if (!rawVar) return false;
+    
+    const rawValue = getVariableValue(rawVar);
     const actual = rawValue == null ? "" : String(rawValue).trim();
     const expected = replaceVars(String(comparison?.value ?? "")).trim();
+    const op = comparison?.operator;
 
-    switch (comparison?.operator) {
+    console.log(`[runtime:compare] var=${rawVar} val="${actual}" op=${op} exp="${expected}"`);
+
+    switch (op) {
       case "equals": return actual === expected;
       case "not_equals": return actual !== expected;
       case "contains": return actual.includes(expected);
@@ -403,10 +427,10 @@ async function runFlow(execution: any, containersIn: any[], edgesIn: any[], inpu
       case "starts_with": return actual.startsWith(expected);
       case "ends_with": return actual.endsWith(expected);
       case "matches_regex": {
-        try { return new RegExp(expected).test(actual); } catch { return false; }
+        try { return new RegExp(expected, "i").test(actual); } catch { return false; }
       }
       case "not_matches_regex": {
-        try { return !new RegExp(expected).test(actual); } catch { return true; }
+        try { return !new RegExp(expected, "i").test(actual); } catch { return true; }
       }
       default: return false;
     }
@@ -416,7 +440,10 @@ async function runFlow(execution: any, containersIn: any[], edgesIn: any[], inpu
     const comparisons = condition?.comparisons || [];
     if (!comparisons.length) return false;
     const results = comparisons.map(evaluateComparison);
-    return condition?.logicalOperator === "OR" ? results.some(Boolean) : results.every(Boolean);
+    const isOr = condition?.logicalOperator === "OR";
+    const final = isOr ? results.some(Boolean) : results.every(Boolean);
+    console.log(`[runtime:condition] group=${condition.id} op=${condition.logicalOperator} results=${results} final=${final}`);
+    return final;
   };
 
   const parseWaitMs = (cfg: any) => {
@@ -772,7 +799,16 @@ async function runFlow(execution: any, containersIn: any[], edgesIn: any[], inpu
         const conditions = cfg.conditions || [];
         const matchedCondition = conditions.find(evaluateCondition);
         const conditionHandle = matchedCondition ? `${node.id}-cond-${matchedCondition.id}` : `${node.id}-else`;
-        currentNodeId = nextFromNode(node.id, container, conditionHandle, true);
+        
+        // Tentamos encontrar o próximo node baseado na condição.
+        // Se falhar (ex: edge não conectado), tentamos o "default" ou o próximo node sequencial (strictHandle = false)
+        let nextId = nextFromNode(node.id, container, conditionHandle, true);
+        if (!nextId) {
+          console.log(`[runtime:condition] Handle ${conditionHandle} não encontrou edge. Tentando fallback não-estrito.`);
+          nextId = nextFromNode(node.id, container, conditionHandle, false);
+        }
+        
+        currentNodeId = nextId;
         continue;
       }
       case "redirect": {
