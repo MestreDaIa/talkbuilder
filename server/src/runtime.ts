@@ -431,12 +431,14 @@ async function runFlow(execution: any, containersIn: any[], edgesIn: any[], inpu
       // Se ainda temos input não consumido (ex: mensagem inicial do usuário), processamos ele aqui
       if (input && (input.message !== undefined || input.button_id !== undefined)) {
           const userValue = input.message ?? input.button_id;
+          const buttonId = input.button_id;
           const varName = cfg.variableName || cfg.saveVariable;
           if (varName && userValue !== undefined) variables[varName] = userValue;
-          input = null;
-          currentNodeId = nextFromNode(node.id, container, input?.button_id);
+          input = null; // Consumido para o loop
+          currentNodeId = nextFromNode(node.id, container, buttonId);
           continue;
       }
+
       
       waiting_for = nodeType === "input-buttons" ? "buttons" : "text";
       if (nodeType === "input-buttons") {
