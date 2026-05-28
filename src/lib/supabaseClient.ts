@@ -35,17 +35,19 @@ function safeCreds(url?: string, anonKey?: string): SystemCreds | null {
 
 function readSystemCreds(): SystemCreds | null {
   const envUrl = import.meta.env.VITE_EXTERNAL_SUPABASE_URL || import.meta.env.VITE_SUPABASE_URL;
+  // Prioriza VITE_SUPABASE_ANON_KEY ou VITE_EXTERNAL_SUPABASE_ANON_KEY (JWT) para o client-side auth
   const envKey =
     import.meta.env.VITE_EXTERNAL_SUPABASE_ANON_KEY ||
-    import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY ||
-    import.meta.env.VITE_SUPABASE_ANON_KEY;
+    import.meta.env.VITE_SUPABASE_ANON_KEY ||
+    import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY;
 
   // Só aceita env se for do banco correto; evita misturar a URL fwoesc... com chave do projeto interno.
   const envCreds = safeCreds(envUrl, envKey);
   if (envCreds && envCreds.url.includes(SYSTEM_SUPABASE_REF)) return envCreds;
 
   // Fallback fixo validado contra o banco informado.
-  return { url: SYSTEM_SUPABASE_URL, anonKey: SYSTEM_SUPABASE_PUBLISHABLE_KEY || SYSTEM_SUPABASE_ANON_KEY };
+  // IMPORTANTE: Para o client-side auth do Supabase, precisamos do ANON_KEY (JWT), não da PUBLISHABLE_KEY sb_...
+  return { url: SYSTEM_SUPABASE_URL, anonKey: SYSTEM_SUPABASE_ANON_KEY };
 }
 
 
