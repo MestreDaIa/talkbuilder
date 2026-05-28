@@ -176,6 +176,129 @@ export const TestPanel = ({
   const startedFlowRef = useRef<string | null>(null);
   const lastStartNodeIdRef = useRef<string | null>(null);
   const waitTimerRef = useRef<number | null>(null);
+  
+  const [isCapturing, setIsCapturing] = useState(false);
+  const [captureType, setCaptureType] = useState<'image' | 'video' | 'audio' | null>(null);
+  const [recordedBlob, setRecordedBlob] = useState<Blob | null>(null);
+  const [recordingDuration, setRecordingDuration] = useState(0);
+  const mediaRecorderRef = useRef<MediaRecorder | null>(null);
+  const captureStreamRef = useRef<MediaStream | null>(null);
+  const captureVideoRef = useRef<HTMLVideoElement>(null);
+  const chunksRef = useRef<Blob[]>([]);
+  const timerRef = useRef<number | null>(null);
+
+  const startCapture = async (type: 'image' | 'video' | 'audio') => {
+    try {
+      const constraints: MediaStreamConstraints = {
+        audio: true,
+        video: type !== 'audio'
+      };
+      
+      const stream = await navigator.mediaDevices.getUserMedia(constraints);
+      captureStreamRef.current = stream;
+      setCaptureType(type);
+      setIsCapturing(true);
+      setRecordedBlob(null);
+      setRecordingDuration(0);
+
+      if (type === 'audio' || type === 'video') {
+        const recorder = new MediaRecorder(stream);
+        mediaRecorderRef.current = recorder;
+        chunksRef.current = [];
+        
+        recorder.ondataavailable = (e) => {
+          if (e.data.size > 0) chunksRef.current.push(e.data);
+        };
+        
+        recorder.onstop = () => {
+          const blob = new Blob(chunksRef.current, { type: type === 'audio' ? 'audio/webm' : 'video/webm' });
+          setRecordedBlob(blob);
+        };
+        
+        recorder.start();
+        timerRef.current = window.setInterval(() => {
+          setRecordingDuration(prev => prev + 1);
+        }, 1000);
+        
+        if (type === 'video' && captureVideoRef.current) {
+          captureVideoRef.current.srcObject = stream;
+        }
+      } else if (type === 'image') {
+        // Delay to allow video to start
+        setTimeout(() => {
+          if (captureVideoRef.current) {
+            captureVideoRef.current.srcObject = stream;
+          }
+        }, 100);
+      }
+    } catch (err) {
+      console.error("Error accessing media devices:", err);
+      alert("Não foi possível acessar a câmera ou microfone. Verifique as permissões.");
+    }
+  };
+
+  const stopCapture = () => {
+    if (captureType === 'image') {
+      const video = captureVideoRef.current;
+      if (video) {
+        const canvas = document.createElement('canvas');
+        canvas.width = video.videoWidth;
+        canvas.height = video.videoHeight;
+        const ctx = canvas.getContext('2d');
+        if (ctx) {
+          ctx.drawImage(video, 0, 0);
+          canvas.toBlob((blob) => {
+            if (blob) {
+              setRecordedBlob(blob);
+              setIsCapturing(false);
+            }
+          }, 'image/jpeg');
+        }
+      }
+    } else if (mediaRecorderRef.current && mediaRecorderRef.current.state !== 'inactive') {
+      mediaRecorderRef.current.stop();
+      setIsCapturing(false);
+    }
+
+    if (captureStreamRef.current) {
+      captureStreamRef.current.getTracks().forEach(track => track.stop());
+    }
+    
+    if (timerRef.current) {
+      window.clearInterval(timerRef.current);
+      timerRef.current = null;
+    }
+  };
+
+  const cancelCapture = () => {
+    if (mediaRecorderRef.current && mediaRecorderRef.current.state !== 'inactive') {
+      mediaRecorderRef.current.stop();
+    }
+    if (captureStreamRef.current) {
+      captureStreamRef.current.getTracks().forEach(track => track.stop());
+    }
+    if (timerRef.current) {
+      window.clearInterval(timerRef.current);
+      timerRef.current = null;
+    }
+    setIsCapturing(false);
+    setCaptureType(null);
+    setRecordedBlob(null);
+  };
+
+  const sendCaptured = () => {
+    if (recordedBlob && captureType) {
+      const url = URL.createObjectURL(recordedBlob);
+      sendMessage(undefined, undefined, { type: captureType, url });
+      cancelCapture();
+    }
+  };
+
+  const formatDuration = (seconds: number) => {
+    const mins = Math.floor(seconds / 60);
+    const secs = seconds % 60;
+    return `${mins}:${secs.toString().padStart(2, '0')}`;
+  };
 
   const contactIdRef = useRef<string>(`test-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`);
 
