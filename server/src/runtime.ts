@@ -102,10 +102,7 @@ export async function processRuntime(body: any) {
         execution = created;
       }
     } catch (e) {
-      console.warn("[runtime] execution table missing", e);
-    }
-    } catch (e) {
-      console.warn("[runtime] execution table missing", e);
+      console.warn("[runtime] execution table error", e);
     }
   } else {
     try {
@@ -117,7 +114,9 @@ export async function processRuntime(body: any) {
         .eq("channel_id", channel)
         .limit(1);
       execution = executions && executions.length > 0 ? executions[0] : null;
-    } catch {}
+    } catch (e) {
+      console.warn("[runtime] execution fetch error", e);
+    }
   }
 
   const memoryKey = `${flow.id}:${channel}:${contact_id}`;
