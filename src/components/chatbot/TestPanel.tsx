@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from "react";
-import { X, Send, Headphones, Play, Pause, FileText, Loader2, RefreshCw } from "lucide-react";
+import { X, Send, Headphones, Play, Pause, FileText, Loader2, RefreshCw, Camera, Video, Mic, Image, Phone, Upload, Paperclip } from "lucide-react";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
 import { Button } from "../../components/ui/button";
