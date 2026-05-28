@@ -151,6 +151,7 @@ export async function processRuntime(body: any) {
   } else if (action !== "start" && clientState?.current_node_id) {
     const newState = normalizeClientState(clientState);
     if (newState.current_node_id) {
+       console.log(`[runtime:state_recovery] Recuperando estado do cliente. Node: ${newState.current_node_id}`);
        execution = { ...execution, ...newState, id: execution.id };
     }
   }
@@ -382,21 +383,18 @@ async function runFlow(execution: any, containersIn: any[], edgesIn: any[], inpu
   if (input && (input.message !== undefined || input.button_id !== undefined)) {
     const userValue = input.message ?? input.button_id;
     variables["last_message"] = userValue;
+    console.log(`[runtime:input_received] Recebido input: ${userValue}. Mode: ${mode}. CurrentNode: ${currentNodeId}`);
 
     if (mode === "agent" && activeAgentNodeId) {
        currentNodeId = activeAgentNodeId;
     } else if (currentNodeId && execution.waiting_for_input) {
        const info = findNode(currentNodeId);
        if (info) {
-         const cfg = info.node.config || {};
          const nodeType = (info.node.type || "").toLowerCase();
-         const varName = cfg.variableName || cfg.saveVariable;
-         if (varName && userValue !== undefined) variables[varName] = userValue;
-
-         if (nodeType !== "ai-agent" && nodeType !== "agent") {
-            currentNodeId = nextFromNode(info.node.id, info.container, input.button_id);
-            inputConsumed = true;
-            input = null; // Consumido para o loop
+         if (nodeType.startsWith("input-")) {
+            console.log(`[runtime:input_processing] Processando input para o node atual ${currentNodeId} (${nodeType})`);
+            // Não movemos o currentNodeId aqui, deixamos o loop de execução lidar com o consumo do input
+            // Isso garante que a lógica de salvar na variável e achar o próximo node seja centralizada
          }
        }
     }
@@ -452,18 +450,26 @@ async function runFlow(execution: any, containersIn: any[], edgesIn: any[], inpu
     }
 
     if (nodeType.startsWith("input-")) {
-      // Se ainda temos input não consumido (ex: mensagem inicial do usuário), processamos ele aqui
+      console.log(`[runtime:input] No node ${node.id} de tipo ${nodeType}. Input disponível: ${!!input}`);
+      
+      // Se ainda temos input não consumido (ex: mensagem inicial do usuário ou resposta de input anterior), processamos ele aqui
       if (input && (input.message !== undefined || input.button_id !== undefined)) {
           const userValue = input.message ?? input.button_id;
           const buttonId = input.button_id;
           const varName = cfg.variableName || cfg.saveVariable;
+          
+          console.log(`[runtime:input_match] Consumindo input para o node ${node.id}. Valor: ${userValue}, Variável: ${varName}`);
+          
           if (varName && userValue !== undefined) variables[varName] = userValue;
           input = null; // Consumido para o loop
-          currentNodeId = nextFromNode(node.id, container, buttonId);
+          
+          const nextNode = nextFromNode(node.id, container, buttonId);
+          console.log(`[runtime:input_next] Avançando do input ${node.id} para ${nextNode}`);
+          currentNodeId = nextNode;
           continue;
       }
 
-      
+      console.log(`[runtime:input_wait] Parando no node ${node.id} para aguardar input.`);
       waiting_for = nodeType === "input-buttons" ? "buttons" : "text";
       if (nodeType === "input-buttons") {
         buttons = (cfg.buttons || []).map((b: any) => ({
