@@ -138,15 +138,9 @@ export async function saveDraft(flowId: string, containers: Container[], edges: 
     throw error;
   }
 
-  // Reseta execuções em andamento que possam referenciar nodes que não existem mais.
-  try {
-    await c
-      .from("flow_executions")
-      .update({ current_node_id: null, active_agent_node_id: null, waiting_for_input: false, runtime_mode: "flow" })
-      .eq("flow_id", flowId);
-  } catch (e) {
-    console.warn("[flowsApi] Não foi possível resetar flow_executions:", e);
-  }
+  // O reset agressivo foi removido para evitar reinícios indesejados durante testes.
+  // O runtime agora valida se o current_node_id ainda existe no fluxo.
+
 
   return data as ChatbotFlowRow;
 }
