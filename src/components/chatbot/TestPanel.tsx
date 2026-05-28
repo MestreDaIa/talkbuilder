@@ -1072,11 +1072,11 @@ export const TestPanel = ({
   };
 
 
-  const sendMessage = async (message?: string, buttonId?: string) => {
-    const msgToSend = message || currentInput;
-    if (!msgToSend && !buttonId) return;
+  const sendMessage = async (message?: string, buttonId?: string, fileData?: { type: 'image' | 'video' | 'audio' | 'file', url: string }) => {
+    const msgToSend = message || currentInput || fileData?.url;
+    if (!msgToSend && !buttonId && !fileData) return;
 
-    if (!buttonId && waitingForType && msgToSend) {
+    if (!buttonId && !fileData && waitingForType && msgToSend) {
       const handleError = (errorContent: string) => {
         const userMsg: Message = { 
           id: `u-${Date.now()}`, 
@@ -1127,15 +1127,19 @@ export const TestPanel = ({
       }
     }
 
-
-    if (msgToSend) {
-      setMessages(prev => [...prev, { 
+    if (msgToSend || fileData) {
+      const userMsg: Message = { 
         id: `u-${Date.now()}`, 
         conversation_id: runtimeStateRef.current?.conversation_id || "temp",
         role: "user",
         type: "user", 
-        content: msgToSend 
-      }]);
+        content: msgToSend || "",
+        isImage: fileData?.type === 'image',
+        isVideo: fileData?.type === 'video',
+        isAudio: fileData?.type === 'audio',
+        isFile: fileData?.type === 'file'
+      };
+      setMessages(prev => [...prev, userMsg]);
     }
 
     setIsLoading(true);
@@ -1146,7 +1150,6 @@ export const TestPanel = ({
     
     applyRuntimeData(data);
     setIsLoading(false);
-
   };
 
   const handleButtonClick = (button: ButtonConfig) => sendMessage(undefined, button.id);
