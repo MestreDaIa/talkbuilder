@@ -236,18 +236,28 @@ async function runFlow(execution: any, containersIn: any[], edgesIn: any[], inpu
     return c?.nodes?.[0]?.id ?? null;
   };
 
-  const normalizeHandle = (value?: string | null) => {
+  const normalizeHandle = (value: string | null | undefined, currentNodeId?: string) => {
     if (!value) return "";
     let raw = String(value);
-    // Remove prefixo de ID de node se existir (ex: node-123-cond-abc -> cond-abc)
-    if (raw.includes("-cond-")) raw = "cond-" + raw.split("-cond-")[1];
-    else if (raw.includes("-btn-")) raw = "btn-" + raw.split("-btn-")[1];
-    else if (raw.endsWith("-else")) raw = "else";
-    else if (raw.endsWith("-default")) raw = "default";
     
-    // Legacy mapping
+    // Remove prefixo de ID de node se existir (ex: node-123-cond-abc -> cond-abc)
+    if (raw.includes("-cond-")) {
+      raw = "cond-" + raw.split("-cond-")[1];
+    } else if (raw.includes("-btn-")) {
+      raw = "btn-" + raw.split("-btn-")[1];
+    } else if (raw.endsWith("-else")) {
+      raw = "else";
+    } else if (raw.endsWith("-default")) {
+      raw = "default";
+    }
+    
+    // Se o handle for exatamente o ID do node, normalizamos para vazio para facilitar match padrão
+    if (currentNodeId && raw === currentNodeId) return "";
+    
+    // Legacy mapping para botões
     const buttonMatch = raw.match(/btn-(.+)$/);
     if (buttonMatch?.[1]) return buttonMatch[1];
+    
     return raw;
   };
 
@@ -255,48 +265,57 @@ async function runFlow(execution: any, containersIn: any[], edgesIn: any[], inpu
     const isInnerNodeHandle = (value?: string | null) =>
       !!value && (String(value) === nodeId || String(value).startsWith(`${nodeId}-`));
 
-    
     const wantedHandle = handle || "";
     const fromNode = edges.filter(
       (e: any) => e.source === nodeId || (e.source === container.id && isInnerNodeHandle(e.sourceHandle))
     );
 
     // 1. Tenta match de handle (exato ou normalizado)
-    let edge = fromNode.find((e: any) => 
-       wantedHandle && (e.sourceHandle === wantedHandle || normalizeHandle(e.sourceHandle) === normalizeHandle(wantedHandle))
-    );
+    let edge = fromNode.find((e: any) => {
+      if (!wantedHandle) {
+        // Se não queremos um handle específico, aceitamos edges sem handle ou que apontem para o ID do node
+        return !e.sourceHandle || e.sourceHandle === nodeId || normalizeHandle(e.sourceHandle, nodeId) === "";
+      }
+      return e.sourceHandle === wantedHandle || normalizeHandle(e.sourceHandle, nodeId) === normalizeHandle(wantedHandle, nodeId);
+    });
     
-    // 2. Fallbacks
+    // 2. Fallbacks de handle (default/else)
     if (!edge && !strictHandle) {
-       edge = fromNode.find((e: any) => normalizeHandle(e.sourceHandle) === "default" || normalizeHandle(e.sourceHandle) === "else");
-       if (!edge) edge = fromNode.find((e: any) => !e.sourceHandle);
+       edge = fromNode.find((e: any) => {
+         const norm = normalizeHandle(e.sourceHandle, nodeId);
+         return norm === "default" || norm === "else";
+       });
     }
 
     if (edge) {
-      console.log(`[runtime:edge_found] de ${nodeId} para ${edge.target} via handle "${wantedHandle || "(default)"}"`);
+      console.log(`[runtime:edge_found] de ${nodeId} para ${edge.target} via handle "${wantedHandle || "(default/auto)"}"`);
       if (findNode(edge.target)) return edge.target;
       const first = firstNodeOfContainer(edge.target);
       if (first) return first;
       return edge.target;
     }
 
-    console.log(`[runtime:edge_not_found] nenhum edge saindo de ${nodeId} com handle "${wantedHandle}"`);
-
-
-    // 3. Sequencial dentro do bloco
-    if (container?.nodes?.length) {
+    // 3. Sequencial dentro do bloco (apenas se não for strictHandle)
+    if (!strictHandle && container?.nodes?.length) {
       const idx = container.nodes.findIndex((n: any) => n.id === nodeId);
       if (idx >= 0 && idx < container.nodes.length - 1) {
-        return container.nodes[idx + 1].id;
+        const nextId = container.nodes[idx + 1].id;
+        console.log(`[runtime:sequential] movendo de ${nodeId} para o próximo node no bloco: ${nextId}`);
+        return nextId;
       }
     }
 
-    // 4. Edge saindo do container
-    const cEdge = edges.find((e: any) => e.source === container.id && !e.sourceHandle);
-    if (cEdge) {
-      if (findNode(cEdge.target)) return cEdge.target;
-      return firstNodeOfContainer(cEdge.target);
+    // 4. Edge saindo do container (apenas se não for strictHandle)
+    if (!strictHandle) {
+      const cEdge = edges.find((e: any) => e.source === container.id && !e.sourceHandle);
+      if (cEdge) {
+        console.log(`[runtime:container_exit] saindo do bloco ${container.id} para ${cEdge.target}`);
+        const targetId = findNode(cEdge.target) ? cEdge.target : firstNodeOfContainer(cEdge.target);
+        if (targetId) return targetId;
+      }
     }
+
+    console.log(`[runtime:edge_not_found] nenhum caminho saindo de ${nodeId}${wantedHandle ? ` com handle "${wantedHandle}"` : ""}`);
     return null;
   };
 
@@ -412,7 +431,7 @@ async function runFlow(execution: any, containersIn: any[], edgesIn: any[], inpu
 
     const { node, container } = info;
     const cfg = node.config || {};
-    const nodeType = (node.type || "").toLowerCase();
+    const nodeType = String(node.type || "").toLowerCase().trim();
 
     if (nodeType === "wait" || nodeType === "await") {
       if (!execution.is_waiting_time) {
@@ -430,6 +449,7 @@ async function runFlow(execution: any, containersIn: any[], edgesIn: any[], inpu
     if (nodeType.startsWith("input-")) {
       // Se ainda temos input não consumido (ex: mensagem inicial do usuário), processamos ele aqui
       if (input && (input.message !== undefined || input.button_id !== undefined)) {
+          console.log(`[runtime:input] processando entrada para node ${node.id} (${nodeType})`);
           const userValue = input.message ?? input.button_id;
           const buttonId = input.button_id;
           const varName = cfg.variableName || cfg.saveVariable;
@@ -470,7 +490,15 @@ async function runFlow(execution: any, containersIn: any[], edgesIn: any[], inpu
       case "condition": {
         const matchedCondition = (cfg.conditions || []).find(evaluateCondition);
         const handle = matchedCondition ? `${node.id}-cond-${matchedCondition.id}` : `${node.id}-else`;
-        currentNodeId = nextFromNode(node.id, container, handle, true);
+        console.log(`[runtime:condition] node ${node.id}: ${matchedCondition ? `condição "${matchedCondition.id}" satisfeita` : "nenhuma condição satisfeita (indo para else)"}`);
+        
+        const nextId = nextFromNode(node.id, container, handle, true);
+        if (nextId) {
+          currentNodeId = nextId;
+        } else {
+          console.log(`[runtime:condition] fallback: nenhum edge encontrado para o handle "${handle}", tentando saída padrão`);
+          currentNodeId = nextFromNode(node.id, container); // Fallback para sequential/container exit
+        }
         continue;
       }
       case "ai-node": {
