@@ -1315,6 +1315,61 @@ export const TestPanel = ({
 
   return (
     <aside className={containerClass} style={themeStyle}>
+      {isCapturing && (
+        <div className="absolute inset-0 z-[60] bg-black flex flex-col items-center justify-center p-4">
+          {(captureType === 'video' || captureType === 'image') && (
+            <video 
+              ref={captureVideoRef} 
+              autoPlay 
+              muted 
+              playsInline 
+              className="w-full max-h-[70%] bg-zinc-900 rounded-lg object-contain mb-4"
+            />
+          )}
+          {captureType === 'audio' && (
+            <div className="flex flex-col items-center gap-4 mb-8">
+              <div className="w-20 h-20 rounded-full bg-red-500/20 flex items-center justify-center animate-pulse">
+                <Mic className="h-10 w-10 text-red-500" />
+              </div>
+              <span className="text-white text-2xl font-mono">{formatDuration(recordingDuration)}</span>
+              <span className="text-zinc-400 text-sm">Gravando áudio...</span>
+            </div>
+          )}
+          {(captureType === 'video') && (
+             <div className="flex flex-col items-center gap-2 mb-4">
+               <span className="text-white font-mono">{formatDuration(recordingDuration)}</span>
+             </div>
+          )}
+          <div className="flex gap-4">
+            <Button variant="outline" className="rounded-full px-6 border-white text-white hover:bg-white/10" onClick={cancelCapture}>Cancelar</Button>
+            <Button variant="destructive" className="rounded-full px-6" onClick={stopCapture}>
+              {captureType === 'image' ? 'Tirar Foto' : 'Parar Gravação'}
+            </Button>
+          </div>
+        </div>
+      )}
+      
+      {recordedBlob && (
+        <div className="absolute inset-0 z-[60] bg-black/95 flex flex-col items-center justify-center p-4">
+           <div className="w-full max-h-[70%] mb-4 overflow-hidden rounded-lg bg-zinc-900 flex items-center justify-center">
+             {captureType === 'image' && <img src={URL.createObjectURL(recordedBlob)} className="max-w-full max-h-full object-contain" alt="Preview" />}
+             {captureType === 'video' && <video src={URL.createObjectURL(recordedBlob)} controls className="max-w-full max-h-full" />}
+             {captureType === 'audio' && (
+               <div className="p-8 bg-zinc-800 rounded-lg w-full max-w-xs flex flex-col items-center gap-4">
+                 <Mic className="h-12 w-12 text-primary" />
+                 <audio src={URL.createObjectURL(recordedBlob)} controls className="w-full" />
+               </div>
+             )}
+           </div>
+           <div className="flex gap-4">
+             <Button variant="outline" className="rounded-full px-6 border-white text-white hover:bg-white/10" onClick={() => {
+               setRecordedBlob(null);
+               if (captureType) startCapture(captureType);
+             }}>Refazer</Button>
+             <Button className="rounded-full px-8" onClick={sendCaptured} style={{ background: theme?.primaryColor }}>Enviar</Button>
+           </div>
+        </div>
+      )}
       <div className="flex flex-col w-full h-full">
         <div className="sticky top-0 z-10 shrink-0 min-h-14 border-b border-border px-3 py-2 flex items-center justify-between"
           style={{ 
