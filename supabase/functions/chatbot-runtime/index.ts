@@ -268,7 +268,8 @@ async function runFlow(execution: any, containersIn: any[], edgesIn: any[], inpu
 
   const nextFromNode = (nodeId: string, container: any, handle?: string, strictHandle = false): string | null => {
     const isInnerNodeHandle = (value?: string | null) =>
-      !!value && String(value).startsWith(`${nodeId}-`);
+      !!value && (String(value) === nodeId || String(value).startsWith(`${nodeId}-`));
+
     
     const wantedHandle = handle || "";
     const fromNode = edges.filter(
@@ -504,6 +505,19 @@ async function runFlow(execution: any, containersIn: any[], edgesIn: any[], inpu
 
     // Comportamento de Entrada
     if (nodeType.startsWith("input-")) {
+      // Se ainda temos input não consumido (ex: payload inicial no start), processamos aqui
+      if (input && (input.message !== undefined || input.button_id !== undefined)) {
+        const userValue = input.message ?? input.button_id;
+        const buttonId = input.button_id;
+        const varName = cfg.variableName || cfg.saveVariable;
+        if (varName && userValue !== undefined) variables[varName] = userValue;
+        
+        console.log(`[node:input_consumed] ${node.id} via loop. Valor: ${userValue}`);
+        input = null; // Consumido
+        currentNodeId = nextFromNode(node.id, container, buttonId);
+        continue;
+      }
+
       if (!input || (input.message === undefined && input.button_id === undefined)) {
         console.log("[node:waiting_input]", node.id);
         waiting_for = nodeType === "input-buttons" ? "buttons" : "text";
@@ -518,6 +532,7 @@ async function runFlow(execution: any, containersIn: any[], edgesIn: any[], inpu
         break;
       }
     }
+
 
     // AI Node (Execução Única)
     if (nodeType === "ai-node") {

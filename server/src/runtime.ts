@@ -253,7 +253,8 @@ async function runFlow(execution: any, containersIn: any[], edgesIn: any[], inpu
 
   const nextFromNode = (nodeId: string, container: any, handle?: string, strictHandle = false): string | null => {
     const isInnerNodeHandle = (value?: string | null) =>
-      !!value && String(value).startsWith(`${nodeId}-`);
+      !!value && (String(value) === nodeId || String(value).startsWith(`${nodeId}-`));
+
     
     const wantedHandle = handle || "";
     const fromNode = edges.filter(
@@ -272,11 +273,15 @@ async function runFlow(execution: any, containersIn: any[], edgesIn: any[], inpu
     }
 
     if (edge) {
+      console.log(`[runtime:edge_found] de ${nodeId} para ${edge.target} via handle "${wantedHandle || "(default)"}"`);
       if (findNode(edge.target)) return edge.target;
       const first = firstNodeOfContainer(edge.target);
       if (first) return first;
       return edge.target;
     }
+
+    console.log(`[runtime:edge_not_found] nenhum edge saindo de ${nodeId} com handle "${wantedHandle}"`);
+
 
     // 3. Sequencial dentro do bloco
     if (container?.nodes?.length) {
@@ -321,8 +326,17 @@ async function runFlow(execution: any, containersIn: any[], edgesIn: any[], inpu
       case "less_than": return Number(actual) < Number(expected);
       case "is_set": return rawValue !== undefined && rawValue !== null && String(rawValue).trim() !== "";
       case "is_empty": return rawValue === undefined || rawValue === null || String(rawValue).trim() === "";
+      case "starts_with": return actual.startsWith(expected);
+      case "ends_with": return actual.endsWith(expected);
+      case "matches_regex": {
+        try { return new RegExp(expected).test(actual); } catch { return false; }
+      }
+      case "not_matches_regex": {
+        try { return !new RegExp(expected).test(actual); } catch { return true; }
+      }
       default: return false;
     }
+
   };
 
   const evaluateCondition = (condition: any) => {
@@ -384,9 +398,17 @@ async function runFlow(execution: any, containersIn: any[], edgesIn: any[], inpu
     const info = findNode(currentNodeId);
     if (!info) {
        console.log(`[runtime] Node não encontrado: ${currentNodeId}. Resetando para o início.`);
-       currentNodeId = null; // Vai causar restart se houver próxima iteração ou fim do loop
+       // Antes de resetar, vamos ver se o ID é de um container e pegar o primeiro node dele
+       const firstNode = firstNodeOfContainer(currentNodeId);
+       if (firstNode) {
+          console.log(`[runtime] O ID ${currentNodeId} é um container. Iniciando pelo primeiro node: ${firstNode}`);
+          currentNodeId = firstNode;
+          continue;
+       }
+       currentNodeId = null; 
        break;
     }
+
 
     const { node, container } = info;
     const cfg = node.config || {};
@@ -409,12 +431,14 @@ async function runFlow(execution: any, containersIn: any[], edgesIn: any[], inpu
       // Se ainda temos input não consumido (ex: mensagem inicial do usuário), processamos ele aqui
       if (input && (input.message !== undefined || input.button_id !== undefined)) {
           const userValue = input.message ?? input.button_id;
+          const buttonId = input.button_id;
           const varName = cfg.variableName || cfg.saveVariable;
           if (varName && userValue !== undefined) variables[varName] = userValue;
-          input = null;
-          currentNodeId = nextFromNode(node.id, container, input?.button_id);
+          input = null; // Consumido para o loop
+          currentNodeId = nextFromNode(node.id, container, buttonId);
           continue;
       }
+
       
       waiting_for = nodeType === "input-buttons" ? "buttons" : "text";
       if (nodeType === "input-buttons") {
