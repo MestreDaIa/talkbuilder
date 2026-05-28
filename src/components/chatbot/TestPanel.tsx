@@ -437,6 +437,8 @@ export const TestPanel = ({
             }
           }
         }
+        // Input já foi consumido pelo node em waiting_for_input — não deve afetar próximos input nodes
+        input = undefined;
       }
 
       console.log("[Runtime] Loop start", { mode, currentNodeId, steps });
