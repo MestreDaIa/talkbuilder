@@ -799,7 +799,16 @@ async function runFlow(execution: any, containersIn: any[], edgesIn: any[], inpu
         const conditions = cfg.conditions || [];
         const matchedCondition = conditions.find(evaluateCondition);
         const conditionHandle = matchedCondition ? `${node.id}-cond-${matchedCondition.id}` : `${node.id}-else`;
-        currentNodeId = nextFromNode(node.id, container, conditionHandle, true);
+        
+        // Tentamos encontrar o próximo node baseado na condição.
+        // Se falhar (ex: edge não conectado), tentamos o "default" ou o próximo node sequencial (strictHandle = false)
+        let nextId = nextFromNode(node.id, container, conditionHandle, true);
+        if (!nextId) {
+          console.log(`[runtime:condition] Handle ${conditionHandle} não encontrou edge. Tentando fallback não-estrito.`);
+          nextId = nextFromNode(node.id, container, conditionHandle, false);
+        }
+        
+        currentNodeId = nextId;
         continue;
       }
       case "redirect": {
