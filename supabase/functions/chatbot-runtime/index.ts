@@ -268,7 +268,8 @@ async function runFlow(execution: any, containersIn: any[], edgesIn: any[], inpu
 
   const nextFromNode = (nodeId: string, container: any, handle?: string, strictHandle = false): string | null => {
     const isInnerNodeHandle = (value?: string | null) =>
-      !!value && String(value).startsWith(`${nodeId}-`);
+      !!value && (String(value) === nodeId || String(value).startsWith(`${nodeId}-`));
+
     
     const wantedHandle = handle || "";
     const fromNode = edges.filter(
