@@ -10,9 +10,9 @@ import { createClient, type SupabaseClient } from "@supabase/supabase-js";
 
 const SYSTEM_SUPABASE_REF = "fwoescubnnagdvwasbjl";
 const SYSTEM_SUPABASE_URL = `https://${SYSTEM_SUPABASE_REF}.supabase.co`;
-const SYSTEM_SUPABASE_PUBLISHABLE_KEY = "sb_publishable_v58nZwBN4s5_lMASv4S3Iw_L23jPbIK";
 const SYSTEM_SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImZ3b2VzY3Vibm5hZ2R2d2FzYmpsIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzY5NzA1OTYsImV4cCI6MjA5MjU0NjU5Nn0.IetF2dz-c_D8gY_KWkhTXBO3wuQz4fm4h_kAhfUOxJA";
-const BLOCKED_INTERNAL_REFS = ["xllkibdddlmcdbrhzedu"];
+const BLOCKED_INTERNAL_REFS: string[] = [];
+
 
 
 // Fallback manual via localStorage para o sistema
@@ -34,21 +34,18 @@ function safeCreds(url?: string, anonKey?: string): SystemCreds | null {
 }
 
 function readSystemCreds(): SystemCreds | null {
-  const envUrl = import.meta.env.VITE_EXTERNAL_SUPABASE_URL || import.meta.env.VITE_SUPABASE_URL;
-  // Prioriza VITE_SUPABASE_ANON_KEY ou VITE_EXTERNAL_SUPABASE_ANON_KEY (JWT) para o client-side auth
-  const envKey =
-    import.meta.env.VITE_EXTERNAL_SUPABASE_ANON_KEY ||
-    import.meta.env.VITE_SUPABASE_ANON_KEY ||
-    import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY;
+  // O usuário solicitou que o .env seja a fonte absoluta
+  const envUrl = import.meta.env.VITE_SUPABASE_URL;
+  const envKey = import.meta.env.VITE_SUPABASE_ANON_KEY;
 
-  // Só aceita env se for do banco correto; evita misturar a URL fwoesc... com chave do projeto interno.
-  const envCreds = safeCreds(envUrl, envKey);
-  if (envCreds && envCreds.url.includes(SYSTEM_SUPABASE_REF)) return envCreds;
+  if (envUrl && envKey) {
+    return { url: envUrl, anonKey: envKey };
+  }
 
-  // Fallback fixo validado contra o banco informado.
-  // IMPORTANTE: Para o client-side auth do Supabase, precisamos do ANON_KEY (JWT), não da PUBLISHABLE_KEY sb_...
+  // Fallback apenas se as envs sumirem
   return { url: SYSTEM_SUPABASE_URL, anonKey: SYSTEM_SUPABASE_ANON_KEY };
 }
+
 
 
 export function saveSystemSupabaseCreds(creds: SystemCreds): void {
@@ -87,12 +84,10 @@ export function isSupabaseConfigured(): boolean {
 
 /** True somente se veio de variável de ambiente (modo "produção"). */
 export function isSupabaseFromEnv(): boolean {
-  const envUrl = import.meta.env.VITE_EXTERNAL_SUPABASE_URL || import.meta.env.VITE_SUPABASE_URL;
-  const envKey =
-    import.meta.env.VITE_EXTERNAL_SUPABASE_ANON_KEY ||
-    import.meta.env.VITE_SUPABASE_ANON_KEY ||
-    import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY;
-  return Boolean(envUrl && envKey && envUrl.includes(SYSTEM_SUPABASE_REF));
+  const envUrl = import.meta.env.VITE_SUPABASE_URL;
+  const envKey = import.meta.env.VITE_SUPABASE_ANON_KEY;
+  return Boolean(envUrl && envKey);
+
 }
 
 /**
