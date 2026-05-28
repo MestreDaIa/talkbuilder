@@ -94,10 +94,12 @@ export async function getFlowByWorkspaceItem(workspaceItemId: string): Promise<C
   return (data as ChatbotFlowRow) ?? null;
 }
 
-/** Salva o rascunho (containers + edges). Não muda status de publicação. */
+/** Salva o rascunho (containers + edges). Se o fluxo já estiver publicado,
+ *  espelha imediatamente para a versão publicada — assim canais como WhatsApp
+ *  passam a executar a versão mais recente sem precisar re-publicar manualmente. */
 export async function saveDraft(flowId: string, containers: Container[], edges: Edge[]): Promise<ChatbotFlowRow> {
   const c = client();
-  
+
   // Garantimos que os dados estão limpos de referências circulares ou estados do React Flow
   // antes de enviar para o banco de dados.
   const cleanContainers = JSON.parse(JSON.stringify(containers));
@@ -105,23 +107,50 @@ export async function saveDraft(flowId: string, containers: Container[], edges: 
 
   console.log("[flowsApi] Salvando rascunho para flow:", flowId, "Nodes:", cleanContainers.length);
 
+  // Verificamos se o fluxo está publicado para decidir se devemos espelhar.
+  const { data: current } = await c
+    .from("chatbot_flows")
+    .select("is_published")
+    .eq("id", flowId)
+    .maybeSingle();
+
+  const now = new Date().toISOString();
+  const updatePayload: Record<string, any> = {
+    draft_containers: cleanContainers,
+    draft_edges: cleanEdges,
+    draft_updated_at: now,
+  };
+  if (current?.is_published) {
+    updatePayload.published_containers = cleanContainers;
+    updatePayload.published_edges = cleanEdges;
+    updatePayload.published_at = now;
+  }
+
   const { data, error } = await c
     .from("chatbot_flows")
-    .update({
-      draft_containers: cleanContainers,
-      draft_edges: cleanEdges,
-      draft_updated_at: new Date().toISOString(),
-    })
+    .update(updatePayload)
     .eq("id", flowId)
     .select("*")
     .single();
-    
+
   if (error) {
     console.error("[flowsApi] Erro ao salvar rascunho:", error);
     throw error;
   }
+
+  // Reseta execuções em andamento que possam referenciar nodes que não existem mais.
+  try {
+    await c
+      .from("flow_executions")
+      .update({ current_node_id: null, active_agent_node_id: null, waiting_for_input: false, runtime_mode: "flow" })
+      .eq("flow_id", flowId);
+  } catch (e) {
+    console.warn("[flowsApi] Não foi possível resetar flow_executions:", e);
+  }
+
   return data as ChatbotFlowRow;
 }
+
 
 export async function updateFlowMeta(
   flowId: string,

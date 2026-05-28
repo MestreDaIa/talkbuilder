@@ -417,6 +417,7 @@ async function runFlow(execution: any, containersIn: any[], edgesIn: any[], inpu
   };
 
   // 1. Processar Entrada do Usuário
+  let inputConsumed = false;
   if (input && (input.message !== undefined || input.button_id !== undefined)) {
     console.log("[runtime:input_received]", input);
     const userValue = input.message ?? input.button_id;
@@ -428,16 +429,23 @@ async function runFlow(execution: any, containersIn: any[], edgesIn: any[], inpu
       const info = findNode(currentNodeId);
       if (info) {
         const cfg = info.node.config || {};
+        const nodeType = (info.node.type || "").toLowerCase();
         const varName = cfg.variableName || cfg.saveVariable;
         if (varName && userValue !== undefined) variables[varName] = userValue;
-        
+
         // Se o nó estava aguardando, agora podemos avançar (exceto para agentes)
-        if (info.node.type !== "ai-agent") {
+        if (nodeType !== "ai-agent") {
            currentNodeId = nextFromNode(info.node.id, info.container, input.button_id);
+           // Consumimos a entrada: próximos input nodes devem aguardar nova mensagem
+           if (nodeType.startsWith("input-")) {
+             inputConsumed = true;
+             input = null;
+           }
         }
       }
     }
   }
+
 
   // 2. Encontrar Nó de Início
   if (!currentNodeId) {
