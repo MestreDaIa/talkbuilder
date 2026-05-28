@@ -253,25 +253,39 @@ async function runFlow(execution: any, containersIn: any[], edgesIn: any[], inpu
 
   const normalizeHandle = (value?: string | null) => {
     if (!value) return "";
-    const raw = String(value);
-    const buttonMatch = raw.match(/-btn-(.+)$/);
+    let raw = String(value);
+    // Remove prefixo de ID de node se existir (ex: node-123-cond-abc -> cond-abc)
+    if (raw.includes("-cond-")) raw = "cond-" + raw.split("-cond-")[1];
+    else if (raw.includes("-btn-")) raw = "btn-" + raw.split("-btn-")[1];
+    else if (raw.endsWith("-else")) raw = "else";
+    else if (raw.endsWith("-default")) raw = "default";
+    
+    // Legacy mapping para botões
+    const buttonMatch = raw.match(/btn-(.+)$/);
     if (buttonMatch?.[1]) return buttonMatch[1];
-    if (raw.endsWith("-default")) return "default";
     return raw;
   };
 
   const nextFromNode = (nodeId: string, container: any, handle?: string, strictHandle = false): string | null => {
     const isInnerNodeHandle = (value?: string | null) =>
       !!value && String(value).startsWith(`${nodeId}-`);
-    const wantedHandle = normalizeHandle(handle);
+    
+    const wantedHandle = handle || "";
     const fromNode = edges.filter(
       (e: any) => e.source === nodeId || (e.source === container.id && isInnerNodeHandle(e.sourceHandle))
     );
-    let edge = fromNode.find((e: any) => wantedHandle && normalizeHandle(e.sourceHandle) === wantedHandle);
-    if (!edge && strictHandle) return null;
-    if (!edge && wantedHandle) edge = fromNode.find((e: any) => normalizeHandle(e.sourceHandle) === "default");
-    if (!edge) edge = fromNode.find((e: any) => !e.sourceHandle);
-    if (!edge) edge = fromNode[0];
+
+    // 1. Tenta match exato ou normalizado
+    let edge = fromNode.find((e: any) => 
+      wantedHandle && (e.sourceHandle === wantedHandle || normalizeHandle(e.sourceHandle) === normalizeHandle(wantedHandle))
+    );
+
+    // 2. Fallbacks
+    if (!edge && !strictHandle) {
+      edge = fromNode.find((e: any) => normalizeHandle(e.sourceHandle) === "default" || normalizeHandle(e.sourceHandle) === "else");
+      if (!edge) edge = fromNode.find((e: any) => !e.sourceHandle);
+    }
+
     if (edge) {
       if (findNode(edge.target)) return edge.target;
       const first = firstNodeOfContainer(edge.target);
