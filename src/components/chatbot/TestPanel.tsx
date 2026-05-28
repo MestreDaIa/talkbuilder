@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from "react";
-import { X, Send, Headphones, Play, Pause, FileText, Loader2, RefreshCw } from "lucide-react";
+import { X, Send, Headphones, Play, Pause, FileText, Loader2, RefreshCw, Camera, Video, Mic, Image, Phone, Upload, Paperclip } from "lucide-react";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
 import { Button } from "../../components/ui/button";
@@ -483,7 +483,7 @@ export const TestPanel = ({
         if (nodeType.startsWith("input-")) {
           if (!input || (input.message === undefined && input.button_id === undefined)) {
             console.log("[node:waiting_input]", node.id);
-            waitingFor = nodeType === "input-buttons" ? "buttons" : "text";
+            waitingFor = nodeType === "input-buttons" ? "buttons" : nodeType;
             waitingForCfg = cfg;
             if (nodeType === "input-buttons") {
               nextButtons = cfg.buttons || [];
@@ -1072,11 +1072,11 @@ export const TestPanel = ({
   };
 
 
-  const sendMessage = async (message?: string, buttonId?: string) => {
-    const msgToSend = message || currentInput;
-    if (!msgToSend && !buttonId) return;
+  const sendMessage = async (message?: string, buttonId?: string, fileData?: { type: 'image' | 'video' | 'audio' | 'file', url: string }) => {
+    const msgToSend = message || currentInput || fileData?.url;
+    if (!msgToSend && !buttonId && !fileData) return;
 
-    if (!buttonId && waitingForType && msgToSend) {
+    if (!buttonId && !fileData && waitingForType && msgToSend) {
       const handleError = (errorContent: string) => {
         const userMsg: Message = { 
           id: `u-${Date.now()}`, 
@@ -1127,15 +1127,19 @@ export const TestPanel = ({
       }
     }
 
-
-    if (msgToSend) {
-      setMessages(prev => [...prev, { 
+    if (msgToSend || fileData) {
+      const userMsg: Message = { 
         id: `u-${Date.now()}`, 
         conversation_id: runtimeStateRef.current?.conversation_id || "temp",
         role: "user",
         type: "user", 
-        content: msgToSend 
-      }]);
+        content: msgToSend || "",
+        isImage: fileData?.type === 'image',
+        isVideo: fileData?.type === 'video',
+        isAudio: fileData?.type === 'audio',
+        isFile: fileData?.type === 'file'
+      };
+      setMessages(prev => [...prev, userMsg]);
     }
 
     setIsLoading(true);
@@ -1146,7 +1150,6 @@ export const TestPanel = ({
     
     applyRuntimeData(data);
     setIsLoading(false);
-
   };
 
   const handleButtonClick = (button: ButtonConfig) => sendMessage(undefined, button.id);
@@ -1266,48 +1269,107 @@ export const TestPanel = ({
           </div>
         )}
         {waitingForInput && (
-          <div className="p-3 border-t border-border flex gap-2" style={{ background: theme?.inputBackgroundColor }}>
+          <div className="p-3 border-t border-border flex flex-col gap-2" style={{ background: theme?.inputBackgroundColor }}>
             {!waitingForButton && (
-              <div className="flex flex-1 gap-2 items-end">
-                {waitingForType === "input-number" || waitingForType === "input-mail" || waitingForType === "input-webSite" ? (
-                  <Input 
-                    value={currentInput} 
-                    onChange={(e) => setCurrentInput(e.target.value)} 
-                    onKeyPress={(e) => e.key === "Enter" && handleSendMessage()} 
-                    placeholder={waitingForConfig?.resPonseUserNumber || waitingForConfig?.responseUserTextInput || waitingForConfig?.placeholder || "Digite aqui"}
-                    type={waitingForType === "input-number" ? (typeof waitingForConfig?.min === 'number' || typeof waitingForConfig?.max === 'number' ? "number" : "text") : waitingForType === "input-mail" ? "email" : "url"}
-                    min={waitingForType === "input-number" ? waitingForConfig?.min : undefined}
-                    max={waitingForType === "input-number" ? waitingForConfig?.max : undefined}
-                    step={waitingForType === "input-number" ? waitingForConfig?.step : undefined}
-                    className="flex-1 min-w-0"
-                    style={{ background: theme?.inputBackgroundColor ? "rgba(255,255,255,0.1)" : undefined, color: theme?.inputTextColor || "inherit", borderColor: theme?.inputTextColor ? `${theme.inputTextColor}40` : undefined }}
-                    disabled={isLoading}
-                  />
-                ) : (
-                  <Textarea
-                    value={currentInput}
-                    onChange={(e) => setCurrentInput(e.target.value)}
-                    onKeyDown={(e) => {
-                      if (e.key === "Enter" && !e.shiftKey) {
-                        e.preventDefault();
-                        handleSendMessage();
+              <div className="flex flex-col gap-2">
+                {waitingForType === "input-image" || waitingForType === "input-video" || waitingForType === "input-audio" || waitingForType === "input-file" ? (
+                  <div className="flex flex-wrap gap-2 justify-center py-2">
+                    <input 
+                      type="file" 
+                      id="file-upload" 
+                      className="hidden" 
+                      accept={
+                        waitingForType === "input-image" ? "image/*" : 
+                        waitingForType === "input-video" ? "video/*" : 
+                        waitingForType === "input-audio" ? "audio/*" : "*"
                       }
-                    }}
-                    placeholder={waitingForConfig?.responseUserTextInput || waitingForConfig?.placeholder || "Digite aqui (Shift+Enter para quebrar linha)"}
-                    rows={1}
-                    className="flex-1 min-w-0 resize-none min-h-[40px] max-h-[160px]"
-                    style={{ background: theme?.inputBackgroundColor ? "rgba(255,255,255,0.1)" : undefined, color: theme?.inputTextColor || "inherit", borderColor: theme?.inputTextColor ? `${theme.inputTextColor}40` : undefined }}
-                    disabled={isLoading}
-                  />
+                      onChange={(e) => {
+                        const file = e.target.files?.[0];
+                        if (file) {
+                          const url = URL.createObjectURL(file);
+                          const type = waitingForType.replace('input-', '') as any;
+                          sendMessage(undefined, undefined, { type, url });
+                        }
+                      }}
+                    />
+                    <Button 
+                      variant="outline" 
+                      className="flex-1 gap-2" 
+                      onClick={() => document.getElementById('file-upload')?.click()}
+                      disabled={isLoading}
+                    >
+                      <Upload className="h-4 w-4" />
+                      {waitingForType === "input-image" ? "Enviar Foto" : 
+                       waitingForType === "input-video" ? "Enviar Vídeo" : 
+                       waitingForType === "input-audio" ? "Enviar Áudio" : "Enviar Arquivo"}
+                    </Button>
+                    {(waitingForType === "input-image" || waitingForType === "input-video" || waitingForType === "input-audio") && (
+                      <Button 
+                        variant="outline" 
+                        className="flex-1 gap-2" 
+                        onClick={() => {
+                          // Simular gravação para o teste
+                          const type = waitingForType.replace('input-', '') as any;
+                          const fakeUrl = type === 'image' ? "https://images.unsplash.com/photo-1517841905240-472988babdf9" : 
+                                          type === 'video' ? "https://www.w3schools.com/html/mov_bbb.mp4" :
+                                          "https://www.w3schools.com/html/horse.mp3";
+                          sendMessage(undefined, undefined, { type, url: fakeUrl });
+                        }}
+                        disabled={isLoading}
+                      >
+                        {waitingForType === "input-image" ? <Camera className="h-4 w-4" /> : 
+                         waitingForType === "input-video" ? <Video className="h-4 w-4" /> : <Mic className="h-4 w-4" />}
+                        {waitingForType === "input-image" ? "Tirar Foto" : 
+                         waitingForType === "input-video" ? "Gravar Vídeo" : "Gravar Áudio"}
+                      </Button>
+                    )}
+                  </div>
+                ) : (
+                  <div className="flex gap-2 items-end w-full">
+                    {waitingForType === "input-number" || waitingForType === "input-mail" || waitingForType === "input-webSite" || waitingForType === "input-phone" ? (
+                      <div className="relative flex-1">
+                        {waitingForType === "input-phone" && <Phone className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />}
+                        <Input 
+                          value={currentInput} 
+                          onChange={(e) => setCurrentInput(e.target.value)} 
+                          onKeyPress={(e) => e.key === "Enter" && handleSendMessage()} 
+                          placeholder={waitingForConfig?.resPonseUserNumber || waitingForConfig?.responseUserTextInput || waitingForConfig?.placeholder || (waitingForType === "input-phone" ? "Seu telefone" : "Digite aqui")}
+                          type={waitingForType === "input-number" ? (typeof waitingForConfig?.min === 'number' || typeof waitingForConfig?.max === 'number' ? "number" : "text") : waitingForType === "input-mail" ? "email" : waitingForType === "input-webSite" ? "url" : "tel"}
+                          min={waitingForType === "input-number" ? waitingForConfig?.min : undefined}
+                          max={waitingForType === "input-number" ? waitingForConfig?.max : undefined}
+                          step={waitingForType === "input-number" ? waitingForConfig?.step : undefined}
+                          className={`flex-1 min-w-0 ${waitingForType === "input-phone" ? "pl-9" : ""}`}
+                          style={{ background: theme?.inputBackgroundColor ? "rgba(255,255,255,0.1)" : undefined, color: theme?.inputTextColor || "inherit", borderColor: theme?.inputTextColor ? `${theme.inputTextColor}40` : undefined }}
+                          disabled={isLoading}
+                        />
+                      </div>
+                    ) : (
+                      <Textarea
+                        value={currentInput}
+                        onChange={(e) => setCurrentInput(e.target.value)}
+                        onKeyDown={(e) => {
+                          if (e.key === "Enter" && !e.shiftKey) {
+                            e.preventDefault();
+                            handleSendMessage();
+                          }
+                        }}
+                        placeholder={waitingForConfig?.responseUserTextInput || waitingForConfig?.placeholder || "Digite aqui (Shift+Enter para quebrar linha)"}
+                        rows={1}
+                        className="flex-1 min-w-0 resize-none min-h-[40px] max-h-[160px]"
+                        style={{ background: theme?.inputBackgroundColor ? "rgba(255,255,255,0.1)" : undefined, color: theme?.inputTextColor || "inherit", borderColor: theme?.inputTextColor ? `${theme.inputTextColor}40` : undefined }}
+                        disabled={isLoading}
+                      />
+                    )}
+                    <Button 
+                      size="icon" 
+                      onClick={handleSendMessage} 
+                      disabled={isLoading || !currentInput.trim()}
+                      style={{ background: theme?.primaryColor, color: "#ffffff" }}
+                    >
+                      <Send className="h-4 w-4" />
+                    </Button>
+                  </div>
                 )}
-                <Button 
-                  size="icon" 
-                  onClick={handleSendMessage} 
-                  disabled={isLoading || !currentInput.trim()}
-                  style={{ background: theme?.primaryColor, color: "#ffffff" }}
-                >
-                  <Send className="h-4 w-4" />
-                </Button>
               </div>
             )}
           </div>
