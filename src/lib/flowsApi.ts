@@ -108,10 +108,11 @@ function sanitizeEdges(containers: Container[], edges: Edge[]): Edge[] {
   }
 
   return edges.filter(e => {
-    // A origem pode ser um container ou um node (ex: botão dentro do container)
-    // O destino deve ser sempre um container.
+    // A origem e o destino podem ser um container ou um node (ex: botão dentro do container).
+    // O React Flow às vezes mantém referências a nodes que já foram removidos do seu container pai,
+    // então verificamos se tanto a origem quanto o destino existem no conjunto de IDs válidos.
     const sourceOk = validContainerIds.has(e.source) || validNodeIds.has(e.source);
-    const targetOk = validContainerIds.has(e.target);
+    const targetOk = validContainerIds.has(e.target) || validNodeIds.has(e.target);
     return sourceOk && targetOk;
   });
 }

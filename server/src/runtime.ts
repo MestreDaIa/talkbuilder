@@ -56,11 +56,14 @@ export async function processRuntime(body: any) {
   edges = edges.filter((e: any) => {
     const sourceOk = validNodeIds.has(e.source) || validContainerIds.has(e.source);
     const targetOk = validNodeIds.has(e.target) || validContainerIds.has(e.target);
-    if (!sourceOk || !targetOk) {
-      console.log(`[runtime:orphan_edge] removida edge órfã ${e.source} -> ${e.target} (sourceOk=${sourceOk}, targetOk=${targetOk})`);
-      return false;
-    }
-    return true;
+    
+    // Silenciamos o log de edges órfãs por padrão para não poluir o console,
+    // já que agora temos uma limpeza ativa no salvamento/publicação.
+    // if (!sourceOk || !targetOk) {
+    //   console.log(`[runtime:orphan_edge] removida edge órfã ${e.source} -> ${e.target}`);
+    // }
+    
+    return sourceOk && targetOk;
   });
   if (edges.length !== beforeEdges) {
     console.log(`[runtime] ${beforeEdges - edges.length} edges órfãs descartadas`);
