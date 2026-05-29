@@ -177,8 +177,19 @@ const CanvasContent = ({
   const handleDelete = useCallback((containerId: string) => {
     const updatedContainers = containers.filter(c => c.id !== containerId);
     onContainersChange(updatedContainers);
+
+    // Também limpamos as edges que estavam conectadas a este container
+    if (onEdgesChangeProp && propEdges) {
+      const remainingEdges = propEdges.filter(e => 
+        e.source !== containerId && e.target !== containerId
+      );
+      if (remainingEdges.length !== propEdges.length) {
+        onEdgesChangeProp(remainingEdges);
+      }
+    }
+
     toast.success("Bloco excluído!");
-  }, [containers, onContainersChange]);
+  }, [containers, onContainersChange, onEdgesChangeProp, propEdges]);
 
   const handleNodeDrop = useCallback((nodeId: string, targetContainerId: string, insertIndex?: number) => {
     const sourceData = findNodeInContainers(nodeId);
