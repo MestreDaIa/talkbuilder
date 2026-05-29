@@ -177,8 +177,19 @@ const CanvasContent = ({
   const handleDelete = useCallback((containerId: string) => {
     const updatedContainers = containers.filter(c => c.id !== containerId);
     onContainersChange(updatedContainers);
+
+    // Também limpamos as edges que estavam conectadas a este container
+    if (onEdgesChangeProp && propEdges) {
+      const remainingEdges = propEdges.filter(e => 
+        e.source !== containerId && e.target !== containerId
+      );
+      if (remainingEdges.length !== propEdges.length) {
+        onEdgesChangeProp(remainingEdges);
+      }
+    }
+
     toast.success("Bloco excluído!");
-  }, [containers, onContainersChange]);
+  }, [containers, onContainersChange, onEdgesChangeProp, propEdges]);
 
   const handleNodeDrop = useCallback((nodeId: string, targetContainerId: string, insertIndex?: number) => {
     const sourceData = findNodeInContainers(nodeId);
@@ -236,8 +247,17 @@ const CanvasContent = ({
       return container;
     });
     onContainersChange(updatedContainers);
+
+    // Também limpamos as edges que tinham este node como origem (ex: botão deletado)
+    if (onEdgesChangeProp && propEdges) {
+      const remainingEdges = propEdges.filter(e => e.source !== nodeId);
+      if (remainingEdges.length !== propEdges.length) {
+        onEdgesChangeProp(remainingEdges);
+      }
+    }
+
     toast.success("Node removido!");
-  }, [containers, onContainersChange]);
+  }, [containers, onContainersChange, onEdgesChangeProp, propEdges]);
 
   const handleDuplicateNode = useCallback((containerId: string, nodeId: string) => {
     const updatedContainers = containers.map(container => {
@@ -343,8 +363,17 @@ const CanvasContent = ({
       }),
     }));
     onContainersChange(updatedContainers);
+
+    // Também limpamos as edges que tinham este botão como handle de origem
+    if (onEdgesChangeProp && propEdges) {
+      const remainingEdges = propEdges.filter(e => e.sourceHandle !== buttonId);
+      if (remainingEdges.length !== propEdges.length) {
+        onEdgesChangeProp(remainingEdges);
+      }
+    }
+
     toast.success("Botão removido!");
-  }, [containers, onContainersChange]);
+  }, [containers, onContainersChange, onEdgesChangeProp, propEdges]);
 
   // Handler to save individual button (must be after handleUpdateButton)
   const handleSaveButton = useCallback((updates: Partial<ButtonConfig>) => {
