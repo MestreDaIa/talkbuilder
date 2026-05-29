@@ -516,7 +516,9 @@ async function runFlow(execution: any, containersIn: any[], edgesIn: any[], inpu
         break;
       }
       case "set-variable":
-        if (cfg.variableName) variables[cfg.variableName] = replaceVars(String(cfg.value || ""));
+        if (cfg.variableName) {
+          variables[cfg.variableName] = evaluateSetVariableValue(cfg, variables, replaceVars);
+        }
         break;
       case "condition": {
         const matchedCondition = (cfg.conditions || []).find(evaluateCondition);
