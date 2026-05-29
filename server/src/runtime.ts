@@ -499,16 +499,39 @@ async function runFlow(execution: any, containersIn: any[], edgesIn: any[], inpu
         if (cfg.variableName) variables[cfg.variableName] = replaceVars(String(cfg.value || ""));
         break;
       case "condition": {
-        const matchedCondition = (cfg.conditions || []).find(evaluateCondition);
-        const handle = matchedCondition ? `${node.id}-cond-${matchedCondition.id}` : `${node.id}-else`;
-        console.log(`[runtime:condition] node ${node.id}: ${matchedCondition ? `condição "${matchedCondition.id}" satisfeita` : "nenhuma condição satisfeita (indo para else)"}`);
+        const conditions = cfg.conditions || [];
+        const matchedCondition = conditions.find(evaluateCondition);
         
-        const nextId = nextFromNode(node.id, container, handle, true);
-        if (nextId) {
-          currentNodeId = nextId;
+        let conditionHandle = "";
+        if (matchedCondition) {
+          conditionHandle = `${node.id}-cond-${matchedCondition.id}`;
+          console.log(`[runtime:condition] Matched condition ${matchedCondition.id}. Handle: ${conditionHandle}`);
         } else {
-          console.log(`[runtime:condition] fallback: nenhum edge encontrado para o handle "${handle}", tentando saída padrão`);
-          currentNodeId = nextFromNode(node.id, container); // Fallback para sequential/container exit
+          conditionHandle = `${node.id}-else`;
+          console.log(`[runtime:condition] No condition matched. Using else handle: ${conditionHandle}`);
+        }
+        
+        // Use strictHandle = true first to find the specific condition path
+        let nextId = nextFromNode(node.id, container, conditionHandle, true);
+        
+        if (!nextId) {
+          // If specific handle failed, try a less strict match for common suffixes
+          const suffix = matchedCondition ? "cond" : "else";
+          nextId = nextFromNode(node.id, container, suffix, false);
+        }
+
+        if (!nextId) {
+           console.warn(`[runtime:condition_stuck] Nenhuma saída encontrada para o nó ${node.id}. Handle tentado: ${conditionHandle}`);
+           // Fallback final: try any outgoing edge or sequential
+           nextId = nextFromNode(node.id, container, undefined, false);
+        }
+
+        if (nextId) {
+           currentNodeId = nextId;
+           console.log(`[runtime:condition] Resulting nextId: ${currentNodeId}`);
+        } else {
+           console.error(`[runtime:condition_terminal] Fluxo interrompido no nó de condição ${node.id}`);
+           currentNodeId = null;
         }
         continue;
       }
