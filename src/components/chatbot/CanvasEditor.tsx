@@ -247,8 +247,17 @@ const CanvasContent = ({
       return container;
     });
     onContainersChange(updatedContainers);
+
+    // Também limpamos as edges que tinham este node como origem (ex: botão deletado)
+    if (onEdgesChangeProp && propEdges) {
+      const remainingEdges = propEdges.filter(e => e.source !== nodeId);
+      if (remainingEdges.length !== propEdges.length) {
+        onEdgesChangeProp(remainingEdges);
+      }
+    }
+
     toast.success("Node removido!");
-  }, [containers, onContainersChange]);
+  }, [containers, onContainersChange, onEdgesChangeProp, propEdges]);
 
   const handleDuplicateNode = useCallback((containerId: string, nodeId: string) => {
     const updatedContainers = containers.map(container => {
