@@ -148,7 +148,7 @@ export async function processRuntime(body: any) {
 
   // 3. Execution state
   let execution: any = null;
-  if (action === "start") {
+  if (action === "start" || action === "resume") {
     try {
       const { data: executions } = await supabase
         .from("flow_executions")
@@ -158,19 +158,25 @@ export async function processRuntime(body: any) {
         .eq("channel_id", channel)
         .limit(1);
       const existing = executions && executions.length > 0 ? executions[0] : null;
-      if (existing) {
-        await supabase
-          .from("flow_executions")
-          .update({ current_node_id: null, variables: {}, waiting_for_input: false, runtime_mode: "flow" })
-          .eq("id", existing.id);
-        execution = { ...existing, current_node_id: null, variables: {}, waiting_for_input: false, runtime_mode: "flow" };
+      
+      if (action === "start") {
+        if (existing) {
+          await supabase
+            .from("flow_executions")
+            .update({ current_node_id: null, variables: {}, waiting_for_input: false, runtime_mode: "flow" })
+            .eq("id", existing.id);
+          execution = { ...existing, current_node_id: null, variables: {}, waiting_for_input: false, runtime_mode: "flow" };
+        } else {
+          const { data: created } = await supabase
+            .from("flow_executions")
+            .insert({ workspace_id: flow.user_id, flow_id: flow.id, contact_id, channel_id: channel, runtime_mode: "flow" })
+            .select()
+            .single();
+          execution = created;
+        }
       } else {
-        const { data: created } = await supabase
-          .from("flow_executions")
-          .insert({ workspace_id: flow.user_id, flow_id: flow.id, contact_id, channel_id: channel, runtime_mode: "flow" })
-          .select()
-          .single();
-        execution = created;
+        // resume
+        execution = existing;
       }
     } catch (e) {
       console.warn("[runtime] execution table missing", e);
