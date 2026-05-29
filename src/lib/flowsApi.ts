@@ -210,6 +210,9 @@ export async function publishFlow(
   if (conflict) throw new Error("Este ID público já está em uso por outro bot seu.");
 
   const now = new Date().toISOString();
+  const cleanContainers = JSON.parse(JSON.stringify(containers));
+  const cleanEdges = sanitizeEdges(cleanContainers, JSON.parse(JSON.stringify(edges)));
+
   const { data, error } = await c
     .from("chatbot_flows")
     .update({
@@ -217,11 +220,11 @@ export async function publishFlow(
       is_published: true,
       is_active: true,
       published_at: now,
-      published_containers: containers,
-      published_edges: edges,
+      published_containers: cleanContainers,
+      published_edges: cleanEdges,
       // espelha rascunho — garante que o JSON salvo é o mesmo do canvas
-      draft_containers: containers,
-      draft_edges: edges,
+      draft_containers: cleanContainers,
+      draft_edges: cleanEdges,
       draft_updated_at: now,
     })
     .eq("id", flowId)
