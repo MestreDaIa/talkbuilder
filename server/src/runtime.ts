@@ -479,17 +479,31 @@ async function runFlow(execution: any, containersIn: any[], edgesIn: any[], inpu
 
   // 2. Iniciar Fluxo se necessário
   if (!currentNodeId) {
+    // Prioridade 1: node do tipo "start"
     for (const c of containers) {
-      const startNode = (c.nodes || []).find((n: any) => n.type === "start");
+      const startNode = (c.nodes || []).find((n: any) => String(n.type || "").toLowerCase() === "start");
       if (startNode) {
         currentNodeId = startNode.id;
         break;
       }
     }
-    if (!currentNodeId && containers.length > 0 && containers[0].nodes?.length > 0) {
-      currentNodeId = containers[0].nodes[0].id;
+    // Prioridade 2: container "raiz" do grafo (sem edges de entrada)
+    if (!currentNodeId && containers.length > 0) {
+      const incoming = new Set<string>();
+      for (const e of edges) {
+        if (!e?.target) continue;
+        const targetContainer = containers.find((c: any) => (c.nodes || []).some((n: any) => n.id === e.target));
+        if (targetContainer) incoming.add(targetContainer.id);
+        else incoming.add(e.target);
+      }
+      const entryContainer = containers.find((c: any) => !incoming.has(c.id)) || containers[0];
+      if (entryContainer?.nodes?.length) {
+        currentNodeId = entryContainer.nodes[0].id;
+        console.log(`[runtime] Container inicial detectado: ${entryContainer.id} (${entryContainer.nameContainer || "sem nome"})`);
+      }
     }
   }
+
 
   // 3. Loop de Execução
   while (currentNodeId && steps < 100) {
