@@ -94,6 +94,28 @@ export async function getFlowByWorkspaceItem(workspaceItemId: string): Promise<C
   return (data as ChatbotFlowRow) ?? null;
 }
 
+/**
+ * Remove conexões (edges) que apontam para containers ou nodes que não existem mais.
+ * Garante que o banco de dados não acumule lixo e evita logs de erro no runtime.
+ */
+function sanitizeEdges(containers: Container[], edges: Edge[]): Edge[] {
+  const validContainerIds = new Set<string>(containers.map(c => c.id));
+  const validNodeIds = new Set<string>();
+  for (const c of containers) {
+    for (const n of c.nodes || []) {
+      validNodeIds.add(n.id);
+    }
+  }
+
+  return edges.filter(e => {
+    // A origem pode ser um container ou um node (ex: botão dentro do container)
+    // O destino deve ser sempre um container.
+    const sourceOk = validContainerIds.has(e.source) || validNodeIds.has(e.source);
+    const targetOk = validContainerIds.has(e.target);
+    return sourceOk && targetOk;
+  });
+}
+
 /** Salva o rascunho (containers + edges). Se o fluxo já estiver publicado,
  *  espelha imediatamente para a versão publicada — assim canais como WhatsApp
  *  passam a executar a versão mais recente sem precisar re-publicar manualmente. */
@@ -101,11 +123,11 @@ export async function saveDraft(flowId: string, containers: Container[], edges: 
   const c = client();
 
   // Garantimos que os dados estão limpos de referências circulares ou estados do React Flow
-  // antes de enviar para o banco de dados.
+  // e removemos edges órfãs antes de enviar para o banco de dados.
   const cleanContainers = JSON.parse(JSON.stringify(containers));
-  const cleanEdges = JSON.parse(JSON.stringify(edges));
+  const cleanEdges = sanitizeEdges(cleanContainers, JSON.parse(JSON.stringify(edges)));
 
-  console.log("[flowsApi] Salvando rascunho para flow:", flowId, "Nodes:", cleanContainers.length);
+  console.log("[flowsApi] Salvando rascunho para flow:", flowId, "Nodes:", cleanContainers.length, "Edges:", cleanEdges.length);
 
   // Verificamos se o fluxo está publicado para decidir se devemos espelhar.
   const { data: current } = await c
