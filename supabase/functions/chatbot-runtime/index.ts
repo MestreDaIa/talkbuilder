@@ -11,6 +11,49 @@ const corsHeaders = {
 const runtimeMemory = new Map<string, { state: any; expiresAt: number }>();
 const MEMORY_TTL_MS = 1000 * 60 * 60 * 6; // 6 hours
 
+function evaluateSetVariableValue(cfg: any, variables: Record<string, any>, replaceVars: (s: string) => string): any {
+  const valueType = cfg.valueType || "expression";
+  const raw = String(cfg.value ?? "");
+  switch (valueType) {
+    case "empty": return "";
+    case "now": return new Date().toISOString();
+    case "today": return new Date().toLocaleDateString("pt-BR");
+    case "yesterday": { const d = new Date(); d.setDate(d.getDate() - 1); return d.toLocaleDateString("pt-BR"); }
+    case "tomorrow": { const d = new Date(); d.setDate(d.getDate() + 1); return d.toLocaleDateString("pt-BR"); }
+    case "random": return Math.random().toString(36).substring(2, 8);
+    case "custom": {
+      try {
+        const interpolated = replaceVars(raw);
+        const varNames = Object.keys(variables);
+        const varValues = varNames.map((k) => variables[k]);
+        const fn = new Function(...varNames, `"use strict";\n${interpolated}`);
+        return fn(...varValues);
+      } catch (e) {
+        console.error("[set-variable:custom] erro ao avaliar", e);
+        return raw;
+      }
+    }
+    case "expression":
+    default: {
+      if (!raw) return "";
+      const interpolated = replaceVars(raw);
+      try {
+        const hasReturn = /\breturn\b/.test(interpolated);
+        const isBlock = interpolated.includes(";") || interpolated.includes("\n") || hasReturn;
+        if (isBlock) {
+          const body = hasReturn ? interpolated : `return (${interpolated});`;
+          const fn = new Function(`"use strict";\n${body}`);
+          return fn();
+        }
+        const fn = new Function(`"use strict"; return (${interpolated});`);
+        return fn();
+      } catch {
+        return interpolated;
+      }
+    }
+  }
+}
+
 /**
  * Normalizes variable names by removing braces and trimming whitespace.
  * e.g., "{{ my_var }}" -> "my_var"
@@ -233,9 +276,9 @@ class FlowEngine {
       case "set-variable": {
         const varName = normalizeVariableName(cfg.variableName);
         if (varName) {
-          const value = this.replaceVars(String(cfg.value || ""));
+          const value = evaluateSetVariableValue(cfg, this.variables, (s: string) => this.replaceVars(s));
           this.variables[varName] = value;
-          console.log(`[FlowEngine] Set variable "${varName}" = "${value}"`);
+          console.log(`[FlowEngine] Set variable "${varName}" =`, value);
         }
         this.currentNodeId = this.nextFromNode(node.id, container);
         break;
