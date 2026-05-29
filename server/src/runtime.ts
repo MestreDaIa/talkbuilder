@@ -199,12 +199,17 @@ export async function processRuntime(body: any) {
 
   if (!execution) {
     execution = normalizeClientState(clientState);
-  } else if (action !== "start" && clientState?.current_node_id) {
-    // Apenas sobrescreve se o estado for válido
+  } else if (action !== "start" && action !== "resume" && clientState?.current_node_id) {
+    // Apenas sobrescreve se o estado for válido e não for um comando de controle (start/resume)
     const newState = normalizeClientState(clientState);
     if (newState.current_node_id) {
        execution = { ...execution, ...newState, id: execution.id };
     }
+  }
+
+  // Tratamento especial para o comando "resume" do nó Wait
+  if (action === "resume") {
+    execution.is_waiting_time = true;
   }
 
   // Executar Fluxo
