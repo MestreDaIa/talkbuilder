@@ -276,9 +276,9 @@ class FlowEngine {
       case "set-variable": {
         const varName = normalizeVariableName(cfg.variableName);
         if (varName) {
-          const value = this.replaceVars(String(cfg.value || ""));
+          const value = evaluateSetVariableValue(cfg, this.variables, (s: string) => this.replaceVars(s));
           this.variables[varName] = value;
-          console.log(`[FlowEngine] Set variable "${varName}" = "${value}"`);
+          console.log(`[FlowEngine] Set variable "${varName}" =`, value);
         }
         this.currentNodeId = this.nextFromNode(node.id, container);
         break;
