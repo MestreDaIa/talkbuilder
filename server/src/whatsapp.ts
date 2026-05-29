@@ -58,8 +58,9 @@ export async function handleWhatsAppWebhook(payload: any, query?: any) {
 
     if (activeExecutions && activeExecutions.length > 0) {
       const exec = activeExecutions[0];
-      // Preferimos o public_id se disponível, senão usamos o ID interno
-      botPublicId = exec.chatbot_flows?.public_id || exec.flow_id;
+      // Acessamos o public_id com cast para evitar erro de tipo do TS
+      const flowData = exec.chatbot_flows as any;
+      botPublicId = (flowData && flowData.public_id) || exec.flow_id;
       console.log(`Execução ativa encontrada para ${remoteJid}: redirecionando para o bot ${botPublicId}`);
     }
   }
