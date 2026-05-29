@@ -680,8 +680,49 @@ async function runFlow(execution: any, containersIn: any[], edgesIn: any[], inpu
       }
       case "redirect": {
         const targetRef = cfg.targetFlow || cfg.targetFlowId;
-        if (targetRef) messages.push({ id: crypto.randomUUID(), type: "bot", content: "Redirecionando..." });
-        break;
+        if (!targetRef || visitedRedirects.has(targetRef)) {
+          console.warn(`[runtime:redirect] abortando redirect para ${targetRef} (circular ou vazio)`);
+          break;
+        }
+        
+        console.log(`[runtime:redirect] redirecionando para o fluxo: ${targetRef}`);
+        visitedRedirects.add(targetRef);
+
+        // Busca o novo fluxo
+        const { data: targetFlow } = await supabase
+          .from("chatbot_flows")
+          .select("*")
+          .or(`id.eq.${targetRef},public_id.eq.${targetRef}`)
+          .maybeSingle();
+
+        if (!targetFlow) {
+          messages.push({ id: crypto.randomUUID(), type: "bot", content: "⚠️ Fluxo de destino não encontrado." });
+          break;
+        }
+
+        // Executa o novo fluxo recursivamente, passando as variáveis atuais
+        const subExecution = {
+          current_node_id: cfg.startNodeId || null,
+          variables: { ...variables },
+          runtime_mode: "flow"
+        };
+
+        const targetContainers = targetFlow.published_containers || targetFlow.draft_containers || [];
+        const targetEdges = targetFlow.published_edges || targetFlow.draft_edges || [];
+
+        const subResult = await runFlow(subExecution, targetContainers, targetEdges, null, targetFlow, supabase, visitedRedirects);
+        
+        // Mescla resultados
+        messages.push(...(subResult.messages || []));
+        Object.assign(variables, subResult.variables || {});
+        
+        // O estado final será o do novo fluxo
+        return {
+          ...subResult,
+          messages,
+          variables,
+          steps: steps + (subResult.steps || 0)
+        };
       }
     }
 

@@ -46,8 +46,26 @@ export async function handleWhatsAppWebhook(payload: any, query?: any) {
   // 1. Identify Bot
   let botPublicId = query?.bot_id || query?.flow_id;
 
+  // 1.1 Se não veio ID na URL, tentamos encontrar uma execução ativa para este contato
   if (!botPublicId) {
-    // Usamos select().eq() em vez de maybeSingle() para evitar erro caso existam múltiplos bindings (como visto nos logs)
+    const { data: activeExecutions } = await supabase
+      .from("flow_executions")
+      .select("flow_id, chatbot_flows(public_id)")
+      .eq("contact_id", remoteJid)
+      .eq("channel_id", "whatsapp")
+      .order("updated_at", { ascending: false })
+      .limit(1);
+
+    if (activeExecutions && activeExecutions.length > 0) {
+      const exec = activeExecutions[0];
+      // Preferimos o public_id se disponível, senão usamos o ID interno
+      botPublicId = exec.chatbot_flows?.public_id || exec.flow_id;
+      console.log(`Execução ativa encontrada para ${remoteJid}: redirecionando para o bot ${botPublicId}`);
+    }
+  }
+
+  // 1.2 Se ainda não temos ID, buscamos o binding da instância
+  if (!botPublicId) {
     const { data: bindings, error: bindingError } = await supabase
       .from("whatsapp_bindings")
       .select("bot_public_id")
@@ -58,9 +76,8 @@ export async function handleWhatsAppWebhook(payload: any, query?: any) {
     }
 
     if (bindings && bindings.length > 0) {
-      // Se houver múltiplos, pegamos o primeiro cadastrado
       botPublicId = bindings[0].bot_public_id;
-      console.log(`Binding encontrado via banco de dados para a instância ${instanceName}: ${botPublicId}`);
+      console.log(`Binding padrão encontrado para a instância ${instanceName}: ${botPublicId}`);
     }
   }
 
