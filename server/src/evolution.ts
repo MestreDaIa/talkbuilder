@@ -2,8 +2,9 @@ import dotenv from "dotenv";
 
 dotenv.config();
 
-const EVO_BASE_URL: string = process.env.EVO_BASE_URL || 'https://evo.zailom.com';
-const EVO_GLOBAL_KEY: string = process.env.EVO_GLOBAL_KEY || '';
+export const EVO_BASE_URL: string = process.env.EVO_BASE_URL || 'https://evo.zailom.com';
+export const EVO_GLOBAL_KEY: string = process.env.EVO_GLOBAL_KEY || '';
+
 
 export const evolutionApi = {
   async sendText(instanceName: string, number: string, text: string) {

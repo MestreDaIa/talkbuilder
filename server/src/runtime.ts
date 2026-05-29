@@ -401,10 +401,19 @@ async function runFlow(execution: any, containersIn: any[], edgesIn: any[], inpu
   };
 
   // 1. Processar Entrada (Resumo de Estado)
+  if (input) {
+    if (input.remoteJid) variables["remoteJid"] = input.remoteJid;
+    if (input.pushName) variables["pushName"] = input.pushName;
+    if (input.instanceName) variables["instanceName"] = input.instanceName;
+    if (input.serverUrl) variables["serverUrl"] = input.serverUrl;
+    if (input.apiKey) variables["apiKey"] = input.apiKey;
+  }
+
   let inputConsumed = false;
   if (input && (input.message !== undefined || input.button_id !== undefined)) {
     const userValue = input.message ?? input.button_id;
     variables["last_message"] = userValue;
+
 
     if (mode === "agent" && activeAgentNodeId) {
        currentNodeId = activeAgentNodeId;
