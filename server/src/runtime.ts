@@ -231,7 +231,8 @@ export async function processRuntime(body: any) {
     waiting_for_input: result.status === "waiting_input",
     mode: result.mode,
     is_waiting_time: result.wait_ms > 0,
-    last_execution_status: result.status
+    last_execution_status: result.status,
+    wait_until: result.wait_ms > 0 ? Date.now() + result.wait_ms : null
   };
   writeMemoryState(memoryKey, runtimeState);
 
@@ -254,6 +255,7 @@ function normalizeClientState(state: any) {
     variables: state?.variables && typeof state.variables === "object" ? state.variables : {},
     waiting_for_input: !!state?.waiting_for_input,
     is_waiting_time: !!state?.is_waiting_time,
+    wait_until: state?.wait_until || null,
     runtime_mode: state?.mode || "flow"
   };
 }

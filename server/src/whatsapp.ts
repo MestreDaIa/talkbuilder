@@ -108,8 +108,51 @@ export async function handleWhatsAppWebhook(payload: any, query?: any) {
       serverUrl: EVO_BASE_URL,
       apiKey: EVO_GLOBAL_KEY
     }
-
   });
+
+  // 2.1 Verificar se o fluxo parou em um nó de "Wait/Await"
+  if (runtimeResult?.wait_ms > 0) {
+    const waitMs = runtimeResult.wait_ms;
+    console.log(`[WHATSAPP] Agendando retomada do fluxo em ${waitMs}ms para ${remoteJid}`);
+    
+    // Retomada assíncrona
+    setTimeout(async () => {
+      try {
+        console.log(`[WHATSAPP:TIMEOUT] Retomando fluxo para ${remoteJid} após ${waitMs}ms`);
+        const resumeResult = await processRuntime({
+          action: "resume",
+          flow_id: botPublicId,
+          contact_id: remoteJid,
+          channel: "whatsapp",
+          payload: {
+            remoteJid,
+            pushName: messageData.pushName || "",
+            instanceName,
+            serverUrl: EVO_BASE_URL,
+            apiKey: EVO_GLOBAL_KEY
+          }
+        });
+        
+        // Se a retomada gerou mensagens, enviamos elas agora
+        if (resumeResult?.messages && resumeResult.messages.length > 0) {
+          for (const msg of resumeResult.messages) {
+            if (!msg.content) continue;
+            if (resumeResult.buttons && resumeResult.buttons.length > 0) {
+              await evolutionApi.sendButtons(instanceName, remoteJid, msg.content, resumeResult.buttons);
+            } else {
+              await evolutionApi.sendText(instanceName, remoteJid, msg.content);
+            }
+          }
+        }
+        
+        // Se após a retomada ainda houver um wait (wait encadeado), o processo se repetirá 
+        // mas precisamos de uma lógica recursiva ou que o processRuntime lide com isso.
+        // Por enquanto, resolvemos o caso principal de 1 wait.
+      } catch (err) {
+        console.error(`[WHATSAPP:TIMEOUT] Erro ao retomar fluxo:`, err);
+      }
+    }, waitMs);
+  }
 
   // 3. Send Responses (and also return them for Evolution Bot compatibility)
   console.log(`[WHATSAPP] Resultado do runtime: ${JSON.stringify({ 
