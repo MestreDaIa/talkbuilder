@@ -363,8 +363,17 @@ const CanvasContent = ({
       }),
     }));
     onContainersChange(updatedContainers);
+
+    // Também limpamos as edges que tinham este botão como handle de origem
+    if (onEdgesChangeProp && propEdges) {
+      const remainingEdges = propEdges.filter(e => e.sourceHandle !== buttonId);
+      if (remainingEdges.length !== propEdges.length) {
+        onEdgesChangeProp(remainingEdges);
+      }
+    }
+
     toast.success("Botão removido!");
-  }, [containers, onContainersChange]);
+  }, [containers, onContainersChange, onEdgesChangeProp, propEdges]);
 
   // Handler to save individual button (must be after handleUpdateButton)
   const handleSaveButton = useCallback((updates: Partial<ButtonConfig>) => {
