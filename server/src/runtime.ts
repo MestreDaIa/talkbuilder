@@ -148,7 +148,7 @@ export async function processRuntime(body: any) {
 
   // 3. Execution state
   let execution: any = null;
-  if (action === "start") {
+  if (action === "start" || action === "resume") {
     try {
       const { data: executions } = await supabase
         .from("flow_executions")
@@ -158,19 +158,25 @@ export async function processRuntime(body: any) {
         .eq("channel_id", channel)
         .limit(1);
       const existing = executions && executions.length > 0 ? executions[0] : null;
-      if (existing) {
-        await supabase
-          .from("flow_executions")
-          .update({ current_node_id: null, variables: {}, waiting_for_input: false, runtime_mode: "flow" })
-          .eq("id", existing.id);
-        execution = { ...existing, current_node_id: null, variables: {}, waiting_for_input: false, runtime_mode: "flow" };
+      
+      if (action === "start") {
+        if (existing) {
+          await supabase
+            .from("flow_executions")
+            .update({ current_node_id: null, variables: {}, waiting_for_input: false, runtime_mode: "flow" })
+            .eq("id", existing.id);
+          execution = { ...existing, current_node_id: null, variables: {}, waiting_for_input: false, runtime_mode: "flow" };
+        } else {
+          const { data: created } = await supabase
+            .from("flow_executions")
+            .insert({ workspace_id: flow.user_id, flow_id: flow.id, contact_id, channel_id: channel, runtime_mode: "flow" })
+            .select()
+            .single();
+          execution = created;
+        }
       } else {
-        const { data: created } = await supabase
-          .from("flow_executions")
-          .insert({ workspace_id: flow.user_id, flow_id: flow.id, contact_id, channel_id: channel, runtime_mode: "flow" })
-          .select()
-          .single();
-        execution = created;
+        // resume
+        execution = existing;
       }
     } catch (e) {
       console.warn("[runtime] execution table missing", e);
@@ -193,12 +199,17 @@ export async function processRuntime(body: any) {
 
   if (!execution) {
     execution = normalizeClientState(clientState);
-  } else if (action !== "start" && clientState?.current_node_id) {
-    // Apenas sobrescreve se o estado for válido
+  } else if (action !== "start" && action !== "resume" && clientState?.current_node_id) {
+    // Apenas sobrescreve se o estado for válido e não for um comando de controle (start/resume)
     const newState = normalizeClientState(clientState);
     if (newState.current_node_id) {
        execution = { ...execution, ...newState, id: execution.id };
     }
+  }
+
+  // Tratamento especial para o comando "resume" do nó Wait
+  if (action === "resume") {
+    execution.is_waiting_time = true;
   }
 
   // Executar Fluxo
@@ -231,7 +242,8 @@ export async function processRuntime(body: any) {
     waiting_for_input: result.status === "waiting_input",
     mode: result.mode,
     is_waiting_time: result.wait_ms > 0,
-    last_execution_status: result.status
+    last_execution_status: result.status,
+    wait_until: result.wait_ms > 0 ? Date.now() + result.wait_ms : null
   };
   writeMemoryState(memoryKey, runtimeState);
 
@@ -254,6 +266,7 @@ function normalizeClientState(state: any) {
     variables: state?.variables && typeof state.variables === "object" ? state.variables : {},
     waiting_for_input: !!state?.waiting_for_input,
     is_waiting_time: !!state?.is_waiting_time,
+    wait_until: state?.wait_until || null,
     runtime_mode: state?.mode || "flow"
   };
 }
