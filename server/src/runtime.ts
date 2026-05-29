@@ -472,19 +472,12 @@ async function runFlow(execution: any, containersIn: any[], edgesIn: any[], inpu
     }
 
     if (nodeType.startsWith("input-")) {
-      // Se ainda temos input não consumido (ex: mensagem inicial do usuário), processamos ele aqui
-      if (input && (input.message !== undefined || input.button_id !== undefined)) {
-          console.log(`[runtime:input] processando entrada para node ${node.id} (${nodeType})`);
-          const userValue = input.message ?? input.button_id;
-          const buttonId = input.button_id;
-          const varName = cfg.variableName || cfg.saveVariable;
-          if (varName && userValue !== undefined) variables[varName] = userValue;
-          input = null; // Consumido para o loop
-          currentNodeId = nextFromNode(node.id, container, buttonId);
-          continue;
-      }
-
-      
+      // IMPORTANTE: quando alcançamos um input-* DURANTE o loop (sem ter estado
+      // previamente aguardando neste node), devemos SEMPRE parar e aguardar a
+      // próxima mensagem do usuário. O consumo de input só acontece no bloco
+      // pré-loop (quando execution.waiting_for_input estava true para este node).
+      // Consumir a mensagem inicial aqui faria o bot pular a etapa de input.
+      console.log(`[runtime:input_wait] aguardando entrada no node ${node.id} (${nodeType})`);
       waiting_for = nodeType === "input-buttons" ? "buttons" : "text";
       if (nodeType === "input-buttons") {
         buttons = (cfg.buttons || []).map((b: any) => ({
@@ -494,6 +487,7 @@ async function runFlow(execution: any, containersIn: any[], edgesIn: any[], inpu
         }));
       }
       status = "waiting_input";
+      currentNodeId = node.id; // garante que persistimos exatamente neste node
       break;
     }
 
