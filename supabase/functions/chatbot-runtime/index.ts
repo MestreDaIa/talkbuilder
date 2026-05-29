@@ -303,7 +303,7 @@ async function runFlow(execution: any, containersIn: any[], edgesIn: any[], inpu
     }
 
     if (edge) {
-      console.log(`[runtime:nextFromNode] Edge encontrado! target=${edge.target}`);
+      console.log(`[runtime:nextFromNode] Edge encontrado! target=${edge.target} handle=${edge.sourceHandle}`);
       if (findNode(edge.target)) return edge.target;
       const first = firstNodeOfContainer(edge.target);
       if (first) return first;
@@ -800,17 +800,27 @@ async function runFlow(execution: any, containersIn: any[], edgesIn: any[], inpu
       case "condition": {
         const conditions = cfg.conditions || [];
         const matchedCondition = conditions.find(evaluateCondition);
-        const conditionHandle = matchedCondition ? `${node.id}-cond-${matchedCondition.id}` : `${node.id}-else`;
         
-        // Tentamos encontrar o próximo node baseado na condição.
-        // Se falhar (ex: edge não conectado), tentamos o "default" ou o próximo node sequencial (strictHandle = false)
+        let conditionHandle = "";
+        if (matchedCondition) {
+          // Tenta IDs exatos de handle (geralmente formatados como nodeid-cond-condid)
+          conditionHandle = `${node.id}-cond-${matchedCondition.id}`;
+          console.log(`[runtime:condition] Matched condition ${matchedCondition.id}. Handle: ${conditionHandle}`);
+        } else {
+          conditionHandle = `${node.id}-else`;
+          console.log(`[runtime:condition] No condition matched. Using else handle: ${conditionHandle}`);
+        }
+        
         let nextId = nextFromNode(node.id, container, conditionHandle, true);
+        
+        // Se não encontrar pelo handle específico do node, tenta apenas o sufixo (fallback do normalizeHandle)
         if (!nextId) {
-          console.log(`[runtime:condition] Handle ${conditionHandle} não encontrou edge. Tentando fallback não-estrito.`);
-          nextId = nextFromNode(node.id, container, conditionHandle, false);
+          const suffix = matchedCondition ? "cond" : "else";
+          nextId = nextFromNode(node.id, container, suffix, false);
         }
         
         currentNodeId = nextId;
+        console.log(`[runtime:condition] Resulting nextId: ${currentNodeId}`);
         continue;
       }
       case "redirect": {
