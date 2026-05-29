@@ -38,8 +38,33 @@ export async function processRuntime(body: any) {
   }
   console.log(`[runtime] Fluxo encontrado: ${flow.name} (${flow.id})`);
 
-  const containers = flow.published_containers || flow.draft_containers || [];
-  const edges = flow.published_edges || flow.draft_edges || [];
+  // Preferimos draft quando ele é mais recente que o published. saveDraft já
+  // espelha para published quando o fluxo está publicado, então usar o mais
+  // novo evita executar uma versão obsoleta com nodes/edges órfãs.
+  const publishedAt = flow.published_at ? new Date(flow.published_at).getTime() : 0;
+  const draftAt = flow.draft_updated_at ? new Date(flow.draft_updated_at).getTime() : 0;
+  const useDraft = !flow.published_containers?.length || draftAt > publishedAt;
+  let containers = (useDraft ? flow.draft_containers : flow.published_containers) || flow.draft_containers || [];
+  let edges = (useDraft ? flow.draft_edges : flow.published_edges) || flow.draft_edges || [];
+  console.log(`[runtime] Usando versão ${useDraft ? "DRAFT" : "PUBLISHED"} (containers=${containers.length}, edges=${edges.length})`);
+
+  // Sanitiza edges órfãs: remove conexões para containers/nodes que não existem mais.
+  const validContainerIds = new Set<string>(containers.map((c: any) => c.id));
+  const validNodeIds = new Set<string>();
+  for (const c of containers) for (const n of (c.nodes || [])) validNodeIds.add(n.id);
+  const beforeEdges = edges.length;
+  edges = edges.filter((e: any) => {
+    const sourceOk = validNodeIds.has(e.source) || validContainerIds.has(e.source);
+    const targetOk = validNodeIds.has(e.target) || validContainerIds.has(e.target);
+    if (!sourceOk || !targetOk) {
+      console.log(`[runtime:orphan_edge] removida edge órfã ${e.source} -> ${e.target} (sourceOk=${sourceOk}, targetOk=${targetOk})`);
+      return false;
+    }
+    return true;
+  });
+  if (edges.length !== beforeEdges) {
+    console.log(`[runtime] ${beforeEdges - edges.length} edges órfãs descartadas`);
+  }
 
   if (!containers.length) {
     throw new Error("Fluxo vazio (nenhum container)");
