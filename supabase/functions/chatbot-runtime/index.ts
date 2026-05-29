@@ -303,7 +303,7 @@ async function runFlow(execution: any, containersIn: any[], edgesIn: any[], inpu
     }
 
     if (edge) {
-      console.log(`[runtime:nextFromNode] Edge encontrado! target=${edge.target}`);
+      console.log(`[runtime:nextFromNode] Edge encontrado! target=${edge.target} handle=${edge.sourceHandle}`);
       if (findNode(edge.target)) return edge.target;
       const first = firstNodeOfContainer(edge.target);
       if (first) return first;
