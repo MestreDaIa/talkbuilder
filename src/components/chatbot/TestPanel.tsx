@@ -922,7 +922,7 @@ export const TestPanel = ({
             alt: firstText(cfg.ImageAlt, cfg.alt) 
           });
         } else if (nodeType === "set-variable" && cfg.variableName) {
-          variables[cfg.variableName] = replaceVars(String(cfg.value || ""));
+          variables[cfg.variableName] = evaluateSetVariableValue(cfg, variables, replaceVars);
         } else if (nodeType === "script") {
           try {
             const rawCode = String(cfg.code || "");
