@@ -661,8 +661,8 @@ class FlowEngine {
       return;
     }
 
-    const method = cfg.method || "GET";
-    const headers = { "Content-Type": "application/json" };
+    const method = (cfg.method || "GET").toUpperCase();
+    const headers: Record<string, string> = {};
     
     // Auth headers
     if (cfg.authentication === "basic" && cfg.authCredentials) {
@@ -672,11 +672,48 @@ class FlowEngine {
       headers[cfg.authCredentials.headerName] = cfg.authCredentials.headerValue;
     }
 
+    // Custom headers from config
+    if (cfg.headers && Array.isArray(cfg.headers)) {
+      cfg.headers.forEach((h: any) => {
+        if (h.key) headers[h.key] = this.replaceVars(h.value || "");
+      });
+    } else if (cfg.headers && typeof cfg.headers === "object") {
+      Object.entries(cfg.headers).forEach(([k, v]) => {
+        headers[k] = this.replaceVars(String(v));
+      });
+    }
+
+    // Response mappings support
+    const getValueByPath = (obj: any, path: string): any => {
+      if (!path) return obj;
+      const parts = path.split('.');
+      const remaining = (parts[0] === 'data') ? parts.slice(1) : parts;
+      
+      let current = obj;
+      for (const part of remaining) {
+        if (current === null || current === undefined || typeof current !== 'object') return undefined;
+        current = current[part];
+      }
+      return current;
+    };
+
     let body = null;
-    if (method !== "GET" && method !== "HEAD") {
-      try {
-        body = cfg.bodyMode === "json" ? JSON.parse(this.replaceVars(cfg.body || "{}")) : this.replaceVars(cfg.body || "");
-      } catch {
+    if (["POST", "PUT", "PATCH"].includes(method)) {
+      if (cfg.bodyType === "json" || cfg.bodyMode === "json" || !cfg.bodyType) {
+        const rawBody = cfg.bodyJson || cfg.body || "{}";
+        const processedBody = typeof rawBody === "string" ? rawBody : JSON.stringify(rawBody);
+        body = this.replaceVars(processedBody);
+        if (!headers["Content-Type"]) headers["Content-Type"] = "application/json";
+      } else if (cfg.bodyType === "form-data") {
+        const params = new URLSearchParams();
+        if (Array.isArray(cfg.body)) {
+          cfg.body.forEach((b: any) => {
+            if (b.key) params.append(b.key, this.replaceVars(b.value || ""));
+          });
+        }
+        body = params.toString();
+        if (!headers["Content-Type"]) headers["Content-Type"] = "application/x-www-form-urlencoded";
+      } else {
         body = this.replaceVars(cfg.body || "");
       }
     }
@@ -689,14 +726,48 @@ class FlowEngine {
         body: body ? (typeof body === "string" ? body : JSON.stringify(body)) : undefined
       });
 
-      const responseData = await res.json().catch(() => ({}));
-      const varName = normalizeVariableName(cfg.responseVariable || "httpResponse");
+      const responseText = await res.text();
+      let responseData;
+      try {
+        responseData = JSON.parse(responseText);
+      } catch {
+        responseData = responseText;
+      }
+
+      const varName = normalizeVariableName(cfg.responseVariable || cfg.saveVariable || "httpResponse");
       if (varName) {
         this.variables[varName] = responseData;
         console.log(`[FlowEngine:HttpRequest] Saved response to ${varName}`);
       }
+
+      // Handle response mappings
+      if (cfg.responseMappings && Array.isArray(cfg.responseMappings)) {
+        cfg.responseMappings.forEach((mapping: any) => {
+          if (mapping.jsonPath && mapping.variableName) {
+            const val = getValueByPath(responseData, mapping.jsonPath);
+            if (val !== undefined) {
+              const targetVar = normalizeVariableName(mapping.variableName);
+              this.variables[targetVar] = val;
+              console.log(`[FlowEngine:HttpRequest] Mapping ${mapping.jsonPath} to ${targetVar}`);
+            }
+          }
+        });
+      }
+
+      // Handle success/error paths
+      const statusHandle = res.ok ? "success" : "error";
+      const nextId = this.nextFromNode(node.id, container, statusHandle, true);
+      if (nextId) {
+        this.currentNodeId = nextId;
+        return;
+      }
     } catch (e) {
       console.error("[FlowEngine:HttpRequest] Error:", e);
+      const nextId = this.nextFromNode(node.id, container, "error", true);
+      if (nextId) {
+        this.currentNodeId = nextId;
+        return;
+      }
     }
 
     this.currentNodeId = this.nextFromNode(node.id, container);
