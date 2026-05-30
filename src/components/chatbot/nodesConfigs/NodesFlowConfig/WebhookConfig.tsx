@@ -110,6 +110,7 @@ export const WebhookConfig = ({ config, setConfig }: WebhookConfigProps) => {
       responseVariable,
       allowedOrigins,
       lastTestPayload,
+      urlMode,
     };
 
     const hasChanged = Object.entries(newConfig).some(
