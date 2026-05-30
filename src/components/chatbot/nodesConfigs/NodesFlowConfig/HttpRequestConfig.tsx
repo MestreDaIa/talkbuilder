@@ -375,7 +375,7 @@ export const HttpRequestConfig = ({
               type="button"
               variant="outline"
               size="sm"
-               onClick={() => handleAddKeyValue(queryParams, setQueryParams, "queryParams")}
+              onClick={() => handleAddKeyValue(queryParams, setQueryParams, "queryParams")}
             >
               <Plus className="h-4 w-4 mr-1" />
               Adicionar
@@ -411,7 +411,7 @@ export const HttpRequestConfig = ({
                         index,
                         "value",
                         e.target.value,
-                         queryParams,
+                        queryParams,
                         setQueryParams,
                         "queryParams"
                       )
@@ -424,7 +424,7 @@ export const HttpRequestConfig = ({
                     variant="ghost"
                     size="icon"
                     onClick={() =>
-                       handleRemoveKeyValue(index, queryParams, setQueryParams, "queryParams")
+                      handleRemoveKeyValue(index, queryParams, setQueryParams, "queryParams")
                     }
                   >
                     <Trash2 className="h-4 w-4 text-destructive" />
@@ -835,7 +835,7 @@ export const HttpRequestConfig = ({
               </Button>
             </CollapsibleTrigger>
           </div>
-          
+
           <CollapsibleContent className="space-y-4 pt-2">
             <div className="space-y-3 pt-0">
               <div className="flex items-center justify-between">
