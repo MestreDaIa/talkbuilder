@@ -102,7 +102,12 @@ app.post("/webhook/whatsapp*", async (req: Request, res: Response) => {
       console.warn("[WEBHOOK] Falha ao capturar payload:", e);
     }
 
-    const result = await handleWhatsAppWebhook(req.body, req.query);
+    const result = await handleWhatsAppWebhook(req.body, req.query, {
+      receivedAt: new Date().toISOString(),
+      method: req.method,
+      headers: req.headers,
+      params: req.params,
+    });
     res.json(result);
   } catch (error: any) {
     console.error("Erro no webhook WhatsApp:", error);

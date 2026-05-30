@@ -7,7 +7,7 @@ import {
   DialogFooter,
 } from "@/components/ui/dialog";
 import { nodeConfigComponents } from "./nodesConfigs";
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { Button } from "@/components/ui/button";
 
 interface NodeConfigDialogProps {
@@ -20,17 +20,28 @@ interface NodeConfigDialogProps {
 
 export const NodeConfigDialog = ({ node, open, onClose, onSave, containers = [] }: NodeConfigDialogProps) => {
   const [config, setConfig] = useState<NodeConfig>({});
+  const configRef = useRef<NodeConfig>({});
 
   useEffect(() => {
     if (open && node) {
       // Criamos uma cópia profunda para evitar mutação direta do estado do canvas
       // enquanto o usuário ainda está editando no diálogo.
-      setConfig(JSON.parse(JSON.stringify(node.config || {})));
+      const nextConfig = JSON.parse(JSON.stringify(node.config || {}));
+      configRef.current = nextConfig;
+      setConfig(nextConfig);
     }
   }, [open, node?.id]);
 
+  const updateConfig = useCallback((next: NodeConfig | ((prev: NodeConfig) => NodeConfig)) => {
+    setConfig((prev) => {
+      const resolved = typeof next === "function" ? (next as (prev: NodeConfig) => NodeConfig)(prev) : next;
+      configRef.current = resolved;
+      return resolved;
+    });
+  }, []);
+
   const handleSave = () => {
-    onSave(JSON.parse(JSON.stringify(config)));
+    onSave(JSON.parse(JSON.stringify(configRef.current)));
     onClose();
   };
 
@@ -59,7 +70,7 @@ export const NodeConfigDialog = ({ node, open, onClose, onSave, containers = [] 
         </DialogHeader>
         <div className="flex-1 overflow-y-auto min-h-0 bg-card text-foreground">
           {ConfigComponent ? (
-            <ConfigComponent config={config} setConfig={setConfig} containers={containers} />
+            <ConfigComponent config={config} setConfig={updateConfig} containers={containers} />
           ) : (
             <div className="p-4 text-center text-muted-foreground">
               Configuração não disponível para este tipo de node.

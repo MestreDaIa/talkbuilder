@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState, useCallback, useContext } from "react";
+import { useEffect, useMemo, useRef, useState, useCallback } from "react";
 import { useVariables, VariablesProvider } from "@/context/VariablesContext";
 import { useParams, useNavigate, useLocation } from "react-router-dom";
 import {
@@ -104,11 +104,9 @@ function BotEditorInner({
   displayName,
   lbl,
   handleAddNode,
-  setGetCenter,
-  botVariables
+  setGetCenter
 }: any) {
   const { variables, setVariables } = useVariables();
-  const lastVariablesRef = useRef(variables);
 
   // Sync variables from initialVariables/Start node whenever containers change
   useEffect(() => {

@@ -1,4 +1,4 @@
-import { useState, useEffect, useMemo, useRef } from "react";
+import { useState, useEffect, useLayoutEffect, useRef } from "react";
 import { Label } from "@/components/ui/label";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
@@ -10,7 +10,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
+import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Copy, Check, Radio, Square, ChevronRight, ChevronDown, ArrowRight } from "lucide-react";
 import { toast } from "sonner";
 import { SkillConfig } from "../SkillConfig";
@@ -93,9 +93,10 @@ export const WebhookConfig = ({ config, setConfig }: WebhookConfigProps) => {
   const [listening, setListening] = useState(false);
   const pollRef = useRef<number | null>(null);
 
-  useEffect(() => {
-    // Only update config if something actually changed from the initial/current config
-    // to prevent unnecessary state updates in the parent canvas
+  useLayoutEffect(() => {
+    // Mantém o rascunho do diálogo sempre sincronizado com o formulário do Webhook.
+    // Usamos layout effect para o último campo digitado já estar no config antes
+    // do usuário clicar em "Salvar" no modal.
     const newConfig = {
       baseUrl,
       method,
@@ -110,11 +111,12 @@ export const WebhookConfig = ({ config, setConfig }: WebhookConfigProps) => {
       lastTestPayload,
     };
 
-    // Deep comparison to avoid infinite loops if setConfig triggers a re-render
-    const hasChanged = JSON.stringify(newConfig) !== JSON.stringify(config);
+    const hasChanged = Object.entries(newConfig).some(
+      ([key, value]) => JSON.stringify(value) !== JSON.stringify((config as any)[key])
+    );
     
     if (hasChanged) {
-      setConfig(newConfig);
+      setConfig({ ...config, ...newConfig });
     }
   }, [
     baseUrl,
@@ -128,7 +130,7 @@ export const WebhookConfig = ({ config, setConfig }: WebhookConfigProps) => {
     responseVariable,
     allowedOrigins,
     lastTestPayload,
-    // config, // Do NOT include config here to avoid loops
+    config,
     setConfig
   ]);
 

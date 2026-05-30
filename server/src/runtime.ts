@@ -411,12 +411,29 @@ async function runFlow(execution: any, containersIn: any[], edgesIn: any[], inpu
       .replace(/&nbsp;/g, " ")
       .trim();
 
+  const getVarValue = (path: string) => {
+    const key = String(path || "").trim();
+    if (!key) return undefined;
+    if (Object.prototype.hasOwnProperty.call(variables, key)) return variables[key];
+
+    return key.split(".").reduce((acc: any, part: string) => {
+      if (acc == null) return undefined;
+      return acc[part];
+    }, variables as any);
+  };
+
+  const stringifyVarValue = (value: any) =>
+    value != null && typeof value === "object" ? JSON.stringify(value) : String(value ?? "");
+
   const replaceVars = (text: string) =>
-    !text ? text : decodeText(text).replace(/{{(.*?)}}/g, (_, k) => variables[k.trim()] ?? `{{${k}}}`);
+    !text ? text : decodeText(text).replace(/{{(.*?)}}/g, (_, k) => {
+      const value = getVarValue(k);
+      return value === undefined ? `{{${k}}}` : stringifyVarValue(value);
+    });
 
   const evaluateComparison = (comparison: any) => {
     const key = String(comparison?.variableName || "").trim().replace(/^{{\s*/, "").replace(/\s*}}$/, "");
-    const rawValue = key ? variables[key] : undefined;
+    const rawValue = key ? getVarValue(key) : undefined;
     const actual = rawValue == null ? "" : String(rawValue).trim();
     const expected = replaceVars(String(comparison?.value ?? "")).trim();
 
@@ -489,6 +506,7 @@ async function runFlow(execution: any, containersIn: any[], edgesIn: any[], inpu
       
       // Salva tanto no padrão quanto em variáveis específicas se o input veio de um webhook
       variables["webhookData"] = webhookData;
+      variables["data"] = webhookData;
     }
   }
 
@@ -613,13 +631,16 @@ async function runFlow(execution: any, containersIn: any[], edgesIn: any[], inpu
         // Se o input contém os dados do webhook, salvamos na variável configurada.
         const varName = cfg.responseVariable || "webhookData";
         if (input && (input.body || input.headers || input.query)) {
-          variables[varName] = {
+          const webhookData = {
             body: input.body,
             headers: input.headers,
             query: input.query,
             method: input.method,
             receivedAt: input.receivedAt
           };
+          variables[varName] = webhookData;
+          variables["webhookData"] = webhookData;
+          variables["data"] = webhookData;
         }
         break;
       }

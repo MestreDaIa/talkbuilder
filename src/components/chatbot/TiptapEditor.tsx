@@ -25,10 +25,14 @@ const parseValueToHTML = (value: string): string => {
     return value;
   }
 
-  // Legacy plain-text path
+  // Legacy/plain-text path. Aceita variáveis simples e caminhos profundos,
+  // ex: {{messageType}} e {{data.body.data.messageType}}.
   let html = value.replace(
-    /\{\{(\w+)\}\}/g,
-    '<span data-variable="$1" class="variable-tag" style="background-color: hsl(var(--primary) / 0.2); color: hsl(var(--primary)); padding: 2px 6px; border-radius: 4px; font-size: 0.875em;">{{$1}}</span>'
+    /\{\{\s*([^}]+?)\s*\}\}/g,
+    (_, name) => {
+      const variableName = String(name).trim();
+      return `<span data-variable="${variableName}" class="variable-tag" style="background-color: hsl(var(--primary) / 0.2); color: hsl(var(--primary)); padding: 2px 6px; border-radius: 4px; font-size: 0.875em;">{{${variableName}}}</span>`;
+    }
   );
 
   html = html.replace(
