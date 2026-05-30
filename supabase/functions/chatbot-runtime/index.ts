@@ -424,10 +424,9 @@ class FlowEngine {
 
   private replaceVars(text: string) {
     if (!text) return text;
-    // Only call decodeText if the text contains HTML-like tags, otherwise just process variables.
-    // This prevents corruption of JSON bodies or URLs that don't come from the rich text editor.
-    const shouldDecode = /<[a-z][\s\S]*>/i.test(text) || text.includes("&nbsp;") || text.includes("&quot;");
-    const baseText = shouldDecode ? decodeText(text) : text;
+    // Only call decodeText if it doesn't look like JSON or a URL.
+    const isJsonOrUrl = /^[{\[]/.test(text) || text.startsWith("http");
+    const baseText = isJsonOrUrl ? text : decodeText(text);
     
     return baseText.replace(/{{(.*?)}}/g, (_, k) => {
       const path = normalizeVariableName(k);
