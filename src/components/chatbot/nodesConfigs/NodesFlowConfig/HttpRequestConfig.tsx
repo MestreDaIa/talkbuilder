@@ -18,7 +18,6 @@ import { useVariables } from "@/context/VariablesContext";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import { VariableModal } from "../../VariableModal";
 import { SkillConfig } from "../SkillConfig";
-import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 
 interface KeyValuePair {
   name: string;
@@ -246,13 +245,15 @@ export const HttpRequestConfig = ({
   return (
     <div className="space-y-4 p-4">
       {/* Informação sobre variáveis */}
-      <Alert className="bg-blue-50 border-blue-200">
-        <Info className="h-4 w-4 text-blue-500" />
-        <AlertTitle className="text-blue-700 text-xs">Variáveis no Teste</AlertTitle>
-        <AlertDescription className="text-blue-600 text-[10px]">
-          Use {"{{messageId}}"} ou outras variáveis. Preencha os valores de teste abaixo para validar a requisição agora.
-        </AlertDescription>
-      </Alert>
+      <div className="bg-blue-50 border border-blue-200 rounded p-3 flex gap-2">
+        <Info className="h-4 w-4 text-blue-500 shrink-0 mt-0.5" />
+        <div className="space-y-1">
+          <p className="text-blue-700 text-xs font-semibold">Variáveis no Teste</p>
+          <p className="text-blue-600 text-[10px]">
+            Use {"{{messageId}}"} ou outras variáveis. Preencha os valores de teste na aba <strong>Test Vars</strong> para validar a requisição agora.
+          </p>
+        </div>
+      </div>
 
       {/* URL & Method */}
       <div className="flex gap-2">
@@ -391,7 +392,7 @@ export const HttpRequestConfig = ({
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-1">
             <Label className="text-xs font-semibold">Mapear Resposta</Label>
-            {!lastJsonResponse && <AlertCircle className="h-3 w-3 text-amber-500" title="Faça um teste para ver os campos disponíveis" />}
+            {!lastJsonResponse && <AlertCircle className="h-3 w-3 text-amber-500" />}
           </div>
           <CollapsibleTrigger asChild><Button variant="ghost" size="sm" className="h-6 w-6 p-0">{isSaveExpanded ? <ChevronDown className="h-3 w-3" /> : <ChevronRight className="h-3 w-3" />}</Button></CollapsibleTrigger>
         </div>
