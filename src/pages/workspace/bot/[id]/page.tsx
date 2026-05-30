@@ -388,7 +388,8 @@ export default function BotPage() {
       // seja criado/carregado com o workspace_id correto para permissões RLS.
       if (!supabase || !bot || !currentWorkspace?.id) {
         if (!currentWorkspace?.id && bot) {
-           console.log("[BotPage] Aguardando currentWorkspace.id...");
+           console.log("[BotPage] Aguardando currentWorkspace.id para carregar flow real...");
+           return; // Não marca como hydrated ainda
         }
         setHydrated(true);
         return;
