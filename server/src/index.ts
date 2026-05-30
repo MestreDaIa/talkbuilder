@@ -46,6 +46,19 @@ app.use((req: Request, res: Response, next: NextFunction) => {
   next();
 });
 
+// =====================================================================
+// Webhook Test Capture (n8n-style) — buffer compartilhado
+// =====================================================================
+type CapturedRequest = {
+  receivedAt: string;
+  method: string;
+  headers: Record<string, any>;
+  query: Record<string, any>;
+  params: Record<string, any>;
+  body: any;
+};
+const webhookCaptures = new Map<string, CapturedRequest>();
+
 // Rota GET auxiliar para testar se o endpoint existe via navegador
 app.get("/webhook/whatsapp", (req: Request, res: Response) => {
   res.json({ 
