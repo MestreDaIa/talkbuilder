@@ -36,9 +36,11 @@ export const NodeConfigDialog = ({ node, open, onClose, onSave, containers = [] 
     setConfig((prev) => {
       const resolved = typeof next === "function" ? (next as (prev: NodeConfig) => NodeConfig)(prev) : next;
       configRef.current = resolved;
+      // Salvamento automático imediato para o canvas pai
+      onSave(JSON.parse(JSON.stringify(resolved)));
       return resolved;
     });
-  }, []);
+  }, [onSave]);
 
   const handleSave = () => {
     onSave(JSON.parse(JSON.stringify(configRef.current)));
