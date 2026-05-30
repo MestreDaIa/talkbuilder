@@ -45,13 +45,22 @@ interface WebhookConfigProps {
   setConfig: (config: WebhookConfigProps["config"]) => void;
 }
 
-const RUNTIME_BASE = (() => {
+const getBaseUrl = () => {
   const runtimeUrl = import.meta.env.VITE_CHATBOT_RUNTIME_URL as string | undefined;
+  if (runtimeUrl) return runtimeUrl;
+  
+  // Se estivermos no navegador, usamos o origin atual como base (ex: https://meusistema.com)
+  if (typeof window !== "undefined") {
+    return window.location.origin;
+  }
+  
   const projectId = import.meta.env.VITE_SUPABASE_PROJECT_ID as string | undefined;
-  return runtimeUrl || (projectId ? `https://${projectId}.supabase.co/functions/v1` : "");
-})();
+  return projectId ? `https://${projectId}.supabase.co/functions/v1` : "";
+};
+
 
 export const WebhookConfig = ({ config, setConfig }: WebhookConfigProps) => {
+  const [baseUrl, setBaseUrl] = useState(config.baseUrl || getBaseUrl());
   const [method, setMethod] = useState(config.method || "POST");
   const [path, setPath] = useState(config.path || "");
   const [authentication, setAuthentication] = useState(config.authentication || "none");
@@ -65,6 +74,7 @@ export const WebhookConfig = ({ config, setConfig }: WebhookConfigProps) => {
     config.lastTestPayload || null
   );
 
+
   const [urlMode, setUrlMode] = useState<"test" | "production">("test");
   const [copied, setCopied] = useState(false);
   const [listening, setListening] = useState(false);
@@ -72,6 +82,7 @@ export const WebhookConfig = ({ config, setConfig }: WebhookConfigProps) => {
 
   useEffect(() => {
     setConfig({
+      baseUrl,
       method,
       path,
       authentication,
@@ -83,8 +94,10 @@ export const WebhookConfig = ({ config, setConfig }: WebhookConfigProps) => {
       allowedOrigins,
       lastTestPayload,
     });
+
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [
+    baseUrl,
     method,
     path,
     authentication,
@@ -98,10 +111,11 @@ export const WebhookConfig = ({ config, setConfig }: WebhookConfigProps) => {
   ]);
 
   const cleanedPath = (path || "meu-webhook").replace(/^\/+|\/+$/g, "");
-  const testUrl = `${RUNTIME_BASE}/webhook-test/${cleanedPath}`;
-  const productionUrl = `${RUNTIME_BASE}/chatbot-webhook/${cleanedPath}`;
-  const captureUrl = `${RUNTIME_BASE}/webhook-capture/${cleanedPath}`;
+  const testUrl = `${baseUrl}/webhook-test/${cleanedPath}`;
+  const productionUrl = `${baseUrl}/chatbot-webhook/${cleanedPath}`;
+  const captureUrl = `${baseUrl}/webhook-capture/${cleanedPath}`;
   const displayedUrl = urlMode === "test" ? testUrl : productionUrl;
+
 
   const handleCopyUrl = () => {
     navigator.clipboard.writeText(displayedUrl);
@@ -235,7 +249,20 @@ export const WebhookConfig = ({ config, setConfig }: WebhookConfigProps) => {
           Parâmetros
         </h4>
 
+        <div className="space-y-1.5">
+          <Label className="text-xs">Base URL da API</Label>
+          <Input 
+            value={baseUrl} 
+            onChange={(e) => setBaseUrl(e.target.value)} 
+            placeholder="https://sua-api.com" 
+          />
+          <p className="text-[10px] text-muted-foreground">
+            A URL base onde o servidor está rodando. Por padrão usa o endereço atual.
+          </p>
+        </div>
+
         <div className="grid grid-cols-2 gap-3">
+
           <div className="space-y-1.5">
             <Label className="text-xs">Método HTTP</Label>
             <Select value={method} onValueChange={setMethod}>
