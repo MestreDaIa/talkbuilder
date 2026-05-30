@@ -316,6 +316,20 @@ class FlowEngine {
         }
         break;
       }
+      case "webhook": {
+        const varName = normalizeVariableName(cfg.responseVariable || "webhookData");
+        if (varName && inputPayload) {
+          // Salva o payload completo na variável (body, headers, query, etc)
+          this.variables[varName] = inputPayload;
+          console.log(`[FlowEngine] Webhook data saved to "${varName}"`);
+        }
+        this.currentNodeId = this.nextFromNode(node.id, container);
+        break;
+      }
+      case "http-request": {
+        await this.executeHttpRequest(node, container);
+        break;
+      }
       default: {
         console.log(`[FlowEngine] Generic node execution for ${type}`);
         this.currentNodeId = this.nextFromNode(node.id, container);
@@ -375,13 +389,33 @@ class FlowEngine {
     return s;
   }
 
+  private getNestedValue(obj: any, path: string) {
+    if (!path) return obj;
+    return path.split('.').reduce((prev, curr) => {
+      return prev ? prev[curr] : undefined;
+    }, obj);
+  }
+
   private replaceVars(text: string) {
     if (!text) return text;
     return decodeText(text).replace(/{{(.*?)}}/g, (_, k) => {
-      const name = normalizeVariableName(k);
-      const val = this.variables[name];
-      console.log(`[FlowEngine:replaceVars] key="${name}" found=${val !== undefined} val="${val}"`);
-      return val !== undefined ? String(val) : `{{${k}}}`;
+      const path = normalizeVariableName(k);
+      const parts = path.split('.');
+      const rootVar = parts[0];
+      const remainingPath = parts.slice(1).join('.');
+      
+      const val = this.variables[rootVar];
+      
+      if (val !== undefined) {
+        if (remainingPath) {
+          const nestedVal = this.getNestedValue(val, remainingPath);
+          return nestedVal !== undefined ? (typeof nestedVal === 'object' ? JSON.stringify(nestedVal) : String(nestedVal)) : `{{${k}}}`;
+        }
+        return typeof val === 'object' ? JSON.stringify(val) : String(val);
+      }
+      
+      console.log(`[FlowEngine:replaceVars] key="${rootVar}" not found in variables`);
+      return `{{${k}}}`;
     });
   }
 
@@ -532,6 +566,55 @@ class FlowEngine {
     this.waitingFor = result.waiting_for;
     this.buttons = result.buttons;
     this.currentNodeId = result.next_node_id;
+  }
+
+  private async executeHttpRequest(node: any, container: any) {
+    const cfg = node.config || {};
+    const url = this.replaceVars(cfg.url || "");
+    if (!url) {
+      this.currentNodeId = this.nextFromNode(node.id, container);
+      return;
+    }
+
+    const method = cfg.method || "GET";
+    const headers = { "Content-Type": "application/json" };
+    
+    // Auth headers
+    if (cfg.authentication === "basic" && cfg.authCredentials) {
+      const auth = btoa(`${cfg.authCredentials.username}:${cfg.authCredentials.password}`);
+      headers["Authorization"] = `Basic ${auth}`;
+    } else if (cfg.authentication === "header" && cfg.authCredentials) {
+      headers[cfg.authCredentials.headerName] = cfg.authCredentials.headerValue;
+    }
+
+    let body = null;
+    if (method !== "GET" && method !== "HEAD") {
+      try {
+        body = cfg.bodyMode === "json" ? JSON.parse(this.replaceVars(cfg.body || "{}")) : this.replaceVars(cfg.body || "");
+      } catch {
+        body = this.replaceVars(cfg.body || "");
+      }
+    }
+
+    try {
+      console.log(`[FlowEngine:HttpRequest] ${method} ${url}`);
+      const res = await fetch(url, {
+        method,
+        headers,
+        body: body ? (typeof body === "string" ? body : JSON.stringify(body)) : undefined
+      });
+
+      const responseData = await res.json().catch(() => ({}));
+      const varName = normalizeVariableName(cfg.responseVariable || "httpResponse");
+      if (varName) {
+        this.variables[varName] = responseData;
+        console.log(`[FlowEngine:HttpRequest] Saved response to ${varName}`);
+      }
+    } catch (e) {
+      console.error("[FlowEngine:HttpRequest] Error:", e);
+    }
+
+    this.currentNodeId = this.nextFromNode(node.id, container);
   }
 
   private parseWaitMs(cfg: any) {
