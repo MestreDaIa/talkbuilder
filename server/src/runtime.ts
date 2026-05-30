@@ -477,8 +477,6 @@ async function runFlow(execution: any, containersIn: any[], edgesIn: any[], inpu
     }
   };
 
-  };
-
   const evaluateCondition = (condition: any) => {
     const comparisons = condition?.comparisons || [];
     if (!comparisons.length) return false;
