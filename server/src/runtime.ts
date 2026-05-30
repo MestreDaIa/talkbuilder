@@ -692,52 +692,80 @@ async function runFlow(execution: any, containersIn: any[], edgesIn: any[], inpu
         }
         break;
       }
-      case "redirect": {
-        const targetRef = cfg.targetFlow || cfg.targetFlowId;
-        if (!targetRef || visitedRedirects.has(targetRef)) {
-          console.warn(`[runtime:redirect] abortando redirect para ${targetRef} (circular ou vazio)`);
-          break;
-        }
+      case "http-request":
+      case "http": {
+        const url = replaceVars(cfg.url || "");
+        const method = (cfg.method || "GET").toUpperCase();
+        const headers: Record<string, string> = {};
         
-        console.log(`[runtime:redirect] redirecionando para o fluxo: ${targetRef}`);
-        visitedRedirects.add(targetRef);
-
-        // Busca o novo fluxo
-        const { data: targetFlow } = await supabase
-          .from("chatbot_flows")
-          .select("*")
-          .or(`id.eq.${targetRef},public_id.eq.${targetRef}`)
-          .maybeSingle();
-
-        if (!targetFlow) {
-          messages.push({ id: crypto.randomUUID(), type: "bot", content: "⚠️ Fluxo de destino não encontrado." });
-          break;
+        if (cfg.headers && Array.isArray(cfg.headers)) {
+          cfg.headers.forEach((h: any) => {
+            if (h.key) headers[h.key] = replaceVars(h.value || "");
+          });
+        } else if (cfg.headers && typeof cfg.headers === "object") {
+          Object.entries(cfg.headers).forEach(([k, v]) => {
+            headers[k] = replaceVars(String(v));
+          });
         }
 
-        // Executa o novo fluxo recursivamente, passando as variáveis atuais
-        const subExecution = {
-          current_node_id: cfg.startNodeId || null,
-          variables: { ...variables },
-          runtime_mode: "flow"
-        };
+        let body: any = null;
+        if (["POST", "PUT", "PATCH"].includes(method)) {
+          if (cfg.bodyType === "json" || !cfg.bodyType) {
+            const rawBody = typeof cfg.body === "string" ? cfg.body : JSON.stringify(cfg.body || {});
+            body = replaceVars(rawBody);
+          } else if (cfg.bodyType === "form-data") {
+            // Simplificado para o runtime
+            const params = new URLSearchParams();
+            if (Array.isArray(cfg.body)) {
+              cfg.body.forEach((b: any) => {
+                if (b.key) params.append(b.key, replaceVars(b.value || ""));
+              });
+            }
+            body = params.toString();
+            headers["Content-Type"] = "application/x-www-form-urlencoded";
+          }
+        }
 
-        const targetContainers = targetFlow.published_containers || targetFlow.draft_containers || [];
-        const targetEdges = targetFlow.published_edges || targetFlow.draft_edges || [];
+        try {
+          console.log(`[runtime:http] chamando ${method} ${url}`);
+          const res = await fetch(url, {
+            method,
+            headers,
+            body: method !== "GET" ? body : undefined
+          });
 
-        const subResult = await runFlow(subExecution, targetContainers, targetEdges, null, targetFlow, supabase, visitedRedirects);
-        
-        // Mescla resultados
-        messages.push(...(subResult.messages || []));
-        Object.assign(variables, subResult.variables || {});
-        
-        // O estado final será o do novo fluxo
-        return {
-          ...subResult,
-          messages,
-          variables,
-          steps: steps + (subResult.steps || 0)
-        };
+          const responseText = await res.text();
+          let responseData;
+          try {
+            responseData = JSON.parse(responseText);
+          } catch {
+            responseData = responseText;
+          }
+
+          if (cfg.saveVariable) {
+            variables[cfg.saveVariable] = responseData;
+          }
+          
+          // Se tivermos handles de sucesso/erro
+          const statusHandle = res.ok ? "success" : "error";
+          const nextId = nextFromNode(node.id, container, statusHandle, true);
+          if (nextId) {
+            currentNodeId = nextId;
+            continue;
+          }
+        } catch (e) {
+          console.error("[runtime:http] erro", e);
+          if (cfg.saveVariable) variables[cfg.saveVariable] = { error: String(e) };
+          const nextId = nextFromNode(node.id, container, "error", true);
+          if (nextId) {
+            currentNodeId = nextId;
+            continue;
+          }
+        }
+        break;
       }
+      case "redirect": {
+...
     }
 
     currentNodeId = nextFromNode(node.id, container);
