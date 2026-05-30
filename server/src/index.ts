@@ -99,20 +99,7 @@ app.post("/runtime", async (req: Request, res: Response) => {
   }
 });
 
-// =====================================================================
-// Webhook Test Capture (n8n-style)
-// Allows the Webhook node UI to "Listen for test event" and inspect the
-// payload that an external system sends, so the user can map fields.
-// =====================================================================
-type CapturedRequest = {
-  receivedAt: string;
-  method: string;
-  headers: Record<string, any>;
-  query: Record<string, any>;
-  params: Record<string, any>;
-  body: any;
-};
-const webhookCaptures = new Map<string, CapturedRequest>();
+// (CapturedRequest / webhookCaptures movidos para o topo do arquivo)
 
 function extractPath(url: string, prefix: string) {
   const cleaned = url.replace(prefix, "").split("?")[0] || "";
