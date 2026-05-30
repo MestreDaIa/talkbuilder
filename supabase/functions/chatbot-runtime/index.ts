@@ -318,10 +318,32 @@ class FlowEngine {
       }
       case "webhook": {
         const varName = normalizeVariableName(cfg.responseVariable || "webhookData");
-        if (varName && inputPayload) {
-          // Salva o payload completo na variável (body, headers, query, etc)
-          this.variables[varName] = inputPayload;
+        const payload = inputPayload || cfg.lastTestPayload || null;
+        if (varName && payload) {
+          this.variables[varName] = payload;
           console.log(`[FlowEngine] Webhook data saved to "${varName}"`);
+        }
+        if (payload && Array.isArray(cfg.responseMappings)) {
+          const getValueByPath = (obj: any, path: string): any => {
+            if (!path) return obj;
+            const parts = String(path).split('.').filter(Boolean);
+            let current: any = obj;
+            for (const part of parts) {
+              if (current === null || current === undefined) return undefined;
+              current = current[part];
+            }
+            return current;
+          };
+          for (const mapping of cfg.responseMappings) {
+            if (mapping?.variableName) {
+              const val = mapping.jsonPath
+                ? getValueByPath(payload, mapping.jsonPath)
+                : payload;
+              if (val !== undefined) {
+                this.variables[normalizeVariableName(mapping.variableName)] = val;
+              }
+            }
+          }
         }
         this.currentNodeId = this.nextFromNode(node.id, container);
         break;
