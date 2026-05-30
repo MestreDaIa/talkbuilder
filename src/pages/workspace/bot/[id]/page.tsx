@@ -104,7 +104,8 @@ function BotEditorInner({
   displayName,
   lbl,
   handleAddNode,
-  setGetCenter
+  setGetCenter,
+  hydrated // Adicionado aqui
 }: any) {
   const { variables, setVariables } = useVariables();
 
@@ -739,7 +740,7 @@ export default function BotPage() {
         lbl={lbl}
         handleAddNode={handleAddNode}
         setGetCenter={setGetCenter}
-        botVariables={botVariables}
+        hydrated={hydrated}
       />
     </VariablesProvider>
   );
