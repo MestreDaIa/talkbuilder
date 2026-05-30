@@ -853,6 +853,11 @@ async function runFlow(execution: any, containersIn: any[], edgesIn: any[], inpu
           });
         }
 
+        // Add default Content-Type if not set and method has body
+        if (["POST", "PUT", "PATCH"].includes(method) && !headers["Content-Type"]) {
+          headers["Content-Type"] = "application/json";
+        }
+
         let body: any = null;
         if (["POST", "PUT", "PATCH"].includes(method)) {
           if (cfg.bodyType === "json" || !cfg.bodyType || cfg.bodyContentType === "json") {
