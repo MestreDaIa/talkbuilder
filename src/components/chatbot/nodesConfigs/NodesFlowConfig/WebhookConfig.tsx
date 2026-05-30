@@ -89,7 +89,7 @@ export const WebhookConfig = ({ config, setConfig }: WebhookConfigProps) => {
   const sinceRef = useRef(0);
 
 
-  const [urlMode, setUrlMode] = useState<"test" | "production">("test");
+  const [urlMode, setUrlMode] = useState<"test" | "production">(config.urlMode || "test");
   const [copied, setCopied] = useState(false);
   const [listening, setListening] = useState(false);
   const pollRef = useRef<number | null>(null);
