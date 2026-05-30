@@ -416,10 +416,15 @@ async function runFlow(execution: any, containersIn: any[], edgesIn: any[], inpu
     if (!key) return undefined;
     if (Object.prototype.hasOwnProperty.call(variables, key)) return variables[key];
 
-    return key.split(".").reduce((acc: any, part: string) => {
+    const val = key.split(".").reduce((acc: any, part: string) => {
       if (acc == null) return undefined;
       return acc[part];
     }, variables as any);
+
+    if (val === undefined) {
+      console.log(`[runtime:var] variável não encontrada: ${key}`);
+    }
+    return val;
   };
 
   const stringifyVarValue = (value: any) =>
