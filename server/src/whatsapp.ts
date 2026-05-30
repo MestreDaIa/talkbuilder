@@ -123,7 +123,7 @@ export async function handleWhatsAppWebhook(payload: any, query?: any) {
     contact_id: remoteJid,
     channel: "whatsapp",
     payload: {
-      message: text,
+      message: text || caption || "",
       button_id: messageData.message?.buttonsResponseMessage?.selectedButtonId || messageData.message?.templateButtonReplyMessage?.selectedId,
       // Special Evolution Bot variables
       messageId: messageData.key.id,
@@ -131,7 +131,13 @@ export async function handleWhatsAppWebhook(payload: any, query?: any) {
       pushName: messageData.pushName || "",
       instanceName,
       serverUrl: EVO_BASE_URL,
-      apiKey: EVO_GLOBAL_KEY
+      apiKey: EVO_GLOBAL_KEY,
+      // Novos campos para suporte a mídia e condições
+      messageType,
+      caption,
+      mimetype,
+      mediaUrl,
+      base64
     }
   });
 
