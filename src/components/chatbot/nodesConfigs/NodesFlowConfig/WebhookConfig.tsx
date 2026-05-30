@@ -132,6 +132,7 @@ export const WebhookConfig = ({ config, setConfig }: WebhookConfigProps) => {
     responseVariable,
     allowedOrigins,
     lastTestPayload,
+    urlMode,
     config,
     setConfig
   ]);
