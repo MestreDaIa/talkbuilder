@@ -26,8 +26,10 @@ interface CapturedRequest {
 
 interface WebhookConfigProps {
   config: {
+    baseUrl?: string;
     method?: string;
     path?: string;
+
     authentication?: string;
     authCredentials?: {
       username?: string;
