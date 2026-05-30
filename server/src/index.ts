@@ -60,6 +60,26 @@ app.get("/webhook/whatsapp", (req: Request, res: Response) => {
 app.post("/webhook/whatsapp*", async (req: Request, res: Response) => {
   try {
     console.log(`[WEBHOOK] Recebido na rota: ${req.url}`);
+
+    // Também grava no buffer de captura para o node Webhook (Listen for test event)
+    // Assim eventos reais da Evolution aparecem no Output do editor.
+    try {
+      const sub = req.url.replace(/^\/webhook\//, "").split("?")[0].replace(/\/+$/, "");
+      const captured: CapturedRequest = {
+        receivedAt: new Date().toISOString(),
+        method: req.method,
+        headers: req.headers as Record<string, any>,
+        query: req.query as Record<string, any>,
+        params: {},
+        body: req.body,
+      };
+      webhookCaptures.set(sub, captured);
+      const base = sub.split("/")[0];
+      if (base && base !== sub) webhookCaptures.set(base, captured);
+    } catch (e) {
+      console.warn("[WEBHOOK] Falha ao capturar payload:", e);
+    }
+
     const result = await handleWhatsAppWebhook(req.body, req.query);
     res.json(result);
   } catch (error: any) {
