@@ -765,7 +765,47 @@ async function runFlow(execution: any, containersIn: any[], edgesIn: any[], inpu
         break;
       }
       case "redirect": {
-...
+        const cfg = node.data || node.config || {};
+        const targetFlowId = cfg.flowId || cfg.targetFlowId;
+        
+        if (targetFlowId && !visitedRedirects.has(targetFlowId)) {
+          visitedRedirects.add(targetFlowId);
+          console.log(`[runtime:redirect] redirecionando para o fluxo ${targetFlowId}`);
+          
+          const { data: targetFlow } = await supabase
+            .from("chatbot_flows")
+            .select("*")
+            .eq("public_id", targetFlowId)
+            .maybeSingle();
+          
+          if (targetFlow) {
+             const targetContainers = targetFlow.draft_containers || [];
+             const targetEdges = targetFlow.draft_edges || [];
+             const startNodeId = targetContainers[0]?.nodes?.[0]?.id;
+             
+             if (startNodeId) {
+               const subResult = await runFlow(
+                 { ...execution, current_node_id: startNodeId, variables },
+                 targetContainers,
+                 targetEdges,
+                 input,
+                 targetFlow,
+                 supabase,
+                 visitedRedirects
+               );
+               
+               messages.push(...(subResult.messages || []));
+               Object.assign(variables, subResult.variables || {});
+               currentNodeId = subResult.next_node_id;
+               wait_ms = subResult.wait_ms;
+               buttons = subResult.buttons;
+               status = subResult.status;
+               return { ...subResult, messages, variables };
+             }
+          }
+        }
+        break;
+      }
     }
 
     currentNodeId = nextFromNode(node.id, container);
