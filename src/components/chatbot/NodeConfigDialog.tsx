@@ -40,8 +40,11 @@ export const NodeConfigDialog = ({ node, open, onClose, onSave, containers = [] 
   const ConfigComponent = nodeConfigComponents[normalizedNodeType] || nodeConfigComponents[node.type];
 
   // Complex nodes need larger dialog
-  const isComplexNode = ['http-request', 'webhook', 'start'].includes(normalizedNodeType);
-  const maxWidth = isComplexNode ? 'sm:max-w-2xl' : 'sm:max-w-md';
+  const isExtraWide = normalizedNodeType === 'webhook';
+  const isComplexNode = ['http-request', 'start'].includes(normalizedNodeType);
+  const maxWidth = isExtraWide
+    ? 'sm:max-w-6xl'
+    : isComplexNode ? 'sm:max-w-2xl' : 'sm:max-w-md';
 
   return (
     <Dialog open={open} onOpenChange={onClose}>

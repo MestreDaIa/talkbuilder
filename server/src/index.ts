@@ -79,6 +79,63 @@ app.post("/runtime", async (req: Request, res: Response) => {
   }
 });
 
+// =====================================================================
+// Webhook Test Capture (n8n-style)
+// Allows the Webhook node UI to "Listen for test event" and inspect the
+// payload that an external system sends, so the user can map fields.
+// =====================================================================
+type CapturedRequest = {
+  receivedAt: string;
+  method: string;
+  headers: Record<string, any>;
+  query: Record<string, any>;
+  params: Record<string, any>;
+  body: any;
+};
+const webhookCaptures = new Map<string, CapturedRequest>();
+
+function extractPath(url: string, prefix: string) {
+  const cleaned = url.replace(prefix, "").split("?")[0] || "";
+  return cleaned.replace(/^\/+/, "").replace(/\/+$/, "");
+}
+
+app.all("/webhook-test/*", (req: Request, res: Response) => {
+  const path = extractPath(req.path, "/webhook-test");
+  const captured: CapturedRequest = {
+    receivedAt: new Date().toISOString(),
+    method: req.method,
+    headers: req.headers as Record<string, any>,
+    query: req.query as Record<string, any>,
+    params: {},
+    body: req.body,
+  };
+  webhookCaptures.set(path, captured);
+  console.log(`[WEBHOOK-TEST] Capturado em "${path}"`);
+  res.json({
+    status: "ok",
+    message: "Test event received and captured. Open the Webhook node in the editor to inspect it.",
+    path,
+    receivedAt: captured.receivedAt,
+  });
+});
+
+app.get("/webhook-capture/:path(*)", (req: Request, res: Response) => {
+  const path = (req.params.path || "").replace(/^\/+/, "").replace(/\/+$/, "");
+  const captured = webhookCaptures.get(path);
+  if (!captured) {
+    return res.status(404).json({ error: "no_capture", path });
+  }
+  res.json(captured);
+});
+
+app.delete("/webhook-capture/:path(*)", (req: Request, res: Response) => {
+  const path = (req.params.path || "").replace(/^\/+/, "").replace(/\/+$/, "");
+  webhookCaptures.delete(path);
+  res.json({ status: "ok" });
+});
+
+
+
 app.get("/", (req: Request, res: Response) => {
   res.json({ 
     status: "ok", 
