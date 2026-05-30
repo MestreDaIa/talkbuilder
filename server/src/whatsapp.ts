@@ -33,14 +33,38 @@ export async function handleWhatsAppWebhook(payload: any, query?: any) {
     return { status: "ignored" };
   }
 
+  // Detectar tipo de mensagem e conteúdo
+  const messageType = messageData.messageType || (messageData.message ? Object.keys(messageData.message)[0] : "unknown");
+  
   const text: string = messageData.message?.conversation || 
                        messageData.message?.extendedTextMessage?.text || 
                        messageData.message?.buttonsResponseMessage?.selectedButtonId ||
                        messageData.message?.templateButtonReplyMessage?.selectedId ||
                        "";
 
-  if (!text && !messageData.message?.buttonsResponseMessage) {
-    return { status: "no_text" };
+  const caption: string = messageData.message?.imageMessage?.caption || 
+                          messageData.message?.videoMessage?.caption || 
+                          messageData.message?.documentMessage?.caption || 
+                          "";
+
+  // Se for mídia, pegamos os dados extras
+  const mediaData = messageData.message?.imageMessage || 
+                    messageData.message?.audioMessage || 
+                    messageData.message?.videoMessage || 
+                    messageData.message?.stickerMessage || 
+                    messageData.message?.documentMessage;
+
+  const mimetype = mediaData?.mimetype || "";
+  const mediaUrl = mediaData?.url || ""; // Nota: Isso costuma ser a URL interna da Evolution
+  
+  // A Evolution costuma enviar o base64 se configurado no webhook
+  // mas aqui estamos pegando o que veio no payload
+  const base64 = payload.base64 || ""; 
+
+  // Não bloqueamos mais se o texto estiver vazio, pois pode ser uma imagem/áudio sem legenda
+  if (!text && !caption && !messageData.message?.buttonsResponseMessage && !mediaData) {
+    console.log("Mensagem sem conteúdo reconhecido ignorada.");
+    return { status: "no_content" };
   }
 
   // 1. Identify Bot
@@ -99,7 +123,7 @@ export async function handleWhatsAppWebhook(payload: any, query?: any) {
     contact_id: remoteJid,
     channel: "whatsapp",
     payload: {
-      message: text,
+      message: text || caption || "",
       button_id: messageData.message?.buttonsResponseMessage?.selectedButtonId || messageData.message?.templateButtonReplyMessage?.selectedId,
       // Special Evolution Bot variables
       messageId: messageData.key.id,
@@ -107,7 +131,13 @@ export async function handleWhatsAppWebhook(payload: any, query?: any) {
       pushName: messageData.pushName || "",
       instanceName,
       serverUrl: EVO_BASE_URL,
-      apiKey: EVO_GLOBAL_KEY
+      apiKey: EVO_GLOBAL_KEY,
+      // Novos campos para suporte a mídia e condições
+      messageType,
+      caption,
+      mimetype,
+      mediaUrl,
+      base64
     }
   });
 
