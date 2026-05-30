@@ -437,17 +437,104 @@ export const WebhookConfig = ({ config, setConfig }: WebhookConfigProps) => {
           </div>
         </div>
 
-        <div className="space-y-1.5">
-          <Label className="text-xs">Salvar dados em variável</Label>
-          <Input
-            value={responseVariable}
-            onChange={(e) => {
-              setResponseVariable(e.target.value);
-              updateMainConfig({ responseVariable: e.target.value });
-            }}
-            placeholder="webhookData"
-          />
+        <div className="space-y-2 border border-border rounded-md p-3 bg-muted/10">
+          <div className="flex items-center justify-between">
+            <Label className="text-xs font-semibold">Mapear Campos para Variáveis</Label>
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              className="h-7 text-[10px]"
+              onClick={() => {
+                const next = [...responseMappings, { variableName: "", jsonPath: "" }];
+                setResponseMappings(next);
+                updateMainConfig({ responseMappings: next });
+              }}
+            >
+              <Plus className="h-3 w-3 mr-1" /> Novo
+            </Button>
+          </div>
+          <p className="text-[10px] text-muted-foreground leading-snug">
+            Selecione (ou crie) a variável e informe o caminho do campo no payload recebido (ex: <code className="font-mono">body.data.messageType</code>). Use depois como <code className="font-mono">{`{{nomeDaVariavel}}`}</code>.
+          </p>
+          {responseMappings.length === 0 && (
+            <p className="text-[10px] text-muted-foreground italic">Nenhum mapeamento. Por padrão o payload completo fica disponível em <code className="font-mono">{`{{webhookData}}`}</code>.</p>
+          )}
+          {responseMappings.map((m, idx) => (
+            <div key={idx} className="grid grid-cols-[1fr_1fr_auto] gap-2 items-end">
+              <div className="space-y-1">
+                <Label className="text-[10px]">Variável</Label>
+                <div className="flex gap-1">
+                  <Input
+                    value={m.variableName}
+                    list={`wh-vars-${idx}`}
+                    placeholder="messageType"
+                    className="h-8 text-xs flex-1"
+                    onChange={(e) => {
+                      const next = [...responseMappings];
+                      next[idx] = { ...next[idx], variableName: e.target.value };
+                      setResponseMappings(next);
+                      updateMainConfig({ responseMappings: next });
+                    }}
+                  />
+                  <datalist id={`wh-vars-${idx}`}>
+                    {availableVariables.map((v) => <option key={v} value={v} />)}
+                  </datalist>
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="icon"
+                    className="h-8 w-8 shrink-0"
+                    onClick={() => setVariableModalOpen({ open: true, index: idx })}
+                  >
+                    <Braces className="h-3 w-3" />
+                  </Button>
+                </div>
+              </div>
+              <div className="space-y-1">
+                <Label className="text-[10px]">Caminho (path)</Label>
+                <Input
+                  value={m.jsonPath}
+                  placeholder="body.data.messageType"
+                  className="h-8 text-xs font-mono"
+                  onChange={(e) => {
+                    const next = [...responseMappings];
+                    next[idx] = { ...next[idx], jsonPath: e.target.value };
+                    setResponseMappings(next);
+                    updateMainConfig({ responseMappings: next });
+                  }}
+                />
+              </div>
+              <Button
+                type="button"
+                variant="ghost"
+                size="icon"
+                className="h-8 w-8"
+                onClick={() => {
+                  const next = responseMappings.filter((_, i) => i !== idx);
+                  setResponseMappings(next);
+                  updateMainConfig({ responseMappings: next });
+                }}
+              >
+                <Trash2 className="h-3 w-3 text-destructive" />
+              </Button>
+            </div>
+          ))}
         </div>
+
+        <VariableModal
+          open={variableModalOpen.open}
+          onClose={() => setVariableModalOpen({ open: false, index: -1 })}
+          onSelect={(v) => {
+            if (variableModalOpen.index >= 0) {
+              const next = [...responseMappings];
+              next[variableModalOpen.index] = { ...next[variableModalOpen.index], variableName: v };
+              setResponseMappings(next);
+              updateMainConfig({ responseMappings: next });
+            }
+          }}
+        />
+
 
         <div className="space-y-1.5">
           <Label className="text-xs">Origens Permitidas (CORS)</Label>
