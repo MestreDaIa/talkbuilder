@@ -403,13 +403,23 @@ async function runFlow(execution: any, containersIn: any[], edgesIn: any[], inpu
     return null;
   };
 
-  const decodeText = (text: string) =>
-    String(text || "")
+  const decodeText = (text: string) => {
+    if (!text) return "";
+    let decoded = String(text)
       .replace(/<br\s*\/?>/gi, "\n")
       .replace(/<\/p>\s*<p[^>]*>/gi, "\n")
       .replace(/<[^>]+>/g, "")
       .replace(/&nbsp;/g, " ")
-      .trim();
+      .replace(/&amp;/g, "&")
+      .replace(/&lt;/g, "<")
+      .replace(/&gt;/g, ">")
+      .replace(/&quot;/g, '"')
+      .replace(/&#39;/g, "'");
+    
+    // Only trim if it's not likely to be a JSON body (which might want to preserve spaces, though rare)
+    // For now, let's keep trim() but make it safer
+    return decoded.trim();
+  };
 
   const getVarValue = (path: string) => {
     const key = String(path || "").trim();
@@ -430,8 +440,11 @@ async function runFlow(execution: any, containersIn: any[], edgesIn: any[], inpu
   const stringifyVarValue = (value: any) =>
     value != null && typeof value === "object" ? JSON.stringify(value) : String(value ?? "");
 
-  const replaceVars = (text: string) =>
-    !text ? text : decodeText(text).replace(/{{(.*?)}}/g, (_, k) => {
+  const replaceVars = (text: string) => {
+    if (!text) return text;
+    const shouldDecode = /<[a-z][\s\S]*>/i.test(text) || text.includes("&nbsp;") || text.includes("&quot;");
+    const baseText = shouldDecode ? decodeText(text) : text;
+    return baseText.replace(/{{(.*?)}}/g, (_, k) => {
       const value = getVarValue(k);
       return value === undefined ? `{{${k}}}` : stringifyVarValue(value);
     });
@@ -868,16 +881,18 @@ async function runFlow(execution: any, containersIn: any[], edgesIn: any[], inpu
           if (cfg.bodyType === "json" || !cfg.bodyType || cfg.bodyContentType === "json") {
             const rawBody = cfg.bodyJson || cfg.body || "{}";
             const processedBody = typeof rawBody === "string" ? rawBody : JSON.stringify(rawBody);
+            // IMPORTANTE: Para JSON, tentamos substituir variáveis SEM o decodeText se possível,
+            // ou pelo menos garantimos que o decodeText não estrague as aspas.
             body = replaceVars(processedBody);
             headers["Content-Type"] = "application/json";
+            
+            console.log(`[runtime:http] Body processado: ${body.substring(0, 200)}${body.length > 200 ? "..." : ""}`);
           } else if (cfg.bodyType === "form-data") {
-            // Simplificado para o runtime
             const params = new URLSearchParams();
-            if (Array.isArray(cfg.body)) {
-              cfg.body.forEach((b: any) => {
-                if (b.key) params.append(b.key, replaceVars(b.value || ""));
-              });
-            }
+            const bodyEntries = Array.isArray(cfg.body) ? cfg.body : [];
+            bodyEntries.forEach((b: any) => {
+              if (b.key) params.append(b.key, replaceVars(b.value || ""));
+            });
             body = params.toString();
             headers["Content-Type"] = "application/x-www-form-urlencoded";
           }
