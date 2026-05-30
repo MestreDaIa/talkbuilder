@@ -128,7 +128,10 @@ Deno.serve(async (req: Request) => {
         channel: "whatsapp",
         payload: {
           message: text,
-          button_id: buttonId
+          button_id: buttonId,
+          apiKey: apiKey || body.apikey || body.apiKey || messageData?.apikey || EVO_GLOBAL_KEY,
+          apikey: apiKey || body.apikey || body.apiKey || messageData?.apikey || EVO_GLOBAL_KEY,
+          body: body
         }
       })
     });
