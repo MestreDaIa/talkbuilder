@@ -25,6 +25,7 @@ export async function handleWhatsAppWebhook(payload: any, query?: any, requestMe
   const instanceName: string = payload.instance;
   const remoteJid: string = messageData.key.remoteJid;
   const fromMe: boolean = !!messageData.key.fromMe;
+  const currentApiKey = payload.apikey || payload.apiKey || payload.data?.apikey || EVO_GLOBAL_KEY;
 
   console.log(`Mensagem de ${remoteJid} na instância ${instanceName}. FromMe: ${fromMe}. Query: ${JSON.stringify(query)}`);
 
@@ -137,7 +138,8 @@ export async function handleWhatsAppWebhook(payload: any, query?: any, requestMe
       pushName: messageData.pushName || "",
       instanceName,
       serverUrl: EVO_BASE_URL,
-      apiKey: EVO_GLOBAL_KEY,
+      apiKey: payload.apikey || payload.apiKey || payload.data?.apikey || EVO_GLOBAL_KEY,
+      apikey: payload.apikey || payload.apiKey || payload.data?.apikey || EVO_GLOBAL_KEY,
       // Novos campos para suporte a mídia e condições
       messageType,
       caption,
@@ -176,9 +178,9 @@ export async function handleWhatsAppWebhook(payload: any, query?: any, requestMe
           for (const msg of resumeResult.messages) {
             if (!msg.content) continue;
             if (resumeResult.buttons && resumeResult.buttons.length > 0) {
-              await evolutionApi.sendButtons(instanceName, remoteJid, msg.content, resumeResult.buttons);
+              await evolutionApi.sendButtons(instanceName, remoteJid, msg.content, resumeResult.buttons, currentApiKey);
             } else {
-              await evolutionApi.sendText(instanceName, remoteJid, msg.content);
+              await evolutionApi.sendText(instanceName, remoteJid, msg.content, currentApiKey);
             }
           }
         }
@@ -220,13 +222,13 @@ export async function handleWhatsAppWebhook(payload: any, query?: any, requestMe
         });
         // Também enviamos via API para garantir (Webhook mode)
         console.log(`[WHATSAPP] Enviando botões via API Evolution para ${remoteJid}`);
-        const result = await evolutionApi.sendButtons(instanceName, remoteJid, msg.content, runtimeResult.buttons);
+        const result = await evolutionApi.sendButtons(instanceName, remoteJid, msg.content, runtimeResult.buttons, currentApiKey);
         console.log(`[WHATSAPP] Resultado envio botões:`, JSON.stringify(result));
       } else {
         botResponses.push({ text: msg.content });
         // Também enviamos via API para garantir (Webhook mode)
         console.log(`[WHATSAPP] Enviando texto via API Evolution para ${remoteJid}`);
-        const result = await evolutionApi.sendText(instanceName, remoteJid, msg.content);
+        const result = await evolutionApi.sendText(instanceName, remoteJid, msg.content, currentApiKey);
         console.log(`[WHATSAPP] Resultado envio texto:`, JSON.stringify(result));
       }
     }

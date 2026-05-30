@@ -7,14 +7,14 @@ export const EVO_GLOBAL_KEY: string = process.env.EVO_GLOBAL_KEY || '';
 
 
 export const evolutionApi = {
-  async sendText(instanceName: string, number: string, text: string) {
+  async sendText(instanceName: string, number: string, text: string, apiKeyOverride?: string) {
     console.log(`Enviando mensagem de texto para ${number} na instância ${instanceName}`);
     try {
       const response = await fetch(`${EVO_BASE_URL}/message/sendText/${instanceName}`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
-          'apikey': EVO_GLOBAL_KEY
+          'apikey': apiKeyOverride || EVO_GLOBAL_KEY
         },
         body: JSON.stringify({
           number,
@@ -33,14 +33,14 @@ export const evolutionApi = {
     }
   },
 
-  async sendButtons(instanceName: string, number: string, text: string, buttons: any[]) {
+  async sendButtons(instanceName: string, number: string, text: string, buttons: any[], apiKeyOverride?: string) {
     console.log(`Enviando botões para ${number} na instância ${instanceName}`);
     try {
       const response = await fetch(`${EVO_BASE_URL}/message/sendButtons/${instanceName}`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
-          'apikey': EVO_GLOBAL_KEY
+          'apikey': apiKeyOverride || EVO_GLOBAL_KEY
         },
         body: JSON.stringify({
           number,
