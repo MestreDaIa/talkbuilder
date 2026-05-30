@@ -81,6 +81,11 @@ export const WebhookConfig = ({ config, setConfig }: WebhookConfigProps) => {
   const [lastTestPayload, setLastTestPayload] = useState<CapturedRequest | null>(
     config.lastTestPayload || null
   );
+  const [capturedEvents, setCapturedEvents] = useState<CapturedRequest[]>(
+    config.lastTestPayload ? [config.lastTestPayload] : []
+  );
+  const [selectedEventIdx, setSelectedEventIdx] = useState<number>(0);
+  const sinceRef = useRef(0);
 
 
   const [urlMode, setUrlMode] = useState<"test" | "production">("test");
