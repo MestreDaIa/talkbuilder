@@ -59,12 +59,21 @@ export function VariablesProvider({
   const replaceVariablesInText = useCallback(
     (text: string, extraVars?: Record<string, any>) => {
       if (!text) return text;
-      return text.replace(/\{\{\s*([\w.-]+)\s*\}\}/g, (_, key) => {
+      const getValue = (source: Record<string, any> | undefined, path: string) => {
+        if (!source) return undefined;
+        if (Object.prototype.hasOwnProperty.call(source, path)) return source[path];
+        return path.split(".").reduce((acc: any, part: string) => {
+          if (acc == null) return undefined;
+          return acc[part];
+        }, source as any);
+      };
+
+      return text.replace(/\{\{\s*([^}]+?)\s*\}\}/g, (_, rawKey) => {
+        const key = String(rawKey).trim();
         // Prioritize extraVars (fresh values passed during flow execution)
         // over the React state `variables` (which can be stale due to closures)
-        const v =
-          extraVars && key in extraVars ? extraVars[key] : variables[key];
-        return v == null ? "" : String(v);
+        const v = getValue(extraVars, key) ?? getValue(variables, key);
+        return v == null ? "" : typeof v === "object" ? JSON.stringify(v) : String(v);
       });
     },
     [variables]
