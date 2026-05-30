@@ -711,12 +711,38 @@ async function runFlow(execution: any, containersIn: any[], edgesIn: any[], inpu
           try {
             let aiReply = "";
             if (provider === "openai") {
+              const messages: any[] = [{ role: "system", content: systemPrompt + context }];
+              
+              if (cfg.visionEnabled) {
+                const content: any[] = [{ type: "text", text: userPrompt }];
+                
+                // Detect image URLs or base64 in userPrompt or variables
+                if (userPrompt.startsWith("http") || userPrompt.startsWith("data:image")) {
+                  content.push({ type: "image_url", image_url: { url: userPrompt } });
+                } else {
+                  const mediaUrl = variables["mediaUrl"] || variables["media_url"] || variables["url"];
+                  const base64 = variables["base64"] || variables["image_base64"];
+                  
+                  if (base64) {
+                    const b64 = String(base64).startsWith("data:") ? base64 : `data:image/jpeg;base64,${base64}`;
+                    content.push({ type: "image_url", image_url: { url: b64 } });
+                  } else if (mediaUrl && String(mediaUrl).startsWith("http")) {
+                    content.push({ type: "image_url", image_url: { url: mediaUrl } });
+                  }
+                }
+                messages.push({ role: "user", content });
+              } else {
+                messages.push({ role: "user", content: userPrompt });
+              }
+
               const res = await fetch("https://api.openai.com/v1/chat/completions", {
                 method: "POST",
                 headers: { "Authorization": `Bearer ${activeKey}`, "Content-Type": "application/json" },
                 body: JSON.stringify({
                   model: cfg.model || "gpt-4o-mini",
-                  messages: [{ role: "system", content: systemPrompt + context }, { role: "user", content: userPrompt }],
+                  messages: messages,
+                  temperature: cfg.temperature ?? 0.7,
+                  max_tokens: cfg.maxTokens ?? 1000,
                 }),
               });
               if (res.ok) {
@@ -726,10 +752,38 @@ async function runFlow(execution: any, containersIn: any[], edgesIn: any[], inpu
             } else if (provider === "gemini") {
               const model = cfg.model || "gemini-2.0-flash";
               const url = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${activeKey}`;
+              
+              const userParts: any[] = [{ text: userPrompt }];
+              if (cfg.visionEnabled) {
+                const mediaUrl = variables["mediaUrl"] || variables["media_url"] || variables["url"];
+                const base64 = variables["base64"] || variables["image_base64"];
+
+                if (base64) {
+                  const b64Data = String(base64).replace(/^data:image\/[a-z]+;base64,/, "");
+                  userParts.push({ inline_data: { mime_type: "image/jpeg", data: b64Data } });
+                } else if (mediaUrl && String(mediaUrl).startsWith("http")) {
+                  try {
+                    const imgRes = await fetch(mediaUrl);
+                    if (imgRes.ok) {
+                      const arrayBuffer = await imgRes.arrayBuffer();
+                      const b64 = Buffer.from(arrayBuffer).toString('base64');
+                      userParts.push({ inline_data: { mime_type: imgRes.headers.get("content-type") || "image/jpeg", data: b64 } });
+                    }
+                  } catch (e) { console.error("[Gemini:Vision] failed to fetch image", e); }
+                }
+              }
+
               const res = await fetch(url, {
                 method: "POST",
                 headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({ contents: [{ parts: [{ text: `Instructions: ${systemPrompt}${context}\n\nUser: ${userPrompt}` }] }] }),
+                body: JSON.stringify({
+                  system_instruction: { parts: [{ text: systemPrompt + context }] },
+                  contents: [{ role: "user", parts: userParts }],
+                  generationConfig: {
+                    temperature: cfg.temperature ?? 0.7,
+                    maxOutputTokens: cfg.maxTokens ?? 1000,
+                  }
+                }),
               });
               if (res.ok) {
                 const data: any = await res.json();
