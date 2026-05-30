@@ -464,6 +464,13 @@ async function runFlow(execution: any, containersIn: any[], edgesIn: any[], inpu
     if (input.instanceName) variables["instanceName"] = input.instanceName;
     if (input.serverUrl) variables["serverUrl"] = input.serverUrl;
     if (input.apiKey) variables["apiKey"] = input.apiKey;
+    
+    // Mapeamento de variáveis de mídia para uso em condições
+    if (input.messageType) variables["messageType"] = input.messageType;
+    if (input.caption) variables["caption"] = input.caption;
+    if (input.mimetype) variables["mimetype"] = input.mimetype;
+    if (input.mediaUrl) variables["mediaUrl"] = input.mediaUrl;
+    if (input.base64) variables["base64"] = input.base64;
   }
 
   let inputConsumed = false;
