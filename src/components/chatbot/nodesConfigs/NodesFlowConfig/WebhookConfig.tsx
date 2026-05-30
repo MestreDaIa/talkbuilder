@@ -1,7 +1,8 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo, useRef } from "react";
 import { Label } from "@/components/ui/label";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
+import { Badge } from "@/components/ui/badge";
 import {
   Select,
   SelectContent,
@@ -9,9 +10,19 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { Copy, Check } from "lucide-react";
+import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
+import { Copy, Check, Radio, Square, ChevronRight, ChevronDown, ArrowRight } from "lucide-react";
 import { toast } from "sonner";
 import { SkillConfig } from "../SkillConfig";
+
+interface CapturedRequest {
+  receivedAt: string;
+  method: string;
+  headers: Record<string, any>;
+  query: Record<string, any>;
+  params: Record<string, any>;
+  body: any;
+}
 
 interface WebhookConfigProps {
   config: {
@@ -29,33 +40,35 @@ interface WebhookConfigProps {
     responseData?: string;
     responseVariable?: string;
     allowedOrigins?: string;
+    lastTestPayload?: CapturedRequest | null;
   };
   setConfig: (config: WebhookConfigProps["config"]) => void;
 }
 
+const RUNTIME_BASE = (() => {
+  const runtimeUrl = import.meta.env.VITE_CHATBOT_RUNTIME_URL as string | undefined;
+  const projectId = import.meta.env.VITE_SUPABASE_PROJECT_ID as string | undefined;
+  return runtimeUrl || (projectId ? `https://${projectId}.supabase.co/functions/v1` : "");
+})();
+
 export const WebhookConfig = ({ config, setConfig }: WebhookConfigProps) => {
   const [method, setMethod] = useState(config.method || "POST");
   const [path, setPath] = useState(config.path || "");
-  const [authentication, setAuthentication] = useState(
-    config.authentication || "none"
-  );
-  const [authCredentials, setAuthCredentials] = useState(
-    config.authCredentials || {}
-  );
-  const [respondMode, setRespondMode] = useState(
-    config.respondMode || "immediately"
-  );
+  const [authentication, setAuthentication] = useState(config.authentication || "none");
+  const [authCredentials, setAuthCredentials] = useState(config.authCredentials || {});
+  const [respondMode, setRespondMode] = useState(config.respondMode || "immediately");
   const [responseCode, setResponseCode] = useState(config.responseCode || 200);
-  const [responseData, setResponseData] = useState(
-    config.responseData || "all"
+  const [responseData, setResponseData] = useState(config.responseData || "all");
+  const [responseVariable, setResponseVariable] = useState(config.responseVariable || "webhookData");
+  const [allowedOrigins, setAllowedOrigins] = useState(config.allowedOrigins || "*");
+  const [lastTestPayload, setLastTestPayload] = useState<CapturedRequest | null>(
+    config.lastTestPayload || null
   );
-  const [responseVariable, setResponseVariable] = useState(
-    config.responseVariable || "webhookData"
-  );
-  const [allowedOrigins, setAllowedOrigins] = useState(
-    config.allowedOrigins || "*"
-  );
+
+  const [urlMode, setUrlMode] = useState<"test" | "production">("test");
   const [copied, setCopied] = useState(false);
+  const [listening, setListening] = useState(false);
+  const pollRef = useRef<number | null>(null);
 
   useEffect(() => {
     setConfig({
@@ -68,7 +81,9 @@ export const WebhookConfig = ({ config, setConfig }: WebhookConfigProps) => {
       responseData,
       responseVariable,
       allowedOrigins,
+      lastTestPayload,
     });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [
     method,
     path,
@@ -79,210 +94,421 @@ export const WebhookConfig = ({ config, setConfig }: WebhookConfigProps) => {
     responseData,
     responseVariable,
     allowedOrigins,
+    lastTestPayload,
   ]);
 
-  const runtimeUrl = import.meta.env.VITE_CHATBOT_RUNTIME_URL;
-  const projectId = import.meta.env.VITE_SUPABASE_PROJECT_ID;
-  const baseUrl = runtimeUrl ||
-    (projectId ? `https://${projectId}.supabase.co/functions/v1` : "");
-  const webhookUrl = `${baseUrl}/chatbot-webhook/${path || "meu-webhook"}`;
+  const cleanedPath = (path || "meu-webhook").replace(/^\/+|\/+$/g, "");
+  const testUrl = `${RUNTIME_BASE}/webhook-test/${cleanedPath}`;
+  const productionUrl = `${RUNTIME_BASE}/chatbot-webhook/${cleanedPath}`;
+  const captureUrl = `${RUNTIME_BASE}/webhook-capture/${cleanedPath}`;
+  const displayedUrl = urlMode === "test" ? testUrl : productionUrl;
 
   const handleCopyUrl = () => {
-    navigator.clipboard.writeText(webhookUrl);
+    navigator.clipboard.writeText(displayedUrl);
     setCopied(true);
     toast.success("URL copiada!");
-    setTimeout(() => setCopied(false), 2000);
+    setTimeout(() => setCopied(false), 1500);
+  };
+
+  // Polling lifecycle
+  useEffect(() => {
+    return () => {
+      if (pollRef.current) window.clearInterval(pollRef.current);
+    };
+  }, []);
+
+  const startListening = async () => {
+    if (!cleanedPath) {
+      toast.error("Defina um caminho (path) antes de escutar.");
+      return;
+    }
+    setListening(true);
+    toast.info("Aguardando um evento de teste...", {
+      description: `Envie uma requisição para a Test URL.`,
+    });
+
+    // Clear any previous capture so we only see fresh ones
+    try {
+      await fetch(captureUrl, { method: "DELETE" });
+    } catch {
+      /* ignore */
+    }
+
+    const poll = async () => {
+      try {
+        const res = await fetch(captureUrl);
+        if (res.ok) {
+          const data = (await res.json()) as CapturedRequest;
+          setLastTestPayload(data);
+          stopListening();
+          toast.success("Evento de teste recebido!");
+        }
+      } catch {
+        /* ignore */
+      }
+    };
+
+    pollRef.current = window.setInterval(poll, 1500);
+  };
+
+  const stopListening = () => {
+    if (pollRef.current) {
+      window.clearInterval(pollRef.current);
+      pollRef.current = null;
+    }
+    setListening(false);
+  };
+
+  const clearCapture = () => {
+    setLastTestPayload(null);
+    toast.success("Captura limpa");
   };
 
   return (
-    <div className="space-y-4">
-      {/* Webhook URL Preview */}
-      <div className="space-y-2">
-        <Label>URL do Webhook</Label>
-        <div className="flex items-center gap-2">
-          <code className="flex-1 text-xs bg-muted p-2 rounded overflow-x-auto">
-            {webhookUrl}
-          </code>
-          <Button
-            type="button"
-            variant="outline"
-            size="icon"
-            onClick={handleCopyUrl}
-          >
-            {copied ? (
-              <Check className="h-4 w-4 text-green-500" />
-            ) : (
-              <Copy className="h-4 w-4" />
-            )}
+    <div className="grid grid-cols-1 lg:grid-cols-[260px_1fr_1fr] gap-0 min-h-[60vh]">
+      {/* ============ LEFT: Webhook URLs ============ */}
+      <aside className="border-r border-border bg-muted/30 p-4 space-y-4">
+        <div>
+          <h4 className="text-xs font-semibold uppercase tracking-wider text-muted-foreground mb-2">
+            Webhook URLs
+          </h4>
+          <Tabs value={urlMode} onValueChange={(v) => setUrlMode(v as "test" | "production")}>
+            <TabsList className="grid grid-cols-2 w-full">
+              <TabsTrigger value="test">Test URL</TabsTrigger>
+              <TabsTrigger value="production">Production</TabsTrigger>
+            </TabsList>
+          </Tabs>
+        </div>
+
+        <div className="space-y-2">
+          <div className="flex items-center gap-2">
+            <Badge variant="secondary" className="font-mono text-[10px]">
+              {method}
+            </Badge>
+            <span className="text-xs text-muted-foreground">
+              {urlMode === "test" ? "Captura no editor" : "Endpoint público"}
+            </span>
+          </div>
+          <div className="rounded-md border border-border bg-background p-2 text-[11px] font-mono break-all">
+            {displayedUrl}
+          </div>
+          <Button type="button" variant="outline" size="sm" className="w-full" onClick={handleCopyUrl}>
+            {copied ? <Check className="h-3.5 w-3.5 mr-1.5" /> : <Copy className="h-3.5 w-3.5 mr-1.5" />}
+            Copiar URL
           </Button>
         </div>
-      </div>
 
-      <div className="grid grid-cols-2 gap-4">
-        {/* Method */}
-        <div className="space-y-2">
-          <Label>Método HTTP</Label>
-          <Select value={method} onValueChange={setMethod}>
-            <SelectTrigger>
-              <SelectValue />
-            </SelectTrigger>
+        <div className="pt-2 border-t border-border space-y-2">
+          {!listening ? (
+            <Button
+              type="button"
+              size="sm"
+              className="w-full"
+              onClick={startListening}
+              disabled={urlMode !== "test"}
+            >
+              <Radio className="h-3.5 w-3.5 mr-1.5" />
+              Listen for test event
+            </Button>
+          ) : (
+            <Button
+              type="button"
+              size="sm"
+              variant="destructive"
+              className="w-full"
+              onClick={stopListening}
+            >
+              <Square className="h-3.5 w-3.5 mr-1.5" />
+              Parar de escutar
+            </Button>
+          )}
+          <p className="text-[10px] text-muted-foreground leading-snug">
+            Envie uma requisição {method} para a Test URL acima.
+            O payload capturado aparecerá no painel <strong>Output</strong>.
+          </p>
+        </div>
+      </aside>
+
+      {/* ============ MIDDLE: Parameters ============ */}
+      <section className="p-5 space-y-4 border-r border-border overflow-y-auto">
+        <h4 className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+          Parâmetros
+        </h4>
+
+        <div className="grid grid-cols-2 gap-3">
+          <div className="space-y-1.5">
+            <Label className="text-xs">Método HTTP</Label>
+            <Select value={method} onValueChange={setMethod}>
+              <SelectTrigger><SelectValue /></SelectTrigger>
+              <SelectContent>
+                <SelectItem value="GET">GET</SelectItem>
+                <SelectItem value="POST">POST</SelectItem>
+                <SelectItem value="PUT">PUT</SelectItem>
+                <SelectItem value="PATCH">PATCH</SelectItem>
+                <SelectItem value="DELETE">DELETE</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
+          <div className="space-y-1.5">
+            <Label className="text-xs">Caminho (Path)</Label>
+            <Input value={path} onChange={(e) => setPath(e.target.value)} placeholder="meu-webhook" />
+          </div>
+        </div>
+
+        <div className="space-y-1.5">
+          <Label className="text-xs">Autenticação</Label>
+          <Select value={authentication} onValueChange={setAuthentication}>
+            <SelectTrigger><SelectValue /></SelectTrigger>
             <SelectContent>
-              <SelectItem value="GET">GET</SelectItem>
-              <SelectItem value="POST">POST</SelectItem>
-              <SelectItem value="PUT">PUT</SelectItem>
-              <SelectItem value="PATCH">PATCH</SelectItem>
-              <SelectItem value="DELETE">DELETE</SelectItem>
+              <SelectItem value="none">Nenhuma</SelectItem>
+              <SelectItem value="basic">Basic Auth</SelectItem>
+              <SelectItem value="header">Header Auth</SelectItem>
             </SelectContent>
           </Select>
         </div>
 
-        {/* Path */}
-        <div className="space-y-2">
-          <Label>Caminho</Label>
+        {authentication === "basic" && (
+          <div className="grid grid-cols-2 gap-3">
+            <div className="space-y-1.5">
+              <Label className="text-xs">Usuário</Label>
+              <Input
+                value={authCredentials.username || ""}
+                onChange={(e) => setAuthCredentials({ ...authCredentials, username: e.target.value })}
+              />
+            </div>
+            <div className="space-y-1.5">
+              <Label className="text-xs">Senha</Label>
+              <Input
+                type="password"
+                value={authCredentials.password || ""}
+                onChange={(e) => setAuthCredentials({ ...authCredentials, password: e.target.value })}
+              />
+            </div>
+          </div>
+        )}
+
+        {authentication === "header" && (
+          <div className="grid grid-cols-2 gap-3">
+            <div className="space-y-1.5">
+              <Label className="text-xs">Nome do Header</Label>
+              <Input
+                value={authCredentials.headerName || ""}
+                onChange={(e) => setAuthCredentials({ ...authCredentials, headerName: e.target.value })}
+                placeholder="X-API-Key"
+              />
+            </div>
+            <div className="space-y-1.5">
+              <Label className="text-xs">Valor</Label>
+              <Input
+                type="password"
+                value={authCredentials.headerValue || ""}
+                onChange={(e) => setAuthCredentials({ ...authCredentials, headerValue: e.target.value })}
+              />
+            </div>
+          </div>
+        )}
+
+        <div className="grid grid-cols-2 gap-3">
+          <div className="space-y-1.5">
+            <Label className="text-xs">Modo de Resposta</Label>
+            <Select value={respondMode} onValueChange={setRespondMode}>
+              <SelectTrigger><SelectValue /></SelectTrigger>
+              <SelectContent>
+                <SelectItem value="immediately">Imediatamente</SelectItem>
+                <SelectItem value="lastNode">Ao finalizar fluxo</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
+          <div className="space-y-1.5">
+            <Label className="text-xs">Código de Resposta</Label>
+            <Select value={String(responseCode)} onValueChange={(v) => setResponseCode(Number(v))}>
+              <SelectTrigger><SelectValue /></SelectTrigger>
+              <SelectContent>
+                <SelectItem value="200">200 OK</SelectItem>
+                <SelectItem value="201">201 Created</SelectItem>
+                <SelectItem value="204">204 No Content</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
+        </div>
+
+        <div className="space-y-1.5">
+          <Label className="text-xs">Salvar dados em variável</Label>
           <Input
-            value={path}
-            onChange={(e) => setPath(e.target.value)}
-            placeholder="meu-webhook"
+            value={responseVariable}
+            onChange={(e) => setResponseVariable(e.target.value)}
+            placeholder="webhookData"
+          />
+          <p className="text-[11px] text-muted-foreground">
+            Use <code className="bg-muted px-1 rounded">{"{{" + responseVariable + ".body.campo}}"}</code> nos próximos nodes.
+          </p>
+        </div>
+
+        <div className="space-y-1.5">
+          <Label className="text-xs">Origens Permitidas (CORS)</Label>
+          <Input
+            value={allowedOrigins}
+            onChange={(e) => setAllowedOrigins(e.target.value)}
+            placeholder="* ou https://meusite.com"
           />
         </div>
-      </div>
 
-      {/* Authentication */}
-      <div className="space-y-2">
-        <Label>Autenticação</Label>
-        <Select value={authentication} onValueChange={setAuthentication}>
-          <SelectTrigger>
-            <SelectValue />
-          </SelectTrigger>
-          <SelectContent>
-            <SelectItem value="none">Nenhuma</SelectItem>
-            <SelectItem value="basic">Basic Auth</SelectItem>
-            <SelectItem value="header">Header Auth</SelectItem>
-          </SelectContent>
-        </Select>
-      </div>
+        <SkillConfig config={config} setConfig={setConfig} />
+      </section>
 
-      {/* Basic Auth Credentials */}
-      {authentication === "basic" && (
-        <div className="grid grid-cols-2 gap-4">
-          <div className="space-y-2">
-            <Label>Usuário</Label>
-            <Input
-              value={authCredentials.username || ""}
-              onChange={(e) =>
-                setAuthCredentials({ ...authCredentials, username: e.target.value })
-              }
-              placeholder="username"
-            />
+      {/* ============ RIGHT: Output ============ */}
+      <section className="bg-muted/20 overflow-hidden flex flex-col">
+        <div className="px-4 py-3 border-b border-border flex items-center justify-between bg-background/40">
+          <div className="flex items-center gap-2">
+            <span className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+              Output
+            </span>
+            {lastTestPayload && (
+              <Badge variant="outline" className="text-[10px]">
+                {new Date(lastTestPayload.receivedAt).toLocaleTimeString()}
+              </Badge>
+            )}
           </div>
-          <div className="space-y-2">
-            <Label>Senha</Label>
-            <Input
-              type="password"
-              value={authCredentials.password || ""}
-              onChange={(e) =>
-                setAuthCredentials({ ...authCredentials, password: e.target.value })
-              }
-              placeholder="••••••••"
-            />
-          </div>
-        </div>
-      )}
-
-      {/* Header Auth Credentials */}
-      {authentication === "header" && (
-        <div className="grid grid-cols-2 gap-4">
-          <div className="space-y-2">
-            <Label>Nome do Header</Label>
-            <Input
-              value={authCredentials.headerName || ""}
-              onChange={(e) =>
-                setAuthCredentials({ ...authCredentials, headerName: e.target.value })
-              }
-              placeholder="X-API-Key"
-            />
-          </div>
-          <div className="space-y-2">
-            <Label>Valor do Header</Label>
-            <Input
-              type="password"
-              value={authCredentials.headerValue || ""}
-              onChange={(e) =>
-                setAuthCredentials({ ...authCredentials, headerValue: e.target.value })
-              }
-              placeholder="••••••••"
-            />
-          </div>
-        </div>
-      )}
-
-      <div className="grid grid-cols-2 gap-4">
-        {/* Response Mode */}
-        <div className="space-y-2">
-          <Label>Modo de Resposta</Label>
-          <Select value={respondMode} onValueChange={setRespondMode}>
-            <SelectTrigger>
-              <SelectValue />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="immediately">Imediatamente</SelectItem>
-              <SelectItem value="lastNode">Ao Finalizar Fluxo</SelectItem>
-            </SelectContent>
-          </Select>
+          {lastTestPayload && (
+            <Button type="button" variant="ghost" size="sm" onClick={clearCapture}>
+              Limpar
+            </Button>
+          )}
         </div>
 
-        {/* Response Code */}
-        <div className="space-y-2">
-          <Label>Código de Resposta</Label>
-          <Select
-            value={String(responseCode)}
-            onValueChange={(v) => setResponseCode(Number(v))}
-          >
-            <SelectTrigger>
-              <SelectValue />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="200">200 OK</SelectItem>
-              <SelectItem value="201">201 Created</SelectItem>
-              <SelectItem value="204">204 No Content</SelectItem>
-            </SelectContent>
-          </Select>
+        <div className="flex-1 overflow-y-auto p-3 text-[11px] font-mono">
+          {!lastTestPayload ? (
+            <div className="h-full flex items-center justify-center text-center text-muted-foreground px-6">
+              <div className="space-y-2">
+                <Radio className="h-8 w-8 mx-auto opacity-40" />
+                <p className="text-xs">
+                  Nenhum dado capturado ainda.
+                  <br />
+                  Clique em <strong>Listen for test event</strong> e dispare uma requisição para a Test URL.
+                </p>
+              </div>
+            </div>
+          ) : (
+            <JsonTree value={lastTestPayload} rootName={responseVariable || "webhookData"} />
+          )}
         </div>
-      </div>
-
-      {/* Response Variable */}
-      <div className="space-y-2">
-        <Label>Salvar dados em variável</Label>
-        <Input
-          value={responseVariable}
-          onChange={(e) => setResponseVariable(e.target.value)}
-          placeholder="webhookData"
-        />
-        <p className="text-xs text-muted-foreground">
-          Os dados recebidos pelo webhook serão salvos nesta variável.
-        </p>
-      </div>
-
-      {/* Allowed Origins (CORS) */}
-      <div className="space-y-2">
-        <Label>Origens Permitidas (CORS)</Label>
-        <Input
-          value={allowedOrigins}
-          onChange={(e) => setAllowedOrigins(e.target.value)}
-          placeholder="* ou https://meusite.com"
-        />
-      </div>
-
-      <div className="bg-muted/50 rounded-lg p-3">
-        <p className="text-xs text-muted-foreground">
-          <strong>Dica:</strong> O Webhook permite que sistemas externos
-          disparem este fluxo via requisição HTTP. Use para integrações com
-          outros sistemas.
-        </p>
-      </div>
-
-      <SkillConfig config={config} setConfig={setConfig} />
+      </section>
     </div>
+  );
+};
 
+// =====================================================================
+// JSON tree viewer — click any leaf to copy its variable path
+// =====================================================================
+interface JsonTreeProps {
+  value: any;
+  rootName: string;
+}
+
+const JsonTree = ({ value, rootName }: JsonTreeProps) => {
+  return (
+    <div className="space-y-0.5">
+      <p className="text-[10px] text-muted-foreground mb-2 px-1">
+        Clique em qualquer campo para copiar o caminho da variável.
+      </p>
+      <TreeNode name={rootName} value={value} path={`{{${rootName}`} depth={0} isRoot />
+    </div>
+  );
+};
+
+const TreeNode = ({
+  name,
+  value,
+  path,
+  depth,
+  isRoot = false,
+}: {
+  name: string;
+  value: any;
+  path: string;
+  depth: number;
+  isRoot?: boolean;
+}) => {
+  const [open, setOpen] = useState(depth < 2);
+  const isObject = value !== null && typeof value === "object";
+  const isArray = Array.isArray(value);
+
+  const copyPath = (p: string) => {
+    const full = `${p}}}`;
+    navigator.clipboard.writeText(full);
+    toast.success("Variável copiada", { description: full });
+  };
+
+  if (!isObject) {
+    return (
+      <div
+        className="group flex items-start gap-2 pl-[calc(0.5rem*var(--d))] py-0.5 hover:bg-muted/60 rounded cursor-pointer"
+        style={{ ["--d" as any]: depth + 1 }}
+        onClick={() => copyPath(path)}
+        title="Copiar caminho"
+      >
+        <span className="text-foreground/80">{name}:</span>
+        <span
+          className={
+            typeof value === "string"
+              ? "text-emerald-500"
+              : typeof value === "number"
+              ? "text-amber-500"
+              : "text-sky-500"
+          }
+        >
+          {typeof value === "string" ? `"${value}"` : String(value)}
+        </span>
+        <ArrowRight className="h-3 w-3 opacity-0 group-hover:opacity-60 ml-auto mr-2" />
+      </div>
+    );
+  }
+
+  const entries = isArray
+    ? (value as any[]).map((v, i) => [String(i), v] as const)
+    : Object.entries(value as Record<string, any>);
+
+  return (
+    <div>
+      <div
+        className="flex items-center gap-1 py-0.5 cursor-pointer hover:bg-muted/60 rounded"
+        style={{ paddingLeft: `${depth * 0.75}rem` }}
+        onClick={() => setOpen((o) => !o)}
+      >
+        {open ? <ChevronDown className="h-3 w-3" /> : <ChevronRight className="h-3 w-3" />}
+        <span className="text-foreground/80">{name}</span>
+        <span className="text-muted-foreground ml-1">
+          {isArray ? `[${entries.length}]` : `{${entries.length}}`}
+        </span>
+        {!isRoot && (
+          <button
+            type="button"
+            className="ml-auto mr-2 text-[10px] text-muted-foreground hover:text-foreground opacity-0 group-hover:opacity-100"
+            onClick={(e) => {
+              e.stopPropagation();
+              copyPath(path);
+            }}
+          >
+            copiar
+          </button>
+        )}
+      </div>
+      {open && (
+        <div>
+          {entries.map(([k, v]) => {
+            const childPath = isArray ? `${path}[${k}]` : `${path}.${k}`;
+            return (
+              <TreeNode
+                key={k}
+                name={k}
+                value={v}
+                path={childPath}
+                depth={depth + 1}
+              />
+            );
+          })}
+        </div>
+      )}
+    </div>
   );
 };
