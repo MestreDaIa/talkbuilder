@@ -316,6 +316,20 @@ class FlowEngine {
         }
         break;
       }
+      case "webhook": {
+        const varName = normalizeVariableName(cfg.responseVariable || "webhookData");
+        if (varName && inputPayload) {
+          // Salva o payload completo na variável (body, headers, query, etc)
+          this.variables[varName] = inputPayload;
+          console.log(`[FlowEngine] Webhook data saved to "${varName}"`);
+        }
+        this.currentNodeId = this.nextFromNode(node.id, container);
+        break;
+      }
+      case "http-request": {
+        await this.executeHttpRequest(node, container);
+        break;
+      }
       default: {
         console.log(`[FlowEngine] Generic node execution for ${type}`);
         this.currentNodeId = this.nextFromNode(node.id, container);
