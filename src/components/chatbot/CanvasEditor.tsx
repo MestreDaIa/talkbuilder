@@ -35,7 +35,7 @@ import { ScrollArea } from "@/components/ui/scroll-area";
 
 interface CanvasEditorProps {
   containers: Container[];
-  onContainersChange: (containers: Container[]) => void;
+  onContainersChange: React.Dispatch<React.SetStateAction<Container[]>>;
   onTest: (container: Container) => void;
   onEdgesChange?: (edges: Edge[]) => void;
   edges?: Edge[];
@@ -66,7 +66,7 @@ const CanvasContent = ({
   onGetCenterPosition 
 }: {
   containers: Container[];
-  onContainersChange: (containers: Container[]) => void;
+  onContainersChange: React.Dispatch<React.SetStateAction<Container[]>>;
   onTest: (container: Container) => void;
   onEdgesChangeProp?: (edges: Edge[]) => void;
   propEdges: Edge[];
