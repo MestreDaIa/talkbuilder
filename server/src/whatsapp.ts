@@ -178,9 +178,9 @@ export async function handleWhatsAppWebhook(payload: any, query?: any, requestMe
           for (const msg of resumeResult.messages) {
             if (!msg.content) continue;
             if (resumeResult.buttons && resumeResult.buttons.length > 0) {
-              await evolutionApi.sendButtons(instanceName, remoteJid, msg.content, resumeResult.buttons);
+              await evolutionApi.sendButtons(instanceName, remoteJid, msg.content, resumeResult.buttons, currentApiKey);
             } else {
-              await evolutionApi.sendText(instanceName, remoteJid, msg.content);
+              await evolutionApi.sendText(instanceName, remoteJid, msg.content, currentApiKey);
             }
           }
         }
