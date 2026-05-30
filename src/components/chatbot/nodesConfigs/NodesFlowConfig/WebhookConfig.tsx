@@ -10,7 +10,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
+import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Copy, Check, Radio, Square, ChevronRight, ChevronDown, ArrowRight } from "lucide-react";
 import { toast } from "sonner";
 import { SkillConfig } from "../SkillConfig";
