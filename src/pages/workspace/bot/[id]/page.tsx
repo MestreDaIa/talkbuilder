@@ -127,9 +127,15 @@ function BotEditorInner({
 
     const timer = setTimeout(async () => {
       try {
+        // Log detalhado para depuração
+        const webhookNodes = containers
+          .flatMap((c: any) => c.nodes)
+          .filter((n: any) => n.type === 'webhook');
+        
         console.log("[BotPage] Auto-salvando rascunho...", {
           containersCount: containers.length,
-          edgesCount: edges.length
+          edgesCount: edges.length,
+          webhookNodesConfigs: webhookNodes.map((n: any) => ({ id: n.id, config: n.config }))
         });
         
         await saveDraft(flow.id, containers, edges);
