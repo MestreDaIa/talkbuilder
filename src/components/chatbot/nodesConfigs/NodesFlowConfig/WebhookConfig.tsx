@@ -44,6 +44,8 @@ interface WebhookConfigProps {
     allowedOrigins?: string;
     lastTestPayload?: CapturedRequest | null;
     urlMode?: "test" | "production";
+    isSkill?: boolean;
+    skillDescription?: string;
   };
   setConfig: (config: WebhookConfigProps["config"]) => void;
 }
@@ -67,21 +69,51 @@ const getBaseUrl = () => {
 
 
 export const WebhookConfig = ({ config, setConfig }: WebhookConfigProps) => {
-  const [baseUrl, setBaseUrl] = useState(config.baseUrl || getBaseUrl());
-  const [method, setMethod] = useState(config.method || "POST");
-  const [path, setPath] = useState(config.path || "");
-  const [authentication, setAuthentication] = useState(config.authentication || "none");
-  const [authCredentials, setAuthCredentials] = useState(config.authCredentials || {});
-  const [respondMode, setRespondMode] = useState(config.respondMode || "immediately");
-  const [responseCode, setResponseCode] = useState(config.responseCode || 200);
-  const [responseData, setResponseData] = useState(config.responseData || "all");
-  const [responseVariable, setResponseVariable] = useState(config.responseVariable || "webhookData");
-  const [allowedOrigins, setAllowedOrigins] = useState(config.allowedOrigins || "*");
-  const [lastTestPayload, setLastTestPayload] = useState<CapturedRequest | null>(
-    config.lastTestPayload || null
-  );
-  const [urlMode, setUrlMode] = useState<"test" | "production">(config.urlMode || "test");
+  // Inicializamos o estado local diretamente do config recebido
+  const [baseUrl, setBaseUrl] = useState(() => config.baseUrl || getBaseUrl());
+  const [method, setMethod] = useState(() => config.method || "POST");
+  const [path, setPath] = useState(() => config.path || "");
+  const [authentication, setAuthentication] = useState(() => config.authentication || "none");
+  const [authCredentials, setAuthCredentials] = useState(() => config.authCredentials || {});
+  const [respondMode, setRespondMode] = useState(() => config.respondMode || "immediately");
+  const [responseCode, setResponseCode] = useState(() => config.responseCode || 200);
+  const [responseData, setResponseData] = useState(() => config.responseData || "all");
+  const [responseVariable, setResponseVariable] = useState(() => config.responseVariable || "webhookData");
+  const [allowedOrigins, setAllowedOrigins] = useState(() => config.allowedOrigins || "*");
+  const [lastTestPayload, setLastTestPayload] = useState<CapturedRequest | null>(() => config.lastTestPayload || null);
+  const [urlMode, setUrlMode] = useState<"test" | "production">(() => config.urlMode || "test");
   
+  // Refs para rastrear valores atuais e evitar loops
+  const isUpdatingRef = useRef(false);
+
+  // Sincroniza props -> estado local (APENAS se o config mudar externamente)
+  useEffect(() => {
+    if (isUpdatingRef.current) return;
+    
+    setBaseUrl(config.baseUrl || getBaseUrl());
+    setMethod(config.method || "POST");
+    setPath(config.path || "");
+    setAuthentication(config.authentication || "none");
+    setAuthCredentials(config.authCredentials || {});
+    setRespondMode(config.respondMode || "immediately");
+    setResponseCode(config.responseCode || 200);
+    setResponseData(config.responseData || "all");
+    setResponseVariable(config.responseVariable || "webhookData");
+    setAllowedOrigins(config.allowedOrigins || "*");
+    setLastTestPayload(config.lastTestPayload || null);
+    setUrlMode(config.urlMode || "test");
+  }, [config]);
+
+  // Função centralizada de atualização
+  const updateMainConfig = (updates: Partial<WebhookConfigProps["config"]>) => {
+    isUpdatingRef.current = true;
+    setConfig({ ...config, ...updates });
+    // Pequeno timeout para resetar a flag após o ciclo de renderização
+    setTimeout(() => {
+      isUpdatingRef.current = false;
+    }, 100);
+  };
+
   const [capturedEvents, setCapturedEvents] = useState<CapturedRequest[]>(
     config.lastTestPayload ? [config.lastTestPayload] : []
   );
@@ -90,76 +122,6 @@ export const WebhookConfig = ({ config, setConfig }: WebhookConfigProps) => {
   const [copied, setCopied] = useState(false);
   const [listening, setListening] = useState(false);
   const pollRef = useRef<number | null>(null);
-
-  // Sincroniza props -> estado local (Standard reactivity)
-  useEffect(() => {
-    if (config.baseUrl !== undefined) setBaseUrl(config.baseUrl);
-    if (config.method !== undefined) setMethod(config.method);
-    if (config.path !== undefined) setPath(config.path);
-    if (config.authentication !== undefined) setAuthentication(config.authentication);
-    if (config.authCredentials !== undefined) setAuthCredentials(config.authCredentials);
-    if (config.respondMode !== undefined) setRespondMode(config.respondMode);
-    if (config.responseCode !== undefined) setResponseCode(config.responseCode);
-    if (config.responseData !== undefined) setResponseData(config.responseData);
-    if (config.responseVariable !== undefined) setResponseVariable(config.responseVariable);
-    if (config.allowedOrigins !== undefined) setAllowedOrigins(config.allowedOrigins);
-    if (config.lastTestPayload !== undefined) setLastTestPayload(config.lastTestPayload);
-    if (config.urlMode !== undefined) setUrlMode(config.urlMode);
-  }, [
-    config.baseUrl,
-    config.method,
-    config.path,
-    config.authentication,
-    config.authCredentials,
-    config.respondMode,
-    config.responseCode,
-    config.responseData,
-    config.responseVariable,
-    config.allowedOrigins,
-    config.lastTestPayload,
-    config.urlMode
-  ]);
-
-  // Sincroniza estado local -> props (Auto-save/Draft sync)
-  useLayoutEffect(() => {
-    const newConfig = {
-      baseUrl,
-      method,
-      path,
-      authentication,
-      authCredentials,
-      respondMode,
-      responseCode,
-      responseData,
-      responseVariable,
-      allowedOrigins,
-      lastTestPayload,
-      urlMode,
-    };
-
-    const hasChanged = Object.entries(newConfig).some(
-      ([key, value]) => JSON.stringify(value) !== JSON.stringify((config as any)[key])
-    );
-    
-    if (hasChanged) {
-      setConfig({ ...config, ...newConfig });
-    }
-  }, [
-    baseUrl,
-    method,
-    path,
-    authentication,
-    authCredentials,
-    respondMode,
-    responseCode,
-    responseData,
-    responseVariable,
-    allowedOrigins,
-    lastTestPayload,
-    urlMode,
-    // config e setConfig omitidos das dependências aqui para evitar loops, 
-    // confiamos nos estados locais para disparar o sync.
-  ]);
 
   const cleanedPath = (path || "meu-webhook").replace(/^\/+|\/+$/g, "");
   const serverOrigin = (() => {
@@ -215,7 +177,9 @@ export const WebhookConfig = ({ config, setConfig }: WebhookConfigProps) => {
             sinceRef.current = data.total ?? sinceRef.current + events.length;
             setCapturedEvents((prev) => {
               const next = [...prev, ...events];
-              setLastTestPayload(next[next.length - 1] || null);
+              const last = next[next.length - 1] || null;
+              setLastTestPayload(last);
+              updateMainConfig({ lastTestPayload: last });
               return next;
             });
           }
@@ -242,7 +206,11 @@ export const WebhookConfig = ({ config, setConfig }: WebhookConfigProps) => {
           <h4 className="text-xs font-semibold uppercase tracking-wider text-muted-foreground mb-2">
             Webhook URLs
           </h4>
-          <Tabs value={urlMode} onValueChange={(v) => setUrlMode(v as "test" | "production")}>
+          <Tabs value={urlMode} onValueChange={(v) => {
+            const val = v as "test" | "production";
+            setUrlMode(val);
+            updateMainConfig({ urlMode: val });
+          }}>
             <TabsList className="grid grid-cols-2 w-full">
               <TabsTrigger value="test">Test URL</TabsTrigger>
               <TabsTrigger value="production">Production</TabsTrigger>
@@ -309,7 +277,10 @@ export const WebhookConfig = ({ config, setConfig }: WebhookConfigProps) => {
           <Label className="text-xs">Base URL da API</Label>
           <Input 
             value={baseUrl} 
-            onChange={(e) => setBaseUrl(e.target.value)} 
+            onChange={(e) => {
+              setBaseUrl(e.target.value);
+              updateMainConfig({ baseUrl: e.target.value });
+            }} 
             placeholder="https://sua-api.com" 
           />
         </div>
@@ -317,7 +288,10 @@ export const WebhookConfig = ({ config, setConfig }: WebhookConfigProps) => {
         <div className="grid grid-cols-2 gap-3">
           <div className="space-y-1.5">
             <Label className="text-xs">Método HTTP</Label>
-            <Select value={method} onValueChange={setMethod}>
+            <Select value={method} onValueChange={(v) => {
+              setMethod(v);
+              updateMainConfig({ method: v });
+            }}>
               <SelectTrigger><SelectValue /></SelectTrigger>
               <SelectContent>
                 <SelectItem value="GET">GET</SelectItem>
@@ -330,13 +304,19 @@ export const WebhookConfig = ({ config, setConfig }: WebhookConfigProps) => {
           </div>
           <div className="space-y-1.5">
             <Label className="text-xs">Caminho (Path)</Label>
-            <Input value={path} onChange={(e) => setPath(e.target.value)} placeholder="meu-webhook" />
+            <Input value={path} onChange={(e) => {
+              setPath(e.target.value);
+              updateMainConfig({ path: e.target.value });
+            }} placeholder="meu-webhook" />
           </div>
         </div>
 
         <div className="space-y-1.5">
           <Label className="text-xs">Autenticação</Label>
-          <Select value={authentication} onValueChange={setAuthentication}>
+          <Select value={authentication} onValueChange={(v) => {
+            setAuthentication(v);
+            updateMainConfig({ authentication: v });
+          }}>
             <SelectTrigger><SelectValue /></SelectTrigger>
             <SelectContent>
               <SelectItem value="none">Nenhuma</SelectItem>
@@ -352,7 +332,11 @@ export const WebhookConfig = ({ config, setConfig }: WebhookConfigProps) => {
               <Label className="text-xs">Usuário</Label>
               <Input
                 value={authCredentials.username || ""}
-                onChange={(e) => setAuthCredentials({ ...authCredentials, username: e.target.value })}
+                onChange={(e) => {
+                  const creds = { ...authCredentials, username: e.target.value };
+                  setAuthCredentials(creds);
+                  updateMainConfig({ authCredentials: creds });
+                }}
               />
             </div>
             <div className="space-y-1.5">
@@ -360,7 +344,11 @@ export const WebhookConfig = ({ config, setConfig }: WebhookConfigProps) => {
               <Input
                 type="password"
                 value={authCredentials.password || ""}
-                onChange={(e) => setAuthCredentials({ ...authCredentials, password: e.target.value })}
+                onChange={(e) => {
+                  const creds = { ...authCredentials, password: e.target.value };
+                  setAuthCredentials(creds);
+                  updateMainConfig({ authCredentials: creds });
+                }}
               />
             </div>
           </div>
@@ -372,7 +360,11 @@ export const WebhookConfig = ({ config, setConfig }: WebhookConfigProps) => {
               <Label className="text-xs">Nome do Header</Label>
               <Input
                 value={authCredentials.headerName || ""}
-                onChange={(e) => setAuthCredentials({ ...authCredentials, headerName: e.target.value })}
+                onChange={(e) => {
+                  const creds = { ...authCredentials, headerName: e.target.value };
+                  setAuthCredentials(creds);
+                  updateMainConfig({ authCredentials: creds });
+                }}
                 placeholder="X-API-Key"
               />
             </div>
@@ -381,7 +373,11 @@ export const WebhookConfig = ({ config, setConfig }: WebhookConfigProps) => {
               <Input
                 type="password"
                 value={authCredentials.headerValue || ""}
-                onChange={(e) => setAuthCredentials({ ...authCredentials, headerValue: e.target.value })}
+                onChange={(e) => {
+                  const creds = { ...authCredentials, headerValue: e.target.value };
+                  setAuthCredentials(creds);
+                  updateMainConfig({ authCredentials: creds });
+                }}
               />
             </div>
           </div>
@@ -390,7 +386,10 @@ export const WebhookConfig = ({ config, setConfig }: WebhookConfigProps) => {
         <div className="grid grid-cols-2 gap-3">
           <div className="space-y-1.5">
             <Label className="text-xs">Modo de Resposta</Label>
-            <Select value={respondMode} onValueChange={setRespondMode}>
+            <Select value={respondMode} onValueChange={(v) => {
+              setRespondMode(v);
+              updateMainConfig({ respondMode: v });
+            }}>
               <SelectTrigger><SelectValue /></SelectTrigger>
               <SelectContent>
                 <SelectItem value="immediately">Imediatamente</SelectItem>
@@ -400,7 +399,11 @@ export const WebhookConfig = ({ config, setConfig }: WebhookConfigProps) => {
           </div>
           <div className="space-y-1.5">
             <Label className="text-xs">Código de Resposta</Label>
-            <Select value={String(responseCode)} onValueChange={(v) => setResponseCode(Number(v))}>
+            <Select value={String(responseCode)} onValueChange={(v) => {
+              const val = Number(v);
+              setResponseCode(val);
+              updateMainConfig({ responseCode: val });
+            }}>
               <SelectTrigger><SelectValue /></SelectTrigger>
               <SelectContent>
                 <SelectItem value="200">200 OK</SelectItem>
@@ -415,7 +418,10 @@ export const WebhookConfig = ({ config, setConfig }: WebhookConfigProps) => {
           <Label className="text-xs">Salvar dados em variável</Label>
           <Input
             value={responseVariable}
-            onChange={(e) => setResponseVariable(e.target.value)}
+            onChange={(e) => {
+              setResponseVariable(e.target.value);
+              updateMainConfig({ responseVariable: e.target.value });
+            }}
             placeholder="webhookData"
           />
         </div>
@@ -424,7 +430,10 @@ export const WebhookConfig = ({ config, setConfig }: WebhookConfigProps) => {
           <Label className="text-xs">Origens Permitidas (CORS)</Label>
           <Input
             value={allowedOrigins}
-            onChange={(e) => setAllowedOrigins(e.target.value)}
+            onChange={(e) => {
+              setAllowedOrigins(e.target.value);
+              updateMainConfig({ allowedOrigins: e.target.value });
+            }}
             placeholder="* ou https://meusite.com"
           />
         </div>
