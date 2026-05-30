@@ -54,11 +54,9 @@ const getBaseUrl = () => {
 
   const runtimeUrl = import.meta.env.VITE_CHATBOT_RUNTIME_URL as string | undefined;
   if (runtimeUrl) {
-    // Se a runtime URL termina com /runtime, removemos para pegar a base do servidor
     return runtimeUrl.replace(/\/runtime$/, "");
   }
   
-  // Se estivermos no navegador e não houver backend URL, usamos o origin atual
   if (typeof window !== "undefined") {
     return window.location.origin;
   }
@@ -82,22 +80,48 @@ export const WebhookConfig = ({ config, setConfig }: WebhookConfigProps) => {
   const [lastTestPayload, setLastTestPayload] = useState<CapturedRequest | null>(
     config.lastTestPayload || null
   );
+  const [urlMode, setUrlMode] = useState<"test" | "production">(config.urlMode || "test");
+  
   const [capturedEvents, setCapturedEvents] = useState<CapturedRequest[]>(
     config.lastTestPayload ? [config.lastTestPayload] : []
   );
   const [selectedEventIdx, setSelectedEventIdx] = useState<number>(0);
   const sinceRef = useRef(0);
-
-
-  const [urlMode, setUrlMode] = useState<"test" | "production">(config.urlMode || "test");
   const [copied, setCopied] = useState(false);
   const [listening, setListening] = useState(false);
   const pollRef = useRef<number | null>(null);
 
+  // Sincroniza props -> estado local (Standard reactivity)
+  useEffect(() => {
+    if (config.baseUrl !== undefined) setBaseUrl(config.baseUrl);
+    if (config.method !== undefined) setMethod(config.method);
+    if (config.path !== undefined) setPath(config.path);
+    if (config.authentication !== undefined) setAuthentication(config.authentication);
+    if (config.authCredentials !== undefined) setAuthCredentials(config.authCredentials);
+    if (config.respondMode !== undefined) setRespondMode(config.respondMode);
+    if (config.responseCode !== undefined) setResponseCode(config.responseCode);
+    if (config.responseData !== undefined) setResponseData(config.responseData);
+    if (config.responseVariable !== undefined) setResponseVariable(config.responseVariable);
+    if (config.allowedOrigins !== undefined) setAllowedOrigins(config.allowedOrigins);
+    if (config.lastTestPayload !== undefined) setLastTestPayload(config.lastTestPayload);
+    if (config.urlMode !== undefined) setUrlMode(config.urlMode);
+  }, [
+    config.baseUrl,
+    config.method,
+    config.path,
+    config.authentication,
+    config.authCredentials,
+    config.respondMode,
+    config.responseCode,
+    config.responseData,
+    config.responseVariable,
+    config.allowedOrigins,
+    config.lastTestPayload,
+    config.urlMode
+  ]);
+
+  // Sincroniza estado local -> props (Auto-save/Draft sync)
   useLayoutEffect(() => {
-    // Mantém o rascunho do diálogo sempre sincronizado com o formulário do Webhook.
-    // Usamos layout effect para o último campo digitado já estar no config antes
-    // do usuário clicar em "Salvar" no modal.
     const newConfig = {
       baseUrl,
       method,
@@ -133,14 +157,11 @@ export const WebhookConfig = ({ config, setConfig }: WebhookConfigProps) => {
     allowedOrigins,
     lastTestPayload,
     urlMode,
-    config,
-    setConfig
+    // config e setConfig omitidos das dependências aqui para evitar loops, 
+    // confiamos nos estados locais para disparar o sync.
   ]);
 
   const cleanedPath = (path || "meu-webhook").replace(/^\/+|\/+$/g, "");
-  // Origem do servidor (sem path) — usada para as rotas internas de captura/teste,
-  // que ficam na raiz (ex: /webhook-test/...). Permite o usuário deixar "/webhook"
-  // no final da Base URL sem quebrar o Listen.
   const serverOrigin = (() => {
     try {
       const u = new URL(baseUrl);
@@ -151,11 +172,8 @@ export const WebhookConfig = ({ config, setConfig }: WebhookConfigProps) => {
   })();
   const testUrl = `${serverOrigin}/webhook-test/${cleanedPath}`;
   const captureUrl = `${serverOrigin}/webhook-capture/${cleanedPath}`;
-  // Production URL = Base URL + path exatamente como o usuário configurou.
-  // Para Evolution use: Base URL = https://api-flowbuilder.zailom.com/webhook  e Path = whatsapp
   const productionUrl = `${(baseUrl || "").replace(/\/+$/, "")}/${cleanedPath}`;
   const displayedUrl = urlMode === "test" ? testUrl : productionUrl;
-
 
   const handleCopyUrl = () => {
     navigator.clipboard.writeText(displayedUrl);
@@ -164,7 +182,6 @@ export const WebhookConfig = ({ config, setConfig }: WebhookConfigProps) => {
     setTimeout(() => setCopied(false), 1500);
   };
 
-  // Polling lifecycle
   useEffect(() => {
     return () => {
       if (pollRef.current) window.clearInterval(pollRef.current);
@@ -181,12 +198,9 @@ export const WebhookConfig = ({ config, setConfig }: WebhookConfigProps) => {
       description: `Envie uma requisição para a Test URL. Vários eventos serão acumulados abaixo.`,
     });
 
-    // Clear any previous capture so we only see fresh ones
     try {
       await fetch(captureUrl, { method: "DELETE" });
-    } catch {
-      /* ignore */
-    }
+    } catch { /* ignore */ }
     sinceRef.current = 0;
     setCapturedEvents([]);
     setSelectedEventIdx(0);
@@ -201,17 +215,13 @@ export const WebhookConfig = ({ config, setConfig }: WebhookConfigProps) => {
             sinceRef.current = data.total ?? sinceRef.current + events.length;
             setCapturedEvents((prev) => {
               const next = [...prev, ...events];
-              // mantém o último como "payload principal" para compatibilidade
               setLastTestPayload(next[next.length - 1] || null);
               return next;
             });
           }
         }
-      } catch {
-        /* ignore */
-      }
+      } catch { /* ignore */ }
     };
-
     pollRef.current = window.setInterval(poll, 1000);
   };
 
@@ -223,30 +233,10 @@ export const WebhookConfig = ({ config, setConfig }: WebhookConfigProps) => {
     setListening(false);
   };
 
-  const clearCapture = async () => {
-    try {
-      await fetch(captureUrl, { method: "DELETE" });
-    } catch {
-      /* ignore */
-    }
-    sinceRef.current = 0;
-    setCapturedEvents([]);
-    setLastTestPayload(null);
-    setSelectedEventIdx(0);
-    toast.success("Captura limpa");
-  };
-
-  // Detecta o nome do evento (Evolution usa body.event)
-  const getEventLabel = (e: CapturedRequest) => {
-    const ev = (e?.body as any)?.event;
-    return typeof ev === "string" ? ev : `${e.method}`;
-  };
-
   const currentEvent = capturedEvents[selectedEventIdx] || lastTestPayload;
 
   return (
     <div className="grid grid-cols-1 lg:grid-cols-[260px_1fr_1fr] gap-0 min-h-[60vh]">
-      {/* ============ LEFT: Webhook URLs ============ */}
       <aside className="border-r border-border bg-muted/30 p-4 space-y-4">
         <div>
           <h4 className="text-xs font-semibold uppercase tracking-wider text-muted-foreground mb-2">
@@ -307,30 +297,9 @@ export const WebhookConfig = ({ config, setConfig }: WebhookConfigProps) => {
             2. Envie uma requisição {method} para a <strong>Test URL</strong>.<br />
             3. O payload aparecerá automaticamente no painel <strong>Output</strong>.
           </p>
-          
-          <div className="pt-2">
-            <Button
-              type="button"
-              variant="ghost"
-              size="sm"
-              className="w-full text-[10px] h-7"
-              onClick={() => {
-                const curl = `curl -X ${method} "${testUrl}" \\
-  -H "Content-Type: application/json" \\
-  -d '{"exemplo": "dados", "numero": 123}'`;
-                navigator.clipboard.writeText(curl);
-                toast.success("Exemplo CURL copiado!", {
-                  description: "Cole no seu terminal para testar."
-                });
-              }}
-            >
-              Copiar comando CURL p/ teste
-            </Button>
-          </div>
         </div>
       </aside>
 
-      {/* ============ MIDDLE: Parameters ============ */}
       <section className="p-5 space-y-4 border-r border-border overflow-y-auto">
         <h4 className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
           Parâmetros
@@ -343,13 +312,9 @@ export const WebhookConfig = ({ config, setConfig }: WebhookConfigProps) => {
             onChange={(e) => setBaseUrl(e.target.value)} 
             placeholder="https://sua-api.com" 
           />
-          <p className="text-[10px] text-muted-foreground">
-            A URL base onde o servidor está rodando. Por padrão usa o endereço atual.
-          </p>
         </div>
 
         <div className="grid grid-cols-2 gap-3">
-
           <div className="space-y-1.5">
             <Label className="text-xs">Método HTTP</Label>
             <Select value={method} onValueChange={setMethod}>
@@ -453,9 +418,6 @@ export const WebhookConfig = ({ config, setConfig }: WebhookConfigProps) => {
             onChange={(e) => setResponseVariable(e.target.value)}
             placeholder="webhookData"
           />
-          <p className="text-[11px] text-muted-foreground">
-            Use <code className="bg-muted px-1 rounded">{"{{" + responseVariable + ".body.campo}}"}</code> nos próximos nodes.
-          </p>
         </div>
 
         <div className="space-y-1.5">
@@ -470,188 +432,24 @@ export const WebhookConfig = ({ config, setConfig }: WebhookConfigProps) => {
         <SkillConfig config={config} setConfig={setConfig} />
       </section>
 
-      {/* ============ RIGHT: Output ============ */}
       <section className="bg-muted/20 overflow-hidden flex flex-col">
         <div className="px-4 py-3 border-b border-border flex items-center justify-between bg-background/40">
-          <div className="flex items-center gap-2">
-            <span className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
-              Output
-            </span>
-            {capturedEvents.length > 0 && (
-              <Badge variant="outline" className="text-[10px]">
-                {capturedEvents.length} evento{capturedEvents.length > 1 ? "s" : ""}
-              </Badge>
-            )}
-            {listening && (
-              <Badge className="text-[10px] bg-red-500/15 text-red-500 border-red-500/30">
-                <Radio className="h-2.5 w-2.5 mr-1 animate-pulse" /> ao vivo
-              </Badge>
-            )}
-          </div>
+          <span className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">Output</span>
           {capturedEvents.length > 0 && (
-            <Button type="button" variant="ghost" size="sm" onClick={clearCapture}>
-              Limpar
-            </Button>
+            <Badge variant="outline" className="text-[10px]">{capturedEvents.length} eventos</Badge>
           )}
         </div>
-
-        {capturedEvents.length > 0 && (
-          <div className="border-b border-border bg-background/30 max-h-40 overflow-y-auto">
-            {capturedEvents.map((e, i) => {
-              const active = i === selectedEventIdx;
-              const label = getEventLabel(e);
-              return (
-                <button
-                  key={i}
-                  type="button"
-                  onClick={() => setSelectedEventIdx(i)}
-                  className={`w-full text-left px-3 py-1.5 text-[11px] border-l-2 flex items-center justify-between gap-2 hover:bg-muted/60 ${
-                    active ? "border-primary bg-muted/60" : "border-transparent"
-                  }`}
-                >
-                  <span className="font-mono truncate">{label}</span>
-                  <span className="text-[10px] text-muted-foreground shrink-0">
-                    {new Date(e.receivedAt).toLocaleTimeString()}
-                  </span>
-                </button>
-              );
-            })}
-          </div>
-        )}
-
-        <div className="flex-1 overflow-y-auto p-3 text-[11px] font-mono">
-          {!currentEvent ? (
-            <div className="h-full flex items-center justify-center text-center text-muted-foreground px-6">
-              <div className="space-y-2">
-                <Radio className="h-8 w-8 mx-auto opacity-40" />
-                <p className="text-xs">
-                  Nenhum dado capturado ainda.
-                  <br />
-                  Clique em <strong>Listen for test event</strong> e dispare uma requisição para a Test URL.
-                </p>
-              </div>
-            </div>
+        <div className="flex-1 p-4 overflow-y-auto font-mono text-[11px]">
+          {currentEvent ? (
+            <pre className="whitespace-pre-wrap">{JSON.stringify(currentEvent, null, 2)}</pre>
           ) : (
-            <JsonTree value={currentEvent} rootName={responseVariable || "webhookData"} />
+            <div className="h-full flex flex-col items-center justify-center text-muted-foreground text-center">
+              <Radio className={`h-8 w-8 mb-2 ${listening ? "animate-pulse text-primary" : ""}`} />
+              <p>Aguardando evento...</p>
+            </div>
           )}
         </div>
       </section>
-    </div>
-  );
-};
-
-// =====================================================================
-// JSON tree viewer — click any leaf to copy its variable path
-// =====================================================================
-interface JsonTreeProps {
-  value: any;
-  rootName: string;
-}
-
-const JsonTree = ({ value, rootName }: JsonTreeProps) => {
-  return (
-    <div className="space-y-0.5">
-      <p className="text-[10px] text-muted-foreground mb-2 px-1">
-        Clique em qualquer campo para copiar o caminho da variável.
-      </p>
-      <TreeNode name={rootName} value={value} path={`{{${rootName}`} depth={0} isRoot />
-    </div>
-  );
-};
-
-const TreeNode = ({
-  name,
-  value,
-  path,
-  depth,
-  isRoot = false,
-}: {
-  name: string;
-  value: any;
-  path: string;
-  depth: number;
-  isRoot?: boolean;
-}) => {
-  const [open, setOpen] = useState(depth < 2);
-  const isObject = value !== null && typeof value === "object";
-  const isArray = Array.isArray(value);
-
-  const copyPath = (p: string) => {
-    const full = `${p}}}`;
-    navigator.clipboard.writeText(full);
-    toast.success("Variável copiada", { description: full });
-  };
-
-  if (!isObject) {
-    return (
-      <div
-        className="group flex items-start gap-2 pl-[calc(0.5rem*var(--d))] py-0.5 hover:bg-muted/60 rounded cursor-pointer"
-        style={{ ["--d" as any]: depth + 1 }}
-        onClick={() => copyPath(path)}
-        title="Copiar caminho"
-      >
-        <span className="text-foreground/80">{name}:</span>
-        <span
-          className={
-            typeof value === "string"
-              ? "text-emerald-500"
-              : typeof value === "number"
-              ? "text-amber-500"
-              : "text-sky-500"
-          }
-        >
-          {typeof value === "string" ? `"${value}"` : String(value)}
-        </span>
-        <ArrowRight className="h-3 w-3 opacity-0 group-hover:opacity-60 ml-auto mr-2" />
-      </div>
-    );
-  }
-
-  const entries = isArray
-    ? (value as any[]).map((v, i) => [String(i), v] as const)
-    : Object.entries(value as Record<string, any>);
-
-  return (
-    <div>
-      <div
-        className="flex items-center gap-1 py-0.5 cursor-pointer hover:bg-muted/60 rounded"
-        style={{ paddingLeft: `${depth * 0.75}rem` }}
-        onClick={() => setOpen((o) => !o)}
-      >
-        {open ? <ChevronDown className="h-3 w-3" /> : <ChevronRight className="h-3 w-3" />}
-        <span className="text-foreground/80">{name}</span>
-        <span className="text-muted-foreground ml-1">
-          {isArray ? `[${entries.length}]` : `{${entries.length}}`}
-        </span>
-        {!isRoot && (
-          <button
-            type="button"
-            className="ml-auto mr-2 text-[10px] text-muted-foreground hover:text-foreground opacity-0 group-hover:opacity-100"
-            onClick={(e) => {
-              e.stopPropagation();
-              copyPath(path);
-            }}
-          >
-            copiar
-          </button>
-        )}
-      </div>
-      {open && (
-        <div>
-          {entries.map(([k, v]) => {
-            const childPath = isArray ? `${path}[${k}]` : `${path}.${k}`;
-            return (
-              <TreeNode
-                key={k}
-                name={k}
-                value={v}
-                path={childPath}
-                depth={depth + 1}
-              />
-            );
-          })}
-        </div>
-      )}
     </div>
   );
 };
