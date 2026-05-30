@@ -95,9 +95,9 @@ app.post("/webhook/whatsapp*", async (req: Request, res: Response) => {
         params: {},
         body: req.body,
       };
-      webhookCaptures.set(sub, captured);
+      pushCapture(sub, captured);
       const base = sub.split("/")[0];
-      if (base && base !== sub) webhookCaptures.set(base, captured);
+      if (base && base !== sub) pushCapture(base, captured);
     } catch (e) {
       console.warn("[WEBHOOK] Falha ao capturar payload:", e);
     }
