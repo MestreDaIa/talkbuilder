@@ -163,8 +163,8 @@ export const WebhookConfig = ({ config, setConfig }: WebhookConfigProps) => {
       return;
     }
     setListening(true);
-    toast.info("Aguardando um evento de teste...", {
-      description: `Envie uma requisição para a Test URL.`,
+    toast.info("Escutando eventos...", {
+      description: `Envie uma requisição para a Test URL. Vários eventos serão acumulados abaixo.`,
     });
 
     // Clear any previous capture so we only see fresh ones
@@ -173,22 +173,32 @@ export const WebhookConfig = ({ config, setConfig }: WebhookConfigProps) => {
     } catch {
       /* ignore */
     }
+    sinceRef.current = 0;
+    setCapturedEvents([]);
+    setSelectedEventIdx(0);
 
     const poll = async () => {
       try {
-        const res = await fetch(captureUrl);
+        const res = await fetch(`${captureUrl}?since=${sinceRef.current}`);
         if (res.ok) {
-          const data = (await res.json()) as CapturedRequest;
-          setLastTestPayload(data);
-          stopListening();
-          toast.success("Evento de teste recebido!");
+          const data = await res.json();
+          const events: CapturedRequest[] = Array.isArray(data?.events) ? data.events : [];
+          if (events.length > 0) {
+            sinceRef.current = data.total ?? sinceRef.current + events.length;
+            setCapturedEvents((prev) => {
+              const next = [...prev, ...events];
+              // mantém o último como "payload principal" para compatibilidade
+              setLastTestPayload(next[next.length - 1] || null);
+              return next;
+            });
+          }
         }
       } catch {
         /* ignore */
       }
     };
 
-    pollRef.current = window.setInterval(poll, 1500);
+    pollRef.current = window.setInterval(poll, 1000);
   };
 
   const stopListening = () => {
@@ -199,10 +209,26 @@ export const WebhookConfig = ({ config, setConfig }: WebhookConfigProps) => {
     setListening(false);
   };
 
-  const clearCapture = () => {
+  const clearCapture = async () => {
+    try {
+      await fetch(captureUrl, { method: "DELETE" });
+    } catch {
+      /* ignore */
+    }
+    sinceRef.current = 0;
+    setCapturedEvents([]);
     setLastTestPayload(null);
+    setSelectedEventIdx(0);
     toast.success("Captura limpa");
   };
+
+  // Detecta o nome do evento (Evolution usa body.event)
+  const getEventLabel = (e: CapturedRequest) => {
+    const ev = (e?.body as any)?.event;
+    return typeof ev === "string" ? ev : `${e.method}`;
+  };
+
+  const currentEvent = capturedEvents[selectedEventIdx] || lastTestPayload;
 
   return (
     <div className="grid grid-cols-1 lg:grid-cols-[260px_1fr_1fr] gap-0 min-h-[60vh]">
