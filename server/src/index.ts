@@ -119,6 +119,16 @@ app.all("/webhook-test/*", (req: Request, res: Response) => {
   });
 });
 
+// Endpoint de Produção (Este seria o que o chatbot usa em execução real)
+app.all("/chatbot-webhook/*", (req: Request, res: Response) => {
+  const path = extractPath(req.path, "/chatbot-webhook");
+  console.log(`[WEBHOOK-PROD] Recebido em "${path}"`);
+  
+  // Aqui no futuro integraremos com o processamento do fluxo do chatbot
+  // Por enquanto apenas respondemos OK
+  res.json({ status: "ok", message: "Production webhook received" });
+});
+
 app.get("/webhook-capture/:path(*)", (req: Request, res: Response) => {
   const path = (req.params.path || "").replace(/^\/+/, "").replace(/\/+$/, "");
   const captured = webhookCaptures.get(path);
