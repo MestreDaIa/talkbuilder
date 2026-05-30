@@ -631,13 +631,16 @@ async function runFlow(execution: any, containersIn: any[], edgesIn: any[], inpu
         // Se o input contém os dados do webhook, salvamos na variável configurada.
         const varName = cfg.responseVariable || "webhookData";
         if (input && (input.body || input.headers || input.query)) {
-          variables[varName] = {
+          const webhookData = {
             body: input.body,
             headers: input.headers,
             query: input.query,
             method: input.method,
             receivedAt: input.receivedAt
           };
+          variables[varName] = webhookData;
+          variables["webhookData"] = webhookData;
+          variables["data"] = webhookData;
         }
         break;
       }
