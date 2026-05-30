@@ -710,9 +710,11 @@ async function runFlow(execution: any, containersIn: any[], edgesIn: any[], inpu
 
         let body: any = null;
         if (["POST", "PUT", "PATCH"].includes(method)) {
-          if (cfg.bodyType === "json" || !cfg.bodyType) {
-            const rawBody = typeof cfg.body === "string" ? cfg.body : JSON.stringify(cfg.body || {});
-            body = replaceVars(rawBody);
+          if (cfg.bodyType === "json" || !cfg.bodyType || cfg.bodyContentType === "json") {
+            const rawBody = cfg.bodyJson || cfg.body || "{}";
+            const processedBody = typeof rawBody === "string" ? rawBody : JSON.stringify(rawBody);
+            body = replaceVars(processedBody);
+            headers["Content-Type"] = "application/json";
           } else if (cfg.bodyType === "form-data") {
             // Simplificado para o runtime
             const params = new URLSearchParams();
@@ -742,8 +744,35 @@ async function runFlow(execution: any, containersIn: any[], edgesIn: any[], inpu
             responseData = responseText;
           }
 
-          if (cfg.saveVariable) {
-            variables[cfg.saveVariable] = responseData;
+          if (cfg.saveVariable || cfg.responseVariable) {
+            variables[cfg.saveVariable || cfg.responseVariable] = responseData;
+          }
+
+          // Suporte a múltiplos mapeamentos de resposta (Save in variable no builder)
+          if (cfg.responseMappings && Array.isArray(cfg.responseMappings)) {
+            const getValueByPath = (obj: any, path: string): any => {
+              if (!path) return obj;
+              const parts = path.split('.');
+              // Se o path começar com "data.", removemos o prefixo pois o builder costuma incluir
+              const remaining = (parts[0] === 'data') ? parts.slice(1) : parts;
+              
+              let current = obj;
+              for (const part of remaining) {
+                if (current === null || current === undefined || typeof current !== 'object') return undefined;
+                current = current[part];
+              }
+              return current;
+            };
+
+            cfg.responseMappings.forEach((mapping: any) => {
+              if (mapping.jsonPath && mapping.variableName) {
+                const val = getValueByPath(responseData, mapping.jsonPath);
+                if (val !== undefined) {
+                  variables[mapping.variableName] = val;
+                  console.log(`[runtime:http] salvando ${mapping.jsonPath} na variável ${mapping.variableName}`);
+                }
+              }
+            });
           }
           
           // Se tivermos handles de sucesso/erro
