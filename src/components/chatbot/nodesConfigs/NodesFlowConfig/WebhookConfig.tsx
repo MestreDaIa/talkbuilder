@@ -121,6 +121,7 @@ export const WebhookConfig = ({ config, setConfig }: WebhookConfigProps) => {
   const sinceRef = useRef(0);
   const [copied, setCopied] = useState(false);
   const [listening, setListening] = useState(false);
+  const [showClear, setShowClear] = useState(false);
   const pollRef = useRef<number | null>(null);
 
   const cleanedPath = (path || "meu-webhook").replace(/^\/+|\/+$/g, "");
