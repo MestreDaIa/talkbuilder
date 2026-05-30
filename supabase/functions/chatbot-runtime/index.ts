@@ -413,9 +413,13 @@ class FlowEngine {
 
   private getNestedValue(obj: any, path: string) {
     if (!path) return obj;
-    return path.split('.').reduce((prev, curr) => {
-      return prev ? prev[curr] : undefined;
-    }, obj);
+    const parts = String(path).split('.').filter(Boolean);
+    let current: any = obj;
+    for (const part of parts) {
+      if (current === null || current === undefined || typeof current !== 'object') return undefined;
+      current = current[part];
+    }
+    return current;
   }
 
   private replaceVars(text: string) {
@@ -459,7 +463,7 @@ class FlowEngine {
     const varName = normalizeVariableName(comp?.variableName);
     if (!varName) return false;
     
-    const actualRaw = this.variables[varName];
+    const actualRaw = this.getNestedValue(this.variables, varName);
     const actual = actualRaw == null ? "" : String(actualRaw).trim();
     const expected = this.replaceVars(String(comp?.value ?? "")).trim();
     const op = comp?.operator;

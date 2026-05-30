@@ -448,6 +448,7 @@ async function runFlow(execution: any, containersIn: any[], edgesIn: any[], inpu
       const value = getVarValue(k);
       return value === undefined ? `{{${k}}}` : stringifyVarValue(value);
     });
+  };
 
   const evaluateComparison = (comparison: any) => {
     const key = String(comparison?.variableName || "").trim().replace(/^{{\s*/, "").replace(/\s*}}$/, "");
@@ -474,7 +475,6 @@ async function runFlow(execution: any, containersIn: any[], edgesIn: any[], inpu
       }
       default: return false;
     }
-
   };
 
   const evaluateCondition = (condition: any) => {
