@@ -496,12 +496,41 @@ class FlowEngine {
       let aiReply = "";
 
       if (provider === "openai") {
+        const messages: any[] = [{ role: "system", content: systemPrompt }];
+        
+        if (cfg.visionEnabled) {
+          // Detect image URLs or base64 in userMessage or variables
+          const content: any[] = [{ type: "text", text: userMessage }];
+          
+          // Check if userMessage itself is a URL or base64
+          if (userMessage.startsWith("http") || userMessage.startsWith("data:image")) {
+             content.push({ type: "image_url", image_url: { url: userMessage } });
+          } else {
+            // Check all variables for potential images if vision is enabled
+            // Or look for specific common media variables
+            const mediaUrl = this.variables["mediaUrl"] || this.variables["media_url"] || this.variables["url"];
+            const base64 = this.variables["base64"] || this.variables["image_base64"];
+            
+            if (base64) {
+              const b64 = String(base64).startsWith("data:") ? base64 : `data:image/jpeg;base64,${base64}`;
+              content.push({ type: "image_url", image_url: { url: b64 } });
+            } else if (mediaUrl && String(mediaUrl).startsWith("http")) {
+              content.push({ type: "image_url", image_url: { url: mediaUrl } });
+            }
+          }
+          messages.push({ role: "user", content });
+        } else {
+          messages.push({ role: "user", content: userMessage });
+        }
+
         const res = await fetch("https://api.openai.com/v1/chat/completions", {
           method: "POST",
           headers: { "Authorization": `Bearer ${activeKey}`, "Content-Type": "application/json" },
           body: JSON.stringify({
-            model: cfg.model || "gpt-4o-mini",
-            messages: [{ role: "system", content: systemPrompt }, { role: "user", content: userMessage }],
+            model: cfg.model || (cfg.visionEnabled ? "gpt-4o-mini" : "gpt-4o-mini"),
+            messages: messages,
+            temperature: cfg.temperature ?? 0.7,
+            max_tokens: cfg.maxTokens ?? 1000,
           }),
         });
         if (res.ok) {
@@ -510,12 +539,46 @@ class FlowEngine {
         }
       } else if (provider === "google" || provider === "gemini") {
         const model = cfg.model || "gemini-2.0-flash";
+        
+        const contents: any[] = [];
+        const userParts: any[] = [{ text: userMessage }];
+
+        if (cfg.visionEnabled) {
+          const mediaUrl = this.variables["mediaUrl"] || this.variables["media_url"] || this.variables["url"];
+          const base64 = this.variables["base64"] || this.variables["image_base64"];
+
+          if (base64) {
+            const b64Data = String(base64).replace(/^data:image\/[a-z]+;base64,/, "");
+            userParts.push({ inline_data: { mime_type: "image/jpeg", data: b64Data } });
+          } else if (mediaUrl && String(mediaUrl).startsWith("http")) {
+            // Gemini doesn't support direct URLs in the same way as OpenAI for simple fetch
+            // usually you need to upload to Google Cloud Storage or send as base64
+            // For simplicity, let's try to fetch it if it's a URL and convert to base64
+            try {
+              const imgRes = await fetch(mediaUrl);
+              if (imgRes.ok) {
+                const arrayBuffer = await imgRes.arrayBuffer();
+                const b64 = btoa(String.fromCharCode(...new Uint8Array(arrayBuffer)));
+                userParts.push({ inline_data: { mime_type: imgRes.headers.get("content-type") || "image/jpeg", data: b64 } });
+              }
+            } catch (e) {
+              console.error("[Gemini:Vision] failed to fetch image", e);
+            }
+          }
+        }
+
+        contents.push({ role: "user", parts: userParts });
+
         const res = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${activeKey}`, {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({
             system_instruction: { parts: [{ text: systemPrompt }] },
-            contents: [{ parts: [{ text: userMessage }] }],
+            contents: contents,
+            generationConfig: {
+              temperature: cfg.temperature ?? 0.7,
+              maxOutputTokens: cfg.maxTokens ?? 1000,
+            }
           }),
         });
         if (res.ok) {
