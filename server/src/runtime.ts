@@ -471,6 +471,25 @@ async function runFlow(execution: any, containersIn: any[], edgesIn: any[], inpu
     if (input.mimetype) variables["mimetype"] = input.mimetype;
     if (input.mediaUrl) variables["mediaUrl"] = input.mediaUrl;
     if (input.base64) variables["base64"] = input.base64;
+
+    // Se houver dados de um webhook (payload), colocamos em webhookData
+    // para que {{webhookData.body.data.messageType}} funcione se o nó Webhook
+    // estiver configurado para salvar em 'webhookData' (padrão)
+    if (input.body || input.headers || input.query) {
+      // Procuramos se existe um nó Webhook no fluxo para saber o nome da variável
+      // mas como o usuário usou webhookData no exemplo, vamos garantir que esteja lá
+      // O nó Webhook por padrão salva em variables[cfg.responseVariable || "webhookData"]
+      const webhookData = {
+        body: input.body,
+        headers: input.headers,
+        query: input.query,
+        method: input.method,
+        receivedAt: input.receivedAt
+      };
+      
+      // Salva tanto no padrão quanto em variáveis específicas se o input veio de um webhook
+      variables["webhookData"] = webhookData;
+    }
   }
 
   let inputConsumed = false;
@@ -586,6 +605,22 @@ async function runFlow(execution: any, containersIn: any[], edgesIn: any[], inpu
       case "bubble-number": {
         const text = replaceVars(cfg.message || cfg.content || cfg.text || cfg.number || "");
         if (text) messages.push({ id: crypto.randomUUID(), type: "bot", content: text });
+        break;
+      }
+      case "webhook": {
+        // O nó Webhook é um nó de entrada/gatilho. 
+        // Se chegamos aqui durante a execução, significa que o fluxo passou por ele.
+        // Se o input contém os dados do webhook, salvamos na variável configurada.
+        const varName = cfg.responseVariable || "webhookData";
+        if (input && (input.body || input.headers || input.query)) {
+          variables[varName] = {
+            body: input.body,
+            headers: input.headers,
+            query: input.query,
+            method: input.method,
+            receivedAt: input.receivedAt
+          };
+        }
         break;
       }
       case "bubble-image": {

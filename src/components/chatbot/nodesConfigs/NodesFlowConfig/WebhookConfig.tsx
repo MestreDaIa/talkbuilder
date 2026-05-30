@@ -94,7 +94,9 @@ export const WebhookConfig = ({ config, setConfig }: WebhookConfigProps) => {
   const pollRef = useRef<number | null>(null);
 
   useEffect(() => {
-    setConfig({
+    // Only update config if something actually changed from the initial/current config
+    // to prevent unnecessary state updates in the parent canvas
+    const newConfig = {
       baseUrl,
       method,
       path,
@@ -106,9 +108,14 @@ export const WebhookConfig = ({ config, setConfig }: WebhookConfigProps) => {
       responseVariable,
       allowedOrigins,
       lastTestPayload,
-    });
+    };
 
-    // eslint-disable-next-line react-hooks/exhaustive-deps
+    // Deep comparison to avoid infinite loops if setConfig triggers a re-render
+    const hasChanged = JSON.stringify(newConfig) !== JSON.stringify(config);
+    
+    if (hasChanged) {
+      setConfig(newConfig);
+    }
   }, [
     baseUrl,
     method,
@@ -121,6 +128,8 @@ export const WebhookConfig = ({ config, setConfig }: WebhookConfigProps) => {
     responseVariable,
     allowedOrigins,
     lastTestPayload,
+    // config, // Do NOT include config here to avoid loops
+    setConfig
   ]);
 
   const cleanedPath = (path || "meu-webhook").replace(/^\/+|\/+$/g, "");
