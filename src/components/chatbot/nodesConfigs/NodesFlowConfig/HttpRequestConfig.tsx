@@ -1,4 +1,4 @@
-import { useState, useEffect, useMemo } from "react";
+import { useState, useEffect, useMemo, useCallback } from "react";
 import { Label } from "@/components/ui/label";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
@@ -12,15 +12,13 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { Plus, Trash2, Play, Loader2, ChevronDown, ChevronRight, Braces } from "lucide-react";
+import { Plus, Trash2, Play, Loader2, ChevronDown, ChevronRight, Braces, Info, AlertCircle } from "lucide-react";
 import { toast } from "sonner";
 import { useVariables } from "@/context/VariablesContext";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
-import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from "@/components/ui/command";
-import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { VariableModal } from "../../VariableModal";
-import { cn } from "@/lib/utils";
 import { SkillConfig } from "../SkillConfig";
+import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 
 interface KeyValuePair {
   name: string;
@@ -68,9 +66,9 @@ export const HttpRequestConfig = ({
   config,
   setConfig,
 }: HttpRequestConfigProps) => {
-  const { getAllVariableNames, addVariable } = useVariables();
+  const { getAllVariableNames, variables, replaceVariablesInText } = useVariables();
   
-  // Sincronização de estados locais
+  // Local state for UI
   const [method, setMethod] = useState(config.method || "GET");
   const [url, setUrl] = useState(config.url || "");
   const [authType, setAuthType] = useState(config.authType || "none");
@@ -83,10 +81,6 @@ export const HttpRequestConfig = ({
   const [bodyJson, setBodyJson] = useState(config.bodyJson || "{}");
   const [bodyRaw, setBodyRaw] = useState(config.bodyRaw || "");
   const [timeout, setTimeout_] = useState(config.timeout || 30000);
-  const [followRedirects, setFollowRedirects] = useState(config.followRedirects ?? true);
-  const [ignoreSSL, setIgnoreSSL] = useState(config.ignoreSSL ?? false);
-  const [responseVariable, setResponseVariable] = useState(config.responseVariable || "httpResponse");
-  const [responseFormat, setResponseFormat] = useState(config.responseFormat || "json");
   const [responseMappings, setResponseMappings] = useState<ResponseMapping[]>(config.responseMappings || []);
 
   const [isTesting, setIsTesting] = useState(false);
@@ -95,7 +89,15 @@ export const HttpRequestConfig = ({
   const [isSaveExpanded, setIsSaveExpanded] = useState(false);
   const [variableModalOpen, setVariableModalOpen] = useState<{ open: boolean; index: number }>({ open: false, index: -1 });
 
-  // Sincroniza estados locais se a config do pai mudar (ex: ao abrir o modal)
+  // Variables for testing (mocks)
+  const [testVariables, setTestVariables] = useState<Record<string, string>>({
+    messageId: "",
+    remoteJid: "5511999999999@s.whatsapp.net",
+    instanceName: "teste05",
+    apiKey: ""
+  });
+
+  // Sincroniza estados locais se a config do pai mudar
   useEffect(() => {
     setMethod(config.method || "GET");
     setUrl(config.url || "");
@@ -109,17 +111,11 @@ export const HttpRequestConfig = ({
     setBodyJson(config.bodyJson || "{}");
     setBodyRaw(config.bodyRaw || "");
     setTimeout_(config.timeout || 30000);
-    setFollowRedirects(config.followRedirects ?? true);
-    setIgnoreSSL(config.ignoreSSL ?? false);
-    setResponseVariable(config.responseVariable || "httpResponse");
-    setResponseFormat(config.responseFormat || "json");
     setResponseMappings(config.responseMappings || []);
   }, [config]);
 
-  // Helper para atualizar config e estado local
   const updateConfig = (updates: Partial<typeof config>) => {
-    const newConfig = { ...config, ...updates };
-    setConfig(newConfig);
+    setConfig({ ...config, ...updates });
   };
 
   const availableVariables = useMemo(() => getAllVariableNames(), [getAllVariableNames]);
@@ -140,54 +136,26 @@ export const HttpRequestConfig = ({
       }
     };
     traverse(lastJsonResponse);
-    return paths;
+    return [...new Set(paths)];
   }, [lastJsonResponse]);
 
-  const handleAddKeyValue = (
-    list: KeyValuePair[],
-    setList: (val: KeyValuePair[]) => void,
-    field: "queryParams" | "headers" | "bodyParams"
-  ) => {
+  const handleAddKeyValue = (list: KeyValuePair[], setList: any, field: string) => {
     const newList = [...list, { name: "", value: "" }];
     setList(newList);
     updateConfig({ [field]: newList });
   };
 
-  const handleRemoveKeyValue = (
-    index: number,
-    list: KeyValuePair[],
-    setList: (val: KeyValuePair[]) => void,
-    field: "queryParams" | "headers" | "bodyParams"
-  ) => {
+  const handleRemoveKeyValue = (index: number, list: KeyValuePair[], setList: any, field: string) => {
     const newList = list.filter((_, i) => i !== index);
     setList(newList);
     updateConfig({ [field]: newList });
   };
 
-  const handleKeyValueChange = (
-    index: number,
-    field: keyof KeyValuePair,
-    value: string,
-    list: KeyValuePair[],
-    setList: (val: KeyValuePair[]) => void,
-    configField: "queryParams" | "headers" | "bodyParams"
-  ) => {
+  const handleKeyValueChange = (index: number, field: string, value: string, list: KeyValuePair[], setList: any, configField: string) => {
     const updated = [...list];
     updated[index] = { ...updated[index], [field]: value };
     setList(updated);
     updateConfig({ [configField]: updated });
-  };
-
-  const handleAddResponseMapping = () => {
-    const newList = [...responseMappings, { jsonPath: "", variableName: "" }];
-    setResponseMappings(newList);
-    updateConfig({ responseMappings: newList });
-  };
-
-  const handleRemoveResponseMapping = (index: number) => {
-    const newList = responseMappings.filter((_, i) => i !== index);
-    setResponseMappings(newList);
-    updateConfig({ responseMappings: newList });
   };
 
   const handleResponseMappingChange = (index: number, field: keyof ResponseMapping, value: string) => {
@@ -206,43 +174,53 @@ export const HttpRequestConfig = ({
     setTestResult(null);
     setLastJsonResponse(null);
 
+    // Prepare variables for substitution (actual + mocks)
+    const varsForSubstitution = { ...variables, ...testVariables };
+    const replace = (text: string) => replaceVariablesInText(text, varsForSubstitution);
+
     try {
-      let fullUrl = url;
+      let fullUrl = replace(url);
+      
+      // Build query string
       if (queryParams.length > 0) {
         const params = new URLSearchParams();
-        queryParams.forEach((p) => { if (p.name) params.append(p.name, p.value); });
+        queryParams.forEach((p) => {
+          if (p.name) params.append(replace(p.name), replace(p.value));
+        });
         const qs = params.toString();
         if (qs) fullUrl += (fullUrl.includes("?") ? "&" : "?") + qs;
       }
 
       const reqHeaders: Record<string, string> = {};
-      headers.forEach((h) => { if (h.name) reqHeaders[h.name] = h.value; });
+      headers.forEach((h) => {
+        if (h.name) reqHeaders[replace(h.name)] = replace(h.value);
+      });
 
+      // Auth
       if (authType === "bearer" && authCredentials.token) {
-        reqHeaders["Authorization"] = `Bearer ${authCredentials.token}`;
+        reqHeaders["Authorization"] = `Bearer ${replace(authCredentials.token)}`;
       } else if (authType === "basic" && authCredentials.username) {
-        const encoded = btoa(`${authCredentials.username}:${authCredentials.password || ""}`);
-        reqHeaders["Authorization"] = `Basic ${encoded}`;
-      } else if (authType === "header" && authCredentials.headerName) {
-        reqHeaders[authCredentials.headerName] = authCredentials.headerValue || "";
+        const user = replace(authCredentials.username);
+        const pass = replace(authCredentials.password || "");
+        reqHeaders["Authorization"] = `Basic ${btoa(`${user}:${pass}`)}`;
       } else if (authType === "apiKey" && authCredentials.apiKeyName) {
-        if (authCredentials.apiKeyLocation === "header") {
-          reqHeaders[authCredentials.apiKeyName] = authCredentials.apiKeyValue || "";
-        }
+        const name = replace(authCredentials.apiKeyName);
+        const val = replace(authCredentials.apiKeyValue || "");
+        if (authCredentials.apiKeyLocation === "header") reqHeaders[name] = val;
       }
 
       let body: string | undefined;
-      if (sendBody && method !== "GET" && method !== "HEAD") {
+      if (sendBody && !["GET", "HEAD"].includes(method)) {
         if (bodyContentType === "json") {
           reqHeaders["Content-Type"] = "application/json";
-          body = bodyJson;
+          body = replace(bodyJson);
         } else if (bodyContentType === "form-urlencoded") {
           reqHeaders["Content-Type"] = "application/x-www-form-urlencoded";
           const params = new URLSearchParams();
-          bodyParams.forEach((p) => { if (p.name) params.append(p.name, p.value); });
+          bodyParams.forEach((p) => { if (p.name) params.append(replace(p.name), replace(p.value)); });
           body = params.toString();
         } else if (bodyContentType === "raw") {
-          body = bodyRaw;
+          body = replace(bodyRaw);
         }
       }
 
@@ -267,27 +245,29 @@ export const HttpRequestConfig = ({
 
   return (
     <div className="space-y-4 p-4">
+      {/* Informação sobre variáveis */}
+      <Alert className="bg-blue-50 border-blue-200">
+        <Info className="h-4 w-4 text-blue-500" />
+        <AlertTitle className="text-blue-700 text-xs">Variáveis no Teste</AlertTitle>
+        <AlertDescription className="text-blue-600 text-[10px]">
+          Use {"{{messageId}}"} ou outras variáveis. Preencha os valores de teste abaixo para validar a requisição agora.
+        </AlertDescription>
+      </Alert>
+
+      {/* URL & Method */}
       <div className="flex gap-2">
-        <div className="w-32">
-          <Select value={method} onValueChange={(val) => {
-            setMethod(val);
-            updateConfig({ method: val });
-          }}>
+        <div className="w-28 shrink-0">
+          <Select value={method} onValueChange={(v) => { setMethod(v); updateConfig({ method: v }); }}>
             <SelectTrigger><SelectValue /></SelectTrigger>
             <SelectContent>
-              {["GET", "POST", "PUT", "PATCH", "DELETE", "HEAD", "OPTIONS"].map(m => (
-                <SelectItem key={m} value={m}>{m}</SelectItem>
-              ))}
+              {["GET", "POST", "PUT", "PATCH", "DELETE", "HEAD"].map(m => <SelectItem key={m} value={m}>{m}</SelectItem>)}
             </SelectContent>
           </Select>
         </div>
         <Input
           className="flex-1"
           value={url}
-          onChange={(e) => {
-            setUrl(e.target.value);
-            updateConfig({ url: e.target.value });
-          }}
+          onChange={(e) => { setUrl(e.target.value); updateConfig({ url: e.target.value }); }}
           placeholder="https://api.exemplo.com/endpoint"
         />
         <Button variant="outline" onClick={handleTestRequest} disabled={isTesting}>
@@ -301,156 +281,140 @@ export const HttpRequestConfig = ({
           <TabsTrigger value="auth">Auth</TabsTrigger>
           <TabsTrigger value="headers">Headers</TabsTrigger>
           <TabsTrigger value="body">Body</TabsTrigger>
-          <TabsTrigger value="options">Opções</TabsTrigger>
+          <TabsTrigger value="test">Test Vars</TabsTrigger>
         </TabsList>
 
-        <TabsContent value="params" className="space-y-3">
+        <TabsContent value="params" className="space-y-3 pt-2">
           <div className="flex items-center justify-between">
-            <Label>Query Parameters</Label>
-            <Button variant="outline" size="sm" onClick={() => handleAddKeyValue(queryParams, setQueryParams, "queryParams")}>
-              <Plus className="h-4 w-4 mr-1" /> Adicionar
+            <Label className="text-xs">Query Parameters</Label>
+            <Button variant="outline" size="sm" className="h-7 text-xs" onClick={() => handleAddKeyValue(queryParams, setQueryParams, "queryParams")}>
+              <Plus className="h-3 w-3 mr-1" /> Adicionar
             </Button>
           </div>
-          <div className="space-y-2">
-            {queryParams.map((param, index) => (
-              <div key={index} className="flex items-center gap-2">
-                <Input value={param.name} placeholder="Nome" className="flex-1" onChange={(e) => handleKeyValueChange(index, "name", e.target.value, queryParams, setQueryParams, "queryParams")} />
-                <Input value={param.value} placeholder="Valor (suporta {{var}})" className="flex-1" onChange={(e) => handleKeyValueChange(index, "value", e.target.value, queryParams, setQueryParams, "queryParams")} />
-                <Button variant="ghost" size="icon" onClick={() => handleRemoveKeyValue(index, queryParams, setQueryParams, "queryParams")}>
-                  <Trash2 className="h-4 w-4 text-destructive" />
-                </Button>
-              </div>
-            ))}
-          </div>
+          {queryParams.map((param, index) => (
+            <div key={index} className="flex gap-2">
+              <Input value={param.name} placeholder="Nome" className="h-8 text-xs" onChange={(e) => handleKeyValueChange(index, "name", e.target.value, queryParams, setQueryParams, "queryParams")} />
+              <Input value={param.value} placeholder="Valor" className="h-8 text-xs" onChange={(e) => handleKeyValueChange(index, "value", e.target.value, queryParams, setQueryParams, "queryParams")} />
+              <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => handleRemoveKeyValue(index, queryParams, setQueryParams, "queryParams")}><Trash2 className="h-3 w-3 text-destructive" /></Button>
+            </div>
+          ))}
         </TabsContent>
 
-        <TabsContent value="auth" className="space-y-3">
-          <div className="space-y-2">
-            <Label>Tipo de Autenticação</Label>
-            <Select value={authType} onValueChange={(val) => { setAuthType(val); updateConfig({ authType: val }); }}>
-              <SelectTrigger><SelectValue /></SelectTrigger>
-              <SelectContent>
-                <SelectItem value="none">Nenhuma</SelectItem>
-                <SelectItem value="basic">Basic Auth</SelectItem>
-                <SelectItem value="bearer">Bearer Token</SelectItem>
-                <SelectItem value="header">Header Auth</SelectItem>
-                <SelectItem value="apiKey">API Key</SelectItem>
-              </SelectContent>
-            </Select>
-          </div>
+        <TabsContent value="auth" className="space-y-3 pt-2">
+          <Label className="text-xs">Tipo de Autenticação</Label>
+          <Select value={authType} onValueChange={(v) => { setAuthType(v); updateConfig({ authType: v }); }}>
+            <SelectTrigger className="h-8 text-xs"><SelectValue /></SelectTrigger>
+            <SelectContent>
+              {["none", "basic", "bearer", "apiKey"].map(t => <SelectItem key={t} value={t}>{t}</SelectItem>)}
+            </SelectContent>
+          </Select>
           {authType === "basic" && (
-            <div className="grid grid-cols-2 gap-4">
-              <div className="space-y-2">
-                <Label>Usuário</Label>
-                <Input value={authCredentials.username || ""} onChange={(e) => {
-                  const newAuth = { ...authCredentials, username: e.target.value };
-                  setAuthCredentials(newAuth); updateConfig({ authCredentials: newAuth });
-                }} />
-              </div>
-              <div className="space-y-2">
-                <Label>Senha</Label>
-                <Input type="password" value={authCredentials.password || ""} onChange={(e) => {
-                  const newAuth = { ...authCredentials, password: e.target.value };
-                  setAuthCredentials(newAuth); updateConfig({ authCredentials: newAuth });
-                }} />
-              </div>
-            </div>
-          )}
-          {authType === "bearer" && (
-            <div className="space-y-2">
-              <Label>Token</Label>
-              <Input type="password" value={authCredentials.token || ""} onChange={(e) => {
-                const newAuth = { ...authCredentials, token: e.target.value };
-                setAuthCredentials(newAuth); updateConfig({ authCredentials: newAuth });
+            <div className="grid grid-cols-2 gap-2">
+              <Input value={authCredentials.username || ""} placeholder="Usuário" className="h-8 text-xs" onChange={(e) => {
+                const creds = { ...authCredentials, username: e.target.value };
+                setAuthCredentials(creds); updateConfig({ authCredentials: creds });
+              }} />
+              <Input type="password" value={authCredentials.password || ""} placeholder="Senha" className="h-8 text-xs" onChange={(e) => {
+                const creds = { ...authCredentials, password: e.target.value };
+                setAuthCredentials(creds); updateConfig({ authCredentials: creds });
               }} />
             </div>
           )}
+          {authType === "bearer" && (
+            <Input type="password" value={authCredentials.token || ""} placeholder="Token" className="h-8 text-xs" onChange={(e) => {
+              const creds = { ...authCredentials, token: e.target.value };
+              setAuthCredentials(creds); updateConfig({ authCredentials: creds });
+            }} />
+          )}
         </TabsContent>
 
-        <TabsContent value="headers" className="space-y-3">
+        <TabsContent value="headers" className="space-y-3 pt-2">
           <div className="flex items-center justify-between">
-            <Label>Headers</Label>
-            <Button variant="outline" size="sm" onClick={() => handleAddKeyValue(headers, setHeaders, "headers")}>
-              <Plus className="h-4 w-4 mr-1" /> Adicionar
+            <Label className="text-xs">Headers</Label>
+            <Button variant="outline" size="sm" className="h-7 text-xs" onClick={() => handleAddKeyValue(headers, setHeaders, "headers")}>
+              <Plus className="h-3 w-3 mr-1" /> Adicionar
             </Button>
           </div>
-          <div className="space-y-2">
-            {headers.map((header, index) => (
-              <div key={index} className="flex items-center gap-2">
-                <Input value={header.name} placeholder="Nome" className="flex-1" onChange={(e) => handleKeyValueChange(index, "name", e.target.value, headers, setHeaders, "headers")} />
-                <Input value={header.value} placeholder="Valor" className="flex-1" onChange={(e) => handleKeyValueChange(index, "value", e.target.value, headers, setHeaders, "headers")} />
-                <Button variant="ghost" size="icon" onClick={() => handleRemoveKeyValue(index, headers, setHeaders, "headers")}>
-                  <Trash2 className="h-4 w-4 text-destructive" />
-                </Button>
-              </div>
-            ))}
-          </div>
+          {headers.map((h, index) => (
+            <div key={index} className="flex gap-2">
+              <Input value={h.name} placeholder="Nome" className="h-8 text-xs" onChange={(e) => handleKeyValueChange(index, "name", e.target.value, headers, setHeaders, "headers")} />
+              <Input value={h.value} placeholder="Valor" className="h-8 text-xs" onChange={(e) => handleKeyValueChange(index, "value", e.target.value, headers, setHeaders, "headers")} />
+              <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => handleRemoveKeyValue(index, headers, setHeaders, "headers")}><Trash2 className="h-3 w-3 text-destructive" /></Button>
+            </div>
+          ))}
         </TabsContent>
 
-        <TabsContent value="body" className="space-y-3">
+        <TabsContent value="body" className="space-y-3 pt-2">
           <div className="flex items-center space-x-2">
-            <Switch id="sendBody" checked={sendBody} onCheckedChange={(val) => { setSendBody(val); updateConfig({ sendBody: val }); }} />
-            <Label htmlFor="sendBody">Enviar Body</Label>
+            <Switch id="sendBody" checked={sendBody} onCheckedChange={(v) => { setSendBody(v); updateConfig({ sendBody: v }); }} />
+            <Label htmlFor="sendBody" className="text-xs">Enviar Body</Label>
           </div>
           {sendBody && (
             <>
-              <div className="space-y-2">
-                <Label>Tipo de Conteúdo</Label>
-                <Select value={bodyContentType} onValueChange={(val) => { setBodyContentType(val); updateConfig({ bodyContentType: val }); }}>
-                  <SelectTrigger><SelectValue /></SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="json">JSON</SelectItem>
-                    <SelectItem value="form-urlencoded">Form URL-encoded</SelectItem>
-                    <SelectItem value="raw">Raw</SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
-              {bodyContentType === "json" && (
-                <Textarea value={bodyJson} rows={5} className="font-mono text-sm" onChange={(e) => { setBodyJson(e.target.value); updateConfig({ bodyJson: e.target.value }); }} />
-              )}
-              {bodyContentType === "raw" && (
-                <Textarea value={bodyRaw} rows={5} className="font-mono text-sm" onChange={(e) => { setBodyRaw(e.target.value); updateConfig({ bodyRaw: e.target.value }); }} />
-              )}
+              <Select value={bodyContentType} onValueChange={(v) => { setBodyContentType(v); updateConfig({ bodyContentType: v }); }}>
+                <SelectTrigger className="h-8 text-xs"><SelectValue /></SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="json">JSON</SelectItem>
+                  <SelectItem value="form-urlencoded">Form URL-encoded</SelectItem>
+                  <SelectItem value="raw">Raw</SelectItem>
+                </SelectContent>
+              </Select>
+              {bodyContentType === "json" && <Textarea value={bodyJson} rows={4} className="font-mono text-xs" onChange={(e) => { setBodyJson(e.target.value); updateConfig({ bodyJson: e.target.value }); }} />}
+              {bodyContentType === "raw" && <Textarea value={bodyRaw} rows={4} className="font-mono text-xs" onChange={(e) => { setBodyRaw(e.target.value); updateConfig({ bodyRaw: e.target.value }); }} />}
             </>
           )}
         </TabsContent>
 
-        <TabsContent value="options" className="space-y-4">
+        <TabsContent value="test" className="space-y-3 pt-2">
+          <Label className="text-xs">Valores de Teste (Mocks)</Label>
           <div className="space-y-2">
-            <Label>Timeout (ms)</Label>
-            <Input type="number" value={timeout} onChange={(e) => { const v = Number(e.target.value); setTimeout_(v); updateConfig({ timeout: v }); }} />
+            {Object.entries(testVariables).map(([key, val]) => (
+              <div key={key} className="flex items-center gap-2">
+                <div className="w-24 text-[10px] font-mono text-muted-foreground">{key}</div>
+                <Input value={val} placeholder={`Valor para {{${key}}}`} className="h-7 text-[10px]" onChange={(e) => setTestVariables({ ...testVariables, [key]: e.target.value })} />
+              </div>
+            ))}
           </div>
         </TabsContent>
       </Tabs>
 
+      {/* Test Result */}
       {testResult && (
-        <div className="space-y-2 mt-4">
-          <Label>Resultado do Teste</Label>
-          <pre className="text-xs bg-muted p-3 rounded overflow-x-auto max-h-48 overflow-y-auto">{testResult}</pre>
+        <div className="space-y-1 mt-2">
+          <Label className="text-[10px]">Resultado do Teste</Label>
+          <pre className="text-[10px] bg-muted p-2 rounded overflow-auto max-h-32 font-mono">{testResult}</pre>
         </div>
       )}
 
-      <Collapsible open={isSaveExpanded} onOpenChange={setIsSaveExpanded} className="space-y-2 border rounded-lg p-3">
+      {/* Save in Variable Mapping */}
+      <Collapsible open={isSaveExpanded} onOpenChange={setIsSaveExpanded} className="border rounded-lg p-2 bg-muted/20">
         <div className="flex items-center justify-between">
-          <Label className="text-sm font-semibold">Save in variable</Label>
-          <CollapsibleTrigger asChild><Button variant="ghost" size="sm">{isSaveExpanded ? <ChevronDown /> : <ChevronRight />}</Button></CollapsibleTrigger>
+          <div className="flex items-center gap-1">
+            <Label className="text-xs font-semibold">Mapear Resposta</Label>
+            {!lastJsonResponse && <AlertCircle className="h-3 w-3 text-amber-500" title="Faça um teste para ver os campos disponíveis" />}
+          </div>
+          <CollapsibleTrigger asChild><Button variant="ghost" size="sm" className="h-6 w-6 p-0">{isSaveExpanded ? <ChevronDown className="h-3 w-3" /> : <ChevronRight className="h-3 w-3" />}</Button></CollapsibleTrigger>
         </div>
-        <CollapsibleContent className="space-y-4 pt-2">
-          <Button variant="outline" size="sm" className="h-7 text-xs" onClick={handleAddResponseMapping}><Plus className="h-3 w-3 mr-1" /> Add entry</Button>
-          {responseMappings.map((mapping, index) => (
-            <div key={index} className="space-y-4 p-4 border rounded-md bg-muted/30 relative">
-              <Button variant="ghost" size="icon" className="h-6 w-6 absolute top-1 right-1" onClick={() => handleRemoveResponseMapping(index)}><Trash2 className="h-4 w-4 text-destructive" /></Button>
-              <div className="space-y-2">
-                <Label>data:</Label>
-                <Input value={mapping.jsonPath} list={`jsonPaths-${index}`} onChange={(e) => handleResponseMappingChange(index, "jsonPath", e.target.value)} />
-                <datalist id={`jsonPaths-${index}`}>{jsonPaths.map(p => <option key={p} value={p} />)}</datalist>
-              </div>
-              <div className="space-y-2">
-                <Label>set variable:</Label>
-                <div className="flex gap-2">
-                  <Input className="flex-1" value={mapping.variableName} list={`variables-${index}`} onChange={(e) => handleResponseMappingChange(index, "variableName", e.target.value)} />
-                  <datalist id={`variables-${index}`}>{availableVariables.map(v => <option key={v} value={v} />)}</datalist>
-                  <Button variant="ghost" size="icon" className="h-10 w-10 border" onClick={() => setVariableModalOpen({ open: true, index })}><Braces className="h-4 w-4" /></Button>
+        <CollapsibleContent className="space-y-2 pt-2">
+          <Button variant="outline" size="sm" className="h-6 text-[10px] w-full" onClick={() => { setResponseMappings([...responseMappings, { jsonPath: "", variableName: "" }]); setIsSaveExpanded(true); }}>
+            <Plus className="h-3 w-3 mr-1" /> Novo Mapeamento
+          </Button>
+          {responseMappings.map((m, idx) => (
+            <div key={idx} className="p-2 border rounded bg-card space-y-2 relative">
+              <Button variant="ghost" size="icon" className="h-5 w-5 absolute top-1 right-1" onClick={() => { const nl = responseMappings.filter((_, i) => i !== idx); setResponseMappings(nl); updateConfig({ responseMappings: nl }); }}><Trash2 className="h-3 w-3 text-destructive" /></Button>
+              <div className="grid grid-cols-2 gap-2">
+                <div>
+                  <Label className="text-[10px]">Caminho (ex: data.id)</Label>
+                  <Input value={m.jsonPath} list={`paths-${idx}`} className="h-7 text-[10px]" onChange={(e) => handleResponseMappingChange(idx, "jsonPath", e.target.value)} />
+                  <datalist id={`paths-${idx}`}>{jsonPaths.map(p => <option key={p} value={p} />)}</datalist>
+                </div>
+                <div>
+                  <Label className="text-[10px]">Salvar na Variável</Label>
+                  <div className="flex gap-1">
+                    <Input value={m.variableName} list={`vars-${idx}`} className="h-7 text-[10px] flex-1" onChange={(e) => handleResponseMappingChange(idx, "variableName", e.target.value)} />
+                    <datalist id={`vars-${idx}`}>{availableVariables.map(v => <option key={v} value={v} />)}</datalist>
+                    <Button variant="outline" size="icon" className="h-7 w-7" onClick={() => setVariableModalOpen({ open: true, index: idx })}><Braces className="h-3 w-3" /></Button>
+                  </div>
                 </div>
               </div>
             </div>
