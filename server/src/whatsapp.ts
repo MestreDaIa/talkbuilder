@@ -137,7 +137,8 @@ export async function handleWhatsAppWebhook(payload: any, query?: any, requestMe
       pushName: messageData.pushName || "",
       instanceName,
       serverUrl: EVO_BASE_URL,
-      apiKey: EVO_GLOBAL_KEY,
+      apiKey: payload.apikey || payload.apiKey || payload.data?.apikey || EVO_GLOBAL_KEY,
+      apikey: payload.apikey || payload.apiKey || payload.data?.apikey || EVO_GLOBAL_KEY,
       // Novos campos para suporte a mídia e condições
       messageType,
       caption,
