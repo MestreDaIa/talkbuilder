@@ -35,7 +35,7 @@ import { ScrollArea } from "@/components/ui/scroll-area";
 
 interface CanvasEditorProps {
   containers: Container[];
-  onContainersChange: (containers: Container[]) => void;
+  onContainersChange: React.Dispatch<React.SetStateAction<Container[]>>;
   onTest: (container: Container) => void;
   onEdgesChange?: (edges: Edge[]) => void;
   edges?: Edge[];
@@ -66,7 +66,7 @@ const CanvasContent = ({
   onGetCenterPosition 
 }: {
   containers: Container[];
-  onContainersChange: (containers: Container[]) => void;
+  onContainersChange: React.Dispatch<React.SetStateAction<Container[]>>;
   onTest: (container: Container) => void;
   onEdgesChangeProp?: (edges: Edge[]) => void;
   propEdges: Edge[];
@@ -218,7 +218,7 @@ const CanvasContent = ({
   const handleSaveConfig = useCallback((config: NodeConfig) => {
     if (!selectedNode) return;
 
-    const updatedContainers = containers.map(container => {
+    const updatedContainers = containersRef.current.map(container => {
       if (container.id === selectedNode.containerId) {
         return {
           ...container,
@@ -232,9 +232,9 @@ const CanvasContent = ({
       return container;
     });
 
+    containersRef.current = updatedContainers;
     onContainersChange(updatedContainers);
-    toast.success("Configuração salva!");
-  }, [selectedNode, containers, onContainersChange]);
+  }, [selectedNode, onContainersChange]);
 
   const handleDeleteNode = useCallback((containerId: string, nodeId: string) => {
     const updatedContainers = containers.map(container => {

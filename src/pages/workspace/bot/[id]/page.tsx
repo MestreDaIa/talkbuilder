@@ -39,22 +39,31 @@ import { toast } from "sonner";
 
 const STORAGE_PREFIX = "bot_flow_";
 
-/** Cache local — fallback enquanto o flow não carrega ou Supabase está offline. */
-function loadLocal(botId: string): { containers: Container[]; edges: Edge[] } {
-  if (typeof window === "undefined") return { containers: [], edges: [] };
+/** Cache local — fallback enquanto o flow não carrega ou o servidor ainda não recebeu o último save. */
+function loadLocal(botId: string): { containers: Container[]; edges: Edge[]; savedAt: number } {
+  if (typeof window === "undefined") return { containers: [], edges: [], savedAt: 0 };
   try {
     const raw = window.localStorage.getItem(`${STORAGE_PREFIX}${botId}`);
-    if (!raw) return { containers: [], edges: [] };
+    if (!raw) return { containers: [], edges: [], savedAt: 0 };
     const parsed = JSON.parse(raw);
-    return { containers: parsed.containers ?? [], edges: parsed.edges ?? [] };
+    const containers = parsed.containers ?? [];
+    const edges = parsed.edges ?? [];
+    const hasFlowData = containers.length > 0 || edges.length > 0;
+    return {
+      containers,
+      edges,
+      // Caches antigos não tinham timestamp. Se tiverem dados, tratamos como recentes
+      // para não deixar o servidor sobrescrever uma edição recém-feita antes do auto-save.
+      savedAt: parsed.savedAt ?? (hasFlowData ? Date.now() : 0),
+    };
   } catch {
-    return { containers: [], edges: [] };
+    return { containers: [], edges: [], savedAt: 0 };
   }
 }
 
 function saveLocal(botId: string, data: { containers: Container[]; edges: Edge[] }) {
   if (typeof window === "undefined") return;
-  window.localStorage.setItem(`${STORAGE_PREFIX}${botId}`, JSON.stringify(data));
+  window.localStorage.setItem(`${STORAGE_PREFIX}${botId}`, JSON.stringify({ ...data, savedAt: Date.now() }));
 }
 
 function statusLabel(status: FlowStatus): { text: string; className: string } {
@@ -123,22 +132,14 @@ function BotEditorInner({
           edgesCount: edges.length
         });
         
-        // Mantemos a consistência de variáveis no settings se necessário
-        const updatedSettings = {
-          ...(flow.settings || {}),
-          variables: variables
-        };
-
         await saveDraft(flow.id, containers, edges);
-        // Opcionalmente atualizamos o settings se variáveis mudaram
-        // await updateFlowMeta(flow.id, { settings: updatedSettings });
       } catch (err) {
         console.error("[BotPage] Erro no auto-save:", err);
       }
     }, 1000); // Debounce de 1s para não sobrecarregar o banco
 
     return () => clearTimeout(timer);
-  }, [containers, edges, flow?.id, hydrated, variables]);
+  }, [containers, edges, flow?.id, hydrated, historyIndex]);
 
   // Sync variables from initialVariables/Start node whenever containers change
   useEffect(() => {
@@ -353,6 +354,7 @@ export default function BotPage() {
   const [showPublish, setShowPublish] = useState(false);
   const [getCenter, setGetCenter] = useState<(() => { x: number; y: number }) | null>(null);
   const [testContainer, setTestContainer] = useState<Container | null>(null);
+  const localLoadedAtRef = useRef(0);
   
   // Undo/Redo history
   const [history, setHistory] = useState<{ containers: Container[]; edges: Edge[] }[]>([]);
@@ -377,6 +379,7 @@ export default function BotPage() {
     async function load() {
       // Sempre hidrata cache local primeiro pra não piscar tela vazia
       const local = loadLocal(botId);
+      localLoadedAtRef.current = local.savedAt;
       setContainers(local.containers);
       setEdges(local.edges);
 
@@ -402,9 +405,13 @@ export default function BotPage() {
           setBotVariables(row.settings.variables);
         }
 
-        // Se o servidor tem dados, e eles parecem ser mais novos ou o local está vazio, prefere o servidor
+        // Se o servidor tem dados, só prefere o servidor quando ele é mais novo que o cache local.
+        // Isso evita o bug onde uma configuração recém-salva localmente volta para o default
+        // ao recarregar antes do banco responder com o último rascunho.
         const hasServerData = row.draft_containers?.length || row.draft_edges?.length;
-        if (hasServerData) {
+        const serverUpdatedAt = row.draft_updated_at ? new Date(row.draft_updated_at).getTime() : 0;
+        const shouldUseServer = hasServerData && serverUpdatedAt >= localLoadedAtRef.current;
+        if (shouldUseServer) {
           setContainers(row.draft_containers || []);
           setEdges(row.draft_edges || []);
         }

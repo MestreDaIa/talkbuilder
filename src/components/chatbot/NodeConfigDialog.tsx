@@ -33,13 +33,12 @@ export const NodeConfigDialog = ({ node, open, onClose, onSave, containers = [] 
   }, [open, node?.id]);
 
   const updateConfig = useCallback((next: NodeConfig | ((prev: NodeConfig) => NodeConfig)) => {
-    setConfig((prev) => {
-      const resolved = typeof next === "function" ? (next as (prev: NodeConfig) => NodeConfig)(prev) : next;
-      configRef.current = resolved;
-      // Salvamento automático imediato para o canvas pai
-      onSave(JSON.parse(JSON.stringify(resolved)));
-      return resolved;
-    });
+    const resolved = typeof next === "function" ? (next as (prev: NodeConfig) => NodeConfig)(configRef.current) : next;
+    configRef.current = resolved;
+    setConfig(resolved);
+    // Sincroniza imediatamente com o canvas pai para o cache local e o auto-save
+    // pegarem a configuração antes mesmo do modal ser fechado.
+    onSave(JSON.parse(JSON.stringify(resolved)));
   }, [onSave]);
 
   const handleSave = () => {
