@@ -132,6 +132,9 @@ app.delete("/webhook-capture/:path(*)", (req: Request, res: Response) => {
   const path = (req.params.path || "").replace(/^\/+/, "").replace(/\/+$/, "");
   webhookCaptures.delete(path);
   res.json({ status: "ok" });
+});
+
+
 
 app.get("/", (req: Request, res: Response) => {
   res.json({ 
