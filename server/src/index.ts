@@ -138,7 +138,7 @@ app.all("/webhook-test/*", (req: Request, res: Response) => {
     params: {},
     body: req.body,
   };
-  webhookCaptures.set(path, captured);
+  pushCapture(path, captured);
   console.log(`[WEBHOOK-TEST] Capturado em "${path}"`);
   res.json({
     status: "ok",
@@ -152,19 +152,31 @@ app.all("/webhook-test/*", (req: Request, res: Response) => {
 app.all("/chatbot-webhook/*", (req: Request, res: Response) => {
   const path = extractPath(req.path, "/chatbot-webhook");
   console.log(`[WEBHOOK-PROD] Recebido em "${path}"`);
-  
-  // Aqui no futuro integraremos com o processamento do fluxo do chatbot
-  // Por enquanto apenas respondemos OK
   res.json({ status: "ok", message: "Production webhook received" });
 });
 
+// Retorna a fila de eventos capturados (mais recentes no fim). Use ?since=N para incremental.
 app.get("/webhook-capture/:path(*)", (req: Request, res: Response) => {
   const path = (req.params.path || "").replace(/^\/+/, "").replace(/\/+$/, "");
-  const captured = webhookCaptures.get(path);
-  if (!captured) {
-    return res.status(404).json({ error: "no_capture", path });
+  const arr = webhookCaptures.get(path) || [];
+  const since = Math.max(0, Number(req.query.since) || 0);
+  const events = arr.slice(since);
+  if (!arr.length) {
+    return res.status(404).json({ error: "no_capture", path, total: 0 });
   }
-  res.json(captured);
+  res.json({
+    path,
+    total: arr.length,
+    since,
+    events,
+    // backwards-compat: campo legado com o último evento
+    receivedAt: arr[arr.length - 1].receivedAt,
+    method: arr[arr.length - 1].method,
+    headers: arr[arr.length - 1].headers,
+    query: arr[arr.length - 1].query,
+    params: arr[arr.length - 1].params,
+    body: arr[arr.length - 1].body,
+  });
 });
 
 app.delete("/webhook-capture/:path(*)", (req: Request, res: Response) => {
