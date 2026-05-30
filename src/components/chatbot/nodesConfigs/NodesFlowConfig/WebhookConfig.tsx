@@ -245,9 +245,30 @@ export const WebhookConfig = ({ config, setConfig }: WebhookConfigProps) => {
             </Button>
           )}
           <p className="text-[10px] text-muted-foreground leading-snug">
-            Envie uma requisição {method} para a Test URL acima.
-            O payload capturado aparecerá no painel <strong>Output</strong>.
+            1. Clique no botão acima para começar a escutar.<br />
+            2. Envie uma requisição {method} para a <strong>Test URL</strong>.<br />
+            3. O payload aparecerá automaticamente no painel <strong>Output</strong>.
           </p>
+          
+          <div className="pt-2">
+            <Button
+              type="button"
+              variant="ghost"
+              size="sm"
+              className="w-full text-[10px] h-7"
+              onClick={() => {
+                const curl = `curl -X ${method} "${testUrl}" \\
+  -H "Content-Type: application/json" \\
+  -d '{"exemplo": "dados", "numero": 123}'`;
+                navigator.clipboard.writeText(curl);
+                toast.success("Exemplo CURL copiado!", {
+                  description: "Cole no seu terminal para testar."
+                });
+              }}
+            >
+              Copiar comando CURL p/ teste
+            </Button>
+          </div>
         </div>
       </aside>
 
