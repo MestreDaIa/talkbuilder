@@ -475,6 +475,7 @@ async function runFlow(execution: any, containersIn: any[], edgesIn: any[], inpu
       }
       default: return false;
     }
+  };
 
   };
 
