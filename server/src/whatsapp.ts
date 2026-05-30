@@ -2,7 +2,7 @@ import { supabase } from "./supabase.js";
 import { processRuntime } from "./runtime.js";
 import { evolutionApi, EVO_BASE_URL, EVO_GLOBAL_KEY } from "./evolution.js";
 
-export async function handleWhatsAppWebhook(payload: any, query?: any) {
+export async function handleWhatsAppWebhook(payload: any, query?: any, requestMeta?: any) {
   // console.log("Recebendo webhook WhatsApp:", JSON.stringify(payload, null, 2));
   
   // Suporte a ambos formatos: com ou sem o wrapper de evento da Evolution API
@@ -125,6 +125,12 @@ export async function handleWhatsAppWebhook(payload: any, query?: any) {
     payload: {
       message: text || caption || "",
       button_id: messageData.message?.buttonsResponseMessage?.selectedButtonId || messageData.message?.templateButtonReplyMessage?.selectedId,
+      body: payload,
+      headers: requestMeta?.headers || {},
+      query: query || {},
+      params: requestMeta?.params || {},
+      method: requestMeta?.method || "POST",
+      receivedAt: requestMeta?.receivedAt || new Date().toISOString(),
       // Special Evolution Bot variables
       messageId: messageData.key.id,
       remoteJid,
