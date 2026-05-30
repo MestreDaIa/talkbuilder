@@ -442,8 +442,8 @@ async function runFlow(execution: any, containersIn: any[], edgesIn: any[], inpu
 
   const replaceVars = (text: string) => {
     if (!text) return text;
-    const shouldDecode = /<[a-z][\s\S]*>/i.test(text) || text.includes("&nbsp;") || text.includes("&quot;");
-    const baseText = shouldDecode ? decodeText(text) : text;
+    const isJsonOrUrl = /^[{\[]/.test(text) || text.startsWith("http");
+    const baseText = isJsonOrUrl ? text : decodeText(text);
     return baseText.replace(/{{(.*?)}}/g, (_, k) => {
       const value = getVarValue(k);
       return value === undefined ? `{{${k}}}` : stringifyVarValue(value);
