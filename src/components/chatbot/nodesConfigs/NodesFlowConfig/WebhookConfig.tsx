@@ -1,4 +1,4 @@
-import { useState, useEffect, useLayoutEffect, useRef } from "react";
+import { useState, useEffect, useLayoutEffect, useRef, useMemo } from "react";
 import { Label } from "@/components/ui/label";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
@@ -11,10 +11,12 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Copy, Check, Radio, Square, ChevronRight, ChevronDown, ArrowRight } from "lucide-react";
+import { Copy, Check, Radio, Square, ChevronRight, ChevronDown, ArrowRight, Plus, Trash2, Braces } from "lucide-react";
 import { toast } from "sonner";
 import { SkillConfig } from "../SkillConfig";
 import { JsonViewer } from "./JsonViewer";
+import { VariableModal } from "../../VariableModal";
+import { useVariables } from "@/context/VariablesContext";
 
 interface CapturedRequest {
   receivedAt: string;
