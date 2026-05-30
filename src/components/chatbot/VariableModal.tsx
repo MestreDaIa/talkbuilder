@@ -15,22 +15,7 @@ export const VariableModal = ({ open, onClose, onSelect }: VariableModalProps) =
   const [searchTerm, setSearchTerm] = useState('');
   const { getAllVariableNames, addVariable, removeVariable, variables } = useVariables();
 
-  const allVariables = useMemo(() => {
-    const systemVars = [
-      "last_message", 
-      "messageType", 
-      "caption", 
-      "remoteJid", 
-      "pushName", 
-      "instanceName", 
-      "messageId", 
-      "mimetype", 
-      "mediaUrl", 
-      "base64"
-    ];
-    const userVars = getAllVariableNames();
-    return Array.from(new Set([...userVars, ...systemVars]));
-  }, [variables, getAllVariableNames]);
+  const allVariables = useMemo(() => getAllVariableNames(), [variables, getAllVariableNames]);
 
   const filteredVariables = useMemo(() => {
     if (!searchTerm.trim()) return allVariables;
