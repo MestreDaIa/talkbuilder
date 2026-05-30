@@ -506,6 +506,7 @@ async function runFlow(execution: any, containersIn: any[], edgesIn: any[], inpu
       
       // Salva tanto no padrão quanto em variáveis específicas se o input veio de um webhook
       variables["webhookData"] = webhookData;
+      variables["data"] = webhookData;
     }
   }
 
