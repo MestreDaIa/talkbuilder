@@ -14,6 +14,7 @@ import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Copy, Check, Radio, Square, ChevronRight, ChevronDown, ArrowRight } from "lucide-react";
 import { toast } from "sonner";
 import { SkillConfig } from "../SkillConfig";
+import { JsonViewer } from "./JsonViewer";
 
 interface CapturedRequest {
   receivedAt: string;
@@ -474,7 +475,7 @@ export const WebhookConfig = ({ config, setConfig }: WebhookConfigProps) => {
           {capturedEvents.length > 0 ? (
             <>
               {/* Lista de Eventos */}
-              <div className="h-1/3 border-b border-border overflow-y-auto bg-background/20 p-2 space-y-1">
+              <div className="h-40 border-b border-border overflow-y-auto bg-background/20 p-2 space-y-1 shrink-0">
                 {capturedEvents.map((ev, idx) => {
                   const eventName = ev.body?.event || ev.method || "Event";
                   const time = new Date(ev.receivedAt || Date.now()).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' });
@@ -501,9 +502,20 @@ export const WebhookConfig = ({ config, setConfig }: WebhookConfigProps) => {
 
               {/* Detalhes do Evento Selecionado */}
               <div className="flex-1 p-4 overflow-y-auto font-mono text-[11px] bg-background/10">
-                <pre className="whitespace-pre-wrap leading-relaxed">
-                  {JSON.stringify(currentEvent, null, 2)}
-                </pre>
+                <div className="space-y-4">
+                  <div>
+                    <div className="text-[10px] text-muted-foreground uppercase tracking-wider mb-2 font-bold">Resumo da Requisição</div>
+                    <div className="grid grid-cols-2 gap-2 text-[10px] bg-muted/30 p-2 rounded-md mb-4">
+                      <div><span className="text-muted-foreground">Método:</span> <span className="font-semibold">{currentEvent?.method}</span></div>
+                      <div><span className="text-muted-foreground">Data/Hora:</span> <span>{new Date(currentEvent?.receivedAt || "").toLocaleString()}</span></div>
+                    </div>
+                  </div>
+                  
+                  <div>
+                    <div className="text-[10px] text-muted-foreground uppercase tracking-wider mb-2 font-bold">Payload JSON</div>
+                    <JsonViewer data={currentEvent} />
+                  </div>
+                </div>
               </div>
             </>
           ) : (
