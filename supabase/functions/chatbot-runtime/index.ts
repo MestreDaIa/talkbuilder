@@ -409,9 +409,9 @@ class FlowEngine {
       if (val !== undefined) {
         if (remainingPath) {
           const nestedVal = this.getNestedValue(val, remainingPath);
-          return nestedVal !== undefined ? (typeof nestedVal === \'object\' ? JSON.stringify(nestedVal) : String(nestedVal)) : `{{${k}}}`;
+          return nestedVal !== undefined ? (typeof nestedVal === 'object' ? JSON.stringify(nestedVal) : String(nestedVal)) : `{{${k}}}`;
         }
-        return typeof val === \'object\' ? JSON.stringify(val) : String(val);
+        return typeof val === 'object' ? JSON.stringify(val) : String(val);
       }
       
       console.log(`[FlowEngine:replaceVars] key="${rootVar}" not found in variables`);
