@@ -14,6 +14,7 @@ import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Copy, Check, Radio, Square, ChevronRight, ChevronDown, ArrowRight } from "lucide-react";
 import { toast } from "sonner";
 import { SkillConfig } from "../SkillConfig";
+import { JsonViewer } from "./JsonViewer";
 
 interface CapturedRequest {
   receivedAt: string;
