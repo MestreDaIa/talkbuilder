@@ -43,6 +43,7 @@ interface WebhookConfigProps {
     responseVariable?: string;
     allowedOrigins?: string;
     lastTestPayload?: CapturedRequest | null;
+    urlMode?: "test" | "production";
   };
   setConfig: (config: WebhookConfigProps["config"]) => void;
 }
