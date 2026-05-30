@@ -121,6 +121,7 @@ export const WebhookConfig = ({ config, setConfig }: WebhookConfigProps) => {
   const sinceRef = useRef(0);
   const [copied, setCopied] = useState(false);
   const [listening, setListening] = useState(false);
+  const [showClear, setShowClear] = useState(false);
   const pollRef = useRef<number | null>(null);
 
   const cleanedPath = (path || "meu-webhook").replace(/^\/+|\/+$/g, "");
@@ -195,6 +196,14 @@ export const WebhookConfig = ({ config, setConfig }: WebhookConfigProps) => {
       pollRef.current = null;
     }
     setListening(false);
+  };
+
+  const clearCapture = () => {
+    setCapturedEvents([]);
+    setSelectedEventIdx(0);
+    setLastTestPayload(null);
+    updateMainConfig({ lastTestPayload: null });
+    sinceRef.current = 0;
   };
 
   const currentEvent = capturedEvents[selectedEventIdx] || lastTestPayload;
@@ -441,20 +450,71 @@ export const WebhookConfig = ({ config, setConfig }: WebhookConfigProps) => {
         <SkillConfig config={config} setConfig={setConfig} />
       </section>
 
-      <section className="bg-muted/20 overflow-hidden flex flex-col">
+      <section className="bg-muted/20 overflow-hidden flex flex-col h-full border-l border-border">
         <div className="px-4 py-3 border-b border-border flex items-center justify-between bg-background/40">
-          <span className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">Output</span>
-          {capturedEvents.length > 0 && (
-            <Badge variant="outline" className="text-[10px]">{capturedEvents.length} eventos</Badge>
-          )}
+          <div className="flex items-center gap-2">
+            <span className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">Output</span>
+            {listening && (
+              <span className="flex h-2 w-2 rounded-full bg-red-500 animate-pulse" />
+            )}
+          </div>
+          <div className="flex items-center gap-2">
+            {capturedEvents.length > 0 && (
+              <>
+                <Badge variant="outline" className="text-[10px]">{capturedEvents.length} eventos</Badge>
+                <Button variant="ghost" size="icon" className="h-6 w-6 text-muted-foreground hover:text-destructive" onClick={clearCapture}>
+                  <Square className="h-3 w-3" />
+                </Button>
+              </>
+            )}
+          </div>
         </div>
-        <div className="flex-1 p-4 overflow-y-auto font-mono text-[11px]">
-          {currentEvent ? (
-            <pre className="whitespace-pre-wrap">{JSON.stringify(currentEvent, null, 2)}</pre>
+        
+        <div className="flex-1 flex flex-col min-h-0">
+          {capturedEvents.length > 0 ? (
+            <>
+              {/* Lista de Eventos */}
+              <div className="h-1/3 border-b border-border overflow-y-auto bg-background/20 p-2 space-y-1">
+                {capturedEvents.map((ev, idx) => {
+                  const eventName = ev.body?.event || ev.method || "Event";
+                  const time = new Date(ev.receivedAt || Date.now()).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' });
+                  
+                  return (
+                    <button
+                      key={idx}
+                      onClick={() => setSelectedEventIdx(idx)}
+                      className={`w-full flex items-center justify-between p-2 text-[10px] rounded-md transition-colors ${
+                        selectedEventIdx === idx 
+                          ? "bg-primary text-primary-foreground font-medium" 
+                          : "hover:bg-muted text-muted-foreground"
+                      }`}
+                    >
+                      <div className="flex items-center gap-2 overflow-hidden">
+                        <ArrowRight className={`h-3 w-3 shrink-0 ${selectedEventIdx === idx ? "opacity-100" : "opacity-0"}`} />
+                        <span className="truncate">{eventName}</span>
+                      </div>
+                      <span className="shrink-0 opacity-70 ml-2">{time}</span>
+                    </button>
+                  );
+                })}
+              </div>
+
+              {/* Detalhes do Evento Selecionado */}
+              <div className="flex-1 p-4 overflow-y-auto font-mono text-[11px] bg-background/10">
+                <pre className="whitespace-pre-wrap leading-relaxed">
+                  {JSON.stringify(currentEvent, null, 2)}
+                </pre>
+              </div>
+            </>
           ) : (
-            <div className="h-full flex flex-col items-center justify-center text-muted-foreground text-center">
-              <Radio className={`h-8 w-8 mb-2 ${listening ? "animate-pulse text-primary" : ""}`} />
-              <p>Aguardando evento...</p>
+            <div className="flex-1 flex flex-col items-center justify-center text-muted-foreground text-center p-6">
+              <Radio className={`h-8 w-8 mb-3 ${listening ? "animate-pulse text-primary" : "opacity-20"}`} />
+              <p className="text-sm font-medium">Aguardando eventos...</p>
+              <p className="text-xs mt-1 max-w-[200px]">
+                {listening 
+                  ? "Envie uma requisição para a URL de teste para ver os dados aqui em tempo real."
+                  : "Clique em 'Listen for test event' para começar a capturar requisições."}
+              </p>
             </div>
           )}
         </div>
