@@ -391,7 +391,7 @@ class FlowEngine {
 
   private getNestedValue(obj: any, path: string) {
     if (!path) return obj;
-    return path.split(\'.\').reduce((prev, curr) => {
+    return path.split('.').reduce((prev, curr) => {
       return prev ? prev[curr] : undefined;
     }, obj);
   }
@@ -400,9 +400,9 @@ class FlowEngine {
     if (!text) return text;
     return decodeText(text).replace(/{{(.*?)}}/g, (_, k) => {
       const path = normalizeVariableName(k);
-      const parts = path.split(\'.\');
+      const parts = path.split('.');
       const rootVar = parts[0];
-      const remainingPath = parts.slice(1).join(\'.\');
+      const remainingPath = parts.slice(1).join('.');
       
       const val = this.variables[rootVar];
       
