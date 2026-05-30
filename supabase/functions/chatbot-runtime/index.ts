@@ -431,12 +431,15 @@ class FlowEngine {
       if (val !== undefined) {
         if (remainingPath) {
           const nestedVal = this.getNestedValue(val, remainingPath);
-          return nestedVal !== undefined ? (typeof nestedVal === 'object' ? JSON.stringify(nestedVal) : String(nestedVal)) : `{{${k}}}`;
+          if (nestedVal !== undefined) {
+            return typeof nestedVal === 'object' ? JSON.stringify(nestedVal) : String(nestedVal);
+          }
+        } else {
+          return typeof val === 'object' ? JSON.stringify(val) : String(val);
         }
-        return typeof val === 'object' ? JSON.stringify(val) : String(val);
       }
       
-      console.log(`[FlowEngine:replaceVars] key="${rootVar}" not found in variables`);
+      console.log(`[FlowEngine:replaceVars] key="${path}" not found in variables`);
       return `{{${k}}}`;
     });
   }
