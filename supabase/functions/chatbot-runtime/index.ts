@@ -375,13 +375,33 @@ class FlowEngine {
     return s;
   }
 
+  private getNestedValue(obj: any, path: string) {
+    if (!path) return obj;
+    return path.split(\'.\').reduce((prev, curr) => {
+      return prev ? prev[curr] : undefined;
+    }, obj);
+  }
+
   private replaceVars(text: string) {
     if (!text) return text;
     return decodeText(text).replace(/{{(.*?)}}/g, (_, k) => {
-      const name = normalizeVariableName(k);
-      const val = this.variables[name];
-      console.log(`[FlowEngine:replaceVars] key="${name}" found=${val !== undefined} val="${val}"`);
-      return val !== undefined ? String(val) : `{{${k}}}`;
+      const path = normalizeVariableName(k);
+      const parts = path.split(\'.\');
+      const rootVar = parts[0];
+      const remainingPath = parts.slice(1).join(\'.\');
+      
+      const val = this.variables[rootVar];
+      
+      if (val !== undefined) {
+        if (remainingPath) {
+          const nestedVal = this.getNestedValue(val, remainingPath);
+          return nestedVal !== undefined ? (typeof nestedVal === \'object\' ? JSON.stringify(nestedVal) : String(nestedVal)) : `{{${k}}}`;
+        }
+        return typeof val === \'object\' ? JSON.stringify(val) : String(val);
+      }
+      
+      console.log(`[FlowEngine:replaceVars] key="${rootVar}" not found in variables`);
+      return `{{${k}}}`;
     });
   }
 
