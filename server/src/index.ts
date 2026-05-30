@@ -46,6 +46,19 @@ app.use((req: Request, res: Response, next: NextFunction) => {
   next();
 });
 
+// =====================================================================
+// Webhook Test Capture (n8n-style) — buffer compartilhado
+// =====================================================================
+type CapturedRequest = {
+  receivedAt: string;
+  method: string;
+  headers: Record<string, any>;
+  query: Record<string, any>;
+  params: Record<string, any>;
+  body: any;
+};
+const webhookCaptures = new Map<string, CapturedRequest>();
+
 // Rota GET auxiliar para testar se o endpoint existe via navegador
 app.get("/webhook/whatsapp", (req: Request, res: Response) => {
   res.json({ 
@@ -60,6 +73,26 @@ app.get("/webhook/whatsapp", (req: Request, res: Response) => {
 app.post("/webhook/whatsapp*", async (req: Request, res: Response) => {
   try {
     console.log(`[WEBHOOK] Recebido na rota: ${req.url}`);
+
+    // Também grava no buffer de captura para o node Webhook (Listen for test event)
+    // Assim eventos reais da Evolution aparecem no Output do editor.
+    try {
+      const sub = req.url.replace(/^\/webhook\//, "").split("?")[0].replace(/\/+$/, "");
+      const captured: CapturedRequest = {
+        receivedAt: new Date().toISOString(),
+        method: req.method,
+        headers: req.headers as Record<string, any>,
+        query: req.query as Record<string, any>,
+        params: {},
+        body: req.body,
+      };
+      webhookCaptures.set(sub, captured);
+      const base = sub.split("/")[0];
+      if (base && base !== sub) webhookCaptures.set(base, captured);
+    } catch (e) {
+      console.warn("[WEBHOOK] Falha ao capturar payload:", e);
+    }
+
     const result = await handleWhatsAppWebhook(req.body, req.query);
     res.json(result);
   } catch (error: any) {
@@ -79,20 +112,7 @@ app.post("/runtime", async (req: Request, res: Response) => {
   }
 });
 
-// =====================================================================
-// Webhook Test Capture (n8n-style)
-// Allows the Webhook node UI to "Listen for test event" and inspect the
-// payload that an external system sends, so the user can map fields.
-// =====================================================================
-type CapturedRequest = {
-  receivedAt: string;
-  method: string;
-  headers: Record<string, any>;
-  query: Record<string, any>;
-  params: Record<string, any>;
-  body: any;
-};
-const webhookCaptures = new Map<string, CapturedRequest>();
+// (CapturedRequest / webhookCaptures movidos para o topo do arquivo)
 
 function extractPath(url: string, prefix: string) {
   const cleaned = url.replace(prefix, "").split("?")[0] || "";
