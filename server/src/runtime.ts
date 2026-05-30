@@ -458,6 +458,7 @@ async function runFlow(execution: any, containersIn: any[], edgesIn: any[], inpu
 
   // 1. Processar Entrada (Resumo de Estado)
   if (input) {
+    if (input.messageId) variables["messageId"] = input.messageId;
     if (input.remoteJid) variables["remoteJid"] = input.remoteJid;
     if (input.pushName) variables["pushName"] = input.pushName;
     if (input.instanceName) variables["instanceName"] = input.instanceName;
