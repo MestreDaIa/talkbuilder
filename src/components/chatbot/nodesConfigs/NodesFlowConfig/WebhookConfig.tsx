@@ -198,6 +198,14 @@ export const WebhookConfig = ({ config, setConfig }: WebhookConfigProps) => {
     setListening(false);
   };
 
+  const clearCapture = () => {
+    setCapturedEvents([]);
+    setSelectedEventIdx(0);
+    setLastTestPayload(null);
+    updateMainConfig({ lastTestPayload: null });
+    sinceRef.current = 0;
+  };
+
   const currentEvent = capturedEvents[selectedEventIdx] || lastTestPayload;
 
   return (
