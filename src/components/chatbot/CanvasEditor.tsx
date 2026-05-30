@@ -231,7 +231,6 @@ const CanvasContent = ({
       }
       return container;
     }));
-    toast.success("Configuração salva!");
   }, [selectedNode, onContainersChange]);
 
   const handleDeleteNode = useCallback((containerId: string, nodeId: string) => {
