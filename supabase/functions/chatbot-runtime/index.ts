@@ -420,7 +420,12 @@ class FlowEngine {
 
   private replaceVars(text: string) {
     if (!text) return text;
-    return decodeText(text).replace(/{{(.*?)}}/g, (_, k) => {
+    // Only call decodeText if the text contains HTML-like tags, otherwise just process variables.
+    // This prevents corruption of JSON bodies or URLs that don't come from the rich text editor.
+    const shouldDecode = /<[a-z][\s\S]*>/i.test(text) || text.includes("&nbsp;") || text.includes("&quot;");
+    const baseText = shouldDecode ? decodeText(text) : text;
+    
+    return baseText.replace(/{{(.*?)}}/g, (_, k) => {
       const path = normalizeVariableName(k);
       const parts = path.split('.');
       const rootVar = parts[0];
@@ -726,8 +731,10 @@ class FlowEngine {
       const res = await fetch(url, {
         method,
         headers,
-        body: body ? (typeof body === "string" ? body : JSON.stringify(body)) : undefined
+        body: (method !== "GET" && body) ? (typeof body === "string" ? body : JSON.stringify(body)) : undefined
       });
+      
+      console.log(`[FlowEngine:HttpRequest] Response status: ${res.status}`);
 
       const responseText = await res.text();
       let responseData;
