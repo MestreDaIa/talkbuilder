@@ -9,6 +9,21 @@ const escapeHtml = (s: string) =>
 
 const isHtml = (value: string) => /<[a-z][\s\S]*>/i.test(value);
 
+const getVariableValue = (variables: Record<string, any> | undefined, path: string) => {
+  if (!variables) return undefined;
+  const key = String(path || "").trim();
+  if (!key) return undefined;
+  if (Object.prototype.hasOwnProperty.call(variables, key)) return variables[key];
+
+  return key.split(".").reduce((acc: any, part: string) => {
+    if (acc == null) return undefined;
+    return acc[part];
+  }, variables as any);
+};
+
+const stringifyVariableValue = (value: any) =>
+  value != null && typeof value === "object" ? JSON.stringify(value) : String(value ?? "");
+
 /**
  * Normalize a stored bubble-text value into HTML.
  * - HTML values (Tiptap output) are passed through.
@@ -59,8 +74,9 @@ export const richHtmlFor = (
     /<span[^>]*data-variable="([^"]+)"[^>]*>[\s\S]*?<\/span>/gi,
     (_, name) => {
       const trimmed = String(name).trim();
-      if (opts.variables && trimmed in opts.variables) {
-        return escapeHtml(String(opts.variables[trimmed] ?? ""));
+      const value = getVariableValue(opts.variables, trimmed);
+      if (value !== undefined) {
+        return escapeHtml(stringifyVariableValue(value));
       }
       return `<span class="${varClass}">${escapeHtml(trimmed)}</span>`;
     }
@@ -69,8 +85,9 @@ export const richHtmlFor = (
   // Resolve any remaining bare {{var}} tokens
   html = html.replace(/\{\{([^}]+)\}\}/g, (_, name) => {
     const trimmed = String(name).trim();
-    if (opts.variables && trimmed in opts.variables) {
-      return escapeHtml(String(opts.variables[trimmed] ?? ""));
+    const value = getVariableValue(opts.variables, trimmed);
+    if (value !== undefined) {
+      return escapeHtml(stringifyVariableValue(value));
     }
     return `<span class="${varClass}">${escapeHtml(trimmed)}</span>`;
   });
