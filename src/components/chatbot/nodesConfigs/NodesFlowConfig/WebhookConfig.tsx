@@ -119,9 +119,22 @@ export const WebhookConfig = ({ config, setConfig }: WebhookConfigProps) => {
   ]);
 
   const cleanedPath = (path || "meu-webhook").replace(/^\/+|\/+$/g, "");
-  const testUrl = `${baseUrl}/webhook-test/${cleanedPath}`;
-  const productionUrl = `${baseUrl}/chatbot-webhook/${cleanedPath}`;
-  const captureUrl = `${baseUrl}/webhook-capture/${cleanedPath}`;
+  // Origem do servidor (sem path) — usada para as rotas internas de captura/teste,
+  // que ficam na raiz (ex: /webhook-test/...). Permite o usuário deixar "/webhook"
+  // no final da Base URL sem quebrar o Listen.
+  const serverOrigin = (() => {
+    try {
+      const u = new URL(baseUrl);
+      return `${u.protocol}//${u.host}`;
+    } catch {
+      return (baseUrl || "").replace(/\/+$/, "").replace(/\/webhook$/, "");
+    }
+  })();
+  const testUrl = `${serverOrigin}/webhook-test/${cleanedPath}`;
+  const captureUrl = `${serverOrigin}/webhook-capture/${cleanedPath}`;
+  // Production URL = Base URL + path exatamente como o usuário configurou.
+  // Para Evolution use: Base URL = https://api-flowbuilder.zailom.com/webhook  e Path = whatsapp
+  const productionUrl = `${(baseUrl || "").replace(/\/+$/, "")}/${cleanedPath}`;
   const displayedUrl = urlMode === "test" ? testUrl : productionUrl;
 
 
