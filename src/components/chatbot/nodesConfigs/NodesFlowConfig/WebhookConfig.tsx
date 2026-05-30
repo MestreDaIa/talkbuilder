@@ -48,10 +48,16 @@ interface WebhookConfigProps {
 }
 
 const getBaseUrl = () => {
+  const backendUrl = import.meta.env.VITE_BACKEND_URL as string | undefined;
+  if (backendUrl) return backendUrl;
+
   const runtimeUrl = import.meta.env.VITE_CHATBOT_RUNTIME_URL as string | undefined;
-  if (runtimeUrl) return runtimeUrl;
+  if (runtimeUrl) {
+    // Se a runtime URL termina com /runtime, removemos para pegar a base do servidor
+    return runtimeUrl.replace(/\/runtime$/, "");
+  }
   
-  // Se estivermos no navegador, usamos o origin atual como base (ex: https://meusistema.com)
+  // Se estivermos no navegador e não houver backend URL, usamos o origin atual
   if (typeof window !== "undefined") {
     return window.location.origin;
   }
