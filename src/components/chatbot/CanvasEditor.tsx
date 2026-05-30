@@ -218,7 +218,7 @@ const CanvasContent = ({
   const handleSaveConfig = useCallback((config: NodeConfig) => {
     if (!selectedNode) return;
 
-    const updatedContainers = containers.map(container => {
+    onContainersChange((currentContainers) => currentContainers.map(container => {
       if (container.id === selectedNode.containerId) {
         return {
           ...container,
@@ -230,11 +230,9 @@ const CanvasContent = ({
         };
       }
       return container;
-    });
-
-    onContainersChange(updatedContainers);
+    }));
     toast.success("Configuração salva!");
-  }, [selectedNode, containers, onContainersChange]);
+  }, [selectedNode, onContainersChange]);
 
   const handleDeleteNode = useCallback((containerId: string, nodeId: string) => {
     const updatedContainers = containers.map(container => {
