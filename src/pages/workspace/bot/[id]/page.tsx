@@ -132,15 +132,7 @@ function BotEditorInner({
           edgesCount: edges.length
         });
         
-        // Mantemos a consistência de variáveis no settings se necessário
-        const updatedSettings = {
-          ...(flow.settings || {}),
-          variables: variables
-        };
-
         await saveDraft(flow.id, containers, edges);
-        // Opcionalmente atualizamos o settings se variáveis mudaram
-        // await updateFlowMeta(flow.id, { settings: updatedSettings });
       } catch (err) {
         console.error("[BotPage] Erro no auto-save:", err);
       }
