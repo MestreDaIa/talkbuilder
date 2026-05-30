@@ -57,7 +57,16 @@ type CapturedRequest = {
   params: Record<string, any>;
   body: any;
 };
-const webhookCaptures = new Map<string, CapturedRequest>();
+// Fila de eventos por path (mais recentes no fim). Limite por path para não vazar memória.
+const MAX_EVENTS_PER_PATH = 100;
+const webhookCaptures = new Map<string, CapturedRequest[]>();
+
+function pushCapture(path: string, captured: CapturedRequest) {
+  const arr = webhookCaptures.get(path) || [];
+  arr.push(captured);
+  if (arr.length > MAX_EVENTS_PER_PATH) arr.splice(0, arr.length - MAX_EVENTS_PER_PATH);
+  webhookCaptures.set(path, arr);
+}
 
 // Rota GET auxiliar para testar se o endpoint existe via navegador
 app.get("/webhook/whatsapp", (req: Request, res: Response) => {
@@ -86,9 +95,9 @@ app.post("/webhook/whatsapp*", async (req: Request, res: Response) => {
         params: {},
         body: req.body,
       };
-      webhookCaptures.set(sub, captured);
+      pushCapture(sub, captured);
       const base = sub.split("/")[0];
-      if (base && base !== sub) webhookCaptures.set(base, captured);
+      if (base && base !== sub) pushCapture(base, captured);
     } catch (e) {
       console.warn("[WEBHOOK] Falha ao capturar payload:", e);
     }
@@ -129,7 +138,7 @@ app.all("/webhook-test/*", (req: Request, res: Response) => {
     params: {},
     body: req.body,
   };
-  webhookCaptures.set(path, captured);
+  pushCapture(path, captured);
   console.log(`[WEBHOOK-TEST] Capturado em "${path}"`);
   res.json({
     status: "ok",
@@ -143,19 +152,31 @@ app.all("/webhook-test/*", (req: Request, res: Response) => {
 app.all("/chatbot-webhook/*", (req: Request, res: Response) => {
   const path = extractPath(req.path, "/chatbot-webhook");
   console.log(`[WEBHOOK-PROD] Recebido em "${path}"`);
-  
-  // Aqui no futuro integraremos com o processamento do fluxo do chatbot
-  // Por enquanto apenas respondemos OK
   res.json({ status: "ok", message: "Production webhook received" });
 });
 
+// Retorna a fila de eventos capturados (mais recentes no fim). Use ?since=N para incremental.
 app.get("/webhook-capture/:path(*)", (req: Request, res: Response) => {
   const path = (req.params.path || "").replace(/^\/+/, "").replace(/\/+$/, "");
-  const captured = webhookCaptures.get(path);
-  if (!captured) {
-    return res.status(404).json({ error: "no_capture", path });
+  const arr = webhookCaptures.get(path) || [];
+  const since = Math.max(0, Number(req.query.since) || 0);
+  const events = arr.slice(since);
+  if (!arr.length) {
+    return res.status(404).json({ error: "no_capture", path, total: 0 });
   }
-  res.json(captured);
+  res.json({
+    path,
+    total: arr.length,
+    since,
+    events,
+    // backwards-compat: campo legado com o último evento
+    receivedAt: arr[arr.length - 1].receivedAt,
+    method: arr[arr.length - 1].method,
+    headers: arr[arr.length - 1].headers,
+    query: arr[arr.length - 1].query,
+    params: arr[arr.length - 1].params,
+    body: arr[arr.length - 1].body,
+  });
 });
 
 app.delete("/webhook-capture/:path(*)", (req: Request, res: Response) => {

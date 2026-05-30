@@ -81,6 +81,11 @@ export const WebhookConfig = ({ config, setConfig }: WebhookConfigProps) => {
   const [lastTestPayload, setLastTestPayload] = useState<CapturedRequest | null>(
     config.lastTestPayload || null
   );
+  const [capturedEvents, setCapturedEvents] = useState<CapturedRequest[]>(
+    config.lastTestPayload ? [config.lastTestPayload] : []
+  );
+  const [selectedEventIdx, setSelectedEventIdx] = useState<number>(0);
+  const sinceRef = useRef(0);
 
 
   const [urlMode, setUrlMode] = useState<"test" | "production">("test");
@@ -158,8 +163,8 @@ export const WebhookConfig = ({ config, setConfig }: WebhookConfigProps) => {
       return;
     }
     setListening(true);
-    toast.info("Aguardando um evento de teste...", {
-      description: `Envie uma requisição para a Test URL.`,
+    toast.info("Escutando eventos...", {
+      description: `Envie uma requisição para a Test URL. Vários eventos serão acumulados abaixo.`,
     });
 
     // Clear any previous capture so we only see fresh ones
@@ -168,22 +173,32 @@ export const WebhookConfig = ({ config, setConfig }: WebhookConfigProps) => {
     } catch {
       /* ignore */
     }
+    sinceRef.current = 0;
+    setCapturedEvents([]);
+    setSelectedEventIdx(0);
 
     const poll = async () => {
       try {
-        const res = await fetch(captureUrl);
+        const res = await fetch(`${captureUrl}?since=${sinceRef.current}`);
         if (res.ok) {
-          const data = (await res.json()) as CapturedRequest;
-          setLastTestPayload(data);
-          stopListening();
-          toast.success("Evento de teste recebido!");
+          const data = await res.json();
+          const events: CapturedRequest[] = Array.isArray(data?.events) ? data.events : [];
+          if (events.length > 0) {
+            sinceRef.current = data.total ?? sinceRef.current + events.length;
+            setCapturedEvents((prev) => {
+              const next = [...prev, ...events];
+              // mantém o último como "payload principal" para compatibilidade
+              setLastTestPayload(next[next.length - 1] || null);
+              return next;
+            });
+          }
         }
       } catch {
         /* ignore */
       }
     };
 
-    pollRef.current = window.setInterval(poll, 1500);
+    pollRef.current = window.setInterval(poll, 1000);
   };
 
   const stopListening = () => {
@@ -194,10 +209,26 @@ export const WebhookConfig = ({ config, setConfig }: WebhookConfigProps) => {
     setListening(false);
   };
 
-  const clearCapture = () => {
+  const clearCapture = async () => {
+    try {
+      await fetch(captureUrl, { method: "DELETE" });
+    } catch {
+      /* ignore */
+    }
+    sinceRef.current = 0;
+    setCapturedEvents([]);
     setLastTestPayload(null);
+    setSelectedEventIdx(0);
     toast.success("Captura limpa");
   };
+
+  // Detecta o nome do evento (Evolution usa body.event)
+  const getEventLabel = (e: CapturedRequest) => {
+    const ev = (e?.body as any)?.event;
+    return typeof ev === "string" ? ev : `${e.method}`;
+  };
+
+  const currentEvent = capturedEvents[selectedEventIdx] || lastTestPayload;
 
   return (
     <div className="grid grid-cols-1 lg:grid-cols-[260px_1fr_1fr] gap-0 min-h-[60vh]">
@@ -432,21 +463,50 @@ export const WebhookConfig = ({ config, setConfig }: WebhookConfigProps) => {
             <span className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
               Output
             </span>
-            {lastTestPayload && (
+            {capturedEvents.length > 0 && (
               <Badge variant="outline" className="text-[10px]">
-                {new Date(lastTestPayload.receivedAt).toLocaleTimeString()}
+                {capturedEvents.length} evento{capturedEvents.length > 1 ? "s" : ""}
+              </Badge>
+            )}
+            {listening && (
+              <Badge className="text-[10px] bg-red-500/15 text-red-500 border-red-500/30">
+                <Radio className="h-2.5 w-2.5 mr-1 animate-pulse" /> ao vivo
               </Badge>
             )}
           </div>
-          {lastTestPayload && (
+          {capturedEvents.length > 0 && (
             <Button type="button" variant="ghost" size="sm" onClick={clearCapture}>
               Limpar
             </Button>
           )}
         </div>
 
+        {capturedEvents.length > 0 && (
+          <div className="border-b border-border bg-background/30 max-h-40 overflow-y-auto">
+            {capturedEvents.map((e, i) => {
+              const active = i === selectedEventIdx;
+              const label = getEventLabel(e);
+              return (
+                <button
+                  key={i}
+                  type="button"
+                  onClick={() => setSelectedEventIdx(i)}
+                  className={`w-full text-left px-3 py-1.5 text-[11px] border-l-2 flex items-center justify-between gap-2 hover:bg-muted/60 ${
+                    active ? "border-primary bg-muted/60" : "border-transparent"
+                  }`}
+                >
+                  <span className="font-mono truncate">{label}</span>
+                  <span className="text-[10px] text-muted-foreground shrink-0">
+                    {new Date(e.receivedAt).toLocaleTimeString()}
+                  </span>
+                </button>
+              );
+            })}
+          </div>
+        )}
+
         <div className="flex-1 overflow-y-auto p-3 text-[11px] font-mono">
-          {!lastTestPayload ? (
+          {!currentEvent ? (
             <div className="h-full flex items-center justify-center text-center text-muted-foreground px-6">
               <div className="space-y-2">
                 <Radio className="h-8 w-8 mx-auto opacity-40" />
@@ -458,7 +518,7 @@ export const WebhookConfig = ({ config, setConfig }: WebhookConfigProps) => {
               </div>
             </div>
           ) : (
-            <JsonTree value={lastTestPayload} rootName={responseVariable || "webhookData"} />
+            <JsonTree value={currentEvent} rootName={responseVariable || "webhookData"} />
           )}
         </div>
       </section>
