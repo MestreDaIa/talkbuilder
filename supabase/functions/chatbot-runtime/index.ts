@@ -568,6 +568,55 @@ class FlowEngine {
     this.currentNodeId = result.next_node_id;
   }
 
+  private async executeHttpRequest(node: any, container: any) {
+    const cfg = node.config || {};
+    const url = this.replaceVars(cfg.url || "");
+    if (!url) {
+      this.currentNodeId = this.nextFromNode(node.id, container);
+      return;
+    }
+
+    const method = cfg.method || "GET";
+    const headers = { "Content-Type": "application/json" };
+    
+    // Auth headers
+    if (cfg.authentication === "basic" && cfg.authCredentials) {
+      const auth = btoa(`${cfg.authCredentials.username}:${cfg.authCredentials.password}`);
+      headers["Authorization"] = `Basic ${auth}`;
+    } else if (cfg.authentication === "header" && cfg.authCredentials) {
+      headers[cfg.authCredentials.headerName] = cfg.authCredentials.headerValue;
+    }
+
+    let body = null;
+    if (method !== "GET" && method !== "HEAD") {
+      try {
+        body = cfg.bodyMode === "json" ? JSON.parse(this.replaceVars(cfg.body || "{}")) : this.replaceVars(cfg.body || "");
+      } catch {
+        body = this.replaceVars(cfg.body || "");
+      }
+    }
+
+    try {
+      console.log(`[FlowEngine:HttpRequest] ${method} ${url}`);
+      const res = await fetch(url, {
+        method,
+        headers,
+        body: body ? (typeof body === "string" ? body : JSON.stringify(body)) : undefined
+      });
+
+      const responseData = await res.json().catch(() => ({}));
+      const varName = normalizeVariableName(cfg.responseVariable || "httpResponse");
+      if (varName) {
+        this.variables[varName] = responseData;
+        console.log(`[FlowEngine:HttpRequest] Saved response to ${varName}`);
+      }
+    } catch (e) {
+      console.error("[FlowEngine:HttpRequest] Error:", e);
+    }
+
+    this.currentNodeId = this.nextFromNode(node.id, container);
+  }
+
   private parseWaitMs(cfg: any) {
     const raw = Number(cfg.waitTime ?? cfg.duration ?? cfg.seconds ?? 5);
     const unit = String(cfg.timeUnit ?? cfg.unit ?? "seconds").toLowerCase();
