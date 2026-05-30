@@ -25,6 +25,7 @@ export async function handleWhatsAppWebhook(payload: any, query?: any, requestMe
   const instanceName: string = payload.instance;
   const remoteJid: string = messageData.key.remoteJid;
   const fromMe: boolean = !!messageData.key.fromMe;
+  const currentApiKey = payload.apikey || payload.apiKey || payload.data?.apikey || EVO_GLOBAL_KEY;
 
   console.log(`Mensagem de ${remoteJid} na instância ${instanceName}. FromMe: ${fromMe}. Query: ${JSON.stringify(query)}`);
 
