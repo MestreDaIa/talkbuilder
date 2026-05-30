@@ -102,6 +102,7 @@ export async function handleWhatsAppWebhook(payload: any, query?: any) {
       message: text,
       button_id: messageData.message?.buttonsResponseMessage?.selectedButtonId || messageData.message?.templateButtonReplyMessage?.selectedId,
       // Special Evolution Bot variables
+      messageId: messageData.key.id,
       remoteJid,
       pushName: messageData.pushName || "",
       instanceName,
@@ -125,6 +126,7 @@ export async function handleWhatsAppWebhook(payload: any, query?: any) {
           contact_id: remoteJid,
           channel: "whatsapp",
           payload: {
+            messageId: messageData.key.id,
             remoteJid,
             pushName: messageData.pushName || "",
             instanceName,
