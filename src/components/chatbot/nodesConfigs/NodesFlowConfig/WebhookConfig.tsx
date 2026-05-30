@@ -115,6 +115,7 @@ export const WebhookConfig = ({ config, setConfig }: WebhookConfigProps) => {
     setAllowedOrigins(config.allowedOrigins || "*");
     setLastTestPayload(config.lastTestPayload || null);
     setUrlMode(config.urlMode || "test");
+    setResponseMappings(config.responseMappings || []);
   }, [config]);
 
   // Função centralizada de atualização
