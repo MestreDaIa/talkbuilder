@@ -362,6 +362,7 @@ export default function BotPage() {
   const [showPublish, setShowPublish] = useState(false);
   const [getCenter, setGetCenter] = useState<(() => { x: number; y: number }) | null>(null);
   const [testContainer, setTestContainer] = useState<Container | null>(null);
+  const localLoadedAtRef = useRef(0);
   
   // Undo/Redo history
   const [history, setHistory] = useState<{ containers: Container[]; edges: Edge[] }[]>([]);
@@ -386,6 +387,7 @@ export default function BotPage() {
     async function load() {
       // Sempre hidrata cache local primeiro pra não piscar tela vazia
       const local = loadLocal(botId);
+      localLoadedAtRef.current = local.savedAt;
       setContainers(local.containers);
       setEdges(local.edges);
 
@@ -411,9 +413,13 @@ export default function BotPage() {
           setBotVariables(row.settings.variables);
         }
 
-        // Se o servidor tem dados, e eles parecem ser mais novos ou o local está vazio, prefere o servidor
+        // Se o servidor tem dados, só prefere o servidor quando ele é mais novo que o cache local.
+        // Isso evita o bug onde uma configuração recém-salva localmente volta para o default
+        // ao recarregar antes do banco responder com o último rascunho.
         const hasServerData = row.draft_containers?.length || row.draft_edges?.length;
-        if (hasServerData) {
+        const serverUpdatedAt = row.draft_updated_at ? new Date(row.draft_updated_at).getTime() : 0;
+        const shouldUseServer = hasServerData && serverUpdatedAt >= localLoadedAtRef.current;
+        if (shouldUseServer) {
           setContainers(row.draft_containers || []);
           setEdges(row.draft_edges || []);
         }
