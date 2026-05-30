@@ -463,7 +463,7 @@ class FlowEngine {
     const varName = normalizeVariableName(comp?.variableName);
     if (!varName) return false;
     
-    const actualRaw = this.variables[varName];
+    const actualRaw = this.getNestedValue(this.variables, varName);
     const actual = actualRaw == null ? "" : String(actualRaw).trim();
     const expected = this.replaceVars(String(comp?.value ?? "")).trim();
     const op = comp?.operator;
