@@ -43,6 +43,7 @@ interface WebhookConfigProps {
     responseVariable?: string;
     allowedOrigins?: string;
     lastTestPayload?: CapturedRequest | null;
+    urlMode?: "test" | "production";
   };
   setConfig: (config: WebhookConfigProps["config"]) => void;
 }
@@ -88,7 +89,7 @@ export const WebhookConfig = ({ config, setConfig }: WebhookConfigProps) => {
   const sinceRef = useRef(0);
 
 
-  const [urlMode, setUrlMode] = useState<"test" | "production">("test");
+  const [urlMode, setUrlMode] = useState<"test" | "production">(config.urlMode || "test");
   const [copied, setCopied] = useState(false);
   const [listening, setListening] = useState(false);
   const pollRef = useRef<number | null>(null);
@@ -109,6 +110,7 @@ export const WebhookConfig = ({ config, setConfig }: WebhookConfigProps) => {
       responseVariable,
       allowedOrigins,
       lastTestPayload,
+      urlMode,
     };
 
     const hasChanged = Object.entries(newConfig).some(
@@ -130,6 +132,7 @@ export const WebhookConfig = ({ config, setConfig }: WebhookConfigProps) => {
     responseVariable,
     allowedOrigins,
     lastTestPayload,
+    urlMode,
     config,
     setConfig
   ]);
