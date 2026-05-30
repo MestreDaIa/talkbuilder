@@ -885,6 +885,7 @@ async function runFlow(execution: any, containersIn: any[], edgesIn: any[], inpu
 
         try {
           console.log(`[runtime:http] chamando ${method} ${url}`);
+          // console.log(`[runtime:http] headers:`, JSON.stringify(Object.keys(headers)));
           const res = await fetch(url, {
             method,
             headers,
