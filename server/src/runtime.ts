@@ -626,21 +626,49 @@ async function runFlow(execution: any, containersIn: any[], edgesIn: any[], inpu
         break;
       }
       case "webhook": {
-        // O nó Webhook é um nó de entrada/gatilho. 
+        // O nó Webhook é um nó de entrada/gatilho.
         // Se chegamos aqui durante a execução, significa que o fluxo passou por ele.
-        // Se o input contém os dados do webhook, salvamos na variável configurada.
         const varName = cfg.responseVariable || "webhookData";
+        let webhookData: any = null;
         if (input && (input.body || input.headers || input.query)) {
-          const webhookData = {
+          webhookData = {
             body: input.body,
             headers: input.headers,
             query: input.query,
             method: input.method,
             receivedAt: input.receivedAt
           };
+        } else if (cfg.lastTestPayload) {
+          webhookData = cfg.lastTestPayload;
+        }
+        if (webhookData) {
           variables[varName] = webhookData;
           variables["webhookData"] = webhookData;
           variables["data"] = webhookData;
+
+          // Mapear campos: extrai paths do payload e salva em variáveis individuais
+          if (Array.isArray(cfg.responseMappings)) {
+            const getValueByPath = (obj: any, path: string): any => {
+              if (!path) return obj;
+              const parts = String(path).split('.').filter(Boolean);
+              let current: any = obj;
+              for (const part of parts) {
+                if (current === null || current === undefined) return undefined;
+                current = current[part];
+              }
+              return current;
+            };
+            cfg.responseMappings.forEach((mapping: any) => {
+              if (mapping?.variableName) {
+                const val = mapping.jsonPath
+                  ? getValueByPath(webhookData, mapping.jsonPath)
+                  : webhookData;
+                if (val !== undefined) {
+                  variables[mapping.variableName] = val;
+                }
+              }
+            });
+          }
         }
         break;
       }
