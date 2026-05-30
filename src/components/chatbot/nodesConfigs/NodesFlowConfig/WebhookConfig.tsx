@@ -91,6 +91,10 @@ export const WebhookConfig = ({ config, setConfig }: WebhookConfigProps) => {
   const [allowedOrigins, setAllowedOrigins] = useState(() => config.allowedOrigins || "*");
   const [lastTestPayload, setLastTestPayload] = useState<CapturedRequest | null>(() => config.lastTestPayload || null);
   const [urlMode, setUrlMode] = useState<"test" | "production">(() => config.urlMode || "test");
+  const [responseMappings, setResponseMappings] = useState<ResponseMapping[]>(() => config.responseMappings || []);
+  const [variableModalOpen, setVariableModalOpen] = useState<{ open: boolean; index: number }>({ open: false, index: -1 });
+  const { getAllVariableNames, variables } = useVariables();
+  const availableVariables = useMemo(() => getAllVariableNames(), [variables, getAllVariableNames]);
   
   // Refs para rastrear valores atuais e evitar loops
   const isUpdatingRef = useRef(false);
