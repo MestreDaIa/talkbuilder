@@ -463,21 +463,50 @@ export const WebhookConfig = ({ config, setConfig }: WebhookConfigProps) => {
             <span className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
               Output
             </span>
-            {lastTestPayload && (
+            {capturedEvents.length > 0 && (
               <Badge variant="outline" className="text-[10px]">
-                {new Date(lastTestPayload.receivedAt).toLocaleTimeString()}
+                {capturedEvents.length} evento{capturedEvents.length > 1 ? "s" : ""}
+              </Badge>
+            )}
+            {listening && (
+              <Badge className="text-[10px] bg-red-500/15 text-red-500 border-red-500/30">
+                <Radio className="h-2.5 w-2.5 mr-1 animate-pulse" /> ao vivo
               </Badge>
             )}
           </div>
-          {lastTestPayload && (
+          {capturedEvents.length > 0 && (
             <Button type="button" variant="ghost" size="sm" onClick={clearCapture}>
               Limpar
             </Button>
           )}
         </div>
 
+        {capturedEvents.length > 0 && (
+          <div className="border-b border-border bg-background/30 max-h-40 overflow-y-auto">
+            {capturedEvents.map((e, i) => {
+              const active = i === selectedEventIdx;
+              const label = getEventLabel(e);
+              return (
+                <button
+                  key={i}
+                  type="button"
+                  onClick={() => setSelectedEventIdx(i)}
+                  className={`w-full text-left px-3 py-1.5 text-[11px] border-l-2 flex items-center justify-between gap-2 hover:bg-muted/60 ${
+                    active ? "border-primary bg-muted/60" : "border-transparent"
+                  }`}
+                >
+                  <span className="font-mono truncate">{label}</span>
+                  <span className="text-[10px] text-muted-foreground shrink-0">
+                    {new Date(e.receivedAt).toLocaleTimeString()}
+                  </span>
+                </button>
+              );
+            })}
+          </div>
+        )}
+
         <div className="flex-1 overflow-y-auto p-3 text-[11px] font-mono">
-          {!lastTestPayload ? (
+          {!currentEvent ? (
             <div className="h-full flex items-center justify-center text-center text-muted-foreground px-6">
               <div className="space-y-2">
                 <Radio className="h-8 w-8 mx-auto opacity-40" />
@@ -489,7 +518,7 @@ export const WebhookConfig = ({ config, setConfig }: WebhookConfigProps) => {
               </div>
             </div>
           ) : (
-            <JsonTree value={lastTestPayload} rootName={responseVariable || "webhookData"} />
+            <JsonTree value={currentEvent} rootName={responseVariable || "webhookData"} />
           )}
         </div>
       </section>
