@@ -27,6 +27,11 @@ interface CapturedRequest {
   body: any;
 }
 
+interface ResponseMapping {
+  variableName: string;
+  jsonPath: string;
+}
+
 interface WebhookConfigProps {
   config: {
     baseUrl?: string;
@@ -44,6 +49,7 @@ interface WebhookConfigProps {
     responseCode?: number;
     responseData?: string;
     responseVariable?: string;
+    responseMappings?: ResponseMapping[];
     allowedOrigins?: string;
     lastTestPayload?: CapturedRequest | null;
     urlMode?: "test" | "production";
