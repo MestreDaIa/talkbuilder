@@ -218,7 +218,7 @@ const CanvasContent = ({
   const handleSaveConfig = useCallback((config: NodeConfig) => {
     if (!selectedNode) return;
 
-    onContainersChange((currentContainers) => currentContainers.map(container => {
+    const updatedContainers = containersRef.current.map(container => {
       if (container.id === selectedNode.containerId) {
         return {
           ...container,
@@ -230,7 +230,10 @@ const CanvasContent = ({
         };
       }
       return container;
-    }));
+    });
+
+    containersRef.current = updatedContainers;
+    onContainersChange(updatedContainers);
   }, [selectedNode, onContainersChange]);
 
   const handleDeleteNode = useCallback((containerId: string, nodeId: string) => {
