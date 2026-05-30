@@ -139,7 +139,7 @@ function BotEditorInner({
     }, 1000); // Debounce de 1s para não sobrecarregar o banco
 
     return () => clearTimeout(timer);
-  }, [containers, edges, flow?.id, hydrated, variables]);
+  }, [containers, edges, flow?.id, hydrated, historyIndex]);
 
   // Sync variables from initialVariables/Start node whenever containers change
   useEffect(() => {
