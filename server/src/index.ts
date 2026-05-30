@@ -57,7 +57,16 @@ type CapturedRequest = {
   params: Record<string, any>;
   body: any;
 };
-const webhookCaptures = new Map<string, CapturedRequest>();
+// Fila de eventos por path (mais recentes no fim). Limite por path para não vazar memória.
+const MAX_EVENTS_PER_PATH = 100;
+const webhookCaptures = new Map<string, CapturedRequest[]>();
+
+function pushCapture(path: string, captured: CapturedRequest) {
+  const arr = webhookCaptures.get(path) || [];
+  arr.push(captured);
+  if (arr.length > MAX_EVENTS_PER_PATH) arr.splice(0, arr.length - MAX_EVENTS_PER_PATH);
+  webhookCaptures.set(path, arr);
+}
 
 // Rota GET auxiliar para testar se o endpoint existe via navegador
 app.get("/webhook/whatsapp", (req: Request, res: Response) => {
