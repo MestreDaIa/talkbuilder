@@ -108,6 +108,37 @@ function BotEditorInner({
 }: any) {
   const { variables, setVariables } = useVariables();
 
+  // Auto-save logic: triggers saveDraft whenever containers or edges change after hydration
+  useEffect(() => {
+    if (!hydrated || !flow?.id) return;
+    
+    // Evita loop se estivermos apenas reagindo ao carregamento inicial
+    if (historyIndex === -1) return;
+
+    const timer = setTimeout(async () => {
+      try {
+        console.log("[BotPage] Auto-salvando rascunho...", {
+          containersCount: containers.length,
+          edgesCount: edges.length
+        });
+        
+        // Mantemos a consistência de variáveis no settings se necessário
+        const updatedSettings = {
+          ...(flow.settings || {}),
+          variables: variables
+        };
+
+        await saveDraft(flow.id, containers, edges);
+        // Opcionalmente atualizamos o settings se variáveis mudaram
+        // await updateFlowMeta(flow.id, { settings: updatedSettings });
+      } catch (err) {
+        console.error("[BotPage] Erro no auto-save:", err);
+      }
+    }, 1000); // Debounce de 1s para não sobrecarregar o banco
+
+    return () => clearTimeout(timer);
+  }, [containers, edges, flow?.id, hydrated, variables]);
+
   // Sync variables from initialVariables/Start node whenever containers change
   useEffect(() => {
     const startNode = containers
@@ -130,7 +161,7 @@ function BotEditorInner({
     }
   }, [containers, setVariables]);
 
-  // Função de salvar que inclui variáveis
+  // Função de salvar manual (mantida para UX)
   const handleSaveWithVariables = async () => {
     if (!flow) {
       saveLocal(botId, { containers, edges });
@@ -140,22 +171,12 @@ function BotEditorInner({
     
     setIsSaving(true);
     try {
-      const containersToSave = JSON.parse(JSON.stringify(containers));
-      const edgesToSave = JSON.parse(JSON.stringify(edges));
-      
-      // Incluímos as variáveis atuais no settings
       const updatedSettings = {
         ...(flow.settings || {}),
         variables: variables
       };
 
-      console.log("[BotPage] Salvando rascunho com variáveis...", {
-        variablesCount: Object.keys(variables).length
-      });
-
-      const updated = await saveDraft(flow.id, containersToSave, edgesToSave);
-      
-      // Atualizamos também o settings via updateFlowMeta para garantir que as variáveis persistam
+      await saveDraft(flow.id, containers, edges);
       const finalUpdated = await updateFlowMeta(flow.id, { settings: updatedSettings });
       
       setFlow(finalUpdated);
