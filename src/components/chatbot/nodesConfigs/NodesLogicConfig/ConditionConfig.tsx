@@ -194,23 +194,10 @@ const ComparisonItem = ({
 
 export const ConditionConfig = ({ config, setConfig, containers = [] }: ConditionConfigProps & { containers?: Container[] }) => {
   const { getAllVariableNames } = useVariables();
-  const availableVariables = useMemo(() => {
-    const systemVars = [
-      "last_message", 
-      "messageType", 
-      "caption", 
-      "remoteJid", 
-      "pushName", 
-      "instanceName", 
-      "messageId", 
-      "mimetype", 
-      "mediaUrl", 
-      "base64"
-    ];
-    const nodeVars = getNodeVariableNames(containers);
-    const contextVars = getAllVariableNames();
-    return Array.from(new Set([...systemVars, ...contextVars, ...nodeVars]));
-  }, [containers, getAllVariableNames]);
+  const availableVariables = useMemo(
+    () => Array.from(new Set([...getAllVariableNames(), ...getNodeVariableNames(containers)])),
+    [containers, getAllVariableNames]
+  );
 
   const [defaultConditionId] = useState(createConditionId);
   const conditions: ConditionGroup[] = config.conditions?.length
