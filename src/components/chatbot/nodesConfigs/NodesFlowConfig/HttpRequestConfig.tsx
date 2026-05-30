@@ -69,98 +69,76 @@ export const HttpRequestConfig = ({
   setConfig,
 }: HttpRequestConfigProps) => {
   const { getAllVariableNames, addVariable } = useVariables();
+  
+  // Sincronização de estados locais
   const [method, setMethod] = useState(config.method || "GET");
   const [url, setUrl] = useState(config.url || "");
   const [authType, setAuthType] = useState(config.authType || "none");
-  const [authCredentials, setAuthCredentials] = useState(
-    config.authCredentials || {}
-  );
-  const [queryParams, setQueryParams] = useState<KeyValuePair[]>(
-    config.queryParams || []
-  );
+  const [authCredentials, setAuthCredentials] = useState(config.authCredentials || {});
+  const [queryParams, setQueryParams] = useState<KeyValuePair[]>(config.queryParams || []);
   const [headers, setHeaders] = useState<KeyValuePair[]>(config.headers || []);
   const [sendBody, setSendBody] = useState(config.sendBody ?? false);
-  const [bodyContentType, setBodyContentType] = useState(
-    config.bodyContentType || "json"
-  );
-  const [bodyParams, setBodyParams] = useState<KeyValuePair[]>(
-    config.bodyParams || []
-  );
+  const [bodyContentType, setBodyContentType] = useState(config.bodyContentType || "json");
+  const [bodyParams, setBodyParams] = useState<KeyValuePair[]>(config.bodyParams || []);
   const [bodyJson, setBodyJson] = useState(config.bodyJson || "{}");
   const [bodyRaw, setBodyRaw] = useState(config.bodyRaw || "");
   const [timeout, setTimeout_] = useState(config.timeout || 30000);
-  const [followRedirects, setFollowRedirects] = useState(
-    config.followRedirects ?? true
-  );
+  const [followRedirects, setFollowRedirects] = useState(config.followRedirects ?? true);
   const [ignoreSSL, setIgnoreSSL] = useState(config.ignoreSSL ?? false);
-  const [responseVariable, setResponseVariable] = useState(
-    config.responseVariable || "httpResponse"
-  );
-  const [responseFormat, setResponseFormat] = useState(
-    config.responseFormat || "json"
-  );
-  const [responseMappings, setResponseMappings] = useState<ResponseMapping[]>(
-    config.responseMappings || []
-  );
+  const [responseVariable, setResponseVariable] = useState(config.responseVariable || "httpResponse");
+  const [responseFormat, setResponseFormat] = useState(config.responseFormat || "json");
+  const [responseMappings, setResponseMappings] = useState<ResponseMapping[]>(config.responseMappings || []);
 
-  // Sincroniza estados locais se a config do pai mudar (ex: ao abrir o modal)
-  useEffect(() => {
-    console.log("[HttpRequestConfig] Parent config changed, syncing local state:", config);
-    if (config.method) setMethod(config.method);
-    if (config.url !== undefined) setUrl(config.url);
-    if (config.authType) setAuthType(config.authType);
-    if (config.authCredentials) setAuthCredentials(config.authCredentials);
-    if (config.queryParams) setQueryParams(config.queryParams);
-    if (config.headers) setHeaders(config.headers);
-    if (config.sendBody !== undefined) setSendBody(config.sendBody);
-    if (config.bodyContentType) setBodyContentType(config.bodyContentType);
-    if (config.bodyParams) setBodyParams(config.bodyParams);
-    if (config.bodyJson) setBodyJson(config.bodyJson);
-    if (config.bodyRaw) setBodyRaw(config.bodyRaw);
-    if (config.timeout) setTimeout_(config.timeout);
-    if (config.followRedirects !== undefined) setFollowRedirects(config.followRedirects);
-    if (config.ignoreSSL !== undefined) setIgnoreSSL(config.ignoreSSL);
-    if (config.responseVariable) setResponseVariable(config.responseVariable);
-    if (config.responseFormat) setResponseFormat(config.responseFormat);
-    if (config.responseMappings) setResponseMappings(config.responseMappings);
-  }, [config]);
   const [isTesting, setIsTesting] = useState(false);
   const [testResult, setTestResult] = useState<string | null>(null);
   const [lastJsonResponse, setLastJsonResponse] = useState<any>(null);
   const [isSaveExpanded, setIsSaveExpanded] = useState(false);
-  const [openDataPopovers, setOpenDataPopovers] = useState<Record<number, boolean>>({});
-  const [openVariablePopovers, setOpenVariablePopovers] = useState<Record<number, boolean>>({});
   const [variableModalOpen, setVariableModalOpen] = useState<{ open: boolean; index: number }>({ open: false, index: -1 });
 
-  // Removido useEffect que chamava setConfig automaticamente.
-  // Agora apenas o clique em "Salvar" no modal dispara a atualização no pai.
+  // Sincroniza estados locais se a config do pai mudar (ex: ao abrir o modal)
+  useEffect(() => {
+    setMethod(config.method || "GET");
+    setUrl(config.url || "");
+    setAuthType(config.authType || "none");
+    setAuthCredentials(config.authCredentials || {});
+    setQueryParams(config.queryParams || []);
+    setHeaders(config.headers || []);
+    setSendBody(config.sendBody ?? false);
+    setBodyContentType(config.bodyContentType || "json");
+    setBodyParams(config.bodyParams || []);
+    setBodyJson(config.bodyJson || "{}");
+    setBodyRaw(config.bodyRaw || "");
+    setTimeout_(config.timeout || 30000);
+    setFollowRedirects(config.followRedirects ?? true);
+    setIgnoreSSL(config.ignoreSSL ?? false);
+    setResponseVariable(config.responseVariable || "httpResponse");
+    setResponseFormat(config.responseFormat || "json");
+    setResponseMappings(config.responseMappings || []);
+  }, [config]);
 
+  // Helper para atualizar config e estado local
+  const updateConfig = (updates: Partial<typeof config>) => {
+    const newConfig = { ...config, ...updates };
+    setConfig(newConfig);
+  };
 
   const availableVariables = useMemo(() => getAllVariableNames(), [getAllVariableNames]);
 
   const jsonPaths = useMemo(() => {
     if (!lastJsonResponse) return [];
-    
     const paths: string[] = [];
     const traverse = (obj: any, path: string = "data") => {
       if (obj === null || typeof obj !== "object") {
         paths.push(path);
         return;
       }
-      
       paths.push(path);
-      
       if (Array.isArray(obj)) {
-        obj.forEach((item, index) => {
-          traverse(item, `${path}.${index}`);
-        });
+        obj.forEach((item, index) => traverse(item, `${path}.${index}`));
       } else {
-        Object.keys(obj).forEach((key) => {
-          traverse(obj[key], `${path}.${key}`);
-        });
+        Object.keys(obj).forEach((key) => traverse(obj[key], `${path}.${key}`));
       }
     };
-    
     traverse(lastJsonResponse);
     return paths;
   }, [lastJsonResponse]);
@@ -172,7 +150,7 @@ export const HttpRequestConfig = ({
   ) => {
     const newList = [...list, { name: "", value: "" }];
     setList(newList);
-    setConfig({ ...config, [field]: newList });
+    updateConfig({ [field]: newList });
   };
 
   const handleRemoveKeyValue = (
@@ -183,7 +161,7 @@ export const HttpRequestConfig = ({
   ) => {
     const newList = list.filter((_, i) => i !== index);
     setList(newList);
-    setConfig({ ...config, [field]: newList });
+    updateConfig({ [field]: newList });
   };
 
   const handleKeyValueChange = (
@@ -197,76 +175,62 @@ export const HttpRequestConfig = ({
     const updated = [...list];
     updated[index] = { ...updated[index], [field]: value };
     setList(updated);
-    setConfig({ ...config, [configField]: updated });
+    updateConfig({ [configField]: updated });
   };
 
   const handleAddResponseMapping = () => {
     const newList = [...responseMappings, { jsonPath: "", variableName: "" }];
     setResponseMappings(newList);
-    setConfig({ ...config, responseMappings: newList });
+    updateConfig({ responseMappings: newList });
   };
 
   const handleRemoveResponseMapping = (index: number) => {
     const newList = responseMappings.filter((_, i) => i !== index);
     setResponseMappings(newList);
-    setConfig({ ...config, responseMappings: newList });
+    updateConfig({ responseMappings: newList });
   };
 
   const handleResponseMappingChange = (index: number, field: keyof ResponseMapping, value: string) => {
     const updated = [...responseMappings];
     updated[index] = { ...updated[index], [field]: value };
     setResponseMappings(updated);
-    setConfig({ ...config, responseMappings: updated });
+    updateConfig({ responseMappings: updated });
   };
-
 
   const handleTestRequest = async () => {
     if (!url) {
       toast.error("Informe a URL");
       return;
     }
-
     setIsTesting(true);
     setTestResult(null);
     setLastJsonResponse(null);
 
     try {
-      // Build query string
       let fullUrl = url;
       if (queryParams.length > 0) {
         const params = new URLSearchParams();
-        queryParams.forEach((p) => {
-          if (p.name) params.append(p.name, p.value);
-        });
+        queryParams.forEach((p) => { if (p.name) params.append(p.name, p.value); });
         const qs = params.toString();
         if (qs) fullUrl += (fullUrl.includes("?") ? "&" : "?") + qs;
       }
 
-      // Build headers
       const reqHeaders: Record<string, string> = {};
-      headers.forEach((h) => {
-        if (h.name) reqHeaders[h.name] = h.value;
-      });
+      headers.forEach((h) => { if (h.name) reqHeaders[h.name] = h.value; });
 
-      // Auth headers
       if (authType === "bearer" && authCredentials.token) {
         reqHeaders["Authorization"] = `Bearer ${authCredentials.token}`;
       } else if (authType === "basic" && authCredentials.username) {
-        const encoded = btoa(
-          `${authCredentials.username}:${authCredentials.password || ""}`
-        );
+        const encoded = btoa(`${authCredentials.username}:${authCredentials.password || ""}`);
         reqHeaders["Authorization"] = `Basic ${encoded}`;
       } else if (authType === "header" && authCredentials.headerName) {
-        reqHeaders[authCredentials.headerName] =
-          authCredentials.headerValue || "";
+        reqHeaders[authCredentials.headerName] = authCredentials.headerValue || "";
       } else if (authType === "apiKey" && authCredentials.apiKeyName) {
         if (authCredentials.apiKeyLocation === "header") {
-          reqHeaders[authCredentials.apiKeyName] =
-            authCredentials.apiKeyValue || "";
+          reqHeaders[authCredentials.apiKeyName] = authCredentials.apiKeyValue || "";
         }
       }
 
-      // Build body
       let body: string | undefined;
       if (sendBody && method !== "GET" && method !== "HEAD") {
         if (bodyContentType === "json") {
@@ -275,34 +239,23 @@ export const HttpRequestConfig = ({
         } else if (bodyContentType === "form-urlencoded") {
           reqHeaders["Content-Type"] = "application/x-www-form-urlencoded";
           const params = new URLSearchParams();
-          bodyParams.forEach((p) => {
-            if (p.name) params.append(p.name, p.value);
-          });
+          bodyParams.forEach((p) => { if (p.name) params.append(p.name, p.value); });
           body = params.toString();
         } else if (bodyContentType === "raw") {
           body = bodyRaw;
         }
       }
 
-      const response = await fetch(fullUrl, {
-        method,
-        headers: reqHeaders,
-        body,
-      });
-
+      const response = await fetch(fullUrl, { method, headers: reqHeaders, body });
       const responseText = await response.text();
       let formatted = responseText;
       try {
         const json = JSON.parse(responseText);
         formatted = JSON.stringify(json, null, 2);
         setLastJsonResponse(json);
-      } catch {
-        // Keep as text
-      }
+      } catch { }
 
-      setTestResult(
-        `Status: ${response.status} ${response.statusText}\n\n${formatted}`
-      );
+      setTestResult(`Status: ${response.status} ${response.statusText}\n\n${formatted}`);
       toast.success(`Requisição concluída: ${response.status}`);
     } catch (error: any) {
       setTestResult(`Erro: ${error.message}`);
@@ -314,24 +267,17 @@ export const HttpRequestConfig = ({
 
   return (
     <div className="space-y-4 p-4">
-      {/* Method & URL */}
       <div className="flex gap-2">
         <div className="w-32">
           <Select value={method} onValueChange={(val) => {
             setMethod(val);
-            setConfig({ ...config, method: val });
+            updateConfig({ method: val });
           }}>
-            <SelectTrigger>
-              <SelectValue />
-            </SelectTrigger>
+            <SelectTrigger><SelectValue /></SelectTrigger>
             <SelectContent>
-              <SelectItem value="GET">GET</SelectItem>
-              <SelectItem value="POST">POST</SelectItem>
-              <SelectItem value="PUT">PUT</SelectItem>
-              <SelectItem value="PATCH">PATCH</SelectItem>
-              <SelectItem value="DELETE">DELETE</SelectItem>
-              <SelectItem value="HEAD">HEAD</SelectItem>
-              <SelectItem value="OPTIONS">OPTIONS</SelectItem>
+              {["GET", "POST", "PUT", "PATCH", "DELETE", "HEAD", "OPTIONS"].map(m => (
+                <SelectItem key={m} value={m}>{m}</SelectItem>
+              ))}
             </SelectContent>
           </Select>
         </div>
@@ -340,21 +286,12 @@ export const HttpRequestConfig = ({
           value={url}
           onChange={(e) => {
             setUrl(e.target.value);
-            setConfig({ ...config, url: e.target.value });
+            updateConfig({ url: e.target.value });
           }}
           placeholder="https://api.exemplo.com/endpoint"
         />
-        <Button
-          type="button"
-          variant="outline"
-          onClick={handleTestRequest}
-          disabled={isTesting}
-        >
-          {isTesting ? (
-            <Loader2 className="h-4 w-4 animate-spin" />
-          ) : (
-            <Play className="h-4 w-4" />
-          )}
+        <Button variant="outline" onClick={handleTestRequest} disabled={isTesting}>
+          {isTesting ? <Loader2 className="h-4 w-4 animate-spin" /> : <Play className="h-4 w-4" />}
         </Button>
       </div>
 
@@ -367,82 +304,31 @@ export const HttpRequestConfig = ({
           <TabsTrigger value="options">Opções</TabsTrigger>
         </TabsList>
 
-        {/* Query Parameters */}
         <TabsContent value="params" className="space-y-3">
           <div className="flex items-center justify-between">
             <Label>Query Parameters</Label>
-            <Button
-              type="button"
-              variant="outline"
-              size="sm"
-              onClick={() => handleAddKeyValue(queryParams, setQueryParams, "queryParams")}
-            >
-              <Plus className="h-4 w-4 mr-1" />
-              Adicionar
+            <Button variant="outline" size="sm" onClick={() => handleAddKeyValue(queryParams, setQueryParams, "queryParams")}>
+              <Plus className="h-4 w-4 mr-1" /> Adicionar
             </Button>
           </div>
-          {queryParams.length === 0 ? (
-            <p className="text-xs text-muted-foreground">
-              Nenhum parâmetro de query.
-            </p>
-          ) : (
-            <div className="space-y-2">
-              {queryParams.map((param, index) => (
-                <div key={index} className="flex items-center gap-2">
-                  <Input
-                    value={param.name}
-                    onChange={(e) =>
-                      handleKeyValueChange(
-                        index,
-                        "name",
-                        e.target.value,
-                        queryParams,
-                        setQueryParams,
-                        "queryParams"
-                      )
-                    }
-                    placeholder="Nome"
-                    className="flex-1"
-                  />
-                  <Input
-                    value={param.value}
-                    onChange={(e) =>
-                      handleKeyValueChange(
-                        index,
-                        "value",
-                        e.target.value,
-                        queryParams,
-                        setQueryParams,
-                        "queryParams"
-                      )
-                    }
-                    placeholder="Valor (suporta {{var}})"
-                    className="flex-1"
-                  />
-                  <Button
-                    type="button"
-                    variant="ghost"
-                    size="icon"
-                    onClick={() =>
-                      handleRemoveKeyValue(index, queryParams, setQueryParams, "queryParams")
-                    }
-                  >
-                    <Trash2 className="h-4 w-4 text-destructive" />
-                  </Button>
-                </div>
-              ))}
-            </div>
-          )}
+          <div className="space-y-2">
+            {queryParams.map((param, index) => (
+              <div key={index} className="flex items-center gap-2">
+                <Input value={param.name} placeholder="Nome" className="flex-1" onChange={(e) => handleKeyValueChange(index, "name", e.target.value, queryParams, setQueryParams, "queryParams")} />
+                <Input value={param.value} placeholder="Valor (suporta {{var}})" className="flex-1" onChange={(e) => handleKeyValueChange(index, "value", e.target.value, queryParams, setQueryParams, "queryParams")} />
+                <Button variant="ghost" size="icon" onClick={() => handleRemoveKeyValue(index, queryParams, setQueryParams, "queryParams")}>
+                  <Trash2 className="h-4 w-4 text-destructive" />
+                </Button>
+              </div>
+            ))}
+          </div>
         </TabsContent>
 
-        {/* Authentication */}
         <TabsContent value="auth" className="space-y-3">
           <div className="space-y-2">
             <Label>Tipo de Autenticação</Label>
-            <Select value={authType} onValueChange={setAuthType}>
-              <SelectTrigger>
-                <SelectValue />
-              </SelectTrigger>
+            <Select value={authType} onValueChange={(val) => { setAuthType(val); updateConfig({ authType: val }); }}>
+              <SelectTrigger><SelectValue /></SelectTrigger>
               <SelectContent>
                 <SelectItem value="none">Nenhuma</SelectItem>
                 <SelectItem value="basic">Basic Auth</SelectItem>
@@ -452,485 +338,127 @@ export const HttpRequestConfig = ({
               </SelectContent>
             </Select>
           </div>
-
           {authType === "basic" && (
             <div className="grid grid-cols-2 gap-4">
               <div className="space-y-2">
                 <Label>Usuário</Label>
-                <Input
-                  value={authCredentials.username || ""}
-                  onChange={(e) =>
-                    setAuthCredentials({
-                      ...authCredentials,
-                      username: e.target.value,
-                    })
-                  }
-                  placeholder="username"
-                />
+                <Input value={authCredentials.username || ""} onChange={(e) => {
+                  const newAuth = { ...authCredentials, username: e.target.value };
+                  setAuthCredentials(newAuth); updateConfig({ authCredentials: newAuth });
+                }} />
               </div>
               <div className="space-y-2">
                 <Label>Senha</Label>
-                <Input
-                  type="password"
-                  value={authCredentials.password || ""}
-                  onChange={(e) =>
-                    setAuthCredentials({
-                      ...authCredentials,
-                      password: e.target.value,
-                    })
-                  }
-                  placeholder="••••••••"
-                />
+                <Input type="password" value={authCredentials.password || ""} onChange={(e) => {
+                  const newAuth = { ...authCredentials, password: e.target.value };
+                  setAuthCredentials(newAuth); updateConfig({ authCredentials: newAuth });
+                }} />
               </div>
             </div>
           )}
-
           {authType === "bearer" && (
             <div className="space-y-2">
               <Label>Token</Label>
-              <Input
-                type="password"
-                value={authCredentials.token || ""}
-                onChange={(e) =>
-                  setAuthCredentials({
-                    ...authCredentials,
-                    token: e.target.value,
-                  })
-                }
-                placeholder="eyJhbGciOiJIUzI1NiIsInR5cCI6..."
-              />
-            </div>
-          )}
-
-          {authType === "header" && (
-            <div className="grid grid-cols-2 gap-4">
-              <div className="space-y-2">
-                <Label>Nome do Header</Label>
-                <Input
-                  value={authCredentials.headerName || ""}
-                  onChange={(e) =>
-                    setAuthCredentials({
-                      ...authCredentials,
-                      headerName: e.target.value,
-                    })
-                  }
-                  placeholder="X-API-Key"
-                />
-              </div>
-              <div className="space-y-2">
-                <Label>Valor do Header</Label>
-                <Input
-                  type="password"
-                  value={authCredentials.headerValue || ""}
-                  onChange={(e) =>
-                    setAuthCredentials({
-                      ...authCredentials,
-                      headerValue: e.target.value,
-                    })
-                  }
-                  placeholder="••••••••"
-                />
-              </div>
-            </div>
-          )}
-
-          {authType === "apiKey" && (
-            <div className="space-y-3">
-              <div className="grid grid-cols-2 gap-4">
-                <div className="space-y-2">
-                  <Label>Nome da API Key</Label>
-                  <Input
-                    value={authCredentials.apiKeyName || ""}
-                    onChange={(e) =>
-                      setAuthCredentials({
-                        ...authCredentials,
-                        apiKeyName: e.target.value,
-                      })
-                    }
-                    placeholder="api_key"
-                  />
-                </div>
-                <div className="space-y-2">
-                  <Label>Valor</Label>
-                  <Input
-                    type="password"
-                    value={authCredentials.apiKeyValue || ""}
-                    onChange={(e) =>
-                      setAuthCredentials({
-                        ...authCredentials,
-                        apiKeyValue: e.target.value,
-                      })
-                    }
-                    placeholder="••••••••"
-                  />
-                </div>
-              </div>
-              <div className="space-y-2">
-                <Label>Localização</Label>
-                <Select
-                  value={authCredentials.apiKeyLocation || "header"}
-                  onValueChange={(v) =>
-                    setAuthCredentials({
-                      ...authCredentials,
-                      apiKeyLocation: v,
-                    })
-                  }
-                >
-                  <SelectTrigger>
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="header">Header</SelectItem>
-                    <SelectItem value="query">Query Param</SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
+              <Input type="password" value={authCredentials.token || ""} onChange={(e) => {
+                const newAuth = { ...authCredentials, token: e.target.value };
+                setAuthCredentials(newAuth); updateConfig({ authCredentials: newAuth });
+              }} />
             </div>
           )}
         </TabsContent>
 
-        {/* Headers */}
         <TabsContent value="headers" className="space-y-3">
           <div className="flex items-center justify-between">
             <Label>Headers</Label>
-            <Button
-              type="button"
-              variant="outline"
-              size="sm"
-              onClick={() => handleAddKeyValue(headers, setHeaders, "headers")}
-            >
-              <Plus className="h-4 w-4 mr-1" />
-              Adicionar
+            <Button variant="outline" size="sm" onClick={() => handleAddKeyValue(headers, setHeaders, "headers")}>
+              <Plus className="h-4 w-4 mr-1" /> Adicionar
             </Button>
           </div>
-          {headers.length === 0 ? (
-            <p className="text-xs text-muted-foreground">Nenhum header.</p>
-          ) : (
-            <div className="space-y-2">
-              {headers.map((header, index) => (
-                <div key={index} className="flex items-center gap-2">
-                  <Input
-                    value={header.name}
-                    onChange={(e) =>
-                      handleKeyValueChange(
-                        index,
-                        "name",
-                        e.target.value,
-                        headers,
-                        setHeaders,
-                        "headers"
-                      )
-                    }
-                    placeholder="Nome"
-                    className="flex-1"
-                  />
-                  <Input
-                    value={header.value}
-                    onChange={(e) =>
-                      handleKeyValueChange(
-                        index,
-                        "value",
-                        e.target.value,
-                        headers,
-                        setHeaders,
-                        "headers"
-                      )
-                    }
-                    placeholder="Valor (suporta {{var}})"
-                    className="flex-1"
-                  />
-                  <Button
-                    type="button"
-                    variant="ghost"
-                    size="icon"
-                    onClick={() =>
-                      handleRemoveKeyValue(index, headers, setHeaders, "headers")
-                    }
-                  >
-                    <Trash2 className="h-4 w-4 text-destructive" />
-                  </Button>
-                </div>
-              ))}
-            </div>
-          )}
+          <div className="space-y-2">
+            {headers.map((header, index) => (
+              <div key={index} className="flex items-center gap-2">
+                <Input value={header.name} placeholder="Nome" className="flex-1" onChange={(e) => handleKeyValueChange(index, "name", e.target.value, headers, setHeaders, "headers")} />
+                <Input value={header.value} placeholder="Valor" className="flex-1" onChange={(e) => handleKeyValueChange(index, "value", e.target.value, headers, setHeaders, "headers")} />
+                <Button variant="ghost" size="icon" onClick={() => handleRemoveKeyValue(index, headers, setHeaders, "headers")}>
+                  <Trash2 className="h-4 w-4 text-destructive" />
+                </Button>
+              </div>
+            ))}
+          </div>
         </TabsContent>
 
-        {/* Body */}
         <TabsContent value="body" className="space-y-3">
           <div className="flex items-center space-x-2">
-            <Switch
-              id="sendBody"
-              checked={sendBody}
-              onCheckedChange={setSendBody}
-            />
+            <Switch id="sendBody" checked={sendBody} onCheckedChange={(val) => { setSendBody(val); updateConfig({ sendBody: val }); }} />
             <Label htmlFor="sendBody">Enviar Body</Label>
           </div>
-
           {sendBody && (
             <>
               <div className="space-y-2">
                 <Label>Tipo de Conteúdo</Label>
-                <Select value={bodyContentType} onValueChange={setBodyContentType}>
-                  <SelectTrigger>
-                    <SelectValue />
-                  </SelectTrigger>
+                <Select value={bodyContentType} onValueChange={(val) => { setBodyContentType(val); updateConfig({ bodyContentType: val }); }}>
+                  <SelectTrigger><SelectValue /></SelectTrigger>
                   <SelectContent>
                     <SelectItem value="json">JSON</SelectItem>
-                    <SelectItem value="form-urlencoded">
-                      Form URL-encoded
-                    </SelectItem>
-                    <SelectItem value="form-data">Form-Data</SelectItem>
+                    <SelectItem value="form-urlencoded">Form URL-encoded</SelectItem>
                     <SelectItem value="raw">Raw</SelectItem>
                   </SelectContent>
                 </Select>
               </div>
-
               {bodyContentType === "json" && (
-                <div className="space-y-2">
-                  <Label>JSON Body</Label>
-                  <Textarea
-                    value={bodyJson}
-                    onChange={(e) => setBodyJson(e.target.value)}
-                    placeholder='{"key": "value"}'
-                    rows={5}
-                    className="font-mono text-sm"
-                  />
-                  <p className="text-xs text-muted-foreground">
-                    Suporta variáveis: {"{{variavel}}"}
-                  </p>
-                </div>
+                <Textarea value={bodyJson} rows={5} className="font-mono text-sm" onChange={(e) => { setBodyJson(e.target.value); updateConfig({ bodyJson: e.target.value }); }} />
               )}
-
-              {(bodyContentType === "form-urlencoded" ||
-                bodyContentType === "form-data") && (
-                <div className="space-y-3">
-                  <div className="flex items-center justify-between">
-                    <Label>Campos</Label>
-                    <Button
-                      type="button"
-                      variant="outline"
-                      size="sm"
-                      onClick={() => handleAddKeyValue(bodyParams, setBodyParams, "bodyParams")}
-                    >
-                      <Plus className="h-4 w-4 mr-1" />
-                      Adicionar
-                    </Button>
-                  </div>
-                  {bodyParams.map((param, index) => (
-                    <div key={index} className="flex items-center gap-2">
-                      <Input
-                        value={param.name}
-                        onChange={(e) =>
-                          handleKeyValueChange(
-                            index,
-                            "name",
-                            e.target.value,
-                            bodyParams,
-                            setBodyParams,
-                            "bodyParams"
-                          )
-                        }
-                        placeholder="Nome"
-                        className="flex-1"
-                      />
-                      <Input
-                        value={param.value}
-                        onChange={(e) =>
-                          handleKeyValueChange(
-                            index,
-                            "value",
-                            e.target.value,
-                            bodyParams,
-                            setBodyParams,
-                            "bodyParams"
-                          )
-                        }
-                        placeholder="Valor"
-                        className="flex-1"
-                      />
-                      <Button
-                        type="button"
-                        variant="ghost"
-                        size="icon"
-                        onClick={() =>
-                          handleRemoveKeyValue(index, bodyParams, setBodyParams, "bodyParams")
-                        }
-                      >
-                        <Trash2 className="h-4 w-4 text-destructive" />
-                      </Button>
-                    </div>
-                  ))}
-                </div>
-              )}
-
               {bodyContentType === "raw" && (
-                <div className="space-y-2">
-                  <Label>Raw Body</Label>
-                  <Textarea
-                    value={bodyRaw}
-                    onChange={(e) => setBodyRaw(e.target.value)}
-                    placeholder="Conteúdo raw..."
-                    rows={5}
-                    className="font-mono text-sm"
-                  />
-                </div>
+                <Textarea value={bodyRaw} rows={5} className="font-mono text-sm" onChange={(e) => { setBodyRaw(e.target.value); updateConfig({ bodyRaw: e.target.value }); }} />
               )}
             </>
           )}
         </TabsContent>
 
-        {/* Options */}
         <TabsContent value="options" className="space-y-4">
           <div className="space-y-2">
             <Label>Timeout (ms)</Label>
-            <Input
-              type="number"
-              value={timeout}
-              onChange={(e) => setTimeout_(Number(e.target.value))}
-              placeholder="30000"
-            />
-          </div>
-
-          <div className="flex items-center space-x-2">
-            <Switch
-              id="followRedirects"
-              checked={followRedirects}
-              onCheckedChange={setFollowRedirects}
-            />
-            <Label htmlFor="followRedirects">Seguir Redirecionamentos</Label>
-          </div>
-
-          <div className="flex items-center space-x-2">
-            <Switch
-              id="ignoreSSL"
-              checked={ignoreSSL}
-              onCheckedChange={setIgnoreSSL}
-            />
-            <Label htmlFor="ignoreSSL">Ignorar Erros SSL</Label>
+            <Input type="number" value={timeout} onChange={(e) => { const v = Number(e.target.value); setTimeout_(v); updateConfig({ timeout: v }); }} />
           </div>
         </TabsContent>
       </Tabs>
 
-      {/* Test Result */}
       {testResult && (
         <div className="space-y-2 mt-4">
           <Label>Resultado do Teste</Label>
-          <pre className="text-xs bg-muted p-3 rounded overflow-x-auto max-h-48 overflow-y-auto">
-            {testResult}
-          </pre>
+          <pre className="text-xs bg-muted p-3 rounded overflow-x-auto max-h-48 overflow-y-auto">{testResult}</pre>
         </div>
       )}
 
-      <div className="space-y-4 pt-4">
-        <Collapsible
-          open={isSaveExpanded}
-          onOpenChange={setIsSaveExpanded}
-          className="space-y-2 border rounded-lg p-3"
-        >
-          <div className="flex items-center justify-between">
-            <Label className="text-sm font-semibold">Save in variable</Label>
-            <CollapsibleTrigger asChild>
-              <Button variant="ghost" size="sm">
-                {isSaveExpanded ? <ChevronDown className="h-4 w-4" /> : <ChevronRight className="h-4 w-4" />}
-              </Button>
-            </CollapsibleTrigger>
-          </div>
-
-          <CollapsibleContent className="space-y-4 pt-2">
-            <div className="space-y-3 pt-0">
-              <div className="flex items-center justify-between">
-                <div />
-                <Button
-                  type="button"
-                  variant="outline"
-                  size="sm"
-                  className="h-7 text-xs"
-                  onClick={handleAddResponseMapping}
-                >
-                  <Plus className="h-3 w-3 mr-1" />
-                  Add an entry
-                </Button>
+      <Collapsible open={isSaveExpanded} onOpenChange={setIsSaveExpanded} className="space-y-2 border rounded-lg p-3">
+        <div className="flex items-center justify-between">
+          <Label className="text-sm font-semibold">Save in variable</Label>
+          <CollapsibleTrigger asChild><Button variant="ghost" size="sm">{isSaveExpanded ? <ChevronDown /> : <ChevronRight />}</Button></CollapsibleTrigger>
+        </div>
+        <CollapsibleContent className="space-y-4 pt-2">
+          <Button variant="outline" size="sm" className="h-7 text-xs" onClick={handleAddResponseMapping}><Plus className="h-3 w-3 mr-1" /> Add entry</Button>
+          {responseMappings.map((mapping, index) => (
+            <div key={index} className="space-y-4 p-4 border rounded-md bg-muted/30 relative">
+              <Button variant="ghost" size="icon" className="h-6 w-6 absolute top-1 right-1" onClick={() => handleRemoveResponseMapping(index)}><Trash2 className="h-4 w-4 text-destructive" /></Button>
+              <div className="space-y-2">
+                <Label>data:</Label>
+                <Input value={mapping.jsonPath} list={`jsonPaths-${index}`} onChange={(e) => handleResponseMappingChange(index, "jsonPath", e.target.value)} />
+                <datalist id={`jsonPaths-${index}`}>{jsonPaths.map(p => <option key={p} value={p} />)}</datalist>
               </div>
-
-              {responseMappings.map((mapping, index) => (
-                <div key={index} className="space-y-4 p-4 border rounded-md bg-muted/30 relative">
-                  <Button
-                    type="button"
-                    variant="ghost"
-                    size="icon"
-                    className="h-6 w-6 absolute top-1 right-1"
-                    onClick={() => handleRemoveResponseMapping(index)}
-                  >
-                    <Trash2 className="h-4 w-4 text-destructive" />
-                  </Button>
-
-                  <div className="space-y-2">
-                    <Label className="text-sm font-medium">data:</Label>
-                    <div className="flex-1 relative">
-                      <Input
-                        placeholder="Select or type data path..."
-                        value={mapping.jsonPath}
-                        onChange={(e) => handleResponseMappingChange(index, "jsonPath", e.target.value)}
-                        list={`jsonPaths-${index}`}
-                      />
-                      <datalist id={`jsonPaths-${index}`}>
-                        {jsonPaths.map((path) => (
-                          <option key={path} value={path} />
-                        ))}
-                      </datalist>
-                    </div>
-                  </div>
-
-                  <div className="space-y-2">
-                    <Label className="text-sm font-medium">set variable:</Label>
-                    <div className="flex gap-2">
-                      <div className="flex-1 relative">
-                        <Input
-                          placeholder="Select or type variable..."
-                          value={mapping.variableName}
-                          onChange={(e) => handleResponseMappingChange(index, "variableName", e.target.value)}
-                          list={`variables-${index}`}
-                        />
-                        <datalist id={`variables-${index}`}>
-                          {availableVariables.map((v) => (
-                            <option key={v} value={v} />
-                          ))}
-                        </datalist>
-                      </div>
-                      <Button
-                        type="button"
-                        variant="ghost"
-                        size="icon"
-                        className="h-10 w-10 text-muted-foreground hover:text-foreground border rounded-md"
-                        onClick={() => setVariableModalOpen({ open: true, index })}
-                        title="Selecionar ou criar variável"
-                      >
-                        <Braces className="h-4 w-4" />
-                      </Button>
-                    </div>
-                  </div>
+              <div className="space-y-2">
+                <Label>set variable:</Label>
+                <div className="flex gap-2">
+                  <Input className="flex-1" value={mapping.variableName} list={`variables-${index}`} onChange={(e) => handleResponseMappingChange(index, "variableName", e.target.value)} />
+                  <datalist id={`variables-${index}`}>{availableVariables.map(v => <option key={v} value={v} />)}</datalist>
+                  <Button variant="ghost" size="icon" className="h-10 w-10 border" onClick={() => setVariableModalOpen({ open: true, index })}><Braces className="h-4 w-4" /></Button>
                 </div>
-              ))}
+              </div>
             </div>
-          </CollapsibleContent>
-        </Collapsible>
-      <VariableModal
-        open={variableModalOpen.open}
-        onClose={() => setVariableModalOpen({ ...variableModalOpen, open: false })}
-        onSelect={(varName) => {
-          handleResponseMappingChange(variableModalOpen.index, "variableName", varName);
-        }}
-      />
-    </div>
+          ))}
+        </CollapsibleContent>
+      </Collapsible>
 
-      <div className="bg-muted/50 rounded-lg p-3">
-        <p className="text-xs text-muted-foreground">
-          <strong>Dica:</strong> Use {"{{variavel}}"} para inserir valores
-          dinâmicos na URL, headers ou body. A resposta será armazenada na
-          variável configurada.
-        </p>
-      </div>
-
+      <VariableModal open={variableModalOpen.open} onClose={() => setVariableModalOpen({ ...variableModalOpen, open: false })} onSelect={(v) => handleResponseMappingChange(variableModalOpen.index, "variableName", v)} />
       <SkillConfig config={config} setConfig={setConfig} />
     </div>
   );
