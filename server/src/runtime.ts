@@ -442,8 +442,14 @@ async function runFlow(execution: any, containersIn: any[], edgesIn: any[], inpu
 
   const replaceVars = (text: string) => {
     if (!text) return text;
-    const isJsonOrUrl = /^[{\[]/.test(text) || text.startsWith("http");
-    const baseText = isJsonOrUrl ? text : decodeText(text);
+    // Remove caracteres de controle invisíveis (exceto \n, \r, \t) que podem corromper JSON ou requisições
+    // O caractere \u0001 (SOH) apareceu nos logs corrompendo o body.
+    const sanitized = String(text).replace(/[\u0000-\u0008\u000B-\u000C\u000E-\u001F\u007F-\u009F]/g, "");
+    
+    // Se parecer JSON ou URL, não aplicamos o decodeText completo para não estragar aspas ou estruturas
+    const isJsonOrUrl = /^\s*[{\[]/.test(sanitized) || /^\s*http/.test(sanitized);
+    const baseText = isJsonOrUrl ? sanitized : decodeText(sanitized);
+    
     return baseText.replace(/{{(.*?)}}/g, (_, k) => {
       const value = getVarValue(k);
       return value === undefined ? `{{${k}}}` : stringifyVarValue(value);
