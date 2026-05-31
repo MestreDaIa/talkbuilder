@@ -861,6 +861,14 @@ async function runFlow(execution: any, containersIn: any[], edgesIn: any[], inpu
         const method = (cfg.method || "GET").toUpperCase();
         const headers: Record<string, string> = {};
         
+        // Tratar autenticação se configurada
+        if (cfg.authentication === "basic" && cfg.authCredentials) {
+          const auth = Buffer.from(`${cfg.authCredentials.username}:${cfg.authCredentials.password}`).toString("base64");
+          headers["Authorization"] = `Basic ${auth}`;
+        } else if (cfg.authentication === "header" && cfg.authCredentials) {
+          headers[cfg.authCredentials.headerName] = replaceVars(cfg.authCredentials.headerValue || "");
+        }
+
         if (cfg.headers && Array.isArray(cfg.headers)) {
           cfg.headers.forEach((h: any) => {
             if (h.key) headers[h.key] = replaceVars(h.value || "");
