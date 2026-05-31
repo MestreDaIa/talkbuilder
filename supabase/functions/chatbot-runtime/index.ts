@@ -680,7 +680,7 @@ class FlowEngine {
       const auth = btoa(`${cfg.authCredentials.username}:${cfg.authCredentials.password}`);
       headers["Authorization"] = `Basic ${auth}`;
     } else if (cfg.authentication === "header" && cfg.authCredentials) {
-      headers[cfg.authCredentials.headerName] = cfg.authCredentials.headerValue;
+      headers[cfg.authCredentials.headerName] = this.replaceVars(cfg.authCredentials.headerValue || "");
     }
 
     // Custom headers from config
