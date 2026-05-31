@@ -674,7 +674,7 @@ class FlowEngine {
 
   private async executeHttpRequest(node: any, container: any) {
     const cfg = node.config || {};
-    const url = this.replaceVars(cfg.url || "");
+    const url = this.replaceVars(cfg.url || "", true);
     if (!url) {
       this.currentNodeId = this.nextFromNode(node.id, container);
       return;
@@ -688,18 +688,22 @@ class FlowEngine {
       const auth = btoa(`${cfg.authCredentials.username}:${cfg.authCredentials.password}`);
       headers["Authorization"] = `Basic ${auth}`;
     } else if (cfg.authentication === "header" && cfg.authCredentials) {
-      headers[cfg.authCredentials.headerName] = this.replaceVars(cfg.authCredentials.headerValue || "");
+      headers[cfg.authCredentials.headerName] = this.replaceVars(cfg.authCredentials.headerValue || "", true);
     }
 
     // Custom headers from config
     if (cfg.headers && Array.isArray(cfg.headers)) {
       cfg.headers.forEach((h: any) => {
-        if (h.key) headers[h.key] = this.replaceVars(h.value || "");
+        if (h.key) headers[h.key] = this.replaceVars(h.value || "", true);
       });
     } else if (cfg.headers && typeof cfg.headers === "object") {
       Object.entries(cfg.headers).forEach(([k, v]) => {
-        headers[k] = this.replaceVars(String(v));
+        headers[k] = this.replaceVars(String(v), true);
       });
+    }
+    
+    if (["POST", "PUT", "PATCH", "GET"].includes(method) && !headers["Accept"]) {
+      headers["Accept"] = "application/json, text/plain, */*";
     }
 
     // Response mappings support
