@@ -725,24 +725,30 @@ class FlowEngine {
       if (cfg.bodyType === "json" || cfg.bodyMode === "json" || !cfg.bodyType) {
         const rawBody = cfg.bodyJson || cfg.body || "{}";
         const processedBody = typeof rawBody === "string" ? rawBody : JSON.stringify(rawBody);
-        body = this.replaceVars(processedBody);
+        body = this.replaceVars(processedBody, true);
         if (!headers["Content-Type"]) headers["Content-Type"] = "application/json";
       } else if (cfg.bodyType === "form-data") {
         const params = new URLSearchParams();
         if (Array.isArray(cfg.body)) {
           cfg.body.forEach((b: any) => {
-            if (b.key) params.append(b.key, this.replaceVars(b.value || ""));
+            if (b.key) params.append(b.key, this.replaceVars(b.value || "", true));
           });
         }
         body = params.toString();
         if (!headers["Content-Type"]) headers["Content-Type"] = "application/x-www-form-urlencoded";
       } else {
-        body = this.replaceVars(cfg.body || "");
+        body = this.replaceVars(cfg.body || "", true);
       }
     }
 
     try {
       console.log(`[FlowEngine:HttpRequest] ${method} ${url}`);
+      // Log seguro dos headers
+      Object.keys(headers).forEach(k => {
+        const val = String(headers[k]);
+        const masked = val.length > 8 ? `${val.substring(0, 4)}...${val.substring(val.length - 4)}` : "***";
+        console.log(`[FlowEngine:HttpRequest] header: ${k} = ${masked}`);
+      });
       const res = await fetch(url, {
         method,
         headers,
