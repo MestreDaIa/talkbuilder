@@ -422,14 +422,19 @@ class FlowEngine {
     return current;
   }
 
-  private replaceVars(text: string) {
+  private replaceVars(text: string, raw = false) {
     if (!text) return text;
     // Remove caracteres de controle invisíveis (exceto \n, \r, \t) que podem corromper JSON
     const sanitized = String(text).replace(/[\u0000-\u0008\u000B-\u000C\u000E-\u001F\u007F-\u009F]/g, "");
     
-    // Se parecer JSON ou URL, não aplicamos o decodeText para preservar aspas e estrutura
-    const isJsonOrUrl = /^\s*[{\[]/.test(sanitized) || /^\s*http/.test(sanitized);
-    const baseText = isJsonOrUrl ? sanitized : decodeText(sanitized);
+    let baseText;
+    if (raw) {
+      baseText = sanitized;
+    } else {
+      // Se parecer JSON ou URL, não aplicamos o decodeText para preservar aspas e estrutura
+      const isJsonOrUrl = /^\s*[{\[]/.test(sanitized) || /^\s*http/.test(sanitized);
+      baseText = isJsonOrUrl ? sanitized : decodeText(sanitized);
+    }
     
     return baseText.replace(/{{(.*?)}}/g, (_, k) => {
       const path = normalizeVariableName(k);
@@ -669,7 +674,7 @@ class FlowEngine {
 
   private async executeHttpRequest(node: any, container: any) {
     const cfg = node.config || {};
-    const url = this.replaceVars(cfg.url || "");
+    const url = this.replaceVars(cfg.url || "", true);
     if (!url) {
       this.currentNodeId = this.nextFromNode(node.id, container);
       return;
@@ -683,18 +688,22 @@ class FlowEngine {
       const auth = btoa(`${cfg.authCredentials.username}:${cfg.authCredentials.password}`);
       headers["Authorization"] = `Basic ${auth}`;
     } else if (cfg.authentication === "header" && cfg.authCredentials) {
-      headers[cfg.authCredentials.headerName] = this.replaceVars(cfg.authCredentials.headerValue || "");
+      headers[cfg.authCredentials.headerName] = this.replaceVars(cfg.authCredentials.headerValue || "", true);
     }
 
     // Custom headers from config
     if (cfg.headers && Array.isArray(cfg.headers)) {
       cfg.headers.forEach((h: any) => {
-        if (h.key) headers[h.key] = this.replaceVars(h.value || "");
+        if (h.key) headers[h.key] = this.replaceVars(h.value || "", true);
       });
     } else if (cfg.headers && typeof cfg.headers === "object") {
       Object.entries(cfg.headers).forEach(([k, v]) => {
-        headers[k] = this.replaceVars(String(v));
+        headers[k] = this.replaceVars(String(v), true);
       });
+    }
+    
+    if (["POST", "PUT", "PATCH", "GET"].includes(method) && !headers["Accept"]) {
+      headers["Accept"] = "application/json, text/plain, */*";
     }
 
     // Response mappings support
@@ -716,24 +725,30 @@ class FlowEngine {
       if (cfg.bodyType === "json" || cfg.bodyMode === "json" || !cfg.bodyType) {
         const rawBody = cfg.bodyJson || cfg.body || "{}";
         const processedBody = typeof rawBody === "string" ? rawBody : JSON.stringify(rawBody);
-        body = this.replaceVars(processedBody);
+        body = this.replaceVars(processedBody, true);
         if (!headers["Content-Type"]) headers["Content-Type"] = "application/json";
       } else if (cfg.bodyType === "form-data") {
         const params = new URLSearchParams();
         if (Array.isArray(cfg.body)) {
           cfg.body.forEach((b: any) => {
-            if (b.key) params.append(b.key, this.replaceVars(b.value || ""));
+            if (b.key) params.append(b.key, this.replaceVars(b.value || "", true));
           });
         }
         body = params.toString();
         if (!headers["Content-Type"]) headers["Content-Type"] = "application/x-www-form-urlencoded";
       } else {
-        body = this.replaceVars(cfg.body || "");
+        body = this.replaceVars(cfg.body || "", true);
       }
     }
 
     try {
       console.log(`[FlowEngine:HttpRequest] ${method} ${url}`);
+      // Log seguro dos headers
+      Object.keys(headers).forEach(k => {
+        const val = String(headers[k]);
+        const masked = val.length > 8 ? `${val.substring(0, 4)}...${val.substring(val.length - 4)}` : "***";
+        console.log(`[FlowEngine:HttpRequest] header: ${k} = ${masked}`);
+      });
       const res = await fetch(url, {
         method,
         headers,

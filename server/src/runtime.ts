@@ -440,15 +440,19 @@ async function runFlow(execution: any, containersIn: any[], edgesIn: any[], inpu
   const stringifyVarValue = (value: any) =>
     value != null && typeof value === "object" ? JSON.stringify(value) : String(value ?? "");
 
-  const replaceVars = (text: string) => {
+  const replaceVars = (text: string, raw = false) => {
     if (!text) return text;
     // Remove caracteres de controle invisíveis (exceto \n, \r, \t) que podem corromper JSON ou requisições
-    // O caractere \u0001 (SOH) apareceu nos logs corrompendo o body.
     const sanitized = String(text).replace(/[\u0000-\u0008\u000B-\u000C\u000E-\u001F\u007F-\u009F]/g, "");
     
-    // Se parecer JSON ou URL, não aplicamos o decodeText completo para não estragar aspas ou estruturas
-    const isJsonOrUrl = /^\s*[{\[]/.test(sanitized) || /^\s*http/.test(sanitized);
-    const baseText = isJsonOrUrl ? sanitized : decodeText(sanitized);
+    let baseText;
+    if (raw) {
+      baseText = sanitized;
+    } else {
+      // Se parecer JSON ou URL, não aplicamos o decodeText completo para não estragar aspas ou estruturas
+      const isJsonOrUrl = /^\s*[{\[]/.test(sanitized) || /^\s*http/.test(sanitized);
+      baseText = isJsonOrUrl ? sanitized : decodeText(sanitized);
+    }
     
     return baseText.replace(/{{(.*?)}}/g, (_, k) => {
       const value = getVarValue(k);
@@ -863,7 +867,7 @@ async function runFlow(execution: any, containersIn: any[], edgesIn: any[], inpu
       }
       case "http-request":
       case "http": {
-        const url = replaceVars(cfg.url || "");
+        const url = replaceVars(cfg.url || "", true);
         const method = (cfg.method || "GET").toUpperCase();
         const headers: Record<string, string> = {};
         
@@ -872,16 +876,16 @@ async function runFlow(execution: any, containersIn: any[], edgesIn: any[], inpu
           const auth = Buffer.from(`${cfg.authCredentials.username}:${cfg.authCredentials.password}`).toString("base64");
           headers["Authorization"] = `Basic ${auth}`;
         } else if (cfg.authentication === "header" && cfg.authCredentials) {
-          headers[cfg.authCredentials.headerName] = replaceVars(cfg.authCredentials.headerValue || "");
+          headers[cfg.authCredentials.headerName] = replaceVars(cfg.authCredentials.headerValue || "", true);
         }
 
         if (cfg.headers && Array.isArray(cfg.headers)) {
           cfg.headers.forEach((h: any) => {
-            if (h.key) headers[h.key] = replaceVars(h.value || "");
+            if (h.key) headers[h.key] = replaceVars(h.value || "", true);
           });
         } else if (cfg.headers && typeof cfg.headers === "object") {
           Object.entries(cfg.headers).forEach(([k, v]) => {
-            headers[k] = replaceVars(String(v));
+            headers[k] = replaceVars(String(v), true);
           });
         }
 
@@ -889,15 +893,17 @@ async function runFlow(execution: any, containersIn: any[], edgesIn: any[], inpu
         if (["POST", "PUT", "PATCH"].includes(method) && !headers["Content-Type"]) {
           headers["Content-Type"] = "application/json";
         }
+        if (["POST", "PUT", "PATCH", "GET"].includes(method) && !headers["Accept"]) {
+          headers["Accept"] = "application/json, text/plain, */*";
+        }
 
         let body: any = null;
         if (["POST", "PUT", "PATCH"].includes(method)) {
           if (cfg.bodyType === "json" || !cfg.bodyType || cfg.bodyContentType === "json") {
             const rawBody = cfg.bodyJson || cfg.body || "{}";
             const processedBody = typeof rawBody === "string" ? rawBody : JSON.stringify(rawBody);
-            // IMPORTANTE: Para JSON, tentamos substituir variáveis SEM o decodeText se possível,
-            // ou pelo menos garantimos que o decodeText não estrague as aspas.
-            body = replaceVars(processedBody);
+            // IMPORTANTE: Para JSON e requisições técnicas, usamos raw=true para evitar decodeText
+            body = replaceVars(processedBody, true);
             headers["Content-Type"] = "application/json";
             
             console.log(`[runtime:http] Body processado: ${body.substring(0, 200)}${body.length > 200 ? "..." : ""}`);
@@ -905,7 +911,7 @@ async function runFlow(execution: any, containersIn: any[], edgesIn: any[], inpu
             const params = new URLSearchParams();
             const bodyEntries = Array.isArray(cfg.body) ? cfg.body : [];
             bodyEntries.forEach((b: any) => {
-              if (b.key) params.append(b.key, replaceVars(b.value || ""));
+              if (b.key) params.append(b.key, replaceVars(b.value || "", true));
             });
             body = params.toString();
             headers["Content-Type"] = "application/x-www-form-urlencoded";
@@ -914,7 +920,12 @@ async function runFlow(execution: any, containersIn: any[], edgesIn: any[], inpu
 
         try {
           console.log(`[runtime:http] chamando ${method} ${url}`);
-          // console.log(`[runtime:http] headers:`, JSON.stringify(Object.keys(headers)));
+          // Log seguro dos headers para debug
+          Object.keys(headers).forEach(k => {
+            const val = String(headers[k]);
+            const masked = val.length > 8 ? `${val.substring(0, 4)}...${val.substring(val.length - 4)}` : "***";
+            console.log(`[runtime:http] header: ${k} = ${masked}`);
+          });
           const res = await fetch(url, {
             method,
             headers,
