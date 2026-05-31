@@ -436,6 +436,11 @@ class FlowEngine {
       baseText = isJsonOrUrl ? sanitized : decodeText(sanitized);
     }
     
+    // Log minimal character info for debugging without leaking keys
+    if (text !== baseText) {
+      console.log(`[FlowEngine:replaceVars] Modified text. Len diff: ${baseText.length - text.length}`);
+    }
+    
     return baseText.replace(/{{(.*?)}}/g, (_, k) => {
       const path = normalizeVariableName(k);
       const parts = path.split('.');

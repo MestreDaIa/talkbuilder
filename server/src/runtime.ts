@@ -454,6 +454,10 @@ async function runFlow(execution: any, containersIn: any[], edgesIn: any[], inpu
       baseText = isJsonOrUrl ? sanitized : decodeText(sanitized);
     }
     
+    if (text !== baseText) {
+      console.log(`[runtime:replaceVars] Modified text. Len diff: ${baseText.length - text.length}`);
+    }
+    
     return baseText.replace(/{{(.*?)}}/g, (_, k) => {
       const value = getVarValue(k);
       return value === undefined ? `{{${k}}}` : stringifyVarValue(value);
