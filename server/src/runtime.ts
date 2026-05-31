@@ -454,6 +454,10 @@ async function runFlow(execution: any, containersIn: any[], edgesIn: any[], inpu
       baseText = isJsonOrUrl ? sanitized : decodeText(sanitized);
     }
     
+    if (text !== baseText) {
+      console.log(`[runtime:replaceVars] Modified text. Len diff: ${baseText.length - text.length}`);
+    }
+    
     return baseText.replace(/{{(.*?)}}/g, (_, k) => {
       const value = getVarValue(k);
       return value === undefined ? `{{${k}}}` : stringifyVarValue(value);
@@ -867,10 +871,20 @@ async function runFlow(execution: any, containersIn: any[], edgesIn: any[], inpu
       }
       case "http-request":
       case "http": {
-        const url = replaceVars(cfg.url || "", true);
+        let url = replaceVars(cfg.url || "", true);
         const method = (cfg.method || "GET").toUpperCase();
         const headers: Record<string, string> = {};
         
+        // Add Query Params to URL
+        if (cfg.queryParams && Array.isArray(cfg.queryParams)) {
+          const urlObj = new URL(url);
+          cfg.queryParams.forEach((p: any) => {
+            const key = p.key || p.name;
+            if (key) urlObj.searchParams.append(replaceVars(key, true), replaceVars(p.value || "", true));
+          });
+          url = urlObj.toString();
+        }
+
         // Tratar autenticação se configurada
         if (cfg.authentication === "basic" && cfg.authCredentials) {
           const auth = Buffer.from(`${cfg.authCredentials.username}:${cfg.authCredentials.password}`).toString("base64");
@@ -881,7 +895,8 @@ async function runFlow(execution: any, containersIn: any[], edgesIn: any[], inpu
 
         if (cfg.headers && Array.isArray(cfg.headers)) {
           cfg.headers.forEach((h: any) => {
-            if (h.key) headers[h.key] = replaceVars(h.value || "", true);
+            const key = h.key || h.name;
+            if (key) headers[key] = replaceVars(h.value || "", true);
           });
         } else if (cfg.headers && typeof cfg.headers === "object") {
           Object.entries(cfg.headers).forEach(([k, v]) => {
@@ -907,11 +922,12 @@ async function runFlow(execution: any, containersIn: any[], edgesIn: any[], inpu
             headers["Content-Type"] = "application/json";
             
             console.log(`[runtime:http] Body processado: ${body.substring(0, 200)}${body.length > 200 ? "..." : ""}`);
-          } else if (cfg.bodyType === "form-data") {
+          } else if (cfg.bodyType === "form-data" || cfg.bodyType === "form-urlencoded" || cfg.bodyContentType === "form-urlencoded") {
             const params = new URLSearchParams();
-            const bodyEntries = Array.isArray(cfg.body) ? cfg.body : [];
+            const bodyEntries = Array.isArray(cfg.bodyParams) ? cfg.bodyParams : (Array.isArray(cfg.body) ? cfg.body : []);
             bodyEntries.forEach((b: any) => {
-              if (b.key) params.append(b.key, replaceVars(b.value || "", true));
+              const key = b.key || b.name;
+              if (key) params.append(key, replaceVars(b.value || "", true));
             });
             body = params.toString();
             headers["Content-Type"] = "application/x-www-form-urlencoded";

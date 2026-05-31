@@ -436,6 +436,11 @@ class FlowEngine {
       baseText = isJsonOrUrl ? sanitized : decodeText(sanitized);
     }
     
+    // Log minimal character info for debugging without leaking keys
+    if (text !== baseText) {
+      console.log(`[FlowEngine:replaceVars] Modified text. Len diff: ${baseText.length - text.length}`);
+    }
+    
     return baseText.replace(/{{(.*?)}}/g, (_, k) => {
       const path = normalizeVariableName(k);
       const parts = path.split('.');
@@ -674,7 +679,7 @@ class FlowEngine {
 
   private async executeHttpRequest(node: any, container: any) {
     const cfg = node.config || {};
-    const url = this.replaceVars(cfg.url || "", true);
+    let url = this.replaceVars(cfg.url || "", true);
     if (!url) {
       this.currentNodeId = this.nextFromNode(node.id, container);
       return;
@@ -683,6 +688,20 @@ class FlowEngine {
     const method = (cfg.method || "GET").toUpperCase();
     const headers: Record<string, string> = {};
     
+    // Add Query Params to URL
+    if (cfg.queryParams && Array.isArray(cfg.queryParams)) {
+      try {
+        const urlObj = new URL(url);
+        cfg.queryParams.forEach((p: any) => {
+          const key = p.key || p.name;
+          if (key) urlObj.searchParams.append(this.replaceVars(key, true), this.replaceVars(p.value || "", true));
+        });
+        url = urlObj.toString();
+      } catch (e) {
+        console.warn("[FlowEngine:HttpRequest] Failed to append query params", e);
+      }
+    }
+
     // Auth headers
     if (cfg.authentication === "basic" && cfg.authCredentials) {
       const auth = btoa(`${cfg.authCredentials.username}:${cfg.authCredentials.password}`);
@@ -694,7 +713,8 @@ class FlowEngine {
     // Custom headers from config
     if (cfg.headers && Array.isArray(cfg.headers)) {
       cfg.headers.forEach((h: any) => {
-        if (h.key) headers[h.key] = this.replaceVars(h.value || "", true);
+        const key = h.key || h.name;
+        if (key) headers[key] = this.replaceVars(h.value || "", true);
       });
     } else if (cfg.headers && typeof cfg.headers === "object") {
       Object.entries(cfg.headers).forEach(([k, v]) => {
@@ -722,22 +742,22 @@ class FlowEngine {
 
     let body = null;
     if (["POST", "PUT", "PATCH"].includes(method)) {
-      if (cfg.bodyType === "json" || cfg.bodyMode === "json" || !cfg.bodyType) {
+      if (cfg.bodyType === "json" || cfg.bodyMode === "json" || !cfg.bodyType || cfg.bodyContentType === "json") {
         const rawBody = cfg.bodyJson || cfg.body || "{}";
         const processedBody = typeof rawBody === "string" ? rawBody : JSON.stringify(rawBody);
         body = this.replaceVars(processedBody, true);
         if (!headers["Content-Type"]) headers["Content-Type"] = "application/json";
-      } else if (cfg.bodyType === "form-data") {
+      } else if (cfg.bodyType === "form-data" || cfg.bodyType === "form-urlencoded" || cfg.bodyContentType === "form-urlencoded") {
         const params = new URLSearchParams();
-        if (Array.isArray(cfg.body)) {
-          cfg.body.forEach((b: any) => {
-            if (b.key) params.append(b.key, this.replaceVars(b.value || "", true));
-          });
-        }
+        const bodyEntries = Array.isArray(cfg.bodyParams) ? cfg.bodyParams : (Array.isArray(cfg.body) ? cfg.body : []);
+        bodyEntries.forEach((b: any) => {
+          const key = b.key || b.name;
+          if (key) params.append(key, this.replaceVars(b.value || "", true));
+        });
         body = params.toString();
         if (!headers["Content-Type"]) headers["Content-Type"] = "application/x-www-form-urlencoded";
       } else {
-        body = this.replaceVars(cfg.body || "", true);
+        body = this.replaceVars(cfg.bodyRaw || cfg.body || "", true);
       }
     }
 
