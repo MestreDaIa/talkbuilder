@@ -222,6 +222,7 @@ export const TestPanel = ({
   const [waitingForButton, setWaitingForButton] = useState(false);
   const [activeButtons, setActiveButtons] = useState<ButtonConfig[]>([]);
   const [isLoading, setIsLoading] = useState(false);
+  const [attachMenuOpen, setAttachMenuOpen] = useState<boolean>(false);
   const scrollRef = useRef<HTMLDivElement>(null);
   const runtimeStateRef = useRef<RuntimeState | null>(null);
   const hasStartedRef = useRef(false);
