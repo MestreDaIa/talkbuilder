@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from "react";
-import { MessageCircle, X, Send, Loader2 } from "lucide-react";
+import { MessageCircle, X, Send, Loader2, Image as ImageIcon, Film, Headphones, File as FileIcon, Paperclip } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { ScrollArea } from "@/components/ui/scroll-area";
@@ -439,6 +439,62 @@ export const ChatWidget = ({
       {/* Input */}
       {waitingFor && waitingFor !== "buttons" && (
         <div className="p-3 border-t border-border" style={{ background: themeSettings?.inputBackgroundColor || '#ffffff' }}>
+          {waitingFor === "input-universal" && (
+            <div className="flex gap-2 mb-2 justify-start px-1">
+              <button 
+                title="Enviar Imagem"
+                className="p-1.5 rounded-full hover:bg-muted text-muted-foreground transition-colors"
+                onClick={() => {
+                  const input = document.createElement('input');
+                  input.type = 'file';
+                  input.accept = 'image/*';
+                  input.onchange = (e) => handleFileUpload(e, 'imageInput');
+                  input.click();
+                }}
+              >
+                <ImageIcon className="w-4 h-4" />
+              </button>
+              <button 
+                title="Enviar Vídeo"
+                className="p-1.5 rounded-full hover:bg-muted text-muted-foreground transition-colors"
+                onClick={() => {
+                  const input = document.createElement('input');
+                  input.type = 'file';
+                  input.accept = 'video/*';
+                  input.onchange = (e) => handleFileUpload(e, 'videoInput');
+                  input.click();
+                }}
+              >
+                <Film className="w-4 h-4" />
+              </button>
+              <button 
+                title="Enviar Áudio"
+                className="p-1.5 rounded-full hover:bg-muted text-muted-foreground transition-colors"
+                onClick={() => {
+                  const input = document.createElement('input');
+                  input.type = 'file';
+                  input.accept = 'audio/*';
+                  input.onchange = (e) => handleFileUpload(e, 'audioInput');
+                  input.click();
+                }}
+              >
+                <Headphones className="w-4 h-4" />
+              </button>
+              <button 
+                title="Enviar Documento"
+                className="p-1.5 rounded-full hover:bg-muted text-muted-foreground transition-colors"
+                onClick={() => {
+                  const input = document.createElement('input');
+                  input.type = 'file';
+                  input.accept = '*/*';
+                  input.onchange = (e) => handleFileUpload(e, 'documentInput');
+                  input.click();
+                }}
+              >
+                <FileIcon className="w-4 h-4" />
+              </button>
+            </div>
+          )}
           <div className="flex gap-2">
             <Input
               value={input}
