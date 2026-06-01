@@ -610,17 +610,33 @@ async function runFlow(execution: any, containersIn: any[], edgesIn: any[], inpu
                 else mappedType = "documentInput";
              }
 
-             variables[varName] = {
-               type: mappedType,
-               content: input.mediaUrl || input.base64 || userValue,
-               metadata: {
-                 base64: input.base64,
-                 link: input.mediaUrl,
-                 caption: input.caption || input.message,
-                 mimetype: input.mimetype,
-                 fileName: input.fileName
-               }
-             };
+             if (channelValue === "webchat") {
+               variables[varName] = {
+                 type: mappedType,
+                 content: input.mediaUrl || input.base64 || userValue,
+                 metadata: {
+                   base64: input.base64,
+                   link: input.mediaUrl,
+                   caption: input.caption || input.message,
+                   mimetype: input.mimetype,
+                   fileName: input.fileName
+                 }
+               };
+             } else {
+               // Para outros canais (como WhatsApp via Evolution), usamos os tipos reais da API
+               variables[varName] = {
+                 type: input.messageType || mappedType,
+                 content: userValue, // Mantém o texto/legenda se houver, mas ignora o base64/URL no campo content principal
+                 metadata: {
+                   base64: input.base64,
+                   link: input.mediaUrl,
+                   caption: input.caption || input.message,
+                   mimetype: input.mimetype,
+                   fileName: input.fileName,
+                   rawType: input.messageType
+                 }
+               };
+             }
              console.log(`[runtime:input-universal] Saved to ${varName}:`, variables[varName]);
            } else {
              variables[varName] = userValue;

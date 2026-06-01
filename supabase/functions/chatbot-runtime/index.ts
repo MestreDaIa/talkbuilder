@@ -229,17 +229,34 @@ class FlowEngine {
                 else mappedType = "documentInput";
              }
 
-             this.variables[varName] = {
-               type: mappedType,
-               content: payload.mediaUrl || payload.base64 || userValue,
-               metadata: {
-                 base64: payload.base64,
-                 link: payload.mediaUrl,
-                 caption: payload.caption || payload.message,
-                 mimetype: payload.mimetype,
-                 fileName: payload.fileName
-               }
-             };
+             const channel = this.variables.channel || "webchat";
+             if (channel === "webchat") {
+               this.variables[varName] = {
+                 type: mappedType,
+                 content: payload.mediaUrl || payload.base64 || userValue,
+                 metadata: {
+                   base64: payload.base64,
+                   link: payload.mediaUrl,
+                   caption: payload.caption || payload.message,
+                   mimetype: payload.mimetype,
+                   fileName: payload.fileName
+                 }
+               };
+             } else {
+               // Para outros canais (WhatsApp/Evolution), usamos tipos reais da API e ignoramos o content base64
+               this.variables[varName] = {
+                 type: payload.messageType || mappedType,
+                 content: userValue,
+                 metadata: {
+                   base64: payload.base64,
+                   link: payload.mediaUrl,
+                   caption: payload.caption || payload.message,
+                   mimetype: payload.mimetype,
+                   fileName: payload.fileName,
+                   rawType: payload.messageType
+                 }
+               };
+             }
              console.log(`[FlowEngine:input-universal] Saved to ${varName}:`, this.variables[varName]);
           } else {
             this.variables[varName] = userValue;
