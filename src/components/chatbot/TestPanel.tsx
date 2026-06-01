@@ -222,6 +222,7 @@ export const TestPanel = ({
   const [waitingForButton, setWaitingForButton] = useState(false);
   const [activeButtons, setActiveButtons] = useState<ButtonConfig[]>([]);
   const [isLoading, setIsLoading] = useState(false);
+  const [attachMenuOpen, setAttachMenuOpen] = useState<boolean>(false);
   const scrollRef = useRef<HTMLDivElement>(null);
   const runtimeStateRef = useRef<RuntimeState | null>(null);
   const hasStartedRef = useRef(false);
@@ -1553,98 +1554,137 @@ export const TestPanel = ({
                 {waitingForType === "input-universal" ? (
                   <div className="flex flex-col gap-2">
                     <div className="flex items-end gap-2">
-                      <DropdownMenu modal={false}>
-                        <DropdownMenuTrigger asChild>
-                          <Button 
-                            type="button"
-                            variant="ghost" 
-                            size="icon" 
-                            className="rounded-full shrink-0 hover:bg-muted outline-none"
-                            disabled={isLoading}
-                          >
-                            <Paperclip className="h-5 w-5 text-muted-foreground" />
-                          </Button>
-                        </DropdownMenuTrigger>
-                        <DropdownMenuContent align="start" className="w-48 p-2 z-[9999] bg-popover border border-border shadow-xl rounded-xl">
-                          <DropdownMenuItem className="gap-3 cursor-pointer" onClick={() => {
-                            const input = document.createElement('input');
-                            input.type = 'file';
-                            input.accept = 'image/*';
-                            input.onchange = (e) => {
-                              const file = (e.target as HTMLInputElement).files?.[0];
-                              if (file) {
-                                const url = URL.createObjectURL(file);
-                                sendMessage(undefined, undefined, { type: 'image', url, file });
-                              }
-                            };
-                            input.click();
-                          }}>
-                            <div className="w-8 h-8 rounded-full bg-blue-100 flex items-center justify-center text-blue-600">
-                              <ImageIcon className="h-4 w-4" />
+                      <div className="relative">
+                        <Button 
+                          type="button"
+                          variant="ghost" 
+                          size="icon" 
+                          className="rounded-full shrink-0 hover:bg-muted"
+                          disabled={isLoading}
+                          onClick={(e) => {
+                            e.preventDefault();
+                            e.stopPropagation();
+                            setAttachMenuOpen((v) => !v);
+                          }}
+                        >
+                          <Paperclip className="h-5 w-5 text-muted-foreground" />
+                        </Button>
+                        {attachMenuOpen && (
+                          <>
+                            <div
+                              className="fixed inset-0 z-[9998]"
+                              onClick={() => setAttachMenuOpen(false)}
+                            />
+                            <div className="absolute bottom-full mb-2 left-0 w-48 p-2 z-[9999] bg-popover border border-border shadow-xl rounded-xl">
+                              <button
+                                type="button"
+                                className="w-full flex items-center gap-3 px-2 py-1.5 rounded-md hover:bg-muted text-left text-sm"
+                                onClick={() => {
+                                  setAttachMenuOpen(false);
+                                  const input = document.createElement('input');
+                                  input.type = 'file';
+                                  input.accept = 'image/*';
+                                  input.onchange = (e) => {
+                                    const file = (e.target as HTMLInputElement).files?.[0];
+                                    if (file) {
+                                      const url = URL.createObjectURL(file);
+                                      sendMessage(undefined, undefined, { type: 'image', url, file });
+                                    }
+                                  };
+                                  input.click();
+                                }}
+                              >
+                                <div className="w-8 h-8 rounded-full bg-blue-100 flex items-center justify-center text-blue-600">
+                                  <ImageIcon className="h-4 w-4" />
+                                </div>
+                                <span>Imagem</span>
+                              </button>
+                              <button
+                                type="button"
+                                className="w-full flex items-center gap-3 px-2 py-1.5 rounded-md hover:bg-muted text-left text-sm"
+                                onClick={() => {
+                                  setAttachMenuOpen(false);
+                                  const input = document.createElement('input');
+                                  input.type = 'file';
+                                  input.accept = 'video/*';
+                                  input.onchange = (e) => {
+                                    const file = (e.target as HTMLInputElement).files?.[0];
+                                    if (file) {
+                                      const url = URL.createObjectURL(file);
+                                      sendMessage(undefined, undefined, { type: 'video', url, file });
+                                    }
+                                  };
+                                  input.click();
+                                }}
+                              >
+                                <div className="w-8 h-8 rounded-full bg-purple-100 flex items-center justify-center text-purple-600">
+                                  <Video className="h-4 w-4" />
+                                </div>
+                                <span>Vídeo</span>
+                              </button>
+                              <button
+                                type="button"
+                                className="w-full flex items-center gap-3 px-2 py-1.5 rounded-md hover:bg-muted text-left text-sm"
+                                onClick={() => {
+                                  setAttachMenuOpen(false);
+                                  const input = document.createElement('input');
+                                  input.type = 'file';
+                                  input.accept = 'audio/*';
+                                  input.onchange = (e) => {
+                                    const file = (e.target as HTMLInputElement).files?.[0];
+                                    if (file) {
+                                      const url = URL.createObjectURL(file);
+                                      sendMessage(undefined, undefined, { type: 'audio', url, file });
+                                    }
+                                  };
+                                  input.click();
+                                }}
+                              >
+                                <div className="w-8 h-8 rounded-full bg-orange-100 flex items-center justify-center text-orange-600">
+                                  <Mic className="h-4 w-4" />
+                                </div>
+                                <span>Áudio</span>
+                              </button>
+                              <button
+                                type="button"
+                                className="w-full flex items-center gap-3 px-2 py-1.5 rounded-md hover:bg-muted text-left text-sm"
+                                onClick={() => {
+                                  setAttachMenuOpen(false);
+                                  const input = document.createElement('input');
+                                  input.type = 'file';
+                                  input.accept = '*/*';
+                                  input.onchange = (e) => {
+                                    const file = (e.target as HTMLInputElement).files?.[0];
+                                    if (file) {
+                                      const url = URL.createObjectURL(file);
+                                      sendMessage(undefined, undefined, { type: 'file', url, file });
+                                    }
+                                  };
+                                  input.click();
+                                }}
+                              >
+                                <div className="w-8 h-8 rounded-full bg-emerald-100 flex items-center justify-center text-emerald-600">
+                                  <FileText className="h-4 w-4" />
+                                </div>
+                                <span>Documento</span>
+                              </button>
+                              <div className="border-t my-1" />
+                              <button
+                                type="button"
+                                className="w-full flex items-center gap-3 px-2 py-1.5 rounded-md hover:bg-muted text-left text-sm text-primary"
+                                onClick={() => {
+                                  setAttachMenuOpen(false);
+                                  startCapture('image');
+                                }}
+                              >
+                                <Camera className="h-4 w-4" />
+                                <span>Câmera (Foto)</span>
+                              </button>
                             </div>
-                            <span>Imagem</span>
-                          </DropdownMenuItem>
-                          <DropdownMenuItem className="gap-3 cursor-pointer" onClick={() => {
-                            const input = document.createElement('input');
-                            input.type = 'file';
-                            input.accept = 'video/*';
-                            input.onchange = (e) => {
-                              const file = (e.target as HTMLInputElement).files?.[0];
-                              if (file) {
-                                const url = URL.createObjectURL(file);
-                                sendMessage(undefined, undefined, { type: 'video', url, file });
-                              }
-                            };
-                            input.click();
-                          }}>
-                            <div className="w-8 h-8 rounded-full bg-purple-100 flex items-center justify-center text-purple-600">
-                              <Video className="h-4 w-4" />
-                            </div>
-                            <span>Vídeo</span>
-                          </DropdownMenuItem>
-                          <DropdownMenuItem className="gap-3 cursor-pointer" onClick={() => {
-                            const input = document.createElement('input');
-                            input.type = 'file';
-                            input.accept = 'audio/*';
-                            input.onchange = (e) => {
-                              const file = (e.target as HTMLInputElement).files?.[0];
-                              if (file) {
-                                const url = URL.createObjectURL(file);
-                                sendMessage(undefined, undefined, { type: 'audio', url, file });
-                              }
-                            };
-                            input.click();
-                          }}>
-                            <div className="w-8 h-8 rounded-full bg-orange-100 flex items-center justify-center text-orange-600">
-                              <Mic className="h-4 w-4" />
-                            </div>
-                            <span>Áudio</span>
-                          </DropdownMenuItem>
-                          <DropdownMenuItem className="gap-3 cursor-pointer" onClick={() => {
-                            const input = document.createElement('input');
-                            input.type = 'file';
-                            input.accept = '*/*';
-                            input.onchange = (e) => {
-                              const file = (e.target as HTMLInputElement).files?.[0];
-                              if (file) {
-                                const url = URL.createObjectURL(file);
-                                sendMessage(undefined, undefined, { type: 'file', url, file });
-                              }
-                            };
-                            input.click();
-                          }}>
-                            <div className="w-8 h-8 rounded-full bg-emerald-100 flex items-center justify-center text-emerald-600">
-                              <FileText className="h-4 w-4" />
-                            </div>
-                            <span>Documento</span>
-                          </DropdownMenuItem>
-                          <div className="border-t my-1" />
-                          <DropdownMenuItem className="gap-3 cursor-pointer text-primary" onClick={() => startCapture('image')}>
-                            <Camera className="h-4 w-4" />
-                            <span>Câmera (Foto)</span>
-                          </DropdownMenuItem>
-                        </DropdownMenuContent>
-                      </DropdownMenu>
+                          </>
+                        )}
+                      </div>
+
 
                       <Textarea
                         value={currentInput}
