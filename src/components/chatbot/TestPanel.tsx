@@ -423,7 +423,20 @@ export const TestPanel = ({
 
   const getVariableValue = (variables: Record<string, any>, variableName: string) => {
     const key = String(variableName || "").trim().replace(/^{{\s*/, "").replace(/\s*}}$/, "");
-    return key ? variables[key] : undefined;
+    if (!key) return undefined;
+    
+    // Support dot notation for objects (e.g., user_input.type)
+    if (key.includes('.')) {
+      const parts = key.split('.');
+      let current: any = variables;
+      for (const part of parts) {
+        if (current === null || current === undefined || typeof current !== 'object') return undefined;
+        current = current[part];
+      }
+      return current;
+    }
+    
+    return variables[key];
   };
 
   const evaluateComparison = (comparison: ConditionComparison, variables: Record<string, any>, replaceVars: (text: string) => string) => {
