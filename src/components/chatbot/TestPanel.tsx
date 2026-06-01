@@ -1553,18 +1553,19 @@ export const TestPanel = ({
                 {waitingForType === "input-universal" ? (
                   <div className="flex flex-col gap-2">
                     <div className="flex items-end gap-2">
-                      <DropdownMenu>
+                      <DropdownMenu modal={false}>
                         <DropdownMenuTrigger asChild>
                           <Button 
+                            type="button"
                             variant="ghost" 
                             size="icon" 
-                            className="rounded-full shrink-0 hover:bg-muted"
+                            className="rounded-full shrink-0 hover:bg-muted outline-none"
                             disabled={isLoading}
                           >
                             <Paperclip className="h-5 w-5 text-muted-foreground" />
                           </Button>
                         </DropdownMenuTrigger>
-                        <DropdownMenuContent align="start" className="w-48 p-2">
+                        <DropdownMenuContent align="start" className="w-48 p-2 z-[9999] bg-popover border border-border shadow-xl rounded-xl">
                           <DropdownMenuItem className="gap-3 cursor-pointer" onClick={() => {
                             const input = document.createElement('input');
                             input.type = 'file';
