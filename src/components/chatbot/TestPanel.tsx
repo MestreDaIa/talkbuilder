@@ -562,6 +562,13 @@ export const TestPanel = ({
       let currentNodeId = state?.current_node_id || startContainer?.nodes?.[0]?.id || containers?.[0]?.nodes?.[0]?.id || null;
       let activeAgentNodeId = state?.active_agent_node_id || null;
       const variables = { ...(state?.variables || {}) };
+
+      // Inject system variables (channel identifies where the flow is running)
+      variables.channel = "webchat";
+      variables.data = {
+        ...(variables.data || {}),
+        channel: "webchat",
+      };
       const persistentMemory: PersistentMemory = { ...(state?.persistent_memory || {}) };
       const messageHistory: RuntimeMessage[] = [...(state?.message_history || [])];
       const nextMessages: Message[] = [];
