@@ -301,12 +301,17 @@ async function runFlow(execution: any, containersIn: any[], edgesIn: any[], inpu
   
   // Ensure system variables are available
   const channelValue = execution.channel_id || "webchat";
+  console.log(`[runtime] Initializing variables. Channel: ${channelValue}, Contact: ${execution.contact_id}`);
+  
   if (!variables.channel) variables.channel = channelValue;
   if (!variables.contact_id) variables.contact_id = execution.contact_id;
   
   if (!variables.data) variables.data = {};
-  if (!variables.data.channel) variables.data.channel = channelValue;
-  if (!variables.data.contact_id) variables.data.contact_id = execution.contact_id;
+  // Always ensure data.channel is sync with the actual channel
+  variables.data.channel = channelValue;
+  variables.data.contact_id = execution.contact_id;
+  
+  console.log(`[runtime] System variables set: data.channel=${variables.data.channel}`);
   const messages: any[] = [];
   let waiting_for: string | null = null;
   let buttons: any[] = [];
