@@ -384,7 +384,11 @@ class FlowEngine {
         const varName = normalizeVariableName(cfg.responseVariable || "webhookData");
         const payload = inputPayload || cfg.lastTestPayload || null;
         if (varName && payload) {
-          this.variables[varName] = payload;
+          if (varName === "data") {
+            this.variables[varName] = { ...(this.variables[varName] || {}), ...payload, channel: this.variables.channel };
+          } else {
+            this.variables[varName] = payload;
+          }
           console.log(`[FlowEngine] Webhook data saved to "${varName}"`);
         }
         if (payload && Array.isArray(cfg.responseMappings)) {

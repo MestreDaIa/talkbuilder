@@ -298,6 +298,20 @@ async function runFlow(execution: any, containersIn: any[], edgesIn: any[], inpu
   let activeAgentNodeId: string | null = execution.active_agent_node_id || null;
   let mode: string = execution.runtime_mode || "flow";
   const variables: Record<string, any> = { ...(execution.variables || {}) };
+  
+  // Ensure system variables are available
+  const channelValue = execution.channel_id || "webchat";
+  console.log(`[runtime] Initializing variables for execution ${execution.id || 'new'}. Channel: ${channelValue}, Contact: ${execution.contact_id}`);
+  
+  if (!variables.channel) variables.channel = channelValue;
+  if (!variables.contact_id) variables.contact_id = execution.contact_id;
+  
+  if (!variables.data) variables.data = {};
+  // Always ensure data.channel is sync with the actual channel
+  variables.data.channel = channelValue;
+  variables.data.contact_id = execution.contact_id;
+  
+  console.log(`[runtime] System variables set. data:`, JSON.stringify(variables.data));
   const messages: any[] = [];
   let waiting_for: string | null = null;
   let buttons: any[] = [];
@@ -533,12 +547,17 @@ async function runFlow(execution: any, containersIn: any[], edgesIn: any[], inpu
         headers: input.headers,
         query: input.query,
         method: input.method,
-        receivedAt: input.receivedAt
+        receivedAt: input.receivedAt,
+        channel: variables.channel || "webchat"
       };
       
       // Salva tanto no padrão quanto em variáveis específicas se o input veio de um webhook
       variables["webhookData"] = webhookData;
-      variables["data"] = webhookData;
+      // Merge into existing 'data' object instead of overwriting it, to preserve system fields
+      variables["data"] = { 
+        ...(variables["data"] || {}), 
+        ...webhookData 
+      };
     }
   }
 
@@ -723,7 +742,11 @@ async function runFlow(execution: any, containersIn: any[], edgesIn: any[], inpu
         if (webhookData) {
           variables[varName] = webhookData;
           variables["webhookData"] = webhookData;
-          variables["data"] = webhookData;
+          // Merge into existing 'data' object instead of overwriting it
+          variables["data"] = { 
+            ...(variables["data"] || {}), 
+            ...webhookData 
+          };
 
           // Mapear campos: extrai paths do payload e salva em variáveis individuais
           if (Array.isArray(cfg.responseMappings)) {
