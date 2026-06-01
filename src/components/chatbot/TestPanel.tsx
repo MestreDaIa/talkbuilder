@@ -575,7 +575,11 @@ export const TestPanel = ({
 
       const firstText = (...values: any[]) => String(values.find((v) => typeof v === "string" && v.trim()) || "");
       const cleanText = (text: string) => richToPlainText(text);
-      const replaceVars = (text: string) => cleanText(text).replace(/{{(.*?)}}/g, (_, key) => variables[key.trim()] ?? `{{${key}}}`);
+      const replaceVars = (text: string) => cleanText(text).replace(/{{(.*?)}}/g, (_, key) => {
+        const val = getVariableValue(variables, key.trim());
+        if (val === undefined) return `{{${key}}}`;
+        return typeof val === 'object' ? JSON.stringify(val) : String(val);
+      });
 
       const parseWaitMs = (cfg: any) => {
         const amount = Math.max(1, Number(cfg.waitTime ?? cfg.duration ?? cfg.seconds ?? 5) || 5);
