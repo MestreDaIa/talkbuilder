@@ -111,16 +111,17 @@ class FlowEngine {
     this.edges = flow.published_edges || flow.draft_edges || [];
     
     // Initialize variables with execution state and system variables
+    const channelValue = execution.channel_id || "webchat";
     this.variables = { 
       ...(execution.variables || {}),
-      channel: execution.channel_id || "webchat",
+      channel: channelValue,
       contact_id: execution.contact_id,
     };
 
     // Also expose under 'data' object for convenience as requested
     this.variables.data = {
       ...(this.variables.data || {}),
-      channel: execution.channel_id || "webchat",
+      channel: channelValue,
       contact_id: execution.contact_id
     };
 
