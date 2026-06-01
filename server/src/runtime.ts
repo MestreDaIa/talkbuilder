@@ -559,15 +559,20 @@ async function runFlow(execution: any, containersIn: any[], edgesIn: any[], inpu
          
          if (varName && userValue !== undefined) {
            if (nodeType === "input-universal") {
-             const typeMap: Record<string, string> = {
-               "conversation": "textInput",
-               "extendedTextMessage": "textInput",
-               "imageMessage": "imageInput",
-               "videoMessage": "videoInput",
-               "audioMessage": "audioInput",
-               "documentMessage": "documentInput",
-               "documentWithCaptionMessage": "documentInput"
-             };
+              const typeMap: Record<string, string> = {
+                "conversation": "textInput",
+                "extendedTextMessage": "textInput",
+                "textInput": "textInput",
+                "imageMessage": "imageInput",
+                "imageInput": "imageInput",
+                "videoMessage": "videoInput",
+                "videoInput": "videoInput",
+                "audioMessage": "audioInput",
+                "audioInput": "audioInput",
+                "documentMessage": "documentInput",
+                "documentInput": "documentInput",
+                "documentWithCaptionMessage": "documentInput"
+              };
              
              // Determinar o tipo baseado no messageType do WhatsApp ou na presença de mídia
              let mappedType = typeMap[input.messageType] || "textInput";
