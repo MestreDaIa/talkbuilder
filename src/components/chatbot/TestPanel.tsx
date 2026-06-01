@@ -423,7 +423,20 @@ export const TestPanel = ({
 
   const getVariableValue = (variables: Record<string, any>, variableName: string) => {
     const key = String(variableName || "").trim().replace(/^{{\s*/, "").replace(/\s*}}$/, "");
-    return key ? variables[key] : undefined;
+    if (!key) return undefined;
+    
+    // Support dot notation for objects (e.g., user_input.type)
+    if (key.includes('.')) {
+      const parts = key.split('.');
+      let current: any = variables;
+      for (const part of parts) {
+        if (current === null || current === undefined || typeof current !== 'object') return undefined;
+        current = current[part];
+      }
+      return current;
+    }
+    
+    return variables[key];
   };
 
   const evaluateComparison = (comparison: ConditionComparison, variables: Record<string, any>, replaceVars: (text: string) => string) => {
@@ -562,7 +575,11 @@ export const TestPanel = ({
 
       const firstText = (...values: any[]) => String(values.find((v) => typeof v === "string" && v.trim()) || "");
       const cleanText = (text: string) => richToPlainText(text);
-      const replaceVars = (text: string) => cleanText(text).replace(/{{(.*?)}}/g, (_, key) => variables[key.trim()] ?? `{{${key}}}`);
+      const replaceVars = (text: string) => cleanText(text).replace(/{{(.*?)}}/g, (_, key) => {
+        const val = getVariableValue(variables, key.trim());
+        if (val === undefined) return `{{${key}}}`;
+        return typeof val === 'object' ? JSON.stringify(val) : String(val);
+      });
 
       const parseWaitMs = (cfg: any) => {
         const amount = Math.max(1, Number(cfg.waitTime ?? cfg.duration ?? cfg.seconds ?? 5) || 5);
