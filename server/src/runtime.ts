@@ -298,6 +298,15 @@ async function runFlow(execution: any, containersIn: any[], edgesIn: any[], inpu
   let activeAgentNodeId: string | null = execution.active_agent_node_id || null;
   let mode: string = execution.runtime_mode || "flow";
   const variables: Record<string, any> = { ...(execution.variables || {}) };
+  
+  // Ensure system variables are available
+  const channelValue = execution.channel_id || "webchat";
+  if (!variables.channel) variables.channel = channelValue;
+  if (!variables.contact_id) variables.contact_id = execution.contact_id;
+  
+  if (!variables.data) variables.data = {};
+  if (!variables.data.channel) variables.data.channel = channelValue;
+  if (!variables.data.contact_id) variables.data.contact_id = execution.contact_id;
   const messages: any[] = [];
   let waiting_for: string | null = null;
   let buttons: any[] = [];
