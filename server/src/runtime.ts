@@ -679,7 +679,7 @@ async function runFlow(execution: any, containersIn: any[], edgesIn: any[], inpu
       // pré-loop (quando execution.waiting_for_input estava true para este node).
       // Consumir a mensagem inicial aqui faria o bot pular a etapa de input.
       console.log(`[runtime:input_wait] aguardando entrada no node ${node.id} (${nodeType})`);
-      waiting_for = nodeType === "input-buttons" ? "buttons" : "text";
+      waiting_for = nodeType === "input-buttons" ? "buttons" : nodeType;
       if (nodeType === "input-buttons") {
         buttons = (cfg.buttons || []).map((b: any) => ({
           id: b.id,

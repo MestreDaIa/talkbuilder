@@ -274,7 +274,7 @@ class FlowEngine {
     // Handle Input Nodes (when reached sequentially, without prior input)
     if (type.startsWith("input-")) {
       console.log(`[FlowEngine] Waiting for input at node ${node.id}`);
-      this.waitingFor = type === "input-buttons" ? "buttons" : "text";
+      this.waitingFor = type === "input-buttons" ? "buttons" : type;
       if (type === "input-buttons") {
         this.buttons = (cfg.buttons || []).map((b: any) => ({
           id: b.id,
