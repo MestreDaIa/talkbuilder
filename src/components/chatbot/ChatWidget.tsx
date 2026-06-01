@@ -512,16 +512,17 @@ export const ChatWidget = ({
         <div className="p-3 border-t border-border" style={{ background: themeSettings?.inputBackgroundColor || '#ffffff' }}>
           {waitingFor === "input-universal" && (
             <div className="flex gap-2 mb-2 justify-start px-1">
-              <DropdownMenu>
+              <DropdownMenu modal={false}>
                 <DropdownMenuTrigger asChild>
                   <button 
+                    type="button"
                     title="Anexar arquivo"
-                    className="p-1.5 rounded-full hover:bg-muted text-muted-foreground transition-colors"
+                    className="p-1.5 rounded-full hover:bg-muted text-muted-foreground transition-colors outline-none"
                   >
                     <Paperclip className="w-5 h-5" />
                   </button>
                 </DropdownMenuTrigger>
-                <DropdownMenuContent align="start" className="w-48 p-2 z-[60]">
+                <DropdownMenuContent align="start" className="w-48 p-2 z-[9999] bg-popover border border-border shadow-xl rounded-xl">
                   <DropdownMenuItem className="gap-3 cursor-pointer" onClick={() => {
                     const input = document.createElement('input');
                     input.type = 'file';
