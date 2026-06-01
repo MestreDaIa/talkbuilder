@@ -177,10 +177,49 @@ class FlowEngine {
       const info = this.findNode(this.currentNodeId);
       if (info && info.node.type.startsWith("input-")) {
         const cfg = info.node.config || {};
+        const nodeType = (info.node.type || "").toLowerCase().trim();
         const varName = normalizeVariableName(cfg.variableName || cfg.saveVariable);
+        
         if (varName) {
-          this.variables[varName] = userValue;
-          console.log(`[FlowEngine] Saved input to variable "${varName}": ${userValue}`);
+          if (nodeType === "input-universal") {
+             const typeMap: Record<string, string> = {
+               "conversation": "textInput",
+               "extendedTextMessage": "textInput",
+               "imageMessage": "imageInput",
+               "videoMessage": "videoInput",
+               "audioMessage": "audioInput",
+               "documentMessage": "documentInput",
+               "documentWithCaptionMessage": "documentInput"
+             };
+             
+             let mappedType = typeMap[payload.messageType] || "textInput";
+             if (payload.mimetype?.startsWith("image/")) mappedType = "imageInput";
+             else if (payload.mimetype?.startsWith("video/")) mappedType = "videoInput";
+             else if (payload.mimetype?.startsWith("audio/")) mappedType = "audioInput";
+             else if (payload.mimetype?.startsWith("application/")) mappedType = "documentInput";
+             else if (payload.mediaUrl && !payload.message) {
+                if (payload.mediaUrl.match(/\.(jpg|jpeg|png|gif|webp)/i)) mappedType = "imageInput";
+                else if (payload.mediaUrl.match(/\.(mp4|mov|avi)/i)) mappedType = "videoInput";
+                else if (payload.mediaUrl.match(/\.(mp3|ogg|wav|m4a)/i)) mappedType = "audioInput";
+                else mappedType = "documentInput";
+             }
+
+             this.variables[varName] = {
+               type: mappedType,
+               content: payload.mediaUrl || payload.base64 || userValue,
+               metadata: {
+                 base64: payload.base64,
+                 link: payload.mediaUrl,
+                 caption: payload.caption || payload.message,
+                 mimetype: payload.mimetype,
+                 fileName: payload.fileName
+               }
+             };
+             console.log(`[FlowEngine:input-universal] Saved to ${varName}:`, this.variables[varName]);
+          } else {
+            this.variables[varName] = userValue;
+            console.log(`[FlowEngine] Saved input to variable "${varName}": ${userValue}`);
+          }
         }
         
         // Advance after input
