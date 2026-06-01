@@ -547,12 +547,17 @@ async function runFlow(execution: any, containersIn: any[], edgesIn: any[], inpu
         headers: input.headers,
         query: input.query,
         method: input.method,
-        receivedAt: input.receivedAt
+        receivedAt: input.receivedAt,
+        channel: variables.channel || "webchat"
       };
       
       // Salva tanto no padrão quanto em variáveis específicas se o input veio de um webhook
       variables["webhookData"] = webhookData;
-      variables["data"] = webhookData;
+      // Merge into existing 'data' object instead of overwriting it, to preserve system fields
+      variables["data"] = { 
+        ...(variables["data"] || {}), 
+        ...webhookData 
+      };
     }
   }
 
