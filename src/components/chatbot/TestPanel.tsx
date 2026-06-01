@@ -1496,7 +1496,129 @@ export const TestPanel = ({
           <div className="p-3 border-t border-border flex flex-col gap-2" style={{ background: theme?.inputBackgroundColor }}>
             {!waitingForButton && (
               <div className="flex flex-col gap-2">
-                {waitingForType === "input-image" || waitingForType === "input-video" || waitingForType === "input-audio" || waitingForType === "input-file" ? (
+                {waitingForType === "input-universal" ? (
+                  <div className="flex flex-col gap-2">
+                    <div className="flex items-end gap-2">
+                      <DropdownMenu>
+                        <DropdownMenuTrigger asChild>
+                          <Button 
+                            variant="ghost" 
+                            size="icon" 
+                            className="rounded-full shrink-0 hover:bg-muted"
+                            disabled={isLoading}
+                          >
+                            <Paperclip className="h-5 w-5 text-muted-foreground" />
+                          </Button>
+                        </DropdownMenuTrigger>
+                        <DropdownMenuContent align="start" className="w-48 p-2">
+                          <DropdownMenuItem className="gap-3 cursor-pointer" onClick={() => {
+                            const input = document.createElement('input');
+                            input.type = 'file';
+                            input.accept = 'image/*';
+                            input.onchange = (e) => {
+                              const file = (e.target as HTMLInputElement).files?.[0];
+                              if (file) {
+                                const url = URL.createObjectURL(file);
+                                sendMessage(undefined, undefined, { type: 'image', url, file });
+                              }
+                            };
+                            input.click();
+                          }}>
+                            <div className="w-8 h-8 rounded-full bg-blue-100 flex items-center justify-center text-blue-600">
+                              <ImageIcon className="h-4 w-4" />
+                            </div>
+                            <span>Imagem</span>
+                          </DropdownMenuItem>
+                          <DropdownMenuItem className="gap-3 cursor-pointer" onClick={() => {
+                            const input = document.createElement('input');
+                            input.type = 'file';
+                            input.accept = 'video/*';
+                            input.onchange = (e) => {
+                              const file = (e.target as HTMLInputElement).files?.[0];
+                              if (file) {
+                                const url = URL.createObjectURL(file);
+                                sendMessage(undefined, undefined, { type: 'video', url, file });
+                              }
+                            };
+                            input.click();
+                          }}>
+                            <div className="w-8 h-8 rounded-full bg-purple-100 flex items-center justify-center text-purple-600">
+                              <Video className="h-4 w-4" />
+                            </div>
+                            <span>Vídeo</span>
+                          </DropdownMenuItem>
+                          <DropdownMenuItem className="gap-3 cursor-pointer" onClick={() => {
+                            const input = document.createElement('input');
+                            input.type = 'file';
+                            input.accept = 'audio/*';
+                            input.onchange = (e) => {
+                              const file = (e.target as HTMLInputElement).files?.[0];
+                              if (file) {
+                                const url = URL.createObjectURL(file);
+                                sendMessage(undefined, undefined, { type: 'audio', url, file });
+                              }
+                            };
+                            input.click();
+                          }}>
+                            <div className="w-8 h-8 rounded-full bg-orange-100 flex items-center justify-center text-orange-600">
+                              <Mic className="h-4 w-4" />
+                            </div>
+                            <span>Áudio</span>
+                          </DropdownMenuItem>
+                          <DropdownMenuItem className="gap-3 cursor-pointer" onClick={() => {
+                            const input = document.createElement('input');
+                            input.type = 'file';
+                            input.accept = '*/*';
+                            input.onchange = (e) => {
+                              const file = (e.target as HTMLInputElement).files?.[0];
+                              if (file) {
+                                const url = URL.createObjectURL(file);
+                                sendMessage(undefined, undefined, { type: 'file', url, file });
+                              }
+                            };
+                            input.click();
+                          }}>
+                            <div className="w-8 h-8 rounded-full bg-emerald-100 flex items-center justify-center text-emerald-600">
+                              <FileText className="h-4 w-4" />
+                            </div>
+                            <span>Documento</span>
+                          </DropdownMenuItem>
+                          <div className="border-t my-1" />
+                          <DropdownMenuItem className="gap-3 cursor-pointer text-primary" onClick={() => startCapture('image')}>
+                            <Camera className="h-4 w-4" />
+                            <span>Câmera (Foto)</span>
+                          </DropdownMenuItem>
+                        </DropdownMenuContent>
+                      </DropdownMenu>
+
+                      <Textarea
+                        value={currentInput}
+                        onChange={(e) => setCurrentInput(e.target.value)}
+                        onKeyDown={(e) => {
+                          if (e.key === "Enter" && !e.shiftKey) {
+                            e.preventDefault();
+                            handleSendMessage();
+                          }
+                        }}
+                        placeholder={waitingForConfig?.placeholder || "Digite sua mensagem..."}
+                        rows={1}
+                        className="flex-1 min-w-0 resize-none min-h-[40px] max-h-[160px] rounded-2xl bg-muted/50 border-none focus-visible:ring-1"
+                        style={{ color: theme?.inputTextColor || "inherit" }}
+                        disabled={isLoading}
+                      />
+                      
+                      <Button 
+                        size="icon" 
+                        onClick={handleSendMessage} 
+                        disabled={isLoading || !currentInput.trim()}
+                        className="rounded-full shrink-0"
+                        style={{ background: theme?.primaryColor, color: "#ffffff" }}
+                      >
+                        <Send className="h-4 w-4" />
+                      </Button>
+                    </div>
+                  </div>
+                ) : waitingForType === "input-image" || waitingForType === "input-video" || waitingForType === "input-audio" || waitingForType === "input-file" ? (
                   <div className="flex flex-wrap gap-2 justify-center py-2">
                     <input 
                       type="file" 
@@ -1512,13 +1634,13 @@ export const TestPanel = ({
                         if (file) {
                           const url = URL.createObjectURL(file);
                           const type = waitingForType.replace('input-', '') as any;
-                          sendMessage(undefined, undefined, { type, url });
+                          sendMessage(undefined, undefined, { type, url, file });
                         }
                       }}
                     />
                     <Button 
                       variant="outline" 
-                      className="flex-1 gap-2" 
+                      className="flex-1 gap-2 rounded-full" 
                       onClick={() => document.getElementById('file-upload')?.click()}
                       disabled={isLoading}
                     >
@@ -1530,7 +1652,7 @@ export const TestPanel = ({
                     {(waitingForType === "input-image" || waitingForType === "input-video" || waitingForType === "input-audio") && (
                       <Button 
                         variant="outline" 
-                        className="flex-1 gap-2" 
+                        className="flex-1 gap-2 rounded-full" 
                         onClick={() => {
                           const type = waitingForType.replace('input-', '') as any;
                           startCapture(type);
@@ -1558,7 +1680,7 @@ export const TestPanel = ({
                           min={waitingForType === "input-number" ? waitingForConfig?.min : undefined}
                           max={waitingForType === "input-number" ? waitingForConfig?.max : undefined}
                           step={waitingForType === "input-number" ? waitingForConfig?.step : undefined}
-                          className={`flex-1 min-w-0 ${waitingForType === "input-phone" ? "pl-9" : ""}`}
+                          className={`flex-1 min-w-0 rounded-2xl ${waitingForType === "input-phone" ? "pl-9" : ""}`}
                           style={{ background: theme?.inputBackgroundColor ? "rgba(255,255,255,0.1)" : undefined, color: theme?.inputTextColor || "inherit", borderColor: theme?.inputTextColor ? `${theme.inputTextColor}40` : undefined }}
                           disabled={isLoading}
                         />
@@ -1575,7 +1697,7 @@ export const TestPanel = ({
                         }}
                         placeholder={waitingForConfig?.responseUserTextInput || waitingForConfig?.placeholder || "Digite aqui (Shift+Enter para quebrar linha)"}
                         rows={1}
-                        className="flex-1 min-w-0 resize-none min-h-[40px] max-h-[160px]"
+                        className="flex-1 min-w-0 resize-none min-h-[40px] max-h-[160px] rounded-2xl"
                         style={{ background: theme?.inputBackgroundColor ? "rgba(255,255,255,0.1)" : undefined, color: theme?.inputTextColor || "inherit", borderColor: theme?.inputTextColor ? `${theme.inputTextColor}40` : undefined }}
                         disabled={isLoading}
                       />
@@ -1584,6 +1706,7 @@ export const TestPanel = ({
                       size="icon" 
                       onClick={handleSendMessage} 
                       disabled={isLoading || !currentInput.trim()}
+                      className="rounded-full"
                       style={{ background: theme?.primaryColor, color: "#ffffff" }}
                     >
                       <Send className="h-4 w-4" />
