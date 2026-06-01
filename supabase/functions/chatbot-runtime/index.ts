@@ -913,10 +913,19 @@ Deno.serve(async (req: Request) => {
     );
 
     const body = await req.json();
-    const { action, flow_id: flowRef, contact_id, channel = "webchat", payload } = body || {};
+    console.log("[runtime] Received request:", JSON.stringify(body));
+    
+    // Support Evolution API payload structure as well as direct chatbot requests
+    const isEvolution = !!(body.data?.message || body.data?.key);
+    const action = isEvolution ? "message" : (body.action || "start");
+    const flowRef = body.flow_id || body.flowId;
+    const contact_id = body.contact_id || body.remoteJid || body.data?.key?.remoteJid || body.sender;
+    const channel = body.channel || (isEvolution ? "whatsapp" : "webchat");
+    const payload = body.payload || body.data || body;
 
-    if (!action || !flowRef || !contact_id) {
-      return json({ error: "missing required fields" }, 400);
+    if (!flowRef || !contact_id) {
+      console.error("[runtime] Missing required fields:", { flowRef, contact_id, action });
+      return json({ error: "missing required fields (flow_id and contact_id)" }, 400);
     }
 
     // 1. Resolve Flow
