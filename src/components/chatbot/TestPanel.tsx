@@ -1,10 +1,16 @@
 import { useState, useEffect, useRef } from "react";
-import { X, Send, Headphones, Play, Pause, FileText, Loader2, RefreshCw, Camera, Video, Mic, Image, Phone, Upload, Paperclip } from "lucide-react";
+import { X, Send, Headphones, Play, Pause, FileText, Loader2, RefreshCw, Camera, Video, Mic, Image as ImageIcon, Phone, Upload, Paperclip } from "lucide-react";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
 import { Button } from "../../components/ui/button";
 import { Input } from "../../components/ui/input";
 import { Textarea } from "../../components/ui/textarea";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 import { type Container, type Node, type ButtonConfig, type Edge, type ConditionComparison, type ConditionGroup } from "../../types/chatbot";
 
 interface ResponseMapping {
@@ -523,7 +529,15 @@ export const TestPanel = ({
 
     const runLocalFlow = async (
       state: RuntimeState | null, 
-      input?: { message?: string; button_id?: string },
+      input?: { 
+        message?: string; 
+        button_id?: string;
+        type?: string;
+        url?: string;
+        base64?: string;
+        fileName?: string;
+        mimetype?: string;
+      },
       containersIn?: Container[],
       edgesIn?: Edge[],
       visitedRedirects = new Set<string>()
@@ -592,7 +606,22 @@ export const TestPanel = ({
           if (info) {
             const cfg = info.node.config || {};
             const varName = cfg.variableName || cfg.saveVariable;
-            if (varName && userValue !== undefined) variables[varName] = userValue;
+            if (varName && userValue !== undefined) {
+              if (info.node.type === 'input-universal') {
+                variables[varName] = {
+                  type: input.type || 'textInput',
+                  content: userValue,
+                  metadata: {
+                    base64: input.base64,
+                    link: input.url,
+                    fileName: input.fileName,
+                    mimetype: input.mimetype
+                  }
+                };
+              } else {
+                variables[varName] = userValue;
+              }
+            }
             
             if (info.node.type === "go-to" && cfg.targetContainerId) {
               const targetNodeId = resolveTargetIn(cfg.targetContainerId, containers);
@@ -1241,7 +1270,7 @@ export const TestPanel = ({
   };
 
 
-  const sendMessage = async (message?: string, buttonId?: string, fileData?: { type: 'image' | 'video' | 'audio' | 'file', url: string }) => {
+  const sendMessage = async (message?: string, buttonId?: string, fileData?: { type: 'image' | 'video' | 'audio' | 'file', url: string, file?: File }) => {
     const msgToSend = message || currentInput || fileData?.url;
     if (!msgToSend && !buttonId && !fileData) return;
 
@@ -1315,7 +1344,32 @@ export const TestPanel = ({
     setCurrentInput("");
 
     const currentState = runtimeStateRef.current;
-    const data = await runLocalFlow(currentState, { message: msgToSend, button_id: buttonId });
+    
+    // Prepare input for input-universal if needed
+    let inputPayload: any = { message: msgToSend, button_id: buttonId };
+    if (fileData) {
+      const typeMap: any = { image: 'imageInput', video: 'videoInput', audio: 'audioInput', file: 'documentInput' };
+      inputPayload = {
+        ...inputPayload,
+        type: typeMap[fileData.type] || 'textInput',
+        url: fileData.url,
+        fileName: fileData.file?.name,
+        mimetype: fileData.file?.type
+      };
+      
+      // If we have a file, let's get base64 if needed (local test only)
+      if (fileData.file) {
+        const reader = new FileReader();
+        inputPayload.base64 = await new Promise((resolve) => {
+          reader.onloadend = () => resolve(reader.result as string);
+          reader.readAsDataURL(fileData.file!);
+        });
+      }
+    } else if (waitingForType === 'input-universal') {
+      inputPayload.type = 'textInput';
+    }
+
+    const data = await runLocalFlow(currentState, inputPayload);
     
     applyRuntimeData(data);
     setIsLoading(false);
