@@ -876,21 +876,26 @@ async function runFlow(execution: any, containersIn: any[], edgesIn: any[], inpu
               
               const userParts: any[] = [{ text: userPrompt }];
               if (cfg.visionEnabled) {
-                const mediaUrl = variables["mediaUrl"] || variables["media_url"] || variables["url"];
-                const base64 = variables["base64"] || variables["image_base64"];
+                // Tenta pegar de variáveis específicas ou do input universal
+                const mediaUrl = variables["mediaUrl"] || variables["media_url"] || variables["url"] || 
+                               (variables[variables.last_input_var]?.metadata?.link);
+                const base64 = variables["base64"] || variables["image_base64"] || 
+                             (variables[variables.last_input_var]?.metadata?.base64);
+                const mimetype = variables["mimetype"] || 
+                                (variables[variables.last_input_var]?.metadata?.mimetype) || "image/jpeg";
 
                 if (base64) {
-                  const b64Data = String(base64).replace(/^data:image\/[a-z]+;base64,/, "");
-                  userParts.push({ inline_data: { mime_type: "image/jpeg", data: b64Data } });
+                  const b64Data = String(base64).replace(/^data:[a-z]+\/[a-z]+;base64,/, "");
+                  userParts.push({ inline_data: { mime_type: mimetype, data: b64Data } });
                 } else if (mediaUrl && String(mediaUrl).startsWith("http")) {
                   try {
                     const imgRes = await fetch(mediaUrl);
                     if (imgRes.ok) {
                       const arrayBuffer = await imgRes.arrayBuffer();
                       const b64 = Buffer.from(arrayBuffer).toString('base64');
-                      userParts.push({ inline_data: { mime_type: imgRes.headers.get("content-type") || "image/jpeg", data: b64 } });
+                      userParts.push({ inline_data: { mime_type: imgRes.headers.get("content-type") || mimetype, data: b64 } });
                     }
-                  } catch (e) { console.error("[Gemini:Vision] failed to fetch image", e); }
+                  } catch (e) { console.error("[Gemini:AI-Node] failed to fetch media", e); }
                 }
               }
 
