@@ -742,7 +742,11 @@ async function runFlow(execution: any, containersIn: any[], edgesIn: any[], inpu
         if (webhookData) {
           variables[varName] = webhookData;
           variables["webhookData"] = webhookData;
-          variables["data"] = webhookData;
+          // Merge into existing 'data' object instead of overwriting it
+          variables["data"] = { 
+            ...(variables["data"] || {}), 
+            ...webhookData 
+          };
 
           // Mapear campos: extrai paths do payload e salva em variáveis individuais
           if (Array.isArray(cfg.responseMappings)) {
