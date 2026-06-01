@@ -109,7 +109,21 @@ class FlowEngine {
     this.flow = flow;
     this.containers = flow.published_containers || flow.draft_containers || [];
     this.edges = flow.published_edges || flow.draft_edges || [];
-    this.variables = { ...(execution.variables || {}) };
+    
+    // Initialize variables with execution state and system variables
+    this.variables = { 
+      ...(execution.variables || {}),
+      channel: execution.channel_id || "webchat",
+      contact_id: execution.contact_id,
+    };
+
+    // Also expose under 'data' object for convenience as requested
+    this.variables.data = {
+      ...(this.variables.data || {}),
+      channel: execution.channel_id || "webchat",
+      contact_id: execution.contact_id
+    };
+
     this.currentNodeId = execution.current_node_id;
     this.activeAgentNodeId = execution.active_agent_node_id || null;
     this.mode = execution.runtime_mode || "flow";
