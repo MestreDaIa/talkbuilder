@@ -185,10 +185,15 @@ class FlowEngine {
              const typeMap: Record<string, string> = {
                "conversation": "textInput",
                "extendedTextMessage": "textInput",
+               "textInput": "textInput",
                "imageMessage": "imageInput",
+               "imageInput": "imageInput",
                "videoMessage": "videoInput",
+               "videoInput": "videoInput",
                "audioMessage": "audioInput",
+               "audioInput": "audioInput",
                "documentMessage": "documentInput",
+               "documentInput": "documentInput",
                "documentWithCaptionMessage": "documentInput"
              };
              

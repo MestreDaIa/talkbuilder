@@ -1,7 +1,13 @@
 import { useState, useEffect, useRef } from "react";
-import { MessageCircle, X, Send, Loader2, Image as ImageIcon, Film, Headphones, File as FileIcon, Paperclip } from "lucide-react";
+import { MessageCircle, X, Send, Loader2, Image as ImageIcon, Film, Headphones, File as FileIcon, Paperclip, Video, Mic } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { getEdgeFunctionUrl } from "@/lib/supabaseHelpers";
 import { markdownToSafeHtml } from "@/lib/markdown";
@@ -261,6 +267,7 @@ export const ChatWidget = ({
     setInput("");
 
     try {
+      const isUniversal = waitingFor === 'input-universal';
       const response = await fetch(getRuntimeUrl(), {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -269,7 +276,12 @@ export const ChatWidget = ({
           flow_id: flowId,
           contact_id: getContactId(),
           channel: "webchat",
-          payload: { message: msgToSend, button_id: buttonId, runtime_state: runtimeStateRef.current },
+          payload: { 
+            message: msgToSend, 
+            button_id: buttonId, 
+            messageType: isUniversal ? 'textInput' : undefined,
+            runtime_state: runtimeStateRef.current 
+          },
         }),
       });
 
@@ -500,61 +512,69 @@ export const ChatWidget = ({
         <div className="p-3 border-t border-border" style={{ background: themeSettings?.inputBackgroundColor || '#ffffff' }}>
           {waitingFor === "input-universal" && (
             <div className="flex gap-2 mb-2 justify-start px-1">
-              <button 
-                title="Enviar Imagem"
-                className="p-1.5 rounded-full hover:bg-muted text-muted-foreground transition-colors"
-                onClick={() => {
-                  const input = document.createElement('input');
-                  input.type = 'file';
-                  input.accept = 'image/*';
-                  input.onchange = (e) => handleFileUpload(e, 'imageInput');
-                  input.click();
-                }}
-              >
-                <ImageIcon className="w-4 h-4" />
-              </button>
-              <button 
-                title="Enviar Vídeo"
-                className="p-1.5 rounded-full hover:bg-muted text-muted-foreground transition-colors"
-                onClick={() => {
-                  const input = document.createElement('input');
-                  input.type = 'file';
-                  input.accept = 'video/*';
-                  input.onchange = (e) => handleFileUpload(e, 'videoInput');
-                  input.click();
-                }}
-              >
-                <Film className="w-4 h-4" />
-              </button>
-              <button 
-                title="Enviar Áudio"
-                className="p-1.5 rounded-full hover:bg-muted text-muted-foreground transition-colors"
-                onClick={() => {
-                  const input = document.createElement('input');
-                  input.type = 'file';
-                  input.accept = 'audio/*';
-                  input.onchange = (e) => handleFileUpload(e, 'audioInput');
-                  input.click();
-                }}
-              >
-                <Headphones className="w-4 h-4" />
-              </button>
-              <button 
-                title="Enviar Documento"
-                className="p-1.5 rounded-full hover:bg-muted text-muted-foreground transition-colors"
-                onClick={() => {
-                  const input = document.createElement('input');
-                  input.type = 'file';
-                  input.accept = '*/*';
-                  input.onchange = (e) => handleFileUpload(e, 'documentInput');
-                  input.click();
-                }}
-              >
-                <FileIcon className="w-4 h-4" />
-              </button>
+              <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                  <button 
+                    title="Anexar arquivo"
+                    className="p-1.5 rounded-full hover:bg-muted text-muted-foreground transition-colors"
+                  >
+                    <Paperclip className="w-5 h-5" />
+                  </button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent align="start" className="w-48 p-2 z-[60]">
+                  <DropdownMenuItem className="gap-3 cursor-pointer" onClick={() => {
+                    const input = document.createElement('input');
+                    input.type = 'file';
+                    input.accept = 'image/*';
+                    input.onchange = (e) => handleFileUpload(e, 'imageInput');
+                    input.click();
+                  }}>
+                    <div className="w-8 h-8 rounded-full bg-blue-100 flex items-center justify-center text-blue-600">
+                      <ImageIcon className="h-4 w-4" />
+                    </div>
+                    <span>Imagem</span>
+                  </DropdownMenuItem>
+                  <DropdownMenuItem className="gap-3 cursor-pointer" onClick={() => {
+                    const input = document.createElement('input');
+                    input.type = 'file';
+                    input.accept = 'video/*';
+                    input.onchange = (e) => handleFileUpload(e, 'videoInput');
+                    input.click();
+                  }}>
+                    <div className="w-8 h-8 rounded-full bg-purple-100 flex items-center justify-center text-purple-600">
+                      <Film className="h-4 w-4" />
+                    </div>
+                    <span>Vídeo</span>
+                  </DropdownMenuItem>
+                  <DropdownMenuItem className="gap-3 cursor-pointer" onClick={() => {
+                    const input = document.createElement('input');
+                    input.type = 'file';
+                    input.accept = 'audio/*';
+                    input.onchange = (e) => handleFileUpload(e, 'audioInput');
+                    input.click();
+                  }}>
+                    <div className="w-8 h-8 rounded-full bg-orange-100 flex items-center justify-center text-orange-600">
+                      <Headphones className="h-4 w-4" />
+                    </div>
+                    <span>Áudio</span>
+                  </DropdownMenuItem>
+                  <DropdownMenuItem className="gap-3 cursor-pointer" onClick={() => {
+                    const input = document.createElement('input');
+                    input.type = 'file';
+                    input.accept = '*/*';
+                    input.onchange = (e) => handleFileUpload(e, 'documentInput');
+                    input.click();
+                  }}>
+                    <div className="w-8 h-8 rounded-full bg-emerald-100 flex items-center justify-center text-emerald-600">
+                      <FileIcon className="h-4 w-4" />
+                    </div>
+                    <span>Documento</span>
+                  </DropdownMenuItem>
+                </DropdownMenuContent>
+              </DropdownMenu>
             </div>
           )}
-          <div className="flex gap-2">
+          <div className="flex gap-2 items-end">
             <Input
               value={input}
               onChange={(e) => setInput(e.target.value)}
@@ -578,18 +598,16 @@ export const ChatWidget = ({
               min={waitingFor === "input-number" ? waitingForConfig?.min : undefined}
               max={waitingFor === "input-number" ? waitingForConfig?.max : undefined}
               step={waitingFor === "input-number" ? waitingForConfig?.step : undefined}
-              className="flex-1 rounded-full min-w-0"
+              className="flex-1 rounded-2xl min-w-0 bg-muted/30 border-none focus-visible:ring-1"
               style={{ 
                 color: themeSettings?.inputTextColor || '#1f2937',
-                backgroundColor: 'rgba(255, 255, 255, 0.1)', // Subtle overlay
-                borderColor: themeSettings?.inputTextColor ? `${themeSettings.inputTextColor}40` : undefined
               }}
             />
             <Button
               size="icon"
               onClick={() => sendMessage()}
               disabled={isLoading || !input.trim()}
-              className="rounded-full overflow-hidden"
+              className="rounded-full shrink-0"
               style={{ background: primaryColor }}
             >
               <Send className="w-4 h-4 text-white" />
