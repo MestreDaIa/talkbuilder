@@ -284,6 +284,65 @@ export const ChatWidget = ({
     }
   };
 
+  const handleFileUpload = async (event: any, inputType: string) => {
+    const file = event.target.files?.[0];
+    if (!file) return;
+
+    setIsLoading(true);
+    try {
+      // For webchat, we'll convert to base64 for now as a simple way to "send" the file
+      // In a real app, you'd upload to Supabase Storage first
+      const reader = new FileReader();
+      reader.onloadend = async () => {
+        const base64 = reader.result as string;
+        
+        // Construct the payload for input-universal
+        const payload = {
+          message: "",
+          mediaUrl: "", // Would be the public URL after upload
+          base64: base64,
+          mimetype: file.type,
+          fileName: file.name,
+          messageType: inputType === 'imageInput' ? 'imageMessage' : 
+                       inputType === 'videoInput' ? 'videoMessage' :
+                       inputType === 'audioInput' ? 'audioMessage' : 'documentMessage'
+        };
+
+        // Add a preview message to the UI
+        setMessages(prev => [...prev, { 
+          id: `u-${Date.now()}`, 
+          type: "user", 
+          content: file.name,
+          isImage: inputType === 'imageInput',
+          isVideo: inputType === 'videoInput',
+          isAudio: inputType === 'audioInput'
+        }]);
+
+        // Send to runtime
+        const response = await fetch(getRuntimeUrl(), {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            action: "message",
+            flow_id: flowId,
+            contact_id: getContactId(),
+            channel: "webchat",
+            payload: { ...payload, runtime_state: runtimeStateRef.current },
+          }),
+        });
+
+        if (!response.ok) throw new Error("Falha ao enviar arquivo");
+
+        const data = await response.json();
+        applyRuntimeData(data);
+      };
+      reader.readAsDataURL(file);
+    } catch (err: any) {
+      setError(err.message || "Erro ao enviar arquivo");
+      setIsLoading(false);
+    }
+  };
+
   const handleButtonClick = (button: ChatButton) => {
     sendMessage(undefined, button.id);
   };
