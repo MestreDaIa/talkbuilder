@@ -213,6 +213,9 @@ export async function processRuntime(body: any) {
   }
 
   // Executar Fluxo
+  execution.channel_id = execution.channel_id || channel;
+  execution.contact_id = execution.contact_id || contact_id;
+
   console.log(`[runtime] Iniciando execução do fluxo. Input: ${JSON.stringify(payload || body?.payload)}`);
   const result = await runFlow(execution, containers, edges, payload || body?.payload, flow, supabase);
   console.log(`[runtime] Execução finalizada. Status: ${result.status}. Mensagens geradas: ${result.messages?.length || 0}`);
