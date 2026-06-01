@@ -554,9 +554,51 @@ async function runFlow(execution: any, containersIn: any[], edgesIn: any[], inpu
        const info = findNode(currentNodeId);
        if (info) {
          const cfg = info.node.config || {};
-         const nodeType = (info.node.type || "").toLowerCase();
+         const nodeType = (info.node.type || "").toLowerCase().trim();
          const varName = cfg.variableName || cfg.saveVariable;
-         if (varName && userValue !== undefined) variables[varName] = userValue;
+         
+         if (varName && userValue !== undefined) {
+           if (nodeType === "input-universal") {
+             const typeMap: Record<string, string> = {
+               "conversation": "textInput",
+               "extendedTextMessage": "textInput",
+               "imageMessage": "imageInput",
+               "videoMessage": "videoInput",
+               "audioMessage": "audioInput",
+               "documentMessage": "documentInput",
+               "documentWithCaptionMessage": "documentInput"
+             };
+             
+             // Determinar o tipo baseado no messageType do WhatsApp ou na presença de mídia
+             let mappedType = typeMap[input.messageType] || "textInput";
+             if (input.mimetype?.startsWith("image/")) mappedType = "imageInput";
+             else if (input.mimetype?.startsWith("video/")) mappedType = "videoInput";
+             else if (input.mimetype?.startsWith("audio/")) mappedType = "audioInput";
+             else if (input.mimetype?.startsWith("application/")) mappedType = "documentInput";
+             else if (input.mediaUrl && !input.message) {
+                // Fallback se não tiver mimetype mas tiver URL
+                if (input.mediaUrl.match(/\.(jpg|jpeg|png|gif|webp)/i)) mappedType = "imageInput";
+                else if (input.mediaUrl.match(/\.(mp4|mov|avi)/i)) mappedType = "videoInput";
+                else if (input.mediaUrl.match(/\.(mp3|ogg|wav|m4a)/i)) mappedType = "audioInput";
+                else mappedType = "documentInput";
+             }
+
+             variables[varName] = {
+               type: mappedType,
+               content: input.mediaUrl || input.base64 || userValue,
+               metadata: {
+                 base64: input.base64,
+                 link: input.mediaUrl,
+                 caption: input.caption || input.message,
+                 mimetype: input.mimetype,
+                 fileName: input.fileName
+               }
+             };
+             console.log(`[runtime:input-universal] Saved to ${varName}:`, variables[varName]);
+           } else {
+             variables[varName] = userValue;
+           }
+         }
 
          if (nodeType !== "ai-agent" && nodeType !== "agent") {
             currentNodeId = nextFromNode(info.node.id, info.container, input.button_id);
@@ -637,7 +679,7 @@ async function runFlow(execution: any, containersIn: any[], edgesIn: any[], inpu
       // pré-loop (quando execution.waiting_for_input estava true para este node).
       // Consumir a mensagem inicial aqui faria o bot pular a etapa de input.
       console.log(`[runtime:input_wait] aguardando entrada no node ${node.id} (${nodeType})`);
-      waiting_for = nodeType === "input-buttons" ? "buttons" : "text";
+      waiting_for = nodeType === "input-buttons" ? "buttons" : nodeType;
       if (nodeType === "input-buttons") {
         buttons = (cfg.buttons || []).map((b: any) => ({
           id: b.id,

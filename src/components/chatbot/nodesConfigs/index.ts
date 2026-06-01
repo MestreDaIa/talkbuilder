@@ -10,6 +10,7 @@ import { InputMailConfig } from "./NodesInputsConfig/InputMailConfig";
 import { InputPhoneConfig } from "./NodesInputsConfig/InputPhoneConfig";
 import { InputButtonConfig } from "./NodesInputsConfig/InputButtonConfig";
 import { InputWebSiteConfig } from "./NodesInputsConfig/InputWebSiteConfig";
+import { InputUniversalConfig } from "./NodesInputsConfig/InputUniversalConfig";
 import { SetVariableConfig } from "./NodesLogicConfig/SetVariableConfig";
 import { ScriptConfig } from "./NodesLogicConfig/ScriptConfig";
 import { ConditionConfig } from "./NodesLogicConfig/ConditionConfig";
@@ -42,6 +43,7 @@ export const nodeConfigComponents: Record<string, React.FC<any>> = {
   "input-video": InputTextConfig,
   "input-audio": InputTextConfig,
   "input-document": InputTextConfig,
+  "input-universal": InputUniversalConfig,
   "input-buttons": InputButtonConfig,
   // Logic
   "set-variable": SetVariableConfig,

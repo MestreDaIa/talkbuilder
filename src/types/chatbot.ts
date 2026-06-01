@@ -21,6 +21,7 @@ export type NodeType =
   | "input-video"
   | "input-audio"
   | "input-document"
+  | "input-universal"
   | "input-buttons"
   | "input-webSite"
   // logic

@@ -72,6 +72,7 @@ const nodeIcons: Record<NodeType, React.ReactNode> = {
   "input-video": <Film className="h-4 w-4" />,
   "input-audio": <Headphones className="h-4 w-4" />,
   "input-document": <File className="h-4 w-4" />,
+  "input-universal": <MessageSquare className="h-4 w-4" />,
   "input-webSite": <Globe className="h-4 w-4" />,
   "input-buttons": <SquareArrowOutUpRight className="h-4 w-4" />,
   // Logic
@@ -108,6 +109,7 @@ const nodeCategories: Record<NodeType, string> = {
   "input-video": "Input",
   "input-audio": "Input",
   "input-document": "Input",
+  "input-universal": "Input",
   "input-webSite": "Input",
   "input-buttons": "Input",
   "set-variable": "Lógica",
@@ -144,6 +146,7 @@ const nodeColors: Record<NodeType, string> = {
   "input-image": "bg-accent/10 border-accent/30 text-orange-600",
   "input-video": "bg-accent/10 border-accent/30 text-orange-600",
   "input-document": "bg-accent/10 border-accent/30 text-orange-600",
+  "input-universal": "bg-accent/10 border-accent/30 text-orange-600",
   "input-webSite": "bg-accent/10 border-accent/30 text-orange-600",
   "input-buttons": "bg-accent/10 border-accent/30 text-orange-600",
   // Logic
@@ -181,6 +184,7 @@ const nodeLabels: Record<NodeType, string> = {
   "input-audio": "Usuário Responde com Audio",
   "input-video": "Usuário Responde com Video",
   "input-document": "Usuário Responde com Documento",
+  "input-universal": "Usuário Responde com qualquer conteúdo",
   "input-webSite": "Usuário Responde com Link",
   "input-buttons": "Usuário Responde seleção de botão",
   // Logic

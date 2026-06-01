@@ -61,6 +61,7 @@ const nodeTypes: {
   { type: "input-video", label: "Video", icon: <Film className="h-5 w-5" />, category: "inputs" },
   { type: "input-audio", label: "Audio", icon: <Headphones className="h-5 w-5" />, category: "inputs" },
   { type: "input-document", label: "Documento", icon: <File className="h-5 w-5" />, category: "inputs" },
+  { type: "input-universal", label: "Input Universal", icon: <MessageSquare className="h-5 w-5" />, category: "inputs" },
   { type: "input-buttons", label: "Botões", icon: <SquareArrowOutUpRight className="h-5 w-5" />, category: "inputs" },
   { type: "input-webSite", label: "Site", icon: <Globe className="h-5 w-5" />, category: "inputs" },
   // Logic
