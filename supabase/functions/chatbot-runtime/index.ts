@@ -916,15 +916,21 @@ Deno.serve(async (req: Request) => {
     console.log("[runtime] Received request:", JSON.stringify(body));
     
     // Support Evolution API payload structure as well as direct chatbot requests
-    const isEvolution = !!(body.data?.message || body.data?.key);
+    const isEvolution = !!(body.data?.message || body.data?.key || body.instanceId || body.instance);
     const action = isEvolution ? "message" : (body.action || "start");
     const flowRef = body.flow_id || body.flowId;
-    const contact_id = body.contact_id || body.remoteJid || body.data?.key?.remoteJid || body.sender;
-    const channel = body.channel || (isEvolution ? "whatsapp" : "webchat");
+    const contact_id = body.contact_id || body.remoteJid || body.data?.key?.remoteJid || body.sender || body.data?.message?.key?.remoteJid;
+    
+    // Better channel detection: 
+    // 1. Explicit body.channel
+    // 2. presence of whatsapp-specific fields
+    const hasWhatsappFields = isEvolution || !!(body.instance || body.remoteJid || body.data?.key?.remoteJid);
+    const channel = body.channel || (hasWhatsappFields ? "whatsapp" : "webchat");
+    
     const payload = body.payload || body.data || body;
 
     if (!flowRef || !contact_id) {
-      console.error("[runtime] Missing required fields:", { flowRef, contact_id, action });
+      console.error("[runtime] Missing required fields:", { flowRef, contact_id, action, isEvolution, hasWhatsappFields });
       return json({ error: "missing required fields (flow_id and contact_id)" }, 400);
     }
 
