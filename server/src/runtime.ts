@@ -602,6 +602,14 @@ async function runFlow(execution: any, containersIn: any[], edgesIn: any[], inpu
 
   // 1. Processar Entrada (Resumo de Estado)
   if (input) {
+    const incomingType = input.messageType || input.mediaType || input.midiaType;
+    const hasIncomingMessage = input.message !== undefined || input.button_id !== undefined || incomingType || input.base64 || input.mediaUrl;
+    if (hasIncomingMessage) {
+      ["base64", "image_base64", "audio_base64", "mediaUrl", "media_url", "mimetype", "mimeType", "mediaType", "midiaType", "url"].forEach((key) => {
+        if (variables[key] !== undefined) delete variables[key];
+      });
+    }
+
     if (input.messageId) variables["messageId"] = input.messageId;
     if (input.remoteJid) variables["remoteJid"] = input.remoteJid;
     if (input.pushName) variables["pushName"] = input.pushName;
@@ -615,6 +623,9 @@ async function runFlow(execution: any, containersIn: any[], edgesIn: any[], inpu
     if (input.mimetype) variables["mimetype"] = input.mimetype;
     if (input.mediaUrl) variables["mediaUrl"] = input.mediaUrl;
     if (input.base64) variables["base64"] = input.base64;
+    if (input.mimeType) variables["mimeType"] = input.mimeType;
+    if (input.mediaType) variables["mediaType"] = input.mediaType;
+    if (input.midiaType) variables["midiaType"] = input.midiaType;
 
     // Se houver dados de um webhook (payload), colocamos em webhookData
     // para que {{webhookData.body.data.messageType}} funcione se o nó Webhook
