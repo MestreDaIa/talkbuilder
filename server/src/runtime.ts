@@ -957,6 +957,15 @@ async function runFlow(execution: any, containersIn: any[], edgesIn: any[], inpu
             const inputMimetype = input?.mimetype || input?.mimeType;
             const isMediaMessage = ["imageMessage", "audioMessage", "videoMessage", "documentWithCaptionMessage"].includes(input?.messageType || "");
 
+            // Limpa as variáveis persistentes se detectamos um NOVO input de mídia ou mensagem
+            if (input && (input.message || input.base64 || input.mediaUrl || isMediaMessage)) {
+              delete variables["base64"];
+              delete variables["mediaUrl"];
+              delete variables["mimetype"];
+              delete variables["image_base64"];
+              delete variables["audio_base64"];
+            }
+
             // Prioriza o que veio no input atual, senão tenta variáveis persistentes
             const base64 = inputMediaBase64 || variables["base64"] || variables["image_base64"] || variables["audio_base64"];
             const mediaUrl = inputMediaUrl || variables["mediaUrl"] || variables["media_url"] || variables["url"];
