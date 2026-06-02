@@ -348,9 +348,9 @@ async function runFlow(execution: any, containersIn: any[], edgesIn: any[], inpu
       raw = "cond-" + raw.split("-cond-")[1];
     } else if (raw.includes("-btn-")) {
       raw = "btn-" + raw.split("-btn-")[1];
-    } else if (raw.endsWith("-else")) {
+    } else if (raw.endsWith("-else") || raw.endsWith("-senão") || raw.endsWith("-senao")) {
       raw = "else";
-    } else if (raw.endsWith("-default")) {
+    } else if (raw.endsWith("-default") || raw.endsWith("-padrão") || raw.endsWith("-padrao")) {
       raw = "default";
     }
     
