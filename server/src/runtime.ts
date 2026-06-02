@@ -1038,10 +1038,14 @@ async function runFlow(execution: any, containersIn: any[], edgesIn: any[], inpu
             // Prioriza o que veio no input atual, senão tenta variáveis persistentes
             const base64 = inputMediaBase64 || variables["base64"] || variables["image_base64"] || variables["audio_base64"];
             const mediaUrl = inputMediaUrl || variables["mediaUrl"] || variables["media_url"] || variables["url"];
-            const mimetype = inputMimetype || variables["mimetype"] || variables["mimeType"] || (input?.messageType === "audioMessage" ? "audio/ogg" : "image/jpeg");
-            
+            let mimetype = inputMimetype || variables["mimetype"] || variables["mimeType"] || (input?.messageType === "audioMessage" ? "audio/ogg" : "image/jpeg");
+            // Normaliza mimetype: remove parâmetros como ";codecs=opus" que as APIs rejeitam
+            if (typeof mimetype === "string") mimetype = mimetype.split(";")[0].trim();
+
             const hasMedia = !!(base64 || mediaUrl || isMediaMessage);
-            
+
+            console.log(`[ai-agent] node=${node.id} provider=${provider} hasMedia=${hasMedia} hasBase64=${!!base64} hasUrl=${!!mediaUrl} mimetype=${mimetype} userPromptLen=${userPrompt.length} isFirstTime=${isFirstTime}`);
+
             if (isFirstTime && cfg.welcomeMessage && !hasMedia && !userPrompt) {
                messages.push({ id: crypto.randomUUID(), type: "bot", content: replaceVars(cfg.welcomeMessage) });
                return { messages, waiting_for: "text", variables, next_node_id: node.id, active_agent_node_id: node.id, mode: "agent", steps, status: "waiting_input" };
@@ -1082,20 +1086,23 @@ async function runFlow(execution: any, containersIn: any[], edgesIn: any[], inpu
                 if (res.ok) {
                   const data: any = await res.json();
                   aiReply = data.choices?.[0]?.message?.content || "";
-                }
+                  console.log(`[ai-agent:openai] reply len=${aiReply.length}`);
+                } else {
+                  const errText = await res.text().catch(() => "");
+                  console.error(`[ai-agent:openai] HTTP ${res.status}: ${errText.slice(0, 500)}`);
               } else if (provider === "gemini") {
                 const model = cfg.model || "gemini-2.0-flash";
                 const url = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${activeKey}`;
-                
+
                 const userParts: any[] = [];
                 if (userPrompt) {
                   userParts.push({ text: userPrompt });
                 } else if (hasMedia) {
                   userParts.push({ text: "Processe o conteúdo enviado (mídia)." });
                 }
-                
+
                 if (base64) {
-                  const b64Data = String(base64).replace(/^data:[a-z0-9-]+\/[a-z0-9-]+;base64,/, "");
+                  const b64Data = String(base64).replace(/^data:[^;]+;base64,/, "");
                   userParts.push({ inline_data: { mime_type: mimetype, data: b64Data } });
                 } else if (mediaUrl && String(mediaUrl).startsWith("http")) {
                   try {
@@ -1103,11 +1110,15 @@ async function runFlow(execution: any, containersIn: any[], edgesIn: any[], inpu
                     if (imgRes.ok) {
                       const arrayBuffer = await imgRes.arrayBuffer();
                       const b64 = Buffer.from(arrayBuffer).toString('base64');
-                      userParts.push({ inline_data: { mime_type: imgRes.headers.get("content-type") || mimetype, data: b64 } });
+                      const ct = (imgRes.headers.get("content-type") || mimetype).split(";")[0].trim();
+                      userParts.push({ inline_data: { mime_type: ct, data: b64 } });
+                    } else {
+                      console.error(`[ai-agent:gemini] fetch media HTTP ${imgRes.status}`);
                     }
-                  } catch (e) { console.error("[Gemini:AI-Agent] failed to fetch media", e); }
+                  } catch (e) { console.error("[ai-agent:gemini] failed to fetch media", e); }
                 }
 
+                console.log(`[ai-agent:gemini] calling model=${model} parts=${userParts.length} inlineData=${userParts.some(p => p.inline_data)}`);
                 const res = await fetch(url, {
                   method: "POST",
                   headers: { "Content-Type": "application/json" },
@@ -1123,6 +1134,13 @@ async function runFlow(execution: any, containersIn: any[], edgesIn: any[], inpu
                 if (res.ok) {
                   const data: any = await res.json();
                   aiReply = data.candidates?.[0]?.content?.parts?.[0]?.text || "";
+                  console.log(`[ai-agent:gemini] reply len=${aiReply.length} finishReason=${data.candidates?.[0]?.finishReason}`);
+                  if (!aiReply) {
+                    console.error(`[ai-agent:gemini] empty reply. Full response: ${JSON.stringify(data).slice(0, 800)}`);
+                  }
+                } else {
+                  const errText = await res.text().catch(() => "");
+                  console.error(`[ai-agent:gemini] HTTP ${res.status}: ${errText.slice(0, 500)}`);
                 }
               }
               if (aiReply) messages.push({ id: crypto.randomUUID(), type: "bot", content: aiReply });
