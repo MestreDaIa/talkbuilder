@@ -729,11 +729,54 @@ async function runFlow(execution: any, containersIn: any[], edgesIn: any[], inpu
     }
 
     if (nodeType.startsWith("input-")) {
-      // IMPORTANTE: quando alcançamos um input-* DURANTE o loop (sem ter estado
-      // previamente aguardando neste node), devemos SEMPRE parar e aguardar a
-      // próxima mensagem do usuário. O consumo de input só acontece no bloco
-      // pré-loop (quando execution.waiting_for_input estava true para este node).
-      // Consumir a mensagem inicial aqui faria o bot pular a etapa de input.
+      // Se ainda temos um input não consumido (ex.: o fluxo foi iniciado por uma
+      // mensagem do usuário e chegou agora a um node de input), consumimos esse
+      // valor aqui em vez de aguardar uma nova mensagem. Isso evita que o usuário
+      // precise enviar a mesma mídia/texto duas vezes para o bot prosseguir.
+      if (input && !inputConsumed && (input.message !== undefined || input.button_id !== undefined || input.base64 || input.mediaUrl)) {
+        const userValue = input.message ?? input.button_id ?? "";
+        variables["last_message"] = userValue;
+        const varName = cfg.variableName || cfg.saveVariable;
+        if (varName) {
+          if (nodeType === "input-universal") {
+            const typeMap: Record<string, string> = {
+              "conversation": "textInput",
+              "extendedTextMessage": "textInput",
+              "imageMessage": "imageInput",
+              "videoMessage": "videoInput",
+              "audioMessage": "audioInput",
+              "documentMessage": "documentInput",
+              "documentWithCaptionMessage": "documentInput"
+            };
+            let mappedType = typeMap[input.messageType] || "textInput";
+            if (input.mimetype?.startsWith("image/")) mappedType = "imageInput";
+            else if (input.mimetype?.startsWith("video/")) mappedType = "videoInput";
+            else if (input.mimetype?.startsWith("audio/")) mappedType = "audioInput";
+            else if (input.mimetype?.startsWith("application/")) mappedType = "documentInput";
+            variables[varName] = channelValue === "webchat"
+              ? {
+                  type: mappedType,
+                  content: input.mediaUrl || input.base64 || userValue,
+                  metadata: { base64: input.base64, link: input.mediaUrl, caption: input.caption || input.message, mimetype: input.mimetype, fileName: input.fileName }
+                }
+              : {
+                  type: input.messageType || mappedType,
+                  content: userValue,
+                  metadata: { base64: input.base64, link: input.mediaUrl, caption: input.caption || input.message, mimetype: input.mimetype, fileName: input.fileName, rawType: input.messageType }
+                };
+          } else {
+            variables[varName] = userValue;
+          }
+        }
+        console.log(`[runtime:input_consume_inline] consumindo input atual no node ${node.id} (${nodeType}) e prosseguindo`);
+        inputConsumed = true;
+        currentNodeId = nextFromNode(node.id, container, input.button_id);
+        input = null;
+        continue;
+      }
+
+      // IMPORTANTE: quando alcançamos um input-* DURANTE o loop sem input pendente,
+      // paramos e aguardamos a próxima mensagem do usuário.
       console.log(`[runtime:input_wait] aguardando entrada no node ${node.id} (${nodeType})`);
       waiting_for = nodeType === "input-buttons" ? "buttons" : nodeType;
       if (nodeType === "input-buttons") {
