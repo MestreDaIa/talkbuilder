@@ -941,18 +941,39 @@ async function runFlow(execution: any, containersIn: any[], edgesIn: any[], inpu
             const userPrompt = replaceVars(input?.message || variables["last_message"] || "").trim();
             if (userPrompt) {
               let aiReply = "";
+              const instructions = replaceVars(cfg.instructions || "");
               if (provider === "openai") {
                 const res = await fetch("https://api.openai.com/v1/chat/completions", {
                   method: "POST",
                   headers: { "Authorization": `Bearer ${activeKey}`, "Content-Type": "application/json" },
                   body: JSON.stringify({
                     model: cfg.model || "gpt-4o-mini",
-                    messages: [{ role: "system", content: cfg.instructions || "" }, { role: "user", content: userPrompt }],
+                    messages: [{ role: "system", content: instructions }, { role: "user", content: userPrompt }],
                   }),
                 });
                 if (res.ok) {
                   const data: any = await res.json();
                   aiReply = data.choices?.[0]?.message?.content || "";
+                }
+              } else if (provider === "gemini") {
+                const model = cfg.model || "gemini-2.0-flash";
+                const url = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${activeKey}`;
+                
+                const res = await fetch(url, {
+                  method: "POST",
+                  headers: { "Content-Type": "application/json" },
+                  body: JSON.stringify({
+                    system_instruction: { parts: [{ text: instructions }] },
+                    contents: [{ role: "user", parts: [{ text: userPrompt }] }],
+                    generationConfig: {
+                      temperature: cfg.temperature ?? 0.7,
+                      maxOutputTokens: cfg.maxTokens ?? 1000,
+                    }
+                  }),
+                });
+                if (res.ok) {
+                  const data: any = await res.json();
+                  aiReply = data.candidates?.[0]?.content?.parts?.[0]?.text || "";
                 }
               }
               if (aiReply) messages.push({ id: crypto.randomUUID(), type: "bot", content: aiReply });
