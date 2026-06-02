@@ -91,25 +91,27 @@ export async function processRuntime(body: any) {
   let edges = (useDraft ? flow.draft_edges : flow.published_edges) || flow.draft_edges || [];
   console.log(`[runtime] Usando versão ${useDraft ? "DRAFT" : "PUBLISHED"} (containers=${containers.length}, edges=${edges.length})`);
 
-  // Sanitiza edges órfãs: remove conexões para containers/nodes que não existem mais.
+  // Sanitiza edges órfãs: opcional, mas vamos manter os logs para debug se necessário
+  // removido o filtro agressivo que estava descartando edges válidas
   const validContainerIds = new Set<string>(containers.map((c: any) => c.id));
   const validNodeIds = new Set<string>();
-  for (const c of containers) for (const n of (c.nodes || [])) validNodeIds.add(n.id);
-  const beforeEdges = edges.length;
-  edges = edges.filter((e: any) => {
+  for (const c of containers) {
+    if (c.nodes) {
+      for (const n of c.nodes) {
+        if (n.id) validNodeIds.add(n.id);
+      }
+    }
+  }
+  
+  const orphanEdges = edges.filter((e: any) => {
     const sourceOk = validNodeIds.has(e.source) || validContainerIds.has(e.source);
     const targetOk = validNodeIds.has(e.target) || validContainerIds.has(e.target);
-    
-    // Silenciamos o log de edges órfãs por padrão para não poluir o console,
-    // já que agora temos uma limpeza ativa no salvamento/publicação.
-    // if (!sourceOk || !targetOk) {
-    //   console.log(`[runtime:orphan_edge] removida edge órfã ${e.source} -> ${e.target}`);
-    // }
-    
-    return sourceOk && targetOk;
+    return !sourceOk || !targetOk;
   });
-  if (edges.length !== beforeEdges) {
-    console.log(`[runtime] ${beforeEdges - edges.length} edges órfãs descartadas`);
+
+  if (orphanEdges.length > 0) {
+    console.log(`[runtime] ${orphanEdges.length} edges potencialmente órfãs detectadas:`, 
+      orphanEdges.map((e: any) => `${e.source}->${e.target}`).join(", "));
   }
 
   if (!containers.length) {
