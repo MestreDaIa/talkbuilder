@@ -23,6 +23,10 @@ interface AgentConfigProps {
 }
 
 export const AgentConfig = ({ config, setConfig }: AgentConfigProps) => {
+  const { getAllVariableNames } = useVariables();
+  const [isVariableModalOpen, setIsVariableModalOpen] = useState(false);
+  const [activeTextarea, setActiveTextarea] = useState<"objective" | "instructions" | null>(null);
+
   const provider = config.provider || "openai";
   const model = config.model || MODELS_BY_PROVIDER[provider]?.[0] || "";
   const apiKey = config.apiKey || "";
@@ -36,6 +40,14 @@ export const AgentConfig = ({ config, setConfig }: AgentConfigProps) => {
   const apiKeyPlaceholder = API_KEY_PLACEHOLDERS_BY_PROVIDER[provider] || "Cole sua chave de API...";
 
   const selectedProvider = AI_PROVIDERS.find(p => p.id === provider);
+
+  const handleVariableSelect = (varName: string) => {
+    if (activeTextarea === "objective") {
+      setConfig({ ...config, objective: (objective || "") + `{{${varName}}}` });
+    } else if (activeTextarea === "instructions") {
+      setConfig({ ...config, instructions: (instructions || "") + `{{${varName}}}` });
+    }
+  };
 
   return (
     <div className="p-4 space-y-6">
