@@ -1038,10 +1038,14 @@ async function runFlow(execution: any, containersIn: any[], edgesIn: any[], inpu
             // Prioriza o que veio no input atual, senão tenta variáveis persistentes
             const base64 = inputMediaBase64 || variables["base64"] || variables["image_base64"] || variables["audio_base64"];
             const mediaUrl = inputMediaUrl || variables["mediaUrl"] || variables["media_url"] || variables["url"];
-            const mimetype = inputMimetype || variables["mimetype"] || variables["mimeType"] || (input?.messageType === "audioMessage" ? "audio/ogg" : "image/jpeg");
-            
+            let mimetype = inputMimetype || variables["mimetype"] || variables["mimeType"] || (input?.messageType === "audioMessage" ? "audio/ogg" : "image/jpeg");
+            // Normaliza mimetype: remove parâmetros como ";codecs=opus" que as APIs rejeitam
+            if (typeof mimetype === "string") mimetype = mimetype.split(";")[0].trim();
+
             const hasMedia = !!(base64 || mediaUrl || isMediaMessage);
-            
+
+            console.log(`[ai-agent] node=${node.id} provider=${provider} hasMedia=${hasMedia} hasBase64=${!!base64} hasUrl=${!!mediaUrl} mimetype=${mimetype} userPromptLen=${userPrompt.length} isFirstTime=${isFirstTime}`);
+
             if (isFirstTime && cfg.welcomeMessage && !hasMedia && !userPrompt) {
                messages.push({ id: crypto.randomUUID(), type: "bot", content: replaceVars(cfg.welcomeMessage) });
                return { messages, waiting_for: "text", variables, next_node_id: node.id, active_agent_node_id: node.id, mode: "agent", steps, status: "waiting_input" };
