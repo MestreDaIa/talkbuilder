@@ -4,6 +4,71 @@ import * as crypto from "node:crypto";
 const runtimeMemory = new Map<string, { state: any; expiresAt: number }>();
 const MEMORY_TTL_MS = 1000 * 60 * 60 * 6;
 
+const DEFAULT_MEDIA_MIME_BY_TYPE: Record<string, string> = {
+  audio: "audio/ogg",
+  audiomessage: "audio/ogg",
+  audioinput: "audio/ogg",
+  image: "image/jpeg",
+  imagemessage: "image/jpeg",
+  imageinput: "image/jpeg",
+  video: "video/mp4",
+  videomessage: "video/mp4",
+  videoinput: "video/mp4",
+  documentmessage: "application/pdf",
+  documentwithcaptionmessage: "application/pdf",
+  documentinput: "application/pdf",
+};
+
+function firstNonEmpty(...values: any[]) {
+  return values.find((value) => value !== undefined && value !== null && String(value).trim() !== "");
+}
+
+function isUnsupportedGenericMime(mime: string) {
+  return !mime || mime === "application/octet-stream" || mime === "binary/octet-stream";
+}
+
+function mimeFromDataUrl(value: any) {
+  const match = String(value || "").match(/^data:([^;]+);base64,/i);
+  return match?.[1]?.toLowerCase();
+}
+
+function mimeFromExtension(value: any) {
+  const path = String(value || "").split("?")[0].toLowerCase();
+  if (/\.(ogg|oga|opus)$/.test(path)) return "audio/ogg";
+  if (/\.(mp3|mpeg|mpga)$/.test(path)) return "audio/mpeg";
+  if (/\.(wav)$/.test(path)) return "audio/wav";
+  if (/\.(m4a|aac)$/.test(path)) return "audio/aac";
+  if (/\.(webm)$/.test(path)) return "audio/webm";
+  if (/\.(jpg|jpeg)$/.test(path)) return "image/jpeg";
+  if (/\.(png)$/.test(path)) return "image/png";
+  if (/\.(webp)$/.test(path)) return "image/webp";
+  if (/\.(gif)$/.test(path)) return "image/gif";
+  if (/\.(mp4|m4v)$/.test(path)) return "video/mp4";
+  if (/\.(mov)$/.test(path)) return "video/quicktime";
+  if (/\.(pdf)$/.test(path)) return "application/pdf";
+  return undefined;
+}
+
+function normalizeMediaMimeType(...candidates: any[]) {
+  for (const candidate of candidates) {
+    if (candidate === undefined || candidate === null) continue;
+    const raw = String(candidate).trim().toLowerCase();
+    if (!raw) continue;
+    const clean = raw.split(";")[0].trim();
+    if (clean.includes("/")) {
+      if (!isUnsupportedGenericMime(clean)) return clean;
+      continue;
+    }
+    const byType = DEFAULT_MEDIA_MIME_BY_TYPE[clean];
+    if (byType) return byType;
+  }
+  for (const candidate of candidates) {
+    const fromExt = mimeFromExtension(candidate);
+    if (fromExt) return fromExt;
+  }
+  return "application/octet-stream";
+}
+
 function evaluateSetVariableValue(cfg: any, variables: Record<string, any>, replaceVars: (s: string) => string): any {
   const valueType = cfg.valueType || "expression";
   const raw = String(cfg.value ?? "");
