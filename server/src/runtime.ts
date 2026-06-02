@@ -4,6 +4,71 @@ import * as crypto from "node:crypto";
 const runtimeMemory = new Map<string, { state: any; expiresAt: number }>();
 const MEMORY_TTL_MS = 1000 * 60 * 60 * 6;
 
+const DEFAULT_MEDIA_MIME_BY_TYPE: Record<string, string> = {
+  audio: "audio/ogg",
+  audiomessage: "audio/ogg",
+  audioinput: "audio/ogg",
+  image: "image/jpeg",
+  imagemessage: "image/jpeg",
+  imageinput: "image/jpeg",
+  video: "video/mp4",
+  videomessage: "video/mp4",
+  videoinput: "video/mp4",
+  documentmessage: "application/pdf",
+  documentwithcaptionmessage: "application/pdf",
+  documentinput: "application/pdf",
+};
+
+function firstNonEmpty(...values: any[]) {
+  return values.find((value) => value !== undefined && value !== null && String(value).trim() !== "");
+}
+
+function isUnsupportedGenericMime(mime: string) {
+  return !mime || mime === "application/octet-stream" || mime === "binary/octet-stream";
+}
+
+function mimeFromDataUrl(value: any) {
+  const match = String(value || "").match(/^data:([^;]+);base64,/i);
+  return match?.[1]?.toLowerCase();
+}
+
+function mimeFromExtension(value: any) {
+  const path = String(value || "").split("?")[0].toLowerCase();
+  if (/\.(ogg|oga|opus)$/.test(path)) return "audio/ogg";
+  if (/\.(mp3|mpeg|mpga)$/.test(path)) return "audio/mpeg";
+  if (/\.(wav)$/.test(path)) return "audio/wav";
+  if (/\.(m4a|aac)$/.test(path)) return "audio/aac";
+  if (/\.(webm)$/.test(path)) return "audio/webm";
+  if (/\.(jpg|jpeg)$/.test(path)) return "image/jpeg";
+  if (/\.(png)$/.test(path)) return "image/png";
+  if (/\.(webp)$/.test(path)) return "image/webp";
+  if (/\.(gif)$/.test(path)) return "image/gif";
+  if (/\.(mp4|m4v)$/.test(path)) return "video/mp4";
+  if (/\.(mov)$/.test(path)) return "video/quicktime";
+  if (/\.(pdf)$/.test(path)) return "application/pdf";
+  return undefined;
+}
+
+function normalizeMediaMimeType(...candidates: any[]) {
+  for (const candidate of candidates) {
+    if (candidate === undefined || candidate === null) continue;
+    const raw = String(candidate).trim().toLowerCase();
+    if (!raw) continue;
+    const clean = raw.split(";")[0].trim();
+    if (/^[a-z0-9.+-]+\/[a-z0-9.+-]+$/i.test(clean)) {
+      if (!isUnsupportedGenericMime(clean)) return clean;
+      continue;
+    }
+    const byType = DEFAULT_MEDIA_MIME_BY_TYPE[clean];
+    if (byType) return byType;
+  }
+  for (const candidate of candidates) {
+    const fromExt = mimeFromExtension(candidate);
+    if (fromExt) return fromExt;
+  }
+  return "application/octet-stream";
+}
+
 function evaluateSetVariableValue(cfg: any, variables: Record<string, any>, replaceVars: (s: string) => string): any {
   const valueType = cfg.valueType || "expression";
   const raw = String(cfg.value ?? "");
@@ -537,6 +602,14 @@ async function runFlow(execution: any, containersIn: any[], edgesIn: any[], inpu
 
   // 1. Processar Entrada (Resumo de Estado)
   if (input) {
+    const incomingType = input.messageType || input.mediaType || input.midiaType;
+    const hasIncomingMessage = input.message !== undefined || input.button_id !== undefined || incomingType || input.base64 || input.mediaUrl;
+    if (hasIncomingMessage) {
+      ["base64", "image_base64", "audio_base64", "mediaUrl", "media_url", "mimetype", "mimeType", "mediaType", "midiaType", "url"].forEach((key) => {
+        if (variables[key] !== undefined) delete variables[key];
+      });
+    }
+
     if (input.messageId) variables["messageId"] = input.messageId;
     if (input.remoteJid) variables["remoteJid"] = input.remoteJid;
     if (input.pushName) variables["pushName"] = input.pushName;
@@ -550,6 +623,9 @@ async function runFlow(execution: any, containersIn: any[], edgesIn: any[], inpu
     if (input.mimetype) variables["mimetype"] = input.mimetype;
     if (input.mediaUrl) variables["mediaUrl"] = input.mediaUrl;
     if (input.base64) variables["base64"] = input.base64;
+    if (input.mimeType) variables["mimeType"] = input.mimeType;
+    if (input.mediaType) variables["mediaType"] = input.mediaType;
+    if (input.midiaType) variables["midiaType"] = input.midiaType;
 
     // Se houver dados de um webhook (payload), colocamos em webhookData
     // para que {{webhookData.body.data.messageType}} funcione se o nó Webhook
@@ -1020,27 +1096,26 @@ async function runFlow(execution: any, containersIn: any[], edgesIn: any[], inpu
                };
             }
 
-            // Extração de mídia do input atual (mensagem que acabou de chegar)
+            // Extração de mídia: prioriza o retorno do HTTP getBase64FromMediaMessage,
+            // sem apagar essas variáveis quando o input original do WhatsApp ainda está em memória.
             const inputMediaBase64 = input?.base64;
             const inputMediaUrl = input?.mediaUrl || input?.url;
-            const inputMimetype = input?.mimetype || input?.mimeType;
-            const isMediaMessage = ["imageMessage", "audioMessage", "videoMessage", "documentWithCaptionMessage"].includes(input?.messageType || "");
+            const inputMediaType = input?.mediaType || input?.midiaType || input?.messageType;
+            const isMediaMessage = ["imageMessage", "audioMessage", "videoMessage", "documentMessage", "documentWithCaptionMessage"].includes(input?.messageType || "");
 
-            // Limpa as variáveis persistentes se detectamos um NOVO input de mídia ou mensagem
-            if (input && (input.message || input.base64 || input.mediaUrl || isMediaMessage)) {
-              if (variables["base64"]) delete variables["base64"];
-              if (variables["mediaUrl"]) delete variables["mediaUrl"];
-              if (variables["mimetype"]) delete variables["mimetype"];
-              if (variables["image_base64"]) delete variables["image_base64"];
-              if (variables["audio_base64"]) delete variables["audio_base64"];
-            }
-
-            // Prioriza o que veio no input atual, senão tenta variáveis persistentes
-            const base64 = inputMediaBase64 || variables["base64"] || variables["image_base64"] || variables["audio_base64"];
-            const mediaUrl = inputMediaUrl || variables["mediaUrl"] || variables["media_url"] || variables["url"];
-            let mimetype = inputMimetype || variables["mimetype"] || variables["mimeType"] || (input?.messageType === "audioMessage" ? "audio/ogg" : "image/jpeg");
-            // Normaliza mimetype: remove parâmetros como ";codecs=opus" que as APIs rejeitam
-            if (typeof mimetype === "string") mimetype = mimetype.split(";")[0].trim();
+            const base64 = firstNonEmpty(inputMediaBase64, variables["base64"], variables["image_base64"], variables["audio_base64"]);
+            const mediaUrl = firstNonEmpty(inputMediaUrl, variables["mediaUrl"], variables["media_url"], variables["url"]);
+            const mimetype = normalizeMediaMimeType(
+              input?.mimetype,
+              input?.mimeType,
+              variables["mimetype"],
+              variables["mimeType"],
+              mimeFromDataUrl(base64),
+              variables["mediaType"],
+              variables["midiaType"],
+              inputMediaType,
+              mediaUrl,
+            );
 
             const hasMedia = !!(base64 || mediaUrl || isMediaMessage);
 
@@ -1111,7 +1186,7 @@ async function runFlow(execution: any, containersIn: any[], edgesIn: any[], inpu
                     if (imgRes.ok) {
                       const arrayBuffer = await imgRes.arrayBuffer();
                       const b64 = Buffer.from(arrayBuffer).toString('base64');
-                      const ct = (imgRes.headers.get("content-type") || mimetype).split(";")[0].trim();
+                      const ct = normalizeMediaMimeType(imgRes.headers.get("content-type"), mimetype, mediaUrl);
                       userParts.push({ inline_data: { mime_type: ct, data: b64 } });
                     } else {
                       console.error(`[ai-agent:gemini] fetch media HTTP ${imgRes.status}`);
