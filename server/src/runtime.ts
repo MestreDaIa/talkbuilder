@@ -419,6 +419,14 @@ async function runFlow(execution: any, containersIn: any[], edgesIn: any[], inpu
     }
 
     console.log(`[runtime:edge_not_found] nenhum caminho saindo de ${nodeId}${wantedHandle ? ` com handle "${wantedHandle}"` : ""}`);
+    
+    // Debug: list all available edges from this node to help diagnose
+    const allFromNode = edges.filter(e => e.source === nodeId);
+    if (allFromNode.length > 0) {
+      console.log(`[runtime:debug] Edges disponíveis saindo de ${nodeId}:`, 
+        allFromNode.map(e => `handle: "${e.sourceHandle || '(empty)'}" -> target: ${e.target}`).join(", "));
+    }
+    
     return null;
   };
 
