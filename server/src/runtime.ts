@@ -826,7 +826,20 @@ async function runFlow(execution: any, containersIn: any[], edgesIn: any[], inpu
           currentNodeId = nextId;
         } else {
           console.log(`[runtime:condition] fallback: nenhum edge encontrado para o handle "${handle}", tentando saída padrão`);
-          currentNodeId = nextFromNode(node.id, container); // Fallback para sequential/container exit
+          let fallbackId = nextFromNode(node.id, container); // sequential/container exit
+          if (!fallbackId) {
+            // Último recurso: pega qualquer edge saindo deste node de condição
+            // (caso o "Senão" não tenha sido conectado, mas as condições levam a algum lugar)
+            const anyEdge = edges.find((e: any) =>
+              e.source === node.id ||
+              (e.source === container.id && (String(e.sourceHandle || "") === node.id || String(e.sourceHandle || "").startsWith(`${node.id}-`)))
+            );
+            if (anyEdge) {
+              console.log(`[runtime:condition] último fallback: seguindo edge "${anyEdge.sourceHandle}" -> ${anyEdge.target}`);
+              fallbackId = findNode(anyEdge.target) ? anyEdge.target : firstNodeOfContainer(anyEdge.target);
+            }
+          }
+          currentNodeId = fallbackId;
         }
         continue;
       }
