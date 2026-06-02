@@ -951,17 +951,26 @@ async function runFlow(execution: any, containersIn: any[], edgesIn: any[], inpu
                };
             }
 
-            // Se for a primeira vez e não houver mensagem do usuário (ex: chegou via fluxo),
-            // tentamos processar imediatamente se houver variáveis de mídia ou se não houver welcome message.
-            const hasMedia = !!(variables["base64"] || variables["image_base64"] || variables["audio_base64"] || variables["mediaUrl"] || variables["media_url"]);
+            // Extração de mídia do input atual (mensagem que acabou de chegar)
+            const inputMediaBase64 = input?.base64;
+            const inputMediaUrl = input?.mediaUrl || input?.url;
+            const inputMimetype = input?.mimetype || input?.mimeType;
+            const isMediaMessage = ["imageMessage", "audioMessage", "videoMessage", "documentWithCaptionMessage"].includes(input?.messageType || "");
+
+            // Prioriza o que veio no input atual, senão tenta variáveis persistentes
+            const base64 = inputMediaBase64 || variables["base64"] || variables["image_base64"] || variables["audio_base64"];
+            const mediaUrl = inputMediaUrl || variables["mediaUrl"] || variables["media_url"] || variables["url"];
+            const mimetype = inputMimetype || variables["mimetype"] || variables["mimeType"] || (input?.messageType === "audioMessage" ? "audio/ogg" : "image/jpeg");
             
-            if (isFirstTime && cfg.welcomeMessage && !hasMedia) {
+            const hasMedia = !!(base64 || mediaUrl || isMediaMessage);
+            
+            if (isFirstTime && cfg.welcomeMessage && !hasMedia && !userPrompt) {
                messages.push({ id: crypto.randomUUID(), type: "bot", content: replaceVars(cfg.welcomeMessage) });
                return { messages, waiting_for: "text", variables, next_node_id: node.id, active_agent_node_id: node.id, mode: "agent", steps, status: "waiting_input" };
             }
 
-            // Processa se houver prompt do usuário OU se for a primeira vez e houver mídia (mesmo sem prompt de texto)
-            if (userPrompt || (isFirstTime && hasMedia)) {
+            // Processa se houver prompt do usuário OU se houver mídia (mesmo sem prompt de texto)
+            if (userPrompt || hasMedia) {
               let aiReply = "";
               const instructions = replaceVars(cfg.instructions || "");
               
@@ -971,13 +980,9 @@ async function runFlow(execution: any, containersIn: any[], edgesIn: any[], inpu
                 
                 if (userPrompt) {
                   userContent.push({ type: "text", text: userPrompt });
-                } else if (isFirstTime && hasMedia) {
-                  userContent.push({ type: "text", text: "Processe o conteúdo enviado (áudio/imagem)." });
+                } else if (hasMedia) {
+                  userContent.push({ type: "text", text: "Processe o conteúdo enviado (mídia)." });
                 }
-
-                const mediaUrl = variables["mediaUrl"] || variables["media_url"] || variables["url"];
-                const base64 = variables["base64"] || variables["image_base64"] || variables["audio_base64"];
-                const mimetype = variables["mimetype"] || "image/jpeg";
 
                 if (base64) {
                   const b64 = String(base64).startsWith("data:") ? base64 : `data:${mimetype};base64,${base64}`;
@@ -1007,16 +1012,12 @@ async function runFlow(execution: any, containersIn: any[], edgesIn: any[], inpu
                 const userParts: any[] = [];
                 if (userPrompt) {
                   userParts.push({ text: userPrompt });
-                } else if (isFirstTime && hasMedia) {
-                  userParts.push({ text: "Processe o conteúdo enviado (áudio/imagem)." });
+                } else if (hasMedia) {
+                  userParts.push({ text: "Processe o conteúdo enviado (mídia)." });
                 }
                 
-                const mediaUrl = variables["mediaUrl"] || variables["media_url"] || variables["url"];
-                const base64 = variables["base64"] || variables["image_base64"] || variables["audio_base64"];
-                const mimetype = variables["mimetype"] || variables["mimeType"] || "image/jpeg";
-
                 if (base64) {
-                  const b64Data = String(base64).replace(/^data:[a-z]+\/[a-z]+;base64,/, "");
+                  const b64Data = String(base64).replace(/^data:[a-z0-9-]+\/[a-z0-9-]+;base64,/, "");
                   userParts.push({ inline_data: { mime_type: mimetype, data: b64Data } });
                 } else if (mediaUrl && String(mediaUrl).startsWith("http")) {
                   try {
