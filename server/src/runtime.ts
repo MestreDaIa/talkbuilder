@@ -959,11 +959,11 @@ async function runFlow(execution: any, containersIn: any[], edgesIn: any[], inpu
 
             // Limpa as variáveis persistentes se detectamos um NOVO input de mídia ou mensagem
             if (input && (input.message || input.base64 || input.mediaUrl || isMediaMessage)) {
-              delete variables["base64"];
-              delete variables["mediaUrl"];
-              delete variables["mimetype"];
-              delete variables["image_base64"];
-              delete variables["audio_base64"];
+              if (variables["base64"]) delete variables["base64"];
+              if (variables["mediaUrl"]) delete variables["mediaUrl"];
+              if (variables["mimetype"]) delete variables["mimetype"];
+              if (variables["image_base64"]) delete variables["image_base64"];
+              if (variables["audio_base64"]) delete variables["audio_base64"];
             }
 
             // Prioriza o que veio no input atual, senão tenta variáveis persistentes
