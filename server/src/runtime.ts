@@ -55,7 +55,7 @@ function normalizeMediaMimeType(...candidates: any[]) {
     const raw = String(candidate).trim().toLowerCase();
     if (!raw) continue;
     const clean = raw.split(";")[0].trim();
-    if (clean.includes("/")) {
+    if (/^[a-z0-9.+-]+\/[a-z0-9.+-]+$/i.test(clean)) {
       if (!isUnsupportedGenericMime(clean)) return clean;
       continue;
     }
