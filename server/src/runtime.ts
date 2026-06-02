@@ -1186,7 +1186,7 @@ async function runFlow(execution: any, containersIn: any[], edgesIn: any[], inpu
                     if (imgRes.ok) {
                       const arrayBuffer = await imgRes.arrayBuffer();
                       const b64 = Buffer.from(arrayBuffer).toString('base64');
-                      const ct = (imgRes.headers.get("content-type") || mimetype).split(";")[0].trim();
+                      const ct = normalizeMediaMimeType(imgRes.headers.get("content-type"), mimetype, mediaUrl);
                       userParts.push({ inline_data: { mime_type: ct, data: b64 } });
                     } else {
                       console.error(`[ai-agent:gemini] fetch media HTTP ${imgRes.status}`);
