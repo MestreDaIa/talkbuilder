@@ -1096,27 +1096,26 @@ async function runFlow(execution: any, containersIn: any[], edgesIn: any[], inpu
                };
             }
 
-            // Extração de mídia do input atual (mensagem que acabou de chegar)
+            // Extração de mídia: prioriza o retorno do HTTP getBase64FromMediaMessage,
+            // sem apagar essas variáveis quando o input original do WhatsApp ainda está em memória.
             const inputMediaBase64 = input?.base64;
             const inputMediaUrl = input?.mediaUrl || input?.url;
-            const inputMimetype = input?.mimetype || input?.mimeType;
-            const isMediaMessage = ["imageMessage", "audioMessage", "videoMessage", "documentWithCaptionMessage"].includes(input?.messageType || "");
+            const inputMediaType = input?.mediaType || input?.midiaType || input?.messageType;
+            const isMediaMessage = ["imageMessage", "audioMessage", "videoMessage", "documentMessage", "documentWithCaptionMessage"].includes(input?.messageType || "");
 
-            // Limpa as variáveis persistentes se detectamos um NOVO input de mídia ou mensagem
-            if (input && (input.message || input.base64 || input.mediaUrl || isMediaMessage)) {
-              if (variables["base64"]) delete variables["base64"];
-              if (variables["mediaUrl"]) delete variables["mediaUrl"];
-              if (variables["mimetype"]) delete variables["mimetype"];
-              if (variables["image_base64"]) delete variables["image_base64"];
-              if (variables["audio_base64"]) delete variables["audio_base64"];
-            }
-
-            // Prioriza o que veio no input atual, senão tenta variáveis persistentes
-            const base64 = inputMediaBase64 || variables["base64"] || variables["image_base64"] || variables["audio_base64"];
-            const mediaUrl = inputMediaUrl || variables["mediaUrl"] || variables["media_url"] || variables["url"];
-            let mimetype = inputMimetype || variables["mimetype"] || variables["mimeType"] || (input?.messageType === "audioMessage" ? "audio/ogg" : "image/jpeg");
-            // Normaliza mimetype: remove parâmetros como ";codecs=opus" que as APIs rejeitam
-            if (typeof mimetype === "string") mimetype = mimetype.split(";")[0].trim();
+            const base64 = firstNonEmpty(inputMediaBase64, variables["base64"], variables["image_base64"], variables["audio_base64"]);
+            const mediaUrl = firstNonEmpty(inputMediaUrl, variables["mediaUrl"], variables["media_url"], variables["url"]);
+            const mimetype = normalizeMediaMimeType(
+              input?.mimetype,
+              input?.mimeType,
+              variables["mimetype"],
+              variables["mimeType"],
+              mimeFromDataUrl(base64),
+              variables["mediaType"],
+              variables["midiaType"],
+              inputMediaType,
+              mediaUrl,
+            );
 
             const hasMedia = !!(base64 || mediaUrl || isMediaMessage);
 
