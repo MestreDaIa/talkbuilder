@@ -140,29 +140,54 @@ export const AgentConfig = ({ config, setConfig }: AgentConfigProps) => {
         </div>
       )}
 
-      <div className="space-y-2">
+      <div className="space-y-2 relative">
         <div className="flex items-center gap-2">
           <Target className="h-4 w-4 text-muted-foreground" />
           <Label>Objetivo do Agente</Label>
         </div>
-        <Input 
-          placeholder="Ex: Vender planos de assinatura e tirar dúvidas sobre preços."
-          value={objective}
-          onChange={(e) => setConfig({ ...config, objective: e.target.value })}
-        />
+        <div className="relative">
+          <Input 
+            placeholder="Ex: Vender planos de assinatura e tirar dúvidas sobre preços."
+            value={objective}
+            onChange={(e) => setConfig({ ...config, objective: e.target.value })}
+            className="pr-10"
+          />
+          <button
+            type="button"
+            className="absolute top-1/2 -translate-y-1/2 right-2 p-1.5 rounded-md hover:bg-accent text-muted-foreground transition-colors"
+            onClick={() => {
+              setActiveTextarea("objective");
+              setIsVariableModalOpen(true);
+            }}
+          >
+            <Brackets className="h-4 w-4" />
+          </button>
+        </div>
       </div>
 
-      <div className="space-y-2">
+      <div className="space-y-2 relative">
         <div className="flex items-center gap-2">
           <Sparkles className="h-4 w-4 text-muted-foreground" />
           <Label>Instruções e Comportamento</Label>
         </div>
-        <Textarea 
-          placeholder="Ex: Seja cordial, use emojis, e sempre tente levar o usuário para o checkout se ele parecer interessado."
-          value={instructions}
-          onChange={(e) => setConfig({ ...config, instructions: e.target.value })}
-          className="min-h-[120px]"
-        />
+        <div className="relative">
+          <Textarea 
+            placeholder="Ex: Seja cordial, use emojis, e sempre tente levar o usuário para o checkout se ele parecer interessado."
+            value={instructions}
+            onChange={(e) => setConfig({ ...config, instructions: e.target.value })}
+            className="min-h-[120px] pr-10"
+          />
+          <button
+            type="button"
+            className="absolute bottom-2 right-2 p-1.5 rounded-md hover:bg-accent text-muted-foreground transition-colors"
+            onClick={() => {
+              setActiveTextarea("instructions");
+              setIsVariableModalOpen(true);
+            }}
+          >
+            <Brackets className="h-4 w-4" />
+          </button>
+        </div>
       </div>
 
       <div className="space-y-2">
