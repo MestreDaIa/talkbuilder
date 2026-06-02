@@ -959,13 +959,31 @@ async function runFlow(execution: any, containersIn: any[], edgesIn: any[], inpu
             if (userPrompt) {
               let aiReply = "";
               const instructions = replaceVars(cfg.instructions || "");
+              
               if (provider === "openai") {
+                const messages: any[] = [{ role: "system", content: instructions }];
+                const userContent: any[] = [{ type: "text", text: userPrompt }];
+
+                // Adicionar suporte a visão (imagem/áudio) se houver nas variáveis
+                const mediaUrl = variables["mediaUrl"] || variables["media_url"] || variables["url"];
+                const base64 = variables["base64"] || variables["image_base64"] || variables["audio_base64"];
+                const mimetype = variables["mimetype"] || "image/jpeg";
+
+                if (base64) {
+                  const b64 = String(base64).startsWith("data:") ? base64 : `data:${mimetype};base64,${base64}`;
+                  userContent.push({ type: "image_url", image_url: { url: b64 } });
+                } else if (mediaUrl && String(mediaUrl).startsWith("http")) {
+                  userContent.push({ type: "image_url", image_url: { url: mediaUrl } });
+                }
+
+                messages.push({ role: "user", content: userContent });
+
                 const res = await fetch("https://api.openai.com/v1/chat/completions", {
                   method: "POST",
                   headers: { "Authorization": `Bearer ${activeKey}`, "Content-Type": "application/json" },
                   body: JSON.stringify({
                     model: cfg.model || "gpt-4o-mini",
-                    messages: [{ role: "system", content: instructions }, { role: "user", content: userPrompt }],
+                    messages: messages,
                   }),
                 });
                 if (res.ok) {
@@ -976,12 +994,33 @@ async function runFlow(execution: any, containersIn: any[], edgesIn: any[], inpu
                 const model = cfg.model || "gemini-2.0-flash";
                 const url = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${activeKey}`;
                 
+                const userParts: any[] = [{ text: userPrompt }];
+                
+                // Adicionar suporte a visão/áudio para Gemini no Agent AI
+                const mediaUrl = variables["mediaUrl"] || variables["media_url"] || variables["url"];
+                const base64 = variables["base64"] || variables["image_base64"] || variables["audio_base64"];
+                const mimetype = variables["mimetype"] || variables["mimeType"] || "image/jpeg";
+
+                if (base64) {
+                  const b64Data = String(base64).replace(/^data:[a-z]+\/[a-z]+;base64,/, "");
+                  userParts.push({ inline_data: { mime_type: mimetype, data: b64Data } });
+                } else if (mediaUrl && String(mediaUrl).startsWith("http")) {
+                  try {
+                    const imgRes = await fetch(mediaUrl);
+                    if (imgRes.ok) {
+                      const arrayBuffer = await imgRes.arrayBuffer();
+                      const b64 = Buffer.from(arrayBuffer).toString('base64');
+                      userParts.push({ inline_data: { mime_type: imgRes.headers.get("content-type") || mimetype, data: b64 } });
+                    }
+                  } catch (e) { console.error("[Gemini:AI-Agent] failed to fetch media", e); }
+                }
+
                 const res = await fetch(url, {
                   method: "POST",
                   headers: { "Content-Type": "application/json" },
                   body: JSON.stringify({
                     system_instruction: { parts: [{ text: instructions }] },
-                    contents: [{ role: "user", parts: [{ text: userPrompt }] }],
+                    contents: [{ role: "user", parts: userParts }],
                     generationConfig: {
                       temperature: cfg.temperature ?? 0.7,
                       maxOutputTokens: cfg.maxTokens ?? 1000,
