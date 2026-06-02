@@ -29,6 +29,7 @@ export const AgentConfig = ({ config, setConfig }: AgentConfigProps) => {
   const welcomeMessage = config.welcomeMessage || "";
   const toolCallingEnabled = config.toolCallingEnabled ?? true;
   const memoryEnabled = config.memoryEnabled ?? true;
+  const exitKeywords = config.exitKeywords || "sair,exit,parar,encerrar,voltar";
   const apiKeyPlaceholder = API_KEY_PLACEHOLDERS_BY_PROVIDER[provider] || "Cole sua chave de API...";
 
   const selectedProvider = AI_PROVIDERS.find(p => p.id === provider);
@@ -147,6 +148,23 @@ export const AgentConfig = ({ config, setConfig }: AgentConfigProps) => {
           onChange={(e) => setConfig({ ...config, instructions: e.target.value })}
           className="min-h-[120px]"
         />
+      </div>
+
+      <div className="space-y-2">
+        <Label className="text-[11px] font-medium text-muted-foreground uppercase tracking-wider">
+          Controle de Saída
+        </Label>
+        <div className="space-y-1">
+          <Label className="text-xs">Palavras-chave para encerrar (separadas por vírgula)</Label>
+          <Input 
+            placeholder="Ex: sair, exit, parar"
+            value={exitKeywords}
+            onChange={(e) => setConfig({ ...config, exitKeywords: e.target.value })}
+          />
+          <p className="text-[10px] text-muted-foreground">
+            Quando o usuário digitar uma dessas palavras, o agente será encerrado e o fluxo continuará.
+          </p>
+        </div>
       </div>
 
       <div className="space-y-4 pt-4 border-t">
