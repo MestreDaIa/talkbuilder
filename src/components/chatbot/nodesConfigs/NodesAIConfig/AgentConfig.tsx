@@ -10,9 +10,12 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Switch } from "@/components/ui/switch";
-import { Brain, Sparkles, Target } from "lucide-react";
+import { Brain, Sparkles, Target, Brackets } from "lucide-react";
 import { AI_PROVIDERS, API_KEY_PLACEHOLDERS_BY_PROVIDER, MODELS_BY_PROVIDER } from "./constants";
 import { KnowledgeBaseSection } from "./KnowledgeBaseSection";
+import { useState } from "react";
+import { VariableModal } from "../../VariableModal";
+import { useVariables } from "@/context/VariablesContext";
 
 interface AgentConfigProps {
   config: NodeConfig;
