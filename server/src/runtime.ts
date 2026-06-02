@@ -933,12 +933,29 @@ async function runFlow(execution: any, containersIn: any[], edgesIn: any[], inpu
         
         if (activeKey) {
           try {
+            const userPrompt = replaceVars(input?.message || variables["last_message"] || "").trim();
+            const exitKeywordsStr = cfg.exitKeywords || "sair,exit,parar,encerrar,voltar,quit,cancelar";
+            const exitKeywords = exitKeywordsStr.split(",").map((k: string) => k.trim().toLowerCase());
+
+            if (!isFirstTime && userPrompt && exitKeywords.includes(userPrompt.toLowerCase())) {
+               console.log(`[ai-agent] user requested exit: ${userPrompt}`);
+               const nextId = nextFromNode(node.id, container, "exit", true) || nextFromNode(node.id, container);
+               return { 
+                 messages: [...messages], 
+                 variables, 
+                 next_node_id: nextId, 
+                 active_agent_node_id: null, 
+                 mode: "flow", 
+                 steps, 
+                 status: nextId ? "running" : "completed" 
+               };
+            }
+
             if (isFirstTime && cfg.welcomeMessage) {
                messages.push({ id: crypto.randomUUID(), type: "bot", content: replaceVars(cfg.welcomeMessage) });
                return { messages, waiting_for: "text", variables, next_node_id: node.id, active_agent_node_id: node.id, mode: "agent", steps, status: "waiting_input" };
             }
 
-            const userPrompt = replaceVars(input?.message || variables["last_message"] || "").trim();
             if (userPrompt) {
               let aiReply = "";
               const instructions = replaceVars(cfg.instructions || "");
