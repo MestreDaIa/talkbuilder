@@ -10,9 +10,12 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Switch } from "@/components/ui/switch";
-import { Brain, Sparkles, Target } from "lucide-react";
+import { Brain, Sparkles, Target, Brackets } from "lucide-react";
 import { AI_PROVIDERS, API_KEY_PLACEHOLDERS_BY_PROVIDER, MODELS_BY_PROVIDER } from "./constants";
 import { KnowledgeBaseSection } from "./KnowledgeBaseSection";
+import { useState } from "react";
+import { VariableModal } from "../../VariableModal";
+import { useVariables } from "@/context/VariablesContext";
 
 interface AgentConfigProps {
   config: NodeConfig;
@@ -20,6 +23,10 @@ interface AgentConfigProps {
 }
 
 export const AgentConfig = ({ config, setConfig }: AgentConfigProps) => {
+  const { getAllVariableNames } = useVariables();
+  const [isVariableModalOpen, setIsVariableModalOpen] = useState(false);
+  const [activeTextarea, setActiveTextarea] = useState<"objective" | "instructions" | null>(null);
+
   const provider = config.provider || "openai";
   const model = config.model || MODELS_BY_PROVIDER[provider]?.[0] || "";
   const apiKey = config.apiKey || "";
@@ -33,6 +40,14 @@ export const AgentConfig = ({ config, setConfig }: AgentConfigProps) => {
   const apiKeyPlaceholder = API_KEY_PLACEHOLDERS_BY_PROVIDER[provider] || "Cole sua chave de API...";
 
   const selectedProvider = AI_PROVIDERS.find(p => p.id === provider);
+
+  const handleVariableSelect = (varName: string) => {
+    if (activeTextarea === "objective") {
+      setConfig({ ...config, objective: (objective || "") + `{{${varName}}}` });
+    } else if (activeTextarea === "instructions") {
+      setConfig({ ...config, instructions: (instructions || "") + `{{${varName}}}` });
+    }
+  };
 
   return (
     <div className="p-4 space-y-6">
@@ -125,29 +140,54 @@ export const AgentConfig = ({ config, setConfig }: AgentConfigProps) => {
         </div>
       )}
 
-      <div className="space-y-2">
+      <div className="space-y-2 relative">
         <div className="flex items-center gap-2">
           <Target className="h-4 w-4 text-muted-foreground" />
           <Label>Objetivo do Agente</Label>
         </div>
-        <Input 
-          placeholder="Ex: Vender planos de assinatura e tirar dúvidas sobre preços."
-          value={objective}
-          onChange={(e) => setConfig({ ...config, objective: e.target.value })}
-        />
+        <div className="relative">
+          <Input 
+            placeholder="Ex: Vender planos de assinatura e tirar dúvidas sobre preços."
+            value={objective}
+            onChange={(e) => setConfig({ ...config, objective: e.target.value })}
+            className="pr-10"
+          />
+          <button
+            type="button"
+            className="absolute top-1/2 -translate-y-1/2 right-2 p-1.5 rounded-md hover:bg-accent text-muted-foreground transition-colors"
+            onClick={() => {
+              setActiveTextarea("objective");
+              setIsVariableModalOpen(true);
+            }}
+          >
+            <Brackets className="h-4 w-4" />
+          </button>
+        </div>
       </div>
 
-      <div className="space-y-2">
+      <div className="space-y-2 relative">
         <div className="flex items-center gap-2">
           <Sparkles className="h-4 w-4 text-muted-foreground" />
           <Label>Instruções e Comportamento</Label>
         </div>
-        <Textarea 
-          placeholder="Ex: Seja cordial, use emojis, e sempre tente levar o usuário para o checkout se ele parecer interessado."
-          value={instructions}
-          onChange={(e) => setConfig({ ...config, instructions: e.target.value })}
-          className="min-h-[120px]"
-        />
+        <div className="relative">
+          <Textarea 
+            placeholder="Ex: Seja cordial, use emojis, e sempre tente levar o usuário para o checkout se ele parecer interessado."
+            value={instructions}
+            onChange={(e) => setConfig({ ...config, instructions: e.target.value })}
+            className="min-h-[120px] pr-10"
+          />
+          <button
+            type="button"
+            className="absolute bottom-2 right-2 p-1.5 rounded-md hover:bg-accent text-muted-foreground transition-colors"
+            onClick={() => {
+              setActiveTextarea("instructions");
+              setIsVariableModalOpen(true);
+            }}
+          >
+            <Brackets className="h-4 w-4" />
+          </button>
+        </div>
       </div>
 
       <div className="space-y-2">
@@ -198,6 +238,15 @@ export const AgentConfig = ({ config, setConfig }: AgentConfigProps) => {
           <strong>Dica:</strong> Para que este agente seja realmente autônomo, configure blocos de ação (como Sheets ou Redirect) e ative a opção "Habilitar como Skill" neles. O agente saberá usá-los quando necessário.
         </p>
       </div>
+
+      <VariableModal 
+        open={isVariableModalOpen}
+        onClose={() => {
+          setIsVariableModalOpen(false);
+          setActiveTextarea(null);
+        }}
+        onSelect={handleVariableSelect}
+      />
     </div>
   );
 };
