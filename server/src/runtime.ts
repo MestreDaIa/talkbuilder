@@ -951,20 +951,30 @@ async function runFlow(execution: any, containersIn: any[], edgesIn: any[], inpu
                };
             }
 
-            if (isFirstTime && cfg.welcomeMessage) {
+            // Se for a primeira vez e não houver mensagem do usuário (ex: chegou via fluxo),
+            // tentamos processar imediatamente se houver variáveis de mídia ou se não houver welcome message.
+            const hasMedia = !!(variables["base64"] || variables["image_base64"] || variables["audio_base64"] || variables["mediaUrl"] || variables["media_url"]);
+            
+            if (isFirstTime && cfg.welcomeMessage && !hasMedia) {
                messages.push({ id: crypto.randomUUID(), type: "bot", content: replaceVars(cfg.welcomeMessage) });
                return { messages, waiting_for: "text", variables, next_node_id: node.id, active_agent_node_id: node.id, mode: "agent", steps, status: "waiting_input" };
             }
 
-            if (userPrompt) {
+            // Processa se houver prompt do usuário OU se for a primeira vez e houver mídia (mesmo sem prompt de texto)
+            if (userPrompt || (isFirstTime && hasMedia)) {
               let aiReply = "";
               const instructions = replaceVars(cfg.instructions || "");
               
               if (provider === "openai") {
                 const messages: any[] = [{ role: "system", content: instructions }];
-                const userContent: any[] = [{ type: "text", text: userPrompt }];
+                const userContent: any[] = [];
+                
+                if (userPrompt) {
+                  userContent.push({ type: "text", text: userPrompt });
+                } else if (isFirstTime && hasMedia) {
+                  userContent.push({ type: "text", text: "Processe o conteúdo enviado (áudio/imagem)." });
+                }
 
-                // Adicionar suporte a visão (imagem/áudio) se houver nas variáveis
                 const mediaUrl = variables["mediaUrl"] || variables["media_url"] || variables["url"];
                 const base64 = variables["base64"] || variables["image_base64"] || variables["audio_base64"];
                 const mimetype = variables["mimetype"] || "image/jpeg";
@@ -994,9 +1004,13 @@ async function runFlow(execution: any, containersIn: any[], edgesIn: any[], inpu
                 const model = cfg.model || "gemini-2.0-flash";
                 const url = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${activeKey}`;
                 
-                const userParts: any[] = [{ text: userPrompt }];
+                const userParts: any[] = [];
+                if (userPrompt) {
+                  userParts.push({ text: userPrompt });
+                } else if (isFirstTime && hasMedia) {
+                  userParts.push({ text: "Processe o conteúdo enviado (áudio/imagem)." });
+                }
                 
-                // Adicionar suporte a visão/áudio para Gemini no Agent AI
                 const mediaUrl = variables["mediaUrl"] || variables["media_url"] || variables["url"];
                 const base64 = variables["base64"] || variables["image_base64"] || variables["audio_base64"];
                 const mimetype = variables["mimetype"] || variables["mimeType"] || "image/jpeg";
