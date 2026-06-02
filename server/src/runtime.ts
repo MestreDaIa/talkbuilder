@@ -341,23 +341,28 @@ async function runFlow(execution: any, containersIn: any[], edgesIn: any[], inpu
 
   const normalizeHandle = (value: string | null | undefined, currentNodeId?: string) => {
     if (!value) return "";
-    let raw = String(value);
+    let raw = String(value).toLowerCase().trim();
     
-    // Remove prefixo de ID de node se existir (ex: node-123-cond-abc -> cond-abc)
-    if (raw.includes("-cond-")) {
-      raw = "cond-" + raw.split("-cond-")[1];
-    } else if (raw.includes("-btn-")) {
-      raw = "btn-" + raw.split("-btn-")[1];
-    } else if (raw.endsWith("-else") || raw.endsWith("-senão") || raw.endsWith("-senao")) {
-      raw = "else";
-    } else if (raw.endsWith("-default") || raw.endsWith("-padrão") || raw.endsWith("-padrao")) {
-      raw = "default";
+    // Debug log for normalization if needed
+    // console.log(`[runtime:normalize] original: ${value}, nodeId: ${currentNodeId}`);
+
+    // Se o handle for exatamente o ID do node ou começar com ele, tratamos como padrão/vazio
+    if (currentNodeId && (raw === currentNodeId.toLowerCase() || raw.startsWith(`${currentNodeId.toLowerCase()}-`))) {
+      // Mas precisamos checar se é um sufixo especial
+      if (raw.endsWith("-else") || raw.endsWith("-senão") || raw.endsWith("-senao")) return "else";
+      if (raw.endsWith("-default") || raw.endsWith("-padrão") || raw.endsWith("-padrao")) return "default";
+      if (raw.includes("-cond-")) return "cond-" + raw.split("-cond-")[1];
+      if (raw.includes("-btn-")) return "btn-" + raw.split("-btn-")[1];
+      
+      // Se for apenas o ID ou o ID seguido de algo não reconhecido, é o handle principal (vazio)
+      return "";
     }
     
-    // Se o handle for exatamente o ID do node, normalizamos para vazio para facilitar match padrão
-    if (currentNodeId && raw === currentNodeId) return "";
+    // Fallbacks para strings que contêm as palavras chave
+    if (raw.includes("else") || raw.includes("senão") || raw.includes("senao")) return "else";
+    if (raw.includes("default") || raw.includes("padrão") || raw.includes("padrao")) return "default";
     
-    // Legacy mapping para botões
+    // Mapeamento de botões (btn-ID)
     const buttonMatch = raw.match(/btn-(.+)$/);
     if (buttonMatch?.[1]) return buttonMatch[1];
     
