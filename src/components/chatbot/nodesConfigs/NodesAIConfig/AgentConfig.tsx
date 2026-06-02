@@ -238,6 +238,15 @@ export const AgentConfig = ({ config, setConfig }: AgentConfigProps) => {
           <strong>Dica:</strong> Para que este agente seja realmente autônomo, configure blocos de ação (como Sheets ou Redirect) e ative a opção "Habilitar como Skill" neles. O agente saberá usá-los quando necessário.
         </p>
       </div>
+
+      <VariableModal 
+        open={isVariableModalOpen}
+        onClose={() => {
+          setIsVariableModalOpen(false);
+          setActiveTextarea(null);
+        }}
+        onSelect={handleVariableSelect}
+      />
     </div>
   );
 };
