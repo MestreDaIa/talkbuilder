@@ -1090,6 +1090,7 @@ async function runFlow(execution: any, containersIn: any[], edgesIn: any[], inpu
                 } else {
                   const errText = await res.text().catch(() => "");
                   console.error(`[ai-agent:openai] HTTP ${res.status}: ${errText.slice(0, 500)}`);
+                }
               } else if (provider === "gemini") {
                 const model = cfg.model || "gemini-2.0-flash";
                 const url = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${activeKey}`;
