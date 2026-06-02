@@ -1103,9 +1103,9 @@ async function runFlow(execution: any, containersIn: any[], edgesIn: any[], inpu
             const inputMediaType = input?.mediaType || input?.midiaType || input?.messageType;
             const isMediaMessage = ["imageMessage", "audioMessage", "videoMessage", "documentMessage", "documentWithCaptionMessage"].includes(input?.messageType || "");
 
-            const base64 = firstNonEmpty(inputMediaBase64, variables["base64"], variables["image_base64"], variables["audio_base64"]);
-            const mediaUrl = firstNonEmpty(inputMediaUrl, variables["mediaUrl"], variables["media_url"], variables["url"]);
-            const mimetype = normalizeMediaMimeType(
+            let base64 = firstNonEmpty(inputMediaBase64, variables["base64"], variables["image_base64"], variables["audio_base64"]);
+            let mediaUrl = firstNonEmpty(inputMediaUrl, variables["mediaUrl"], variables["media_url"], variables["url"]);
+            let mimetype = normalizeMediaMimeType(
               input?.mimetype,
               input?.mimeType,
               variables["mimetype"],
@@ -1116,6 +1116,46 @@ async function runFlow(execution: any, containersIn: any[], edgesIn: any[], inpu
               inputMediaType,
               mediaUrl,
             );
+
+            // Em loop do agente, a segunda mídia em diante NÃO passa pelo nó HTTP
+            // getBase64FromMediaMessage — o fluxo retoma direto neste nó. Buscamos
+            // o base64 da Evolution aqui mesmo quando a mensagem atual é mídia.
+            if (!base64 && isMediaMessage) {
+              const serverUrl = String(input?.serverUrl || variables["serverUrl"] || "").replace(/\/$/, "");
+              const apiKey = input?.apiKey || input?.apikey || variables["apiKey"] || variables["apikey"];
+              const instanceName = input?.instanceName || variables["instanceName"];
+              const messageId = input?.messageId || variables["messageId"];
+              if (serverUrl && apiKey && instanceName && messageId) {
+                try {
+                  const evoUrl = `${serverUrl}/chat/getBase64FromMediaMessage/${instanceName}`;
+                  console.log(`[ai-agent] fetching media base64 inline from ${evoUrl} for messageId=${messageId}`);
+                  const evoRes = await fetch(evoUrl, {
+                    method: "POST",
+                    headers: { "Content-Type": "application/json", "apikey": String(apiKey), "Accept": "application/json, */*" },
+                    body: JSON.stringify({ message: { key: { id: messageId } }, convertToMp4: false }),
+                  });
+                  if (evoRes.ok) {
+                    const evoData: any = await evoRes.json().catch(() => ({}));
+                    if (evoData?.base64) {
+                      base64 = evoData.base64;
+                      variables["base64"] = evoData.base64;
+                    }
+                    if (evoData?.mimetype) {
+                      variables["mimetype"] = evoData.mimetype;
+                      mimetype = normalizeMediaMimeType(evoData.mimetype, mimetype, mediaUrl, inputMediaType);
+                    }
+                    console.log(`[ai-agent] inline fetch OK hasBase64=${!!base64} mimetype=${mimetype}`);
+                  } else {
+                    const errBody = await evoRes.text().catch(() => "");
+                    console.error(`[ai-agent] inline fetch HTTP ${evoRes.status}: ${errBody.slice(0, 300)}`);
+                  }
+                } catch (e) {
+                  console.error(`[ai-agent] inline fetch failed`, e);
+                }
+              } else {
+                console.warn(`[ai-agent] cannot inline fetch media: missing serverUrl/apiKey/instance/messageId`);
+              }
+            }
 
             const hasMedia = !!(base64 || mediaUrl || isMediaMessage);
 
