@@ -343,8 +343,8 @@ async function runFlow(execution: any, containersIn: any[], edgesIn: any[], inpu
     if (!value) return "";
     let raw = String(value).toLowerCase().trim();
     
-    // Debug log for normalization if needed
-    // console.log(`[runtime:normalize] original: ${value}, nodeId: ${currentNodeId}`);
+    // console.log(`[runtime:normalize] input="${value}", node="${currentNodeId}"`);
+
 
     // Se o handle for exatamente o ID do node ou começar com ele, tratamos como padrão/vazio
     if (currentNodeId && (raw === currentNodeId.toLowerCase() || raw.startsWith(`${currentNodeId.toLowerCase()}-`))) {
