@@ -1228,6 +1228,13 @@ async function runFlow(execution: any, containersIn: any[], edgesIn: any[], inpu
                 const model = cfg.model || "gemini-2.0-flash";
                 const url = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${activeKey}`;
 
+                const geminiContents: any[] = [];
+                
+                // Adiciona histórico se houver
+                if (useMemory && history.length > 0) {
+                  geminiContents.push(...history.slice(-historyLimit));
+                }
+
                 const userParts: any[] = [];
                 if (userPrompt) {
                   userParts.push({ text: userPrompt });
@@ -1252,13 +1259,15 @@ async function runFlow(execution: any, containersIn: any[], edgesIn: any[], inpu
                   } catch (e) { console.error("[ai-agent:gemini] failed to fetch media", e); }
                 }
 
-                console.log(`[ai-agent:gemini] calling model=${model} parts=${userParts.length} inlineData=${userParts.some(p => p.inline_data)}`);
+                geminiContents.push({ role: "user", parts: userParts });
+
+                console.log(`[ai-agent:gemini] calling model=${model} parts=${userParts.length} history=${history.length} inlineData=${userParts.some(p => p.inline_data)}`);
                 const res = await fetch(url, {
                   method: "POST",
                   headers: { "Content-Type": "application/json" },
                   body: JSON.stringify({
                     system_instruction: { parts: [{ text: instructions }] },
-                    contents: [{ role: "user", parts: userParts }],
+                    contents: geminiContents,
                     generationConfig: {
                       temperature: cfg.temperature ?? 0.7,
                       maxOutputTokens: cfg.maxTokens ?? 1000,
