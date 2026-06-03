@@ -1213,7 +1213,7 @@ async function runFlow(execution: any, containersIn: any[], edgesIn: any[], inpu
                   headers: { "Authorization": `Bearer ${activeKey}`, "Content-Type": "application/json" },
                   body: JSON.stringify({
                     model: cfg.model || "gpt-4o-mini",
-                    messages: messages,
+                    messages: apiMessages,
                   }),
                 });
                 if (res.ok) {
