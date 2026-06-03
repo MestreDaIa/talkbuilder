@@ -1171,10 +1171,28 @@ async function runFlow(execution: any, containersIn: any[], edgesIn: any[], inpu
               let aiReply = "";
               const instructions = replaceVars(cfg.instructions || "");
               
+              // Gerenciamento de Memória (Histórico) para o Agente
+              const memoryKey = `agent_history_${execution.id}_${node.id}`;
+              const historyLimit = parseInt(cfg.historyLimit || "10");
+              const useMemory = cfg.useMemory !== false; // Toggle de memória
+              
+              let history: any[] = [];
+              if (useMemory) {
+                const cached = readMemoryState(memoryKey);
+                if (cached && Array.isArray(cached)) {
+                  history = cached;
+                }
+              }
+
               if (provider === "openai") {
-                const messages: any[] = [{ role: "system", content: instructions }];
-                const userContent: any[] = [];
+                const apiMessages: any[] = [{ role: "system", content: instructions }];
                 
+                // Adiciona histórico se houver
+                if (useMemory && history.length > 0) {
+                  apiMessages.push(...history.slice(-historyLimit));
+                }
+
+                const userContent: any[] = [];
                 if (userPrompt) {
                   userContent.push({ type: "text", text: userPrompt });
                 } else if (hasMedia) {
@@ -1188,14 +1206,14 @@ async function runFlow(execution: any, containersIn: any[], edgesIn: any[], inpu
                   userContent.push({ type: "image_url", image_url: { url: mediaUrl } });
                 }
 
-                messages.push({ role: "user", content: userContent });
+                apiMessages.push({ role: "user", content: userContent });
 
                 const res = await fetch("https://api.openai.com/v1/chat/completions", {
                   method: "POST",
                   headers: { "Authorization": `Bearer ${activeKey}`, "Content-Type": "application/json" },
                   body: JSON.stringify({
                     model: cfg.model || "gpt-4o-mini",
-                    messages: messages,
+                    messages: apiMessages,
                   }),
                 });
                 if (res.ok) {
@@ -1209,6 +1227,13 @@ async function runFlow(execution: any, containersIn: any[], edgesIn: any[], inpu
               } else if (provider === "gemini") {
                 const model = cfg.model || "gemini-2.0-flash";
                 const url = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${activeKey}`;
+
+                const geminiContents: any[] = [];
+                
+                // Adiciona histórico se houver
+                if (useMemory && history.length > 0) {
+                  geminiContents.push(...history.slice(-historyLimit));
+                }
 
                 const userParts: any[] = [];
                 if (userPrompt) {
@@ -1234,13 +1259,15 @@ async function runFlow(execution: any, containersIn: any[], edgesIn: any[], inpu
                   } catch (e) { console.error("[ai-agent:gemini] failed to fetch media", e); }
                 }
 
-                console.log(`[ai-agent:gemini] calling model=${model} parts=${userParts.length} inlineData=${userParts.some(p => p.inline_data)}`);
+                geminiContents.push({ role: "user", parts: userParts });
+
+                console.log(`[ai-agent:gemini] calling model=${model} parts=${userParts.length} history=${history.length} inlineData=${userParts.some(p => p.inline_data)}`);
                 const res = await fetch(url, {
                   method: "POST",
                   headers: { "Content-Type": "application/json" },
                   body: JSON.stringify({
                     system_instruction: { parts: [{ text: instructions }] },
-                    contents: [{ role: "user", parts: userParts }],
+                    contents: geminiContents,
                     generationConfig: {
                       temperature: cfg.temperature ?? 0.7,
                       maxOutputTokens: cfg.maxTokens ?? 1000,
@@ -1259,7 +1286,27 @@ async function runFlow(execution: any, containersIn: any[], edgesIn: any[], inpu
                   console.error(`[ai-agent:gemini] HTTP ${res.status}: ${errText.slice(0, 500)}`);
                 }
               }
-              if (aiReply) messages.push({ id: crypto.randomUUID(), type: "bot", content: aiReply });
+              if (aiReply) {
+                messages.push({ id: crypto.randomUUID(), type: "bot", content: aiReply });
+                
+                // Atualiza o histórico se a memória estiver habilitada
+                if (useMemory) {
+                  if (provider === "openai") {
+                    history.push({ role: "user", content: userPrompt || "Enviou mídia" });
+                    history.push({ role: "assistant", content: aiReply });
+                  } else if (provider === "gemini") {
+                    history.push({ role: "user", parts: [{ text: userPrompt || "Enviou mídia" }] });
+                    history.push({ role: "model", parts: [{ text: aiReply }] });
+                  }
+                  
+                  // Mantém apenas o limite configurado
+                  const keepCount = historyLimit * 2;
+                  if (history.length > keepCount) {
+                    history = history.slice(-keepCount);
+                  }
+                  writeMemoryState(memoryKey, history);
+                }
+              }
             }
             
             return { messages, waiting_for: "text", variables, next_node_id: node.id, active_agent_node_id: node.id, mode: "agent", steps, status: "waiting_input" };
