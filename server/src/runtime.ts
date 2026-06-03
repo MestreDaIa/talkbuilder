@@ -1171,10 +1171,28 @@ async function runFlow(execution: any, containersIn: any[], edgesIn: any[], inpu
               let aiReply = "";
               const instructions = replaceVars(cfg.instructions || "");
               
+              // Gerenciamento de Memória (Histórico) para o Agente
+              const memoryKey = `agent_history_${execution.id}_${node.id}`;
+              const historyLimit = parseInt(cfg.historyLimit || "10");
+              const useMemory = cfg.useMemory !== false; // Toggle de memória
+              
+              let history: any[] = [];
+              if (useMemory) {
+                const cached = readMemoryState(memoryKey);
+                if (cached && Array.isArray(cached)) {
+                  history = cached;
+                }
+              }
+
               if (provider === "openai") {
-                const messages: any[] = [{ role: "system", content: instructions }];
-                const userContent: any[] = [];
+                const apiMessages: any[] = [{ role: "system", content: instructions }];
                 
+                // Adiciona histórico se houver
+                if (useMemory && history.length > 0) {
+                  apiMessages.push(...history.slice(-historyLimit));
+                }
+
+                const userContent: any[] = [];
                 if (userPrompt) {
                   userContent.push({ type: "text", text: userPrompt });
                 } else if (hasMedia) {
@@ -1188,7 +1206,7 @@ async function runFlow(execution: any, containersIn: any[], edgesIn: any[], inpu
                   userContent.push({ type: "image_url", image_url: { url: mediaUrl } });
                 }
 
-                messages.push({ role: "user", content: userContent });
+                apiMessages.push({ role: "user", content: userContent });
 
                 const res = await fetch("https://api.openai.com/v1/chat/completions", {
                   method: "POST",
