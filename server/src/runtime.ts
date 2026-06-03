@@ -1286,7 +1286,27 @@ async function runFlow(execution: any, containersIn: any[], edgesIn: any[], inpu
                   console.error(`[ai-agent:gemini] HTTP ${res.status}: ${errText.slice(0, 500)}`);
                 }
               }
-              if (aiReply) messages.push({ id: crypto.randomUUID(), type: "bot", content: aiReply });
+              if (aiReply) {
+                messages.push({ id: crypto.randomUUID(), type: "bot", content: aiReply });
+                
+                // Atualiza o histórico se a memória estiver habilitada
+                if (useMemory) {
+                  if (provider === "openai") {
+                    history.push({ role: "user", content: userPrompt || "Enviou mídia" });
+                    history.push({ role: "assistant", content: aiReply });
+                  } else if (provider === "gemini") {
+                    history.push({ role: "user", parts: [{ text: userPrompt || "Enviou mídia" }] });
+                    history.push({ role: "model", parts: [{ text: aiReply }] });
+                  }
+                  
+                  // Mantém apenas o limite configurado
+                  const keepCount = historyLimit * 2;
+                  if (history.length > keepCount) {
+                    history = history.slice(-keepCount);
+                  }
+                  writeMemoryState(memoryKey, history);
+                }
+              }
             }
             
             return { messages, waiting_for: "text", variables, next_node_id: node.id, active_agent_node_id: node.id, mode: "agent", steps, status: "waiting_input" };
