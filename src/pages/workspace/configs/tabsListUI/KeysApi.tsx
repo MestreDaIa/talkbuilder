@@ -7,7 +7,6 @@ import { getSupabase } from '../../../../lib/supabaseClient'
 import { toast } from 'sonner'
 import { Input } from '../../../../components/ui/input'
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from '../../../../components/ui/dialog'
-import { Skeleton } from '../../../../components/ui/skeleton'
 
 export default function KeysApi() {
   const { currentWorkspace, user } = useAuth()
@@ -161,10 +160,10 @@ export default function KeysApi() {
         <div className='flex flex-col gap-4'>
           {loading ? (
             Array(2).fill(0).map((_, i) => (
-              <div key={i} className="space-y-3 p-4 border rounded-xl bg-gray-50/50">
-                <Skeleton className="h-5 w-[150px]" />
-                <Skeleton className="h-10 w-full" />
-                <Skeleton className="h-4 w-[200px]" />
+              <div key={i} className="space-y-3 p-4 border rounded-xl bg-gray-50/50 animate-pulse">
+                <div className="h-5 w-[150px] bg-gray-200 rounded" />
+                <div className="h-10 w-full bg-gray-200 rounded" />
+                <div className="h-4 w-[200px] bg-gray-200 rounded" />
               </div>
             ))
           ) : keys.length === 0 ? (
