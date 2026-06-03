@@ -2,6 +2,7 @@ import express, { Request, Response, NextFunction } from "express";
 import cors from "cors";
 import morgan from "morgan";
 import dotenv from "dotenv";
+import { supabase } from "./supabase.js";
 import { handleWhatsAppWebhook } from "./whatsapp.js";
 import { processRuntime } from "./runtime.js";
 
@@ -37,13 +38,50 @@ app.use(morgan("dev"));
 app.use(express.json({ limit: "50mb" }));
 app.use(express.urlencoded({ limit: "50mb", extended: true }));
 
+// Middleware de Autenticação via API Key
+const authenticateApiKey = async (req: Request, res: Response, next: NextFunction) => {
+  const authHeader = req.headers.authorization;
+  if (!authHeader || !authHeader.startsWith("Bearer ")) {
+    return res.status(401).json({ error: "Missing or invalid Authorization header" });
+  }
+
+  const keyValue = authHeader.split(" ")[1];
+  
+  try {
+    const { data, error } = await supabase
+      .from("api_keys")
+      .select("workspace_id, is_active")
+      .eq("key_value", keyValue)
+      .maybeSingle();
+
+    if (error || !data) {
+      return res.status(401).json({ error: "Invalid API Key" });
+    }
+
+    if (!data.is_active) {
+      return res.status(403).json({ error: "API Key is disabled" });
+    }
+
+    // Injeta o workspace_id na requisição para uso posterior
+    (req as any).workspaceId = data.workspace_id;
+    
+    // Atualiza o last_used_at de forma assíncrona
+    supabase
+      .from("api_keys")
+      .update({ last_used_at: new Date().toISOString() })
+      .eq("key_value", keyValue)
+      .then(() => {});
+
+    next();
+  } catch (err) {
+    console.error("API Key Auth Error:", err);
+    res.status(500).json({ error: "Internal server error during authentication" });
+  }
+};
+
 // Log de todas as requisições para depuração no servidor
 app.use((req: Request, res: Response, next: NextFunction) => {
   console.log(`[${new Date().toISOString()}] ${req.method} ${req.url}`);
-  // console.log('Headers:', JSON.stringify(req.headers));
-  // if (req.body && Object.keys(req.body).length > 0) {
-  //   console.log('Body:', JSON.stringify(req.body, null, 2));
-  // }
   next();
 });
 
@@ -198,6 +236,44 @@ app.delete("/webhook-capture/:path(*)", (req: Request, res: Response) => {
 });
 
 
+
+// =====================================================================
+// API Externa para integrações (ex: Flow-Appoint)
+// =====================================================================
+
+// Executar um fluxo via API Externa
+app.post("/api/v1/flow/execute", authenticateApiKey, async (req: Request, res: Response) => {
+  try {
+    const { flowId, contactId, channel, payload } = req.body;
+    
+    if (!flowId) return res.status(400).json({ error: "Missing flowId" });
+    
+    // Busca o fluxo para garantir que pertence ao workspace da API Key
+    const { data: flow, error: flowError } = await supabase
+      .from("flows")
+      .select("*")
+      .eq("id", flowId)
+      .eq("workspace_id", (req as any).workspaceId)
+      .maybeSingle();
+
+    if (flowError || !flow) {
+      return res.status(404).json({ error: "Flow not found or access denied" });
+    }
+
+    const result = await processRuntime({
+      flow,
+      contact_id: contactId || "api-external",
+      channel: channel || "api",
+      payload: payload || {},
+      action: "start"
+    });
+
+    res.json(result);
+  } catch (error: any) {
+    console.error("Erro na execução via API externa:", error);
+    res.status(500).json({ error: error.message });
+  }
+});
 
 app.get("/", (req: Request, res: Response) => {
   res.json({ 
