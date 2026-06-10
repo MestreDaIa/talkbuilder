@@ -70,7 +70,7 @@ export default function Hero() {
 					className="inline-flex items-center gap-2 px-4 py-1.5 rounded-full bg-white/5 border border-white/10 backdrop-blur text-xs font-medium text-foreground/80 mb-8"
 				>
 					<Sparkles className="w-3.5 h-3.5 text-[#920027]" />
-					Editor visual de chatbots — sem código
+					Editor visual de chatbots — sem código — Zailom Flow
 				</div>
 
 				<h1 className="font-display text-5xl sm:text-7xl md:text-[5rem] lg:text-[6rem] font-bold tracking-tight leading-[1.1] mb-8 flex flex-wrap justify-center gap-x-6">
