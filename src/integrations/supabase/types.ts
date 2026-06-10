@@ -212,8 +212,16 @@ export type Database = {
           avatar_url: string | null
           created_at: string
           email: string | null
+          embed_company_id: string | null
+          embed_max_chatbots: number | null
+          embed_max_integrations: number | null
+          embed_max_messages: number | null
+          embed_plan_synced_at: string | null
+          embed_plan_tier: string | null
+          embed_source: string | null
           full_name: string | null
           id: string
+          plan: string | null
           slug: string | null
           updated_at: string
         }
@@ -221,8 +229,16 @@ export type Database = {
           avatar_url?: string | null
           created_at?: string
           email?: string | null
+          embed_company_id?: string | null
+          embed_max_chatbots?: number | null
+          embed_max_integrations?: number | null
+          embed_max_messages?: number | null
+          embed_plan_synced_at?: string | null
+          embed_plan_tier?: string | null
+          embed_source?: string | null
           full_name?: string | null
           id: string
+          plan?: string | null
           slug?: string | null
           updated_at?: string
         }
@@ -230,8 +246,16 @@ export type Database = {
           avatar_url?: string | null
           created_at?: string
           email?: string | null
+          embed_company_id?: string | null
+          embed_max_chatbots?: number | null
+          embed_max_integrations?: number | null
+          embed_max_messages?: number | null
+          embed_plan_synced_at?: string | null
+          embed_plan_tier?: string | null
+          embed_source?: string | null
           full_name?: string | null
           id?: string
+          plan?: string | null
           slug?: string | null
           updated_at?: string
         }
