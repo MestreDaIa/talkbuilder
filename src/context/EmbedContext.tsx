@@ -16,7 +16,7 @@ import {
  */
 export type EmbedMode = "standalone" | "embedded";
 
-export type EmbedHost = "bookingfy" | "flow-appoint" | null;
+export type EmbedHost = "bookingfy" | "booking" | null;
 
 /**
  * Sessão derivada do JWT do host.
@@ -182,8 +182,8 @@ function detectInitialMode(): {
 		const host: EmbedHost =
 			hostParam === "bookingfy"
 				? "bookingfy"
-				: hostParam === "flow-appoint" || (token && !hostParam)
-					? "flow-appoint"
+				: hostParam === "booking" || (token && !hostParam)
+					? "booking"
 					: null;
 
 		if (token && host) {
@@ -242,9 +242,9 @@ export function EmbedProvider({ children }: { children: React.ReactNode }) {
 			if (data.type === "talkmap:embed:init" && data.token) {
 				// Tenta detectar o host pela origem
 				const inferredHost: Exclude<EmbedHost, null> = event.origin.includes(
-					"flow-appoint"
+					"booking"
 				)
-					? "flow-appoint"
+					? "booking"
 					: "bookingfy";
 				const { session: newSession, error: newError } = buildSession(
 					inferredHost,

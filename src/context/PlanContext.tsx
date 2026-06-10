@@ -38,7 +38,7 @@ type PlanContextType = {
 	botsUsed: number;
 	canAddBot: boolean;
 	remainingBots: number;
-	managedBy: "flow-appoint" | "internal";
+	managedBy: "booking" | "internal";
 	isSuspended: boolean;
 	syncedAt: string | null;
 };
@@ -83,7 +83,7 @@ export function PlanProvider({ children }: { children: React.ReactNode }) {
 
 	const setCurrentPlan = (plan: PlanId) => {
 		// Em workspaces gerenciados pelo Zailom Booking, ignora a alteração local.
-		if (resolved.managedBy === "flow-appoint") {
+		if (resolved.managedBy === "booking") {
 			console.warn("[Plan] Tentativa de alterar plano em workspace gerenciado pelo Zailom Booking — ignorado.");
 			return;
 		}
