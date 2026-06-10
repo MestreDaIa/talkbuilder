@@ -24,8 +24,8 @@ export default function LandingNav() {
 		>
 			<div className="max-w-6xl mx-auto px-6 h-16 flex items-center justify-between">
 				<Link to="/" className="flex items-center gap-2">
-					<img src={logoMark} alt="ZailomFlow" className="h-8 w-auto" />
-					<img src={logoWordmark} alt="ZailomFlow" className="h-7 w-auto" />
+					<img src={logoMark} alt="Zailom Flow" className="h-8 w-auto" />
+					<img src={logoWordmark} alt="Zailom Flow" className="h-7 w-auto" />
 				</Link>
 
 				<nav className="hidden md:flex items-center gap-8 text-sm text-muted-foreground">

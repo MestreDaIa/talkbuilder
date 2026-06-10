@@ -27,10 +27,10 @@ export default function Header() {
         className="cursor-pointer shrink-0 flex items-center gap-2"
         onClick={() => navigate(workspaceRoot(slug))}
       >
-        <img src={logoMark} alt="ZailomFlow" className="h-7 w-auto" />
+        <img src={logoMark} alt="Zailom Flow" className="h-7 w-auto" />
       </button>
       <h1 className="flex-1 text-center flex items-center justify-center gap-2 truncate">
-        <img src={logoWordmark} alt="ZailomFlow" className="h-6 w-auto inline-block" />
+        <img src={logoWordmark} alt="Zailom Flow" className="h-6 w-auto inline-block" />
         <span className="text-base sm:text-lg font-semibold truncate">
           {slug ? `@${slug}` : ""}
           {profile?.display_name ? ` - ${profile.display_name}` : ""}
