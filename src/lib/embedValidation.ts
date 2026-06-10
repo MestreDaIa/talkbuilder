@@ -1,5 +1,5 @@
 /**
- * Validação do JWT de embed (Flow-Appoint / BookingFy).
+ * Validação do JWT de embed (Zailom Booking / BookingFy).
  *
  * ATUAL: client-side — só decodifica payload e checa exp/iss/aud.
  *        A assinatura HS256 NÃO é verificada porque o secret

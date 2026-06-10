@@ -1,6 +1,6 @@
-# Documentação Técnica para Integração Externa - TalkMap / Builder Flow API
+# Documentação Técnica para Integração Externa - Zailom Flow / Builder Flow API
 
-Esta documentação detalha a arquitetura, modelos de dados e fluxos do projeto TalkMap, projetada para permitir a integração e sincronização com sistemas externos (ex: Flow-Appoint).
+Esta documentação detalha a arquitetura, modelos de dados e fluxos do projeto Zailom Flow, projetada para permitir a integração e sincronização com sistemas externos (ex: Zailom Booking).
 
 ---
 
@@ -81,7 +81,7 @@ Os limites são definidos em `src/lib/planResolver.ts` e aplicados via `PlanCont
 
 ## 3. Fluxos de Integração
 
-### 3.1 Provisionamento de Conta (Externo -> TalkMap)
+### 3.1 Provisionamento de Conta (Externo -> Zailom Flow)
 Realizado via Edge Function `provision-account`.
 - **Endpoint**: `POST /functions/v1/provision-account`
 - **Autenticação**: JWT HS256 assinado com `EMBED_SHARED_SECRET`.
@@ -99,7 +99,7 @@ Realizado via Edge Function `provision-account`.
 - **Ação**: Cria o usuário no `auth.users`, cria o `profile` e gera automaticamente um `workspace` inicial (via trigger `handle_new_user`).
 
 ### 3.2 Sincronização de Planos
-A Edge Function `sync-embed-plan` é responsável por atualizar o `embed_plan_tier` no Supabase com base em mudanças no sistema de origem (ex: upgrade de assinatura no Flow-Appoint).
+A Edge Function `sync-embed-plan` é responsável por atualizar o `embed_plan_tier` no Supabase com base em mudanças no sistema de origem (ex: upgrade de assinatura no Zailom Booking).
 
 ### 3.3 Fluxo de Cadastro e Login
 - **Cadastro**: Pode ser feito via UI (`/auth`) ou via provisionamento externo.
@@ -117,7 +117,7 @@ A Edge Function `sync-embed-plan` é responsável por atualizar o `embed_plan_ti
 - `sync-embed-plan`: Sincroniza status de planos externos.
 
 ### 4.2 Webhooks
-- **WhatsApp Webhook**: Entrada de dados da Evolution API. O TalkMap processa a mensagem e responde via Evolution API utilizando as credenciais configuradas em `whatsapp_connections`.
+- **WhatsApp Webhook**: Entrada de dados da Evolution API. O Zailom Flow processa a mensagem e responde via Evolution API utilizando as credenciais configuradas em `whatsapp_connections`.
 
 ---
 

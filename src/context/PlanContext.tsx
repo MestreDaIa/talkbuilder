@@ -53,7 +53,7 @@ export function PlanProvider({ children }: { children: React.ReactNode }) {
 
 	// Override standalone via localStorage (mantém compatibilidade com a UI
 	// de testes de plano). Ignorado quando o workspace é gerenciado pelo
-	// Flow-Appoint — neste caso o tier vem do JWT/sync.
+	// Zailom Booking — neste caso o tier vem do JWT/sync.
 	const [overridePlan, setOverridePlan] = useState<PlanId>("starter");
 
 	useEffect(() => {
@@ -82,9 +82,9 @@ export function PlanProvider({ children }: { children: React.ReactNode }) {
 	}, [profile, overridePlan]);
 
 	const setCurrentPlan = (plan: PlanId) => {
-		// Em workspaces gerenciados pelo Flow-Appoint, ignora a alteração local.
+		// Em workspaces gerenciados pelo Zailom Booking, ignora a alteração local.
 		if (resolved.managedBy === "flow-appoint") {
-			console.warn("[Plan] Tentativa de alterar plano em workspace gerenciado pelo Flow-Appoint — ignorado.");
+			console.warn("[Plan] Tentativa de alterar plano em workspace gerenciado pelo Zailom Booking — ignorado.");
 			return;
 		}
 		setOverridePlan(plan);

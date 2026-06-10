@@ -9,9 +9,9 @@ import {
 } from "react";
 
 /**
- * Modos de operação do TalkMap / builder-flow-api:
+ * Modos de operação do Zailom Flow / builder-flow-api:
  * - "standalone": app rodando sozinho — usuário usa via login normal.
- * - "embedded":   app rodando dentro de iframe de um host (BookingFy ou Flow-Appoint).
+ * - "embedded":   app rodando dentro de iframe de um host (BookingFy ou Zailom Booking).
  *                 Identidade vem do host via JWT.
  */
 export type EmbedMode = "standalone" | "embedded";
@@ -21,7 +21,7 @@ export type EmbedHost = "bookingfy" | "flow-appoint" | null;
 /**
  * Sessão derivada do JWT do host.
  * Os campos variam por host: BookingFy usa tenantId/userId/slug,
- * Flow-Appoint usa companyId/workspaceSlug/userEmail.
+ * Zailom Booking usa companyId/workspaceSlug/userEmail.
  * Mantemos um shape unificado pra facilitar o consumo na UI.
  */
 export type EmbedSession = {
@@ -30,7 +30,7 @@ export type EmbedSession = {
 	companyId: string;
 	// Slug do workspace que esse embed está autorizado a ver/editar
 	workspaceSlug: string;
-	// Email do usuário (Flow-Appoint) ou ID (BookingFy)
+	// Email do usuário (Zailom Booking) ou ID (BookingFy)
 	userIdentifier: string;
 	plan?: "starter" | "pro" | "business";
 	expiresAt?: number; // unix seconds

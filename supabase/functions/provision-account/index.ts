@@ -1,7 +1,7 @@
 // =============================================================================
-// provision-account — Edge Function (Deno) do builder-flow-api (TalkMap)
+// provision-account — Edge Function (Deno) do builder-flow-api (Zailom Flow)
 // -----------------------------------------------------------------------------
-// Recebe do Flow-Appoint os dados de um usuário recém-cadastrado lá e cria
+// Recebe do Zailom Booking os dados de um usuário recém-cadastrado lá e cria
 // (ou reaproveita) a conta correspondente aqui no builder, usando a
 // SERVICE_ROLE_KEY do Supabase externo.
 //
@@ -34,7 +34,7 @@
 //    o JWT do Supabase Auth não se aplica aqui.)
 //
 // Secrets necessários no projeto Supabase externo:
-//   - EMBED_SHARED_SECRET            (mesma chave do Flow-Appoint)
+//   - EMBED_SHARED_SECRET            (mesma chave do Zailom Booking)
 //   - SUPABASE_URL                   (auto-injetado pelo Supabase)
 //   - SUPABASE_SERVICE_ROLE_KEY      (auto-injetado pelo Supabase)
 // =============================================================================
@@ -44,7 +44,7 @@ import { createClient } from "https://esm.sh/@supabase/supabase-js@2.45.4";
 // -------- CORS ---------------------------------------------------------------
 const ALLOWED_ORIGINS = [
   "https://flow-appoint.lovable.app",
-  // adicione domínios extras do Flow-Appoint conforme necessário
+  // adicione domínios extras do Zailom Booking conforme necessário
 ];
 
 function corsHeaders(origin: string | null): HeadersInit {
@@ -297,7 +297,7 @@ Deno.serve(async (req) => {
   });
 
   if (!createErr && created?.user) {
-    // Marca o profile como gerenciado pelo Flow-Appoint (quando aplicável).
+    // Marca o profile como gerenciado pelo Zailom Booking (quando aplicável).
     // O trigger handle_new_user já criou a row em profiles; aqui só
     // anotamos as colunas de embed para sync-embed-plan funcionar depois.
     if (data.company_id) {

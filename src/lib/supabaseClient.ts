@@ -80,7 +80,7 @@ function buildSystemClient(): SupabaseClient {
   return systemClient;
 }
 
-/** Retorna o client do banco do sistema TalkMap. */
+/** Retorna o client do banco do sistema Zailom Flow. */
 export function getSupabase(): SupabaseClient {
   return buildSystemClient();
 }

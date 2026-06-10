@@ -1,7 +1,7 @@
 // =============================================================================
 // planResolver.ts — fonte única de verdade para o plano efetivo do workspace
 // -----------------------------------------------------------------------------
-// Workspaces criados via Flow-Appoint (embed) têm o plano gerenciado pelo host.
+// Workspaces criados via Zailom Booking (embed) têm o plano gerenciado pelo host.
 // Workspaces standalone usam o plano interno (profiles.plan).
 //
 // Sempre que o app for ler "plano atual" (limites, gating de UI, billing,

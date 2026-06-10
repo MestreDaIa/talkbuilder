@@ -238,7 +238,7 @@ app.delete("/webhook-capture/:path(*)", (req: Request, res: Response) => {
 
 
 // =====================================================================
-// API Externa para integrações (ex: Flow-Appoint)
+// API Externa para integrações (ex: Zailom Booking)
 // =====================================================================
 
 // Executar um fluxo via API Externa

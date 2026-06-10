@@ -1,7 +1,7 @@
 // =============================================================================
 // sync-embed-plan — Edge Function (Deno)
 // -----------------------------------------------------------------------------
-// O Flow-Appoint chama este endpoint sempre que o plano/status de uma empresa
+// O Zailom Booking chama este endpoint sempre que o plano/status de uma empresa
 // muda. Atualiza profiles.embed_plan_tier no banco do builder.
 //
 // Auth:    JWT HS256 com EMBED_SHARED_SECRET. Claims:

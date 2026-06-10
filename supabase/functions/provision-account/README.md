@@ -1,7 +1,7 @@
-# `provision-account` — provisionamento de conta vindo do Flow-Appoint
+# `provision-account` — provisionamento de conta vindo do Zailom Booking
 
 Edge function (Deno) que cria/reaproveita uma conta no builder-flow-api
-(TalkMap) a partir dos dados de signup do **Flow-Appoint**.
+(Zailom Flow) a partir dos dados de signup do **Zailom Booking**.
 
 - Hospedagem: **Supabase externo** já configurado pelo builder
   (`VITE_SUPABASE_URL`).
@@ -15,7 +15,7 @@ Edge function (Deno) que cria/reaproveita uma conta no builder-flow-api
 No projeto Supabase externo (onde mora o banco do builder):
 
 1. `EMBED_SHARED_SECRET` cadastrado em **Project Settings → Functions → Secrets**
-   com o **mesmo valor** que está no Flow-Appoint.
+   com o **mesmo valor** que está no Zailom Booking.
 2. `SUPABASE_URL` e `SUPABASE_SERVICE_ROLE_KEY` — injetados automaticamente
    pelo Supabase nas edge functions.
 3. Schema do `docs/supabase-setup.sql` aplicado (precisa do trigger
@@ -109,7 +109,7 @@ Erros:
 - `401` — JWT ausente, expirado, assinatura errada, ou claims errados
 - `500` — falha do Supabase ou config
 
-## Exemplo: chamada do Flow-Appoint (Node)
+## Exemplo: chamada do Zailom Booking (Node)
 
 ```ts
 import jwt from "jsonwebtoken";
@@ -146,11 +146,11 @@ if (!result.ok) throw new Error(result.error);
 
 ## Notas de segurança
 
-- O `EMBED_SHARED_SECRET` **nunca** sai do servidor do Flow-Appoint. O JWT é
+- O `EMBED_SHARED_SECRET` **nunca** sai do servidor do Zailom Booking. O JWT é
   gerado server-side e enviado direto pra essa function.
 - Use `expiresIn: 60s` no JWT pra reduzir janela de replay. Pra hardening
   adicional, gere um `jti` único e mantenha uma blacklist curta no
-  Flow-Appoint, ou inclua `nonce` + cache de 1min do lado do builder.
+  Zailom Booking, ou inclua `nonce` + cache de 1min do lado do builder.
 - A function roda com **service role key** — RLS é ignorada. Mantenha o
   endpoint protegido pela validação de JWT acima.
 - CORS: por padrão libera `https://flow-appoint.lovable.app` e qualquer

@@ -21,7 +21,7 @@ export default function EmbedErrorScreen() {
 				</h1>
 				<p className="text-sm text-muted-foreground">{error}</p>
 				<p className="text-xs text-muted-foreground">
-					Volte ao Flow-Appoint e tente abrir o builder novamente.
+					Volte ao Zailom Booking e tente abrir o builder novamente.
 				</p>
 			</div>
 		</div>

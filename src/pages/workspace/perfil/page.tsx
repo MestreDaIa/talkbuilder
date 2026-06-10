@@ -340,7 +340,7 @@ export default function UserProfile() {
 									</div>
 									{isFlowAppointManaged && (
 										<span className="text-[11px] text-gray-500">
-											Gerenciado pelo Flow-Appoint
+											Gerenciado pelo Zailom Booking
 											{resolvedPlan.syncedAt
 												? ` · sync ${new Date(resolvedPlan.syncedAt).toLocaleString("pt-BR")}`
 												: ""}
@@ -348,7 +348,7 @@ export default function UserProfile() {
 									)}
 									{resolvedPlan.isSuspended && (
 										<span className="text-[11px] text-red-600">
-											Workspace suspenso pelo Flow-Appoint
+											Workspace suspenso pelo Zailom Booking
 										</span>
 									)}
 								</div>
