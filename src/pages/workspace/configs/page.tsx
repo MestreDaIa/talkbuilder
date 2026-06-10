@@ -27,11 +27,11 @@ export default function ConfigurationWorkspace() {
 	const { user, profile } = useAuth();
 	const userMeta = (user?.user_metadata ?? {}) as Record<string, any>;
 	const resolved = resolveEffectivePlan(profile);
-	const isFlowAppointManaged =
-		resolved.managedBy === "flow-appoint" ||
-		(mode === "embedded" && host === "flow-appoint") ||
-		userMeta.source === "flow-appoint";
-	const showBilling = flags.showBilling && !isFlowAppointManaged;
+	const isBookingManaged =
+		resolved.managedBy === "booking" ||
+		(mode === "embedded" && host === "booking") ||
+		userMeta.source === "booking";
+	const showBilling = flags.showBilling && !isBookingManaged;
 	const defaultTab = "workspace";
 	return (
 		<div className="relative flex h-full overflow-hidden bg-[#F8F9FA]">

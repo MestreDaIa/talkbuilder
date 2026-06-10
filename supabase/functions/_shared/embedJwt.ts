@@ -1,5 +1,5 @@
 // =============================================================================
-// _shared/embedJwt.ts — verificação de JWT HS256 compartilhado com o Flow-Appoint
+// _shared/embedJwt.ts — verificação de JWT HS256 compartilhado com o Zailom Booking
 // -----------------------------------------------------------------------------
 // Cada edge function copia esses utilitários porque o runtime Deno do Supabase
 // não compartilha módulos entre funções automaticamente. Mantenha em sincronia.

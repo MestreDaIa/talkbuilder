@@ -121,7 +121,7 @@ export default function KeysApi() {
           <div className="space-y-1 text-left">
             <CardTitle className='text-left text-2xl font-bold text-[#1A1C1E]'>Chave de API</CardTitle>
             <CardDescription className="text-[#64748B]">
-              Gerencie suas chaves de acesso para integrar com sistemas externos como Flow-Appoint.
+              Gerencie suas chaves de acesso para integrar com sistemas externos como Zailom Booking.
             </CardDescription>
           </div>
           
@@ -142,7 +142,7 @@ export default function KeysApi() {
                 <Input 
                   value={newKeyName} 
                   onChange={(e) => setNewKeyName(e.target.value)} 
-                  placeholder="Ex: Integração Flow-Appoint"
+                  placeholder="Ex: Integração Zailom Booking"
                   className="rounded-xl"
                 />
               </div>

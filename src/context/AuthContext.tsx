@@ -115,7 +115,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 		if (!supabase) return;
 		const { data, error } = await supabase
 			.from("profiles")
-			.select("id, slug, display_name, avatar_url, plan, embed_source, embed_company_id, embed_plan_tier, embed_plan_synced_at")
+			.select("id, slug, display_name, avatar_url, plan, embed_source, embed_company_id, embed_plan_tier, embed_plan_synced_at, embed_max_chatbots, embed_max_messages, embed_max_integrations")
 			.eq("id", userId)
 			.maybeSingle();
 		if (error) {

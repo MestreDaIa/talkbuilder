@@ -1,6 +1,6 @@
-# TalkMap ↔ BookingFy — Contrato de Embed
+# Zailom Flow ↔ BookingFy — Contrato de Embed
 
-Este documento descreve como o **BookingFy** embute o **TalkMap** dentro de
+Este documento descreve como o **BookingFy** embute o **Zailom Flow** dentro de
 sua interface, de forma que os dois sistemas continuem sendo produtos
 independentes mas trabalhem juntos quando o cliente possui ambos.
 
@@ -10,10 +10,10 @@ independentes mas trabalhem juntos quando o cliente possui ambos.
 
 | Modo | Quando | Quem hospeda | Quem controla auth/billing |
 |---|---|---|---|
-| **Standalone** | Cliente comprou só o TalkMap | `app.talkmap.com.br` | TalkMap |
-| **Embedded** | Cliente comprou BookingFy (TalkMap vem junto) | `bookingfy.com.br` via `<iframe>` | BookingFy |
+| **Standalone** | Cliente comprou só o Zailom Flow | `app.talkmap.com.br` | Zailom Flow |
+| **Embedded** | Cliente comprou BookingFy (Zailom Flow vem junto) | `bookingfy.com.br` via `<iframe>` | BookingFy |
 
-No modo embedded, algumas seções do TalkMap são escondidas porque o BookingFy
+No modo embedded, algumas seções do Zailom Flow são escondidas porque o BookingFy
 já oferece equivalente: pagamentos, perfil do usuário, dados da empresa,
 gestão de plano e o card de "integração com BookingFy" (não faz sentido
 integrar com quem já é o host).
@@ -39,11 +39,11 @@ para `app.talkmap.com.br/embed`.
 
 ```
 ┌──────────────┐                       ┌────────────────┐
-│  BookingFy   │                       │    TalkMap     │
+│  BookingFy   │                       │    Zailom Flow     │
 │  (parent)    │                       │   (iframe)     │
 └──────┬───────┘                       └────────┬───────┘
        │                                        │
-       │  1. Usuário clica "Chatbot → TalkMap"  │
+       │  1. Usuário clica "Chatbot → Zailom Flow"  │
        │                                        │
        │  2. Gera JWT HS256 (5min, claims abaixo)
        │                                        │
@@ -69,7 +69,7 @@ para `app.talkmap.com.br/embed`.
 
 - Hash não é enviado ao servidor (não aparece em access logs)
 - Não é enviado em headers `Referer` quando o iframe faz outra requisição
-- TalkMap limpa o hash via `history.replaceState` logo após ler
+- Zailom Flow limpa o hash via `history.replaceState` logo após ler
 
 ---
 
@@ -80,7 +80,7 @@ para `app.talkmap.com.br/embed`.
 
 A chave fica:
 - No BookingFy: variável de ambiente do container
-- No TalkMap: variável de ambiente do container `talkmap-builder`
+- No Zailom Flow: variável de ambiente do container `talkmap-builder`
 
 Rotação: alterar a chave nos dois containers e fazer redeploy. Considerar
 janela de aceitação dual durante a rotação se houver sessões ativas.
@@ -121,10 +121,10 @@ janela de aceitação dual durante a rotação se houver sessões ativas.
 
 ---
 
-## 5. Validação no servidor (TalkMap)
+## 5. Validação no servidor (Zailom Flow)
 
 A validação real (assinatura, expiração, audience) **deve** acontecer numa
-server function do TalkMap, não no client. O `EmbedContext` no front só lê
+server function do Zailom Flow, não no client. O `EmbedContext` no front só lê
 claims pra UI condicional — nunca confia neles pra decisões de segurança.
 
 ```ts
@@ -138,7 +138,7 @@ const claims = jwt.verify(token, process.env.EMBED_SHARED_SECRET, {
 });
 ```
 
-Após validar, o TalkMap troca o JWT por uma sessão própria (cookie httpOnly,
+Após validar, o Zailom Flow troca o JWT por uma sessão própria (cookie httpOnly,
 duração ~1h) pra evitar revalidar o JWT em todo request.
 
 ---
@@ -146,7 +146,7 @@ duração ~1h) pra evitar revalidar o JWT em todo request.
 ## 6. PostMessage API
 
 ### Origins permitidas
-TalkMap só aceita mensagens das origens listadas em `EmbedContext.tsx`:
+Zailom Flow só aceita mensagens das origens listadas em `EmbedContext.tsx`:
 - `https://bookingfy.com.br`
 - `https://www.bookingfy.com.br`
 - `http://localhost:*` (dev)
@@ -155,11 +155,11 @@ TalkMap só aceita mensagens das origens listadas em `EmbedContext.tsx`:
 
 | Direção | `type` | Payload | Quando |
 |---|---|---|---|
-| TalkMap → Parent | `talkmap:embed:ready` | — | Iframe carregou, pronto pra receber token |
-| Parent → TalkMap | `talkmap:embed:init` | `{ token: string }` | Injeta/atualiza JWT |
-| Parent → TalkMap | `talkmap:embed:logout` | — | Força sair do modo embed |
-| TalkMap → Parent | `talkmap:embed:resize` | `{ height: number }` | (futuro) ajustar altura do iframe |
-| TalkMap → Parent | `talkmap:embed:navigate` | `{ path: string }` | (futuro) avisar mudança de rota |
+| Zailom Flow → Parent | `talkmap:embed:ready` | — | Iframe carregou, pronto pra receber token |
+| Parent → Zailom Flow | `talkmap:embed:init` | `{ token: string }` | Injeta/atualiza JWT |
+| Parent → Zailom Flow | `talkmap:embed:logout` | — | Força sair do modo embed |
+| Zailom Flow → Parent | `talkmap:embed:resize` | `{ height: number }` | (futuro) ajustar altura do iframe |
+| Zailom Flow → Parent | `talkmap:embed:navigate` | `{ path: string }` | (futuro) avisar mudança de rota |
 
 ---
 
@@ -195,7 +195,7 @@ liberar algo específico (ex: mostrar banner de limites mesmo em embed).
 
 ---
 
-## 9. Flow-Appoint (host adicional)
+## 9. Zailom Booking (host adicional)
 
 Mesma arquitetura do BookingFy, com claims diferentes:
 

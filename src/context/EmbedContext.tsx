@@ -9,19 +9,19 @@ import {
 } from "react";
 
 /**
- * Modos de operação do TalkMap / builder-flow-api:
+ * Modos de operação do Zailom Flow / builder-flow-api:
  * - "standalone": app rodando sozinho — usuário usa via login normal.
- * - "embedded":   app rodando dentro de iframe de um host (BookingFy ou Flow-Appoint).
+ * - "embedded":   app rodando dentro de iframe de um host (BookingFy ou Zailom Booking).
  *                 Identidade vem do host via JWT.
  */
 export type EmbedMode = "standalone" | "embedded";
 
-export type EmbedHost = "bookingfy" | "flow-appoint" | null;
+export type EmbedHost = "bookingfy" | "booking" | null;
 
 /**
  * Sessão derivada do JWT do host.
  * Os campos variam por host: BookingFy usa tenantId/userId/slug,
- * Flow-Appoint usa companyId/workspaceSlug/userEmail.
+ * Zailom Booking usa companyId/workspaceSlug/userEmail.
  * Mantemos um shape unificado pra facilitar o consumo na UI.
  */
 export type EmbedSession = {
@@ -30,7 +30,7 @@ export type EmbedSession = {
 	companyId: string;
 	// Slug do workspace que esse embed está autorizado a ver/editar
 	workspaceSlug: string;
-	// Email do usuário (Flow-Appoint) ou ID (BookingFy)
+	// Email do usuário (Zailom Booking) ou ID (BookingFy)
 	userIdentifier: string;
 	plan?: "starter" | "pro" | "business";
 	expiresAt?: number; // unix seconds
@@ -116,10 +116,10 @@ function buildSession(
 		return { session: null, error: "Sessão expirada." };
 	}
 
-	if (host === "flow-appoint") {
-		// Esperado: { iss: "flow-appoint", aud: "builder-flow-api",
+	if (host === "booking") {
+		// Esperado: { iss: "zailom-booking", aud: "zailom-flow-api",
 		//           company_id, workspace_slug, user_email, exp }
-		if (payload.iss !== "flow-appoint" || payload.aud !== "builder-flow-api") {
+		if (payload.iss !== "zailom-booking" || payload.aud !== "zailom-flow-api") {
 			return { session: null, error: "Token com issuer/audience inválido." };
 		}
 		if (!payload.company_id || !payload.workspace_slug || !payload.user_email) {
@@ -182,8 +182,8 @@ function detectInitialMode(): {
 		const host: EmbedHost =
 			hostParam === "bookingfy"
 				? "bookingfy"
-				: hostParam === "flow-appoint" || (token && !hostParam)
-					? "flow-appoint"
+				: hostParam === "booking" || (token && !hostParam)
+					? "booking"
 					: null;
 
 		if (token && host) {
@@ -242,9 +242,9 @@ export function EmbedProvider({ children }: { children: React.ReactNode }) {
 			if (data.type === "talkmap:embed:init" && data.token) {
 				// Tenta detectar o host pela origem
 				const inferredHost: Exclude<EmbedHost, null> = event.origin.includes(
-					"flow-appoint"
+					"booking"
 				)
-					? "flow-appoint"
+					? "booking"
 					: "bookingfy";
 				const { session: newSession, error: newError } = buildSession(
 					inferredHost,

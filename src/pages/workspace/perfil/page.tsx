@@ -55,10 +55,10 @@ export default function UserProfile() {
 	const userMeta = (user?.user_metadata ?? {}) as Record<string, any>;
 	// Fonte única de verdade do plano efetivo do workspace.
 	const resolvedPlan = useMemo(() => resolveEffectivePlan(profile), [profile]);
-	const isFlowAppointManaged =
-		resolvedPlan.managedBy === "flow-appoint" ||
-		(mode === "embedded" && host === "flow-appoint") ||
-		userMeta.source === "flow-appoint";
+	const isBookingManaged =
+		resolvedPlan.managedBy === "booking" ||
+		(mode === "embedded" && host === "booking") ||
+		userMeta.source === "booking";
 	const planLabel =
 		RESOLVER_LABELS[resolvedPlan.tier] ??
 		(mode === "embedded" && session?.plan
@@ -338,9 +338,9 @@ export default function UserProfile() {
 									>
 										<span className="text-gray-700">Plano {planLabel}</span>
 									</div>
-									{isFlowAppointManaged && (
+									{isBookingManaged && (
 										<span className="text-[11px] text-gray-500">
-											Gerenciado pelo Flow-Appoint
+											Gerenciado pelo Zailom Booking
 											{resolvedPlan.syncedAt
 												? ` · sync ${new Date(resolvedPlan.syncedAt).toLocaleString("pt-BR")}`
 												: ""}
@@ -348,7 +348,7 @@ export default function UserProfile() {
 									)}
 									{resolvedPlan.isSuspended && (
 										<span className="text-[11px] text-red-600">
-											Workspace suspenso pelo Flow-Appoint
+											Workspace suspenso pelo Zailom Booking
 										</span>
 									)}
 								</div>
