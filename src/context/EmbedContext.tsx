@@ -116,10 +116,10 @@ function buildSession(
 		return { session: null, error: "Sessão expirada." };
 	}
 
-	if (host === "flow-appoint") {
-		// Esperado: { iss: "flow-appoint", aud: "builder-flow-api",
+	if (host === "booking") {
+		// Esperado: { iss: "zailom-booking", aud: "zailom-flow-api",
 		//           company_id, workspace_slug, user_email, exp }
-		if (payload.iss !== "flow-appoint" || payload.aud !== "builder-flow-api") {
+		if (payload.iss !== "zailom-booking" || payload.aud !== "zailom-flow-api") {
 			return { session: null, error: "Token com issuer/audience inválido." };
 		}
 		if (!payload.company_id || !payload.workspace_slug || !payload.user_email) {

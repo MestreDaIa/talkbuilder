@@ -40,11 +40,14 @@ export type ProfileForPlan = {
   embed_source?: string | null;
   embed_plan_tier?: string | null;
   embed_plan_synced_at?: string | null;
+  embed_max_chatbots?: number | null;
+  embed_max_messages?: number | null;
+  embed_max_integrations?: number | null;
 };
 
 export type ResolvedPlan = {
   tier: EffectiveTier;
-  managedBy: "flow-appoint" | "internal";
+  managedBy: "booking" | "internal";
   syncedAt: string | null;
   limits: PlanLimits;
   isSuspended: boolean;
@@ -58,13 +61,23 @@ function asEffectiveTier(value: string | null | undefined, fallback: EffectiveTi
 }
 
 export function resolveEffectivePlan(profile: ProfileForPlan | null | undefined): ResolvedPlan {
-  if (profile?.embed_source === "flow-appoint") {
+  if (profile?.embed_source === "booking") {
     const tier = asEffectiveTier(profile.embed_plan_tier, "starter");
+    
+    // Para usuários embedados, os limites provisionados são a fonte oficial da verdade.
+    // Se não existirem, usamos os limites padrão do tier.
+    const limits: PlanLimits = {
+      bots: profile.embed_max_chatbots ?? PLAN_LIMITS[tier].bots,
+      messagesPerMonth: profile.embed_max_messages ?? PLAN_LIMITS[tier].messagesPerMonth,
+      integrations: profile.embed_max_integrations ?? PLAN_LIMITS[tier].integrations,
+      suspended: tier === "suspended"
+    };
+
     return {
       tier,
-      managedBy: "flow-appoint",
+      managedBy: "booking",
       syncedAt: profile.embed_plan_synced_at ?? null,
-      limits: PLAN_LIMITS[tier],
+      limits,
       isSuspended: tier === "suspended",
     };
   }
