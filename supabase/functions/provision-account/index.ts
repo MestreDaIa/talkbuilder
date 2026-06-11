@@ -146,13 +146,23 @@ Deno.serve(async (req) => {
 
   if (profileError) console.error("Erro ao atualizar profile:", profileError);
 
-  // 3. Gerar API Key (Usando a função SQL já existente)
+  // 3. Obter o workspace_id (Trigger handle_new_user já criou o workspace e o vínculo)
+  const { data: membership, error: memberError } = await admin
+    .from("workspace_members")
+    .select("workspace_id")
+    .eq("user_id", userId)
+    .single();
+
+  if (memberError || !membership) {
+    console.error("Erro ao localizar workspace para o usuário:", memberError);
+    return json(500, { ok: false, error: "Workspace não encontrado para o usuário" }, origin);
+  }
+
+  const workspaceId = membership.workspace_id;
+
+  // 4. Gerar API Key (Usando a função SQL já existente)
   const { data: apiKeyRaw, error: rpcError } = await admin.rpc('generate_api_key');
   if (rpcError) return json(500, { ok: false, error: "Erro ao gerar chave de API" }, origin);
-
-  // Como não temos tabela de workspaces (apenas profiles.slug), usamos o userId como workspace_id temporário
-  // ou o UUID do profile. O sistema atual parece usar currentWorkspace.id, que no useAuth é carregado de profiles.id se workspaces falhar.
-  const workspaceId = userId; 
 
   const { error: keyInsertError } = await admin
     .from("api_keys")
@@ -164,7 +174,13 @@ Deno.serve(async (req) => {
       is_active: true
     });
 
-  if (keyInsertError) console.error("Erro ao salvar API Key:", keyInsertError);
+  if (keyInsertError) {
+    console.error("Erro ao salvar API Key:", keyInsertError);
+    // Se falhar aqui, o erro de "user_id" pode estar acontecendo se a tabela estiver desatualizada
+    if (keyInsertError.message.includes("user_id")) {
+      return json(500, { ok: false, error: "Tabela api_keys desatualizada no banco externo. Execute as migrações SQL." }, origin);
+    }
+  }
 
   return json(200, {
     success: true,
