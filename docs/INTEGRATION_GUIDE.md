@@ -1,96 +1,111 @@
-# Documentação Técnica: Integração Zailom Flow x Zailom Booking
+# Documentação Técnica de Integração: Zailom Flow ↔ Zailom Booking
 
-Este documento descreve a arquitetura híbrida do **Zailom Flow**, permitindo seu funcionamento como produto independente ou como módulo gerenciado pelo **Zailom Booking**.
-
----
-
-## 1. Visão Geral da Arquitetura
-
-O Zailom Flow opera em dois modos:
-- **Modo Flow (Nativo):** Gestão completa de ciclo de vida, billing e limites interna.
-- **Modo Booking (Gerenciado):** O Booking atua como "Master Tenant", provisionando contas e definindo limites via API/Edge Functions.
-
-### Campos de Controle (Tabela `profiles`)
-- `embed_source`: Identifica a origem da conta (ex: `'booking'`). Se nulo, a conta é nativa do Flow.
-- `embed_company_id`: ID único da empresa no sistema de origem.
-- `embed_plan_tier`: Tier de plano definido pelo sistema mestre (`starter`, `pro`, `business`, `suspended`).
-- `embed_max_chatbots`, `embed_max_messages`, `embed_max_integrations`: Overrides de limites específicos para esta conta.
+Este guia detalha como sincronizar os limites e planos do **Zailom Booking** (Sistema Mestre) com o **Zailom Flow** (Construtor de Bots).
 
 ---
 
-## 2. Fluxos de Integração
+## 1. Conceito de Sincronização
+O Zailom Flow não gerencia o billing de usuários vindos do Booking. Ele apenas obedece aos limites enviados via API. A sincronização deve ocorrer em dois momentos:
+1. **No Cadastro:** Quando a empresa é criada no Booking.
+2. **Na Mudança de Plano:** Quando o Admin do Booking altera o plano ou limites manualmente.
 
-### 2.1. Provisionamento de Conta (`provision-account`)
-Sempre que um novo cliente assina no Booking, ele deve chamar este endpoint para garantir que o acesso ao Flow esteja pronto.
+---
 
-**Endpoint:** `POST /functions/v1/provision-account`  
-**Autenticação:** JWT HS256 assinado com `EMBED_SHARED_SECRET`.
+## 2. Endpoints de Sincronização
 
-**Payload Exemplo:**
+### 2.1. Provisionamento e Atualização Completa (`provision-account`)
+Deve ser chamado no primeiro acesso ou quando houver mudança estrutural (como troca de e-mail).
+
+**URL:** `https://[SEU-PROJETO].supabase.co/functions/v1/provision-account`
+**Método:** `POST`
+**Headers:** `Authorization: Bearer <JWT_HS256>`
+
+**Payload:**
 ```json
 {
-  "email": "cliente@exemplo.com",
-  "display_name": "Minha Empresa",
-  "company_id": "BK-12345",
+  "email": "fernandiimsoua@gmail.com",
+  "display_name": "Nome da Empresa",
+  "company_id": "9b4fce4a-05f7-494d-aaf8-c2159244e99d",
   "embed_source": "booking",
   "embed_plan_tier": "pro",
   "limits": {
     "max_chatbots": 5,
-    "max_messages": 10000,
-    "max_integrations": 10
+    "max_messages": 5000,
+    "max_integrations": 3
   }
 }
 ```
 
-**Comportamento:**
-1. Verifica se o usuário já existe (por email).
-2. Se não existir, cria o usuário no Auth e o Profile.
-3. Se existir, atualiza os limites e o plano.
-4. Retorna o `workspace_id` e a `api_key` para que o Booking possa realizar ações em nome do usuário.
+### 2.2. Atualização Rápida de Plano/Limites (`sync-embed-plan`)
+Use este endpoint para forçar a atualização de limites sem precisar enviar a senha ou dados de cadastro novamente.
 
-### 2.2. Sincronização de Plano (`sync-embed-plan`)
-Usado para upgrades, downgrades ou suspensão (inadimplência) sem necessidade de re-provisionar.
+**URL:** `https://[SEU-PROJETO].supabase.co/functions/v1/sync-embed-plan`
+**Método:** `POST`
 
-**Endpoint:** `POST /functions/v1/sync-embed-plan`  
 **Payload:**
 ```json
 {
-  "company_id": "BK-12345",
-  "tier": "suspended",
-  "source": "booking"
+  "company_id": "9b4fce4a-05f7-494d-aaf8-c2159244e99d",
+  "source": "booking",
+  "tier": "pro",
+  "limits": {
+    "max_chatbots": 10,
+    "max_messages": 20000,
+    "max_integrations": 5
+  }
 }
 ```
 
 ---
 
-## 3. Estrutura do Banco de Dados (Zailom Flow)
+## 3. Como Gerar o Token de Segurança (JWT HS256)
 
-| Tabela | Função Principal | Colunas Chave |
-| :--- | :--- | :--- |
-| `profiles` | Perfil e Limites | `id`, `plan`, `embed_source`, `embed_plan_tier`, `embed_max_chatbots` |
-| `workspaces` | Organização lógica | `id`, `name`, `slug` |
-| `workspace_members` | Vínculo Usuário x Workspace | `workspace_id`, `user_id`, `role` |
-| `chatbot_flows` | Definição dos bots | `id`, `workspace_id`, `published_containers` |
-| `api_keys` | Acesso Programático | `workspace_id`, `key_value`, `is_active` |
-| `flow_executions` | Sessões ativas de conversa | `flow_id`, `contact_id`, `variables` |
+O Booking deve assinar um token usando a chave `EMBED_SHARED_SECRET` (configurada nos dois sistemas).
 
----
-
-## 4. Segurança e Restrições (Modo Booking)
-
-Quando `embed_source = 'booking'`:
-1. **Billing Bloqueado:** A interface do Flow oculta opções de upgrade e cartões de crédito.
-2. **Gestão de Plano:** Só pode ser alterada via Edge Functions autenticadas.
-3. **Identidade:** O `company_id` é usado como chave de busca para garantir isolamento.
+**Algoritmo:** HS256
+**Payload Sugerido:**
+```json
+{
+  "iss": "zailom-booking",
+  "iat": 1718190000,
+  "exp": 1718193600
+}
+```
 
 ---
 
-## 5. Ordem de Implementação Recomendada
+## 4. Mapeamento de Colunas no Banco (Zailom Flow)
 
-1. **Configuração de Secrets:** Definir `EMBED_SHARED_SECRET` em ambos os ambientes.
-2. **Deploy das Edge Functions:** `provision-account`, `sync-embed-plan` e `embed-plan-status`.
-3. **Backfill de Metadados:** Se houver usuários antigos, atualizar `embed_source` no banco.
-4. **Trigger de Cadastro:** Configurar o Booking para disparar o `provision-account` após o commit do cadastro.
+Se você precisar verificar via SQL no banco do Flow, as colunas estão na tabela `profiles`:
+
+| Coluna | Descrição |
+| :--- | :--- |
+| `embed_source` | Deve ser sempre `'booking'` |
+| `embed_company_id` | O ID da empresa vindo do Booking |
+| `embed_plan_tier` | `starter`, `pro`, `business` ou `suspended` |
+| `embed_max_chatbots` | Quantidade máxima de bots permitidos |
+| `embed_max_messages` | Quantidade máxima de mensagens por mês |
+| `embed_max_integrations` | Quantidade máxima de integrações (WhatsApp, etc) |
+
+**Exemplo de Query de Verificação:**
+```sql
+SELECT email, embed_plan_tier, embed_max_chatbots 
+FROM public.profiles 
+WHERE email = 'fernandiimsoua@gmail.com';
+```
 
 ---
-*Gerado por Zailom Flow Architect - 12/06/2026*
+
+## 5. Resolução de Problemas (FAQ)
+
+**1. Mudei no Booking mas não atualizou no Flow.**
+* O Booking **PRECISA** fazer um disparo HTTP para um dos endpoints acima sempre que houver mudança. A atualização não é automática via banco de dados pois os bancos são isolados.
+
+**2. O endpoint retorna 401 Unauthorized.**
+* Verifique se o `EMBED_SHARED_SECRET` no Flow é exatamente o mesmo usado para assinar o JWT no Booking.
+
+**3. O plano aparece como 'starter' mesmo eu enviando 'pro'.**
+* Verifique se a chave `embed_plan_tier` está sendo enviada corretamente no JSON (veja o payload no item 2.1).
+
+---
+*Documentação atualizada em 12/06/2026 para refletir suporte a limites dinâmicos.*

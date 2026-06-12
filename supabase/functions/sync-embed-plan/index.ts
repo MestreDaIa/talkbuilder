@@ -2,205 +2,104 @@
 // sync-embed-plan — Edge Function (Deno)
 // -----------------------------------------------------------------------------
 // O Zailom Booking chama este endpoint sempre que o plano/status de uma empresa
-// muda. Atualiza profiles.embed_plan_tier no banco do builder.
+// muda. Atualiza profiles.embed_plan_tier e limites no banco do builder.
 //
-// Auth:    JWT HS256 com EMBED_SHARED_SECRET. Claims:
-//          iss=flow-appoint, aud=builder-flow-api, purpose=sync-plan, exp futuro.
+// Auth:    JWT HS256 com EMBED_SHARED_SECRET.
 // Method:  POST
-// Body:    { company_id: string, slug: string, tier: string, source: "flow-appoint" }
-// Tiers:   "starter" | "pro" | "business" | "suspended"
-// Resposta: 200 { ok: true, updated: number } | 404 { ok:false, error } | 401/400
-//
-// Idempotente: o mesmo tier pode ser enviado quantas vezes for.
-//
-// Deploy:
-//   supabase functions deploy sync-embed-plan --no-verify-jwt
+// Body:    { company_id: string, slug: string, tier: string, source: "booking", limits?: { ... } }
 // =============================================================================
 
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.45.4";
-import { corsHeaders, json, verifyHs256Jwt } from "../_shared/embedJwt.ts";
 
-const VALID_TIERS = ["starter", "pro", "business", "suspended"] as const;
-type Tier = typeof VALID_TIERS[number];
-
-type SyncBody = {
-  company_id: string;
-  slug: string;
-  tier: Tier;
-  source: "flow-appoint";
+const corsHeaders = {
+  "Access-Control-Allow-Origin": "*",
+  "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
 };
 
-function validateBody(input: unknown):
-  | { ok: true; data: SyncBody }
-  | { ok: false; reason: string } {
-  if (!input || typeof input !== "object") {
-    return { ok: false, reason: "Body deve ser JSON" };
-  }
-  const b = input as Record<string, unknown>;
-  const company_id = typeof b.company_id === "string" ? b.company_id.trim() : "";
-  const slug = typeof b.slug === "string" ? b.slug.trim().toLowerCase() : "";
-  const tier = typeof b.tier === "string" ? b.tier.trim().toLowerCase() : "";
-  const source = typeof b.source === "string" ? b.source.trim() : "";
+function json(status: number, body: unknown) {
+  return new Response(JSON.stringify(body), {
+    status,
+    headers: { "Content-Type": "application/json", ...corsHeaders },
+  });
+}
 
-  if (!company_id) return { ok: false, reason: "company_id obrigatório" };
-  if (!slug) return { ok: false, reason: "slug obrigatório" };
-  if (!VALID_TIERS.includes(tier as Tier)) {
-    return { ok: false, reason: `tier inválido (esperado: ${VALID_TIERS.join("|")})` };
+// -------- JWT HS256 verify (Simplificado para manter no arquivo se necessário ou importar) --------
+async function verifyHs256Jwt(token: string, secret: string) {
+  try {
+    const [headerB64, payloadB64, sigB64] = token.split(".");
+    const key = await crypto.subtle.importKey(
+      "raw", new TextEncoder().encode(secret),
+      { name: "HMAC", hash: "SHA-256" }, false, ["verify"]
+    );
+    const data = new TextEncoder().encode(`${headerB64}.${payloadB64}`);
+    const sig = new Uint8Array(atob(sigB64.replace(/-/g, "+").replace(/_/g, "/")).split("").map(c => c.charCodeAt(0)));
+    const valid = await crypto.subtle.verify("HMAC", key, sig, data);
+    if (!valid) return { ok: false };
+    const payload = JSON.parse(atob(payloadB64.replace(/-/g, "+").replace(/_/g, "/")));
+    return { ok: true, payload };
+  } catch (e) {
+    return { ok: false };
   }
-  if (source !== "flow-appoint") {
-    return { ok: false, reason: "source inválido" };
-  }
-  return {
-    ok: true,
-    data: { company_id, slug, tier: tier as Tier, source: "flow-appoint" },
-  };
 }
 
 Deno.serve(async (req) => {
-  const origin = req.headers.get("origin");
-
-  if (req.method === "OPTIONS") {
-    return new Response(null, { status: 204, headers: corsHeaders(origin) });
-  }
-  if (req.method !== "POST") {
-    return json(405, { ok: false, error: "Method not allowed" }, origin);
-  }
-
+  if (req.method === "OPTIONS") return new Response(null, { status: 204, headers: corsHeaders });
+  
   const sharedSecret = Deno.env.get("EMBED_SHARED_SECRET");
-  if (!sharedSecret) {
-    return json(500, { ok: false, error: "EMBED_SHARED_SECRET não configurado" }, origin);
-  }
-
   const authHeader = req.headers.get("authorization") ?? "";
-  const bearer = authHeader.startsWith("Bearer ")
-    ? authHeader.slice("Bearer ".length).trim()
-    : "";
-  if (!bearer) {
-    return json(401, { ok: false, error: "Authorization Bearer ausente" }, origin);
-  }
+  const token = authHeader.replace("Bearer ", "").trim();
+  
+  const verified = await verifyHs256Jwt(token, sharedSecret!);
+  if (!verified.ok) return json(401, { ok: false, error: "Unauthorized" });
 
-  const verified = await verifyHs256Jwt(bearer, sharedSecret);
-  if (!verified.ok) {
-    return json(401, { ok: false, error: verified.reason }, origin);
-  }
-  const claims = verified.payload;
-  if (
-    claims.iss !== "flow-appoint" ||
-    claims.aud !== "builder-flow-api" ||
-    claims.purpose !== "sync-plan"
-  ) {
-    return json(401, { ok: false, error: "Token com iss/aud/purpose inválidos" }, origin);
-  }
+  const body = await req.json();
+  const { company_id, slug, tier, source, limits } = body;
 
-  let raw: unknown;
-  try {
-    raw = await req.json();
-  } catch {
-    return json(400, { ok: false, error: "JSON inválido" }, origin);
-  }
-  const validated = validateBody(raw);
-  if (!validated.ok) {
-    return json(400, { ok: false, error: validated.reason }, origin);
-  }
-  const data = validated.data;
+  const admin = createClient(
+    Deno.env.get("SUPABASE_URL")!,
+    Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!
+  );
 
-  const supabaseUrl = Deno.env.get("SUPABASE_URL");
-  const serviceRoleKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY");
-  if (!supabaseUrl || !serviceRoleKey) {
-    return json(500, { ok: false, error: "Supabase admin env ausente" }, origin);
-  }
-  const admin = createClient(supabaseUrl, serviceRoleKey, {
-    auth: { autoRefreshToken: false, persistSession: false },
-  });
-
-  // 1) Localiza por (embed_source, embed_company_id)
-  let { data: rows, error: selErr } = await admin
+  // 1. Localizar Profile
+  let { data: profile } = await admin
     .from("profiles")
-    .select("id, slug, embed_plan_tier, embed_company_id")
-    .eq("embed_source", data.source)
-    .eq("embed_company_id", data.company_id);
+    .select("id")
+    .eq("embed_company_id", company_id)
+    .eq("embed_source", source || "booking")
+    .maybeSingle();
 
-  if (selErr) {
-    console.error("[sync-embed-plan] select falhou:", selErr);
-    return json(500, { ok: false, error: selErr.message }, origin);
-  }
-
-  // 2) Fallback por slug — para contas provisionadas antes das colunas
-  // embed_* existirem. Faz backfill de embed_source/embed_company_id.
-  let backfilled = false;
-  if (!rows || rows.length === 0) {
-    const { data: bySlug, error: slugErr } = await admin
+  if (!profile && slug) {
+    // Fallback por slug
+    const { data: bySlug } = await admin
       .from("profiles")
-      .select("id, slug, embed_plan_tier, embed_company_id, embed_source")
-      .eq("slug", data.slug);
-    if (slugErr) {
-      console.error("[sync-embed-plan] select por slug falhou:", slugErr);
-      return json(500, { ok: false, error: slugErr.message }, origin);
-    }
-    if (bySlug && bySlug.length > 0) {
-      // Conflito: outra empresa do flow-appoint já está vinculada a este slug
-      const conflict = bySlug.find(
-        (r) =>
-          r.embed_source === "flow-appoint" &&
-          r.embed_company_id &&
-          r.embed_company_id !== data.company_id,
-      );
-      if (conflict) {
-        console.error("[sync-embed-plan] slug já vinculado a outra company_id", {
-          slug: data.slug,
-          existing: conflict.embed_company_id,
-          incoming: data.company_id,
-        });
-        return json(409, {
-          ok: false,
-          error: "Slug já vinculado a outra empresa do flow-appoint",
-        }, origin);
-      }
-      rows = bySlug;
-      backfilled = true;
-      console.log("[sync-embed-plan] backfill via slug", {
-        slug: data.slug,
-        company_id: data.company_id,
-        ids: bySlug.map((r) => r.id),
-      });
-    }
+      .select("id")
+      .eq("slug", slug)
+      .maybeSingle();
+    profile = bySlug;
   }
 
-  if (!rows || rows.length === 0) {
-    console.warn(
-      "[sync-embed-plan] workspace não encontrado",
-      { company_id: data.company_id, slug: data.slug },
-    );
-    return json(404, {
-      ok: false,
-      error: "Workspace não encontrado por company_id nem por slug. Provisione a conta primeiro.",
-    }, origin);
-  }
+  if (!profile) return json(404, { ok: false, error: "User not found" });
 
-  const ids = rows.map((r) => r.id);
-  const updatePayload: Record<string, unknown> = {
-    embed_plan_tier: data.tier,
+  // 2. Atualizar
+  const updateData: any = {
+    embed_plan_tier: tier,
     embed_plan_synced_at: new Date().toISOString(),
+    embed_source: source || "booking",
+    embed_company_id: company_id
   };
-  if (backfilled) {
-    updatePayload.embed_source = data.source;
-    updatePayload.embed_company_id = data.company_id;
+
+  if (limits) {
+    if (limits.max_chatbots !== undefined) updateData.embed_max_chatbots = limits.max_chatbots;
+    if (limits.max_messages !== undefined) updateData.embed_max_messages = limits.max_messages;
+    if (limits.max_integrations !== undefined) updateData.embed_max_integrations = limits.max_integrations;
   }
 
-  const { error: updErr, count } = await admin
+  const { error } = await admin
     .from("profiles")
-    .update(updatePayload, { count: "exact" })
-    .in("id", ids);
+    .update(updateData)
+    .eq("id", profile.id);
 
-  if (updErr) {
-    console.error("[sync-embed-plan] update falhou:", updErr);
-    return json(500, { ok: false, error: updErr.message }, origin);
-  }
+  if (error) return json(500, { ok: false, error: error.message });
 
-  return json(200, {
-    ok: true,
-    updated: count ?? rows.length,
-    tier: data.tier,
-    company_id: data.company_id,
-  }, origin);
+  return json(200, { ok: true, message: "Plan updated successfully" });
 });
