@@ -108,32 +108,58 @@ Deno.serve(async (req) => {
 
   const { email, password, slug, display_name, company_id, embed_source, embed_plan_tier, limits } = body;
 
-  // 1. Criar ou obter usuário
+  // 1. Criar ou obter usuário (Lógica de Upsert)
   let userId;
-  const { data: newUser, error: createError } = await admin.auth.admin.createUser({
-    email,
-    password,
-    email_confirm: true,
-    user_metadata: { full_name: display_name, slug }
-  });
+  
+  // Primeiro tentamos ver se já existe um perfil com esse e-mail (mais rápido)
+  const { data: existingProfile } = await admin
+    .from("profiles")
+    .select("id")
+    .eq("email", email)
+    .maybeSingle();
 
-  if (createError) {
-    if (createError.message.includes("already registered") || createError.message.includes("already exists")) {
-      const { data: users } = await admin.auth.admin.listUsers();
-      const existingUser = users.users.find(u => u.email === email);
-      if (!existingUser) return json(500, { ok: false, error: "Erro ao localizar usuário existente" }, origin);
-      userId = existingUser.id;
-    } else {
-      return json(500, { ok: false, error: createError.message }, origin);
-    }
+  if (existingProfile) {
+    console.log(`Usuário encontrado no profiles: ${email} (${existingProfile.id})`);
+    userId = existingProfile.id;
   } else {
-    userId = newUser.user.id;
+    // Tenta criar o usuário no Auth
+    const { data: newUser, error: createError } = await admin.auth.admin.createUser({
+      email,
+      password,
+      email_confirm: true,
+      user_metadata: { full_name: display_name, slug }
+    });
+
+    if (createError) {
+      if (createError.message.includes("already registered") || createError.message.includes("already exists")) {
+        console.log(`Usuário já registrado no Auth, buscando ID: ${email}`);
+        // Se já existe no Auth mas não no profiles, buscamos no Auth
+        const { data: usersData } = await admin.auth.admin.listUsers();
+        const existingUser = usersData?.users?.find(u => u.email === email);
+        
+        if (!existingUser) {
+          return json(500, { ok: false, error: "Usuário reportado como existente, mas não localizado no Auth." }, origin);
+        }
+        userId = existingUser.id;
+      } else {
+        console.error("Erro ao criar usuário:", createError);
+        return json(500, { ok: false, error: createError.message }, origin);
+      }
+    } else {
+      console.log(`Novo usuário criado: ${email} (${newUser.user.id})`);
+      userId = newUser.user.id;
+    }
   }
 
-  // 2. Atualizar Profile (Trigger handle_new_user já deve ter criado a base)
+  // 2. Atualizar Profile (Garantir que limites e dados de embed estejam sincronizados)
+  // Nota: A trigger handle_new_user cria o profile básico, aqui complementamos/atualizamos
   const { error: profileError } = await admin
     .from("profiles")
-    .update({
+    .upsert({
+      id: userId,
+      email: email, // Garantir que o email esteja no profiles para futuras buscas
+      display_name: display_name || undefined,
+      slug: slug || undefined,
       embed_source: embed_source || "booking",
       embed_company_id: company_id,
       embed_plan_tier: embed_plan_tier || "starter",
@@ -141,44 +167,93 @@ Deno.serve(async (req) => {
       embed_max_chatbots: limits?.max_chatbots,
       embed_max_messages: limits?.max_messages,
       embed_max_integrations: limits?.max_integrations,
-    })
-    .eq("id", userId);
+    });
 
-  if (profileError) console.error("Erro ao atualizar profile:", profileError);
+  if (profileError) {
+    console.error("Erro ao atualizar profile:", profileError);
+    // Não paramos aqui pois o usuário/workspace já existem, mas é um sinal de alerta
+  }
 
-  // 3. Obter o workspace_id (Trigger handle_new_user já criou o workspace e o vínculo)
+  // 3. Obter o workspace_id (Trigger handle_new_user já deve ter criado o workspace)
   const { data: membership, error: memberError } = await admin
     .from("workspace_members")
     .select("workspace_id")
     .eq("user_id", userId)
-    .single();
+    .maybeSingle();
 
-  if (memberError || !membership) {
-    console.error("Erro ao localizar workspace para o usuário:", memberError);
-    return json(500, { ok: false, error: "Workspace não encontrado para o usuário" }, origin);
+  if (memberError) {
+    console.error("Erro ao buscar workspace_members:", memberError);
+    return json(500, { ok: false, error: "Erro ao localizar workspace" }, origin);
   }
 
-  const workspaceId = membership.workspace_id;
-
-  // 4. Gerar API Key (Usando a função SQL já existente)
-  const { data: apiKeyRaw, error: rpcError } = await admin.rpc('generate_api_key');
-  if (rpcError) return json(500, { ok: false, error: "Erro ao gerar chave de API" }, origin);
-
-  const { error: keyInsertError } = await admin
-    .from("api_keys")
-    .insert({
-      name: "Zailom Booking Auto-Provisioned",
+  let workspaceId;
+  
+  if (!membership) {
+    console.log(`Workspace não encontrado para ${userId}, tentando criar manualmente como fallback...`);
+    // Fallback caso a trigger tenha falhado ou não exista no banco externo
+    const { data: newWorkspace, error: wsError } = await admin
+      .from("workspaces")
+      .insert({ 
+        name: `${display_name || email} Workspace`,
+        slug: slug || `ws-${userId.slice(0, 8)}`
+      })
+      .select("id")
+      .single();
+    
+    if (wsError || !newWorkspace) {
+      console.error("Erro no fallback de workspace:", wsError);
+      return json(500, { ok: false, error: "Falha ao criar workspace de contingência" }, origin);
+    }
+    
+    workspaceId = newWorkspace.id;
+    await admin.from("workspace_members").insert({
       workspace_id: workspaceId,
-      key_value: apiKeyRaw,
-      created_by: userId,
-      is_active: true
+      user_id: userId,
+      role: 'owner'
     });
+  } else {
+    workspaceId = membership.workspace_id;
+  }
 
-  if (keyInsertError) {
-    console.error("Erro ao salvar API Key:", keyInsertError);
-    // Se falhar aqui, o erro de "user_id" pode estar acontecendo se a tabela estiver desatualizada
-    if (keyInsertError.message.includes("user_id")) {
-      return json(500, { ok: false, error: "Tabela api_keys desatualizada no banco externo. Execute as migrações SQL." }, origin);
+  // 4. Obter ou Gerar API Key
+  // Buscamos se já existe uma chave ativa para este workspace
+  const { data: existingKey } = await admin
+    .from("api_keys")
+    .select("key_value")
+    .eq("workspace_id", workspaceId)
+    .eq("is_active", true)
+    .order("created_at", { ascending: false })
+    .limit(1)
+    .maybeSingle();
+
+  let apiKeyRaw;
+  if (existingKey) {
+    console.log(`Reutilizando API Key existente para workspace ${workspaceId}`);
+    apiKeyRaw = existingKey.key_value;
+  } else {
+    console.log(`Gerando nova API Key para workspace ${workspaceId}`);
+    const { data: newKeyRaw, error: rpcError } = await admin.rpc('generate_api_key');
+    if (rpcError) {
+      console.error("Erro RPC generate_api_key:", rpcError);
+      // Fallback se o RPC não existir no banco externo
+      apiKeyRaw = crypto.randomUUID().replace(/-/g, ''); 
+    } else {
+      apiKeyRaw = newKeyRaw;
+    }
+
+    const { error: keyInsertError } = await admin
+      .from("api_keys")
+      .insert({
+        name: "Zailom Booking Auto-Provisioned",
+        workspace_id: workspaceId,
+        key_value: apiKeyRaw,
+        created_by: userId,
+        is_active: true
+      });
+
+    if (keyInsertError) {
+      console.error("Erro ao salvar nova API Key:", keyInsertError);
+      // Se a tabela api_keys não tiver created_by ou workspace_id, o erro aparecerá aqui
     }
   }
 
