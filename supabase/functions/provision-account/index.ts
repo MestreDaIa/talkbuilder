@@ -152,22 +152,29 @@ Deno.serve(async (req) => {
   }
 
   // 2. Atualizar Profile (Garantir que limites e dados de embed estejam sincronizados)
-  // Nota: A trigger handle_new_user cria o profile básico, aqui complementamos/atualizamos
+  // Usamos um objeto de update dinâmico para evitar sobrescrever com defaults indesejados
+  const updateData: any = {
+    id: userId,
+    email: email,
+    embed_source: embed_source || "booking",
+    embed_company_id: company_id,
+    embed_plan_synced_at: new Date().toISOString(),
+  };
+
+  if (display_name) updateData.display_name = display_name;
+  if (slug) updateData.slug = slug;
+  if (embed_plan_tier) updateData.embed_plan_tier = embed_plan_tier;
+  
+  // Só atualiza limites se eles forem explicitamente enviados no payload
+  if (limits) {
+    if (limits.max_chatbots !== undefined) updateData.embed_max_chatbots = limits.max_chatbots;
+    if (limits.max_messages !== undefined) updateData.embed_max_messages = limits.max_messages;
+    if (limits.max_integrations !== undefined) updateData.embed_max_integrations = limits.max_integrations;
+  }
+
   const { error: profileError } = await admin
     .from("profiles")
-    .upsert({
-      id: userId,
-      email: email, // Garantir que o email esteja no profiles para futuras buscas
-      display_name: display_name || undefined,
-      slug: slug || undefined,
-      embed_source: embed_source || "booking",
-      embed_company_id: company_id,
-      embed_plan_tier: embed_plan_tier || "starter",
-      embed_plan_synced_at: new Date().toISOString(),
-      embed_max_chatbots: limits?.max_chatbots,
-      embed_max_messages: limits?.max_messages,
-      embed_max_integrations: limits?.max_integrations,
-    });
+    .upsert(updateData);
 
   if (profileError) {
     console.error("Erro ao atualizar profile:", profileError);
