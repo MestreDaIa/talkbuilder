@@ -211,7 +211,8 @@ Deno.serve(async (req) => {
       .from("workspaces")
       .insert({ 
         name: `${display_name || email} Workspace`,
-        slug: sanitizedSlug
+        slug: sanitizedSlug,
+        owner_id: userId
       })
       .select("id")
       .single();
