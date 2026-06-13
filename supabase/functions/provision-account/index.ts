@@ -80,6 +80,13 @@ async function verifyHs256Jwt(token: string, secret: string) {
   }
 }
 
+function sanitizeSlug(input: unknown): string {
+  return String(input ?? "")
+    .toLowerCase()
+    .replace(/[^a-z0-9-]+/g, "-")
+    .replace(/^-+|-+$/g, "");
+}
+
 Deno.serve(async (req) => {
   const origin = req.headers.get("origin");
   if (req.method === "OPTIONS") return new Response(null, { status: 204, headers: corsHeaders(origin) });
@@ -107,6 +114,8 @@ Deno.serve(async (req) => {
   });
 
   const { email, password, slug, display_name, company_id, embed_source, embed_plan_tier, limits } = body;
+  const sanitizedSlug = sanitizeSlug(slug);
+  if (!sanitizedSlug) return json(400, { ok: false, error: "slug é obrigatório" }, origin);
 
   // 1. Criar ou obter usuário (Lógica de Upsert)
   let userId;
@@ -127,7 +136,7 @@ Deno.serve(async (req) => {
       email,
       password,
       email_confirm: true,
-      user_metadata: { full_name: display_name, slug }
+      user_metadata: { full_name: display_name, slug: sanitizedSlug }
     });
 
     if (createError) {
@@ -162,7 +171,7 @@ Deno.serve(async (req) => {
   };
 
   if (display_name) updateData.display_name = display_name;
-  if (slug) updateData.slug = slug;
+  updateData.slug = sanitizedSlug;
   if (embed_plan_tier) updateData.embed_plan_tier = embed_plan_tier;
   
   // Só atualiza limites se eles forem explicitamente enviados no payload
@@ -202,7 +211,7 @@ Deno.serve(async (req) => {
       .from("workspaces")
       .insert({ 
         name: `${display_name || email} Workspace`,
-        slug: slug || `ws-${userId.slice(0, 8)}`
+        slug: sanitizedSlug
       })
       .select("id")
       .single();
