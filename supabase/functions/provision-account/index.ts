@@ -203,31 +203,54 @@ Deno.serve(async (req) => {
   }
 
   let workspaceId;
-  
+
   if (!membership) {
-    console.log(`Workspace não encontrado para ${userId}, tentando criar manualmente como fallback...`);
-    // Fallback caso a trigger tenha falhado ou não exista no banco externo
-    const { data: newWorkspace, error: wsError } = await admin
+    console.log(`Membership ausente para ${userId}. Verificando workspace por slug=${sanitizedSlug}...`);
+
+    // Idempotência: se já existir um workspace com esse slug (criado por trigger
+    // ou execução anterior), reutiliza em vez de tentar inserir e bater no unique.
+    const { data: existingWorkspace, error: existingWsError } = await admin
       .from("workspaces")
-      .insert({ 
-        name: `${display_name || email} Workspace`,
-        slug: sanitizedSlug,
-        owner_id: userId
-      })
-      .select("id")
-      .single();
-    
-    if (wsError || !newWorkspace) {
-      console.error("Erro no fallback de workspace:", wsError);
-      return json(500, { ok: false, error: "Falha ao criar workspace de contingência" }, origin);
+      .select("id, owner_id")
+      .eq("slug", sanitizedSlug)
+      .maybeSingle();
+
+    if (existingWsError) {
+      console.error("Erro ao buscar workspace por slug:", existingWsError);
     }
-    
-    workspaceId = newWorkspace.id;
-    await admin.from("workspace_members").insert({
-      workspace_id: workspaceId,
-      user_id: userId,
-      role: 'owner'
-    });
+
+    if (existingWorkspace) {
+      console.log(`Workspace reutilizado (slug=${sanitizedSlug}, id=${existingWorkspace.id})`);
+      workspaceId = existingWorkspace.id;
+    } else {
+      console.log(`Criando workspace fallback para ${userId}...`);
+      const { data: newWorkspace, error: wsError } = await admin
+        .from("workspaces")
+        .insert({
+          name: `${display_name || email} Workspace`,
+          slug: sanitizedSlug,
+          owner_id: userId,
+        })
+        .select("id")
+        .single();
+
+      if (wsError || !newWorkspace) {
+        console.error("Erro no fallback de workspace:", wsError);
+        return json(500, { ok: false, error: "Falha ao criar workspace de contingência" }, origin);
+      }
+      workspaceId = newWorkspace.id;
+    }
+
+    // Garante a membership (idempotente via unique workspace_id+user_id).
+    const { error: memberInsertError } = await admin
+      .from("workspace_members")
+      .upsert(
+        { workspace_id: workspaceId, user_id: userId, role: "owner" },
+        { onConflict: "workspace_id,user_id", ignoreDuplicates: true },
+      );
+    if (memberInsertError) {
+      console.error("Erro ao garantir workspace_member:", memberInsertError);
+    }
   } else {
     workspaceId = membership.workspace_id;
   }
