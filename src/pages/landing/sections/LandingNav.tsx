@@ -82,7 +82,7 @@ export default function LandingNav() {
 							size="sm"
 							className="bg-[#920027] hover:bg-[#b00030] text-white border-0 shadow-[0_4px_20px_-4px_rgba(146,0,39,0.6)]"
 						>
-							Comece agora
+							Comece agora seu noia
 						</Button>
 					</Link>
 				</div>
