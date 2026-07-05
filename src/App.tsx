@@ -4,6 +4,7 @@ import './App.css'
 import { Routes, Route, Navigate, useParams } from "react-router-dom";
 
 import BotPage from "./pages/workspace/bot/[id]/page";
+import DocsPage from "./pages/docs/page";
 import FolderPage from "./pages/workspace/folder/[id]/page";
 import ConfigPage from "./pages/workspace/configs/page";
 import PerfilPage from "./pages/workspace/perfil/page";
