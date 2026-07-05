@@ -1,5 +1,9 @@
 project_id = "fwoescubnnagdvwasbjl"
 
+[functions.booking-api]
+verify_jwt = false
+
+
 [functions.chatbot-runtime]
 verify_jwt = false
 
