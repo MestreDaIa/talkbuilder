@@ -221,7 +221,7 @@ https://app.talkmap.com.br/#embed_token=<JWT>&host=flow-appoint
 - `https://*.lovable.app` (previews)
 
 ### Validação atual (LIMITAÇÃO)
-Este projeto roda em Vite + HashRouter, **sem servidor próprio**. A
+Este projeto roda em Vite + BrowserRouter, **sem servidor próprio**. A
 assinatura HS256 do JWT NÃO é verificada — apenas issuer/audience/exp são
 checados no client (`src/context/EmbedContext.tsx`).
 

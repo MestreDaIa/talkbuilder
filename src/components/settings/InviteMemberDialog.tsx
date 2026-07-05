@@ -47,8 +47,10 @@ export function InviteMemberDialog() {
       const supabase = getSupabase();
       if (!supabase) throw new Error("Supabase não configurado");
 
-      const hashPath = (window.location.hash || "").replace(/^#/, "");
-      const pathParts = hashPath.split("/").filter(Boolean);
+      const pathSource = window.location.hash.startsWith("#/")
+        ? window.location.hash.replace(/^#/, "")
+        : window.location.pathname;
+      const pathParts = pathSource.split("/").filter(Boolean);
       const slugFromUrl = pathParts[0];
       const finalSlug = currentWorkspace?.slug || slugFromUrl;
 
@@ -71,7 +73,7 @@ export function InviteMemberDialog() {
       const inviteToken = Array.isArray(inviteResult) ? inviteResult[0]?.token : inviteResult?.token;
       if (!inviteToken) throw new Error("Convite criado, mas o token não foi retornado pelo banco.");
 
-      const link = `${window.location.origin}/#/invite/${inviteToken}`;
+      const link = `${window.location.origin}/invite/${inviteToken}`;
       setInviteLink(link);
       
       toast({
