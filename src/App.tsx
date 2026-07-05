@@ -107,6 +107,9 @@ function App() {
       {/* Landing pública */}
       <Route path="/" element={<HomeRoute />} />
 
+      {/* Documentação pública da API */}
+      <Route path="/docs" element={<DocsPage />} />
+
       {/* Auth */}
       <Route path="/login" element={<AuthRoute><LoginPage /></AuthRoute>} />
       <Route path="/signup" element={<AuthRoute><SignupPage /></AuthRoute>} />
