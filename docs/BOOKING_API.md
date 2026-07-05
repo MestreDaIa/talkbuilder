@@ -8,7 +8,7 @@ API pública **read-only** do Zailom Flow, destinada exclusivamente ao consumo p
 https://<PROJECT_REF>.supabase.co/functions/v1/booking-api
 ```
 
-> No ambiente atual: `https://xllkibdddlmcdbrhzedu.supabase.co/functions/v1/booking-api`
+> No ambiente atual: `https://fwoescubnnagdvwasbjl.supabase.co/functions/v1/booking-api`
 
 Se preferir um subdomínio próprio (ex.: `api.zailomflow.com`), aponte na VPS via reverse proxy para essa URL — a API funciona igualmente sem isso.
 
