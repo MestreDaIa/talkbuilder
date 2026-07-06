@@ -8,18 +8,22 @@ import { toast } from "sonner";
 import {
   Activity,
   Bot,
-  Building2,
+  BookOpen,
+  Compass,
   Copy,
+  Globe,
   Key,
   Loader2,
   Play,
   Plug,
+  RefreshCcw,
   Send,
   Settings2,
   Shield,
-  BookOpen,
   Terminal,
   Webhook,
+  Workflow,
+  Zap,
 } from "lucide-react";
 
 /* -------------------------------------------------------------------------- */
@@ -27,6 +31,7 @@ import {
 /* -------------------------------------------------------------------------- */
 
 type HttpMethod = "GET" | "POST" | "PUT" | "PATCH" | "DELETE";
+type AuthKind = "apiKey" | "jwtHs256" | "none" | "webhook";
 
 type ParamDef = {
   key: string;
@@ -45,15 +50,23 @@ type Endpoint = {
   title: string;
   summary: string;
   description?: string;
+  auth?: AuthKind;
   params?: ParamDef[];
   bodyExample?: string;
   responseExample: string;
   responseCodes?: { code: number; label: string }[];
+  notes?: string[];
 };
 
 type SidebarGroup = {
   label: string;
   items: { id: string; label: string; method?: HttpMethod }[];
+};
+
+type ReferenceDoc = {
+  id: string;
+  title: string;
+  body: React.ReactNode;
 };
 
 type ApiSection = {
@@ -63,26 +76,34 @@ type ApiSection = {
   baseUrl: string;
   description: string;
   auth: {
-    type: "apiKey" | "none" | "bearer";
+    type: AuthKind;
     description: string;
     example?: string;
   };
   sidebar: SidebarGroup[];
   endpoints: Record<string, Endpoint>;
   reference?: ReferenceDoc[];
-};
-
-type ReferenceDoc = {
-  id: string;
-  title: string;
-  body: React.ReactNode;
+  overview?: ReferenceDoc;
 };
 
 /* -------------------------------------------------------------------------- */
-/* Data — Booking API (nova)                                                  */
+/* Constants                                                                   */
 /* -------------------------------------------------------------------------- */
 
-const BOOKING_BASE = "https://fwoescubnnagdvwasbjl.supabase.co/functions/v1/booking-api";
+const SUPABASE_URL = "https://fwoescubnnagdvwasbjl.supabase.co";
+const FN = (name: string) => `${SUPABASE_URL}/functions/v1/${name}`;
+
+const BOOKING_BASE = FN("booking-api");
+const RUNTIME_BASE = FN("chatbot-runtime");
+const PROVISION_BASE = FN("provision-account");
+const SYNC_PLAN_BASE = FN("sync-embed-plan");
+const READ_PLAN_BASE = FN("embed-plan-status");
+const WPP_WEBHOOK_BASE = FN("whatsapp-webhook");
+const CRAWL_BASE = FN("crawl");
+
+/* -------------------------------------------------------------------------- */
+/* Booking Integration API                                                     */
+/* -------------------------------------------------------------------------- */
 
 const bookingEndpoints: Endpoint[] = [
   {
@@ -90,9 +111,10 @@ const bookingEndpoints: Endpoint[] = [
     method: "GET",
     path: "/health",
     title: "Health Check",
-    summary: "Ping rápido para validar chave + workspace.",
+    summary: "Valida a API Key e retorna o workspace vinculado.",
     description:
-      "Use este endpoint logo após o usuário clicar em 'Conectar' no Booking. Retorna o workspace vinculado à API Key enviada.",
+      "Use logo após o usuário clicar em 'Conectar' no Booking. Confirma que a chave é válida, está ativa e retorna o workspace/slug ao qual pertence.",
+    auth: "apiKey",
     responseExample: `{
   "ok": true,
   "workspace_id": "9b4fce4a-05f7-494d-aaf8-c2159244e99d",
@@ -101,8 +123,9 @@ const bookingEndpoints: Endpoint[] = [
 }`,
     responseCodes: [
       { code: 200, label: "OK" },
-      { code: 401, label: "API Key ausente ou inválida" },
-      { code: 403, label: "API Key desativada" },
+      { code: 401, label: "Header ausente ou chave inválida" },
+      { code: 403, label: "Chave desativada" },
+      { code: 404, label: "Workspace não encontrado" },
     ],
   },
   {
@@ -110,17 +133,20 @@ const bookingEndpoints: Endpoint[] = [
     method: "GET",
     path: "/workspace",
     title: "Workspace",
-    summary: "Informações completas do workspace autenticado.",
+    summary: "Retorna dados completos do workspace autenticado.",
+    description:
+      "Devolve nome, slug, plano, origem (flow ou booking), external_company_id e os limites (max_chatbots, max_messages, max_integrations).",
+    auth: "apiKey",
     responseExample: `{
   "workspace": {
-    "id": "uuid",
+    "id": "9b4fce4a-05f7-494d-aaf8-c2159244e99d",
     "slug": "empresa-x",
     "name": "Empresa X",
     "email": "user@empresa.com",
     "status": "active",
     "plan": "pro",
     "source": "booking",
-    "external_company_id": "uuid|null",
+    "external_company_id": "fefb4d36-...",
     "limits": {
       "max_chatbots": 5,
       "max_messages": 5000,
@@ -129,24 +155,42 @@ const bookingEndpoints: Endpoint[] = [
     "created_at": "2026-06-11T20:17:10Z"
   }
 }`,
+    responseCodes: [
+      { code: 200, label: "OK" },
+      { code: 401, label: "Chave inválida" },
+      { code: 404, label: "Workspace não encontrado" },
+    ],
   },
   {
     id: "instances",
     method: "GET",
     path: "/instances",
-    title: "Listar instâncias",
-    summary: "Lista todas as instâncias de WhatsApp do workspace.",
+    title: "Listar instâncias WhatsApp",
+    summary: "Lista todas as instâncias de WhatsApp (Evolution API) do workspace.",
+    auth: "apiKey",
     responseExample: `{
-  "instances": [{
-    "id": "uuid",
-    "name": "Atendimento",
-    "instance_name": "atendimento-01",
-    "status": "connected",
-    "connected": true,
-    "phone_number": "5511999999999",
-    "last_connected_at": "2026-07-05T10:00:00Z"
-  }]
+  "instances": [
+    {
+      "id": "uuid",
+      "name": "Atendimento",
+      "instance_name": "atendimento-01",
+      "status": "connected",
+      "connected": true,
+      "phone_number": "5511999999999",
+      "last_connected_at": "2026-07-05T10:00:00Z",
+      "created_at": "2026-06-01T10:00:00Z",
+      "updated_at": "2026-07-05T10:00:00Z"
+    }
+  ]
 }`,
+    notes: [
+      "connected é true quando status ∈ {connected, open}.",
+      "phone_number é extraído de settings.phone_number, settings.phone, settings.number ou settings.wid.",
+    ],
+    responseCodes: [
+      { code: 200, label: "OK" },
+      { code: 401, label: "Chave inválida" },
+    ],
   },
   {
     id: "instance-by-id",
@@ -154,14 +198,9 @@ const bookingEndpoints: Endpoint[] = [
     path: "/instances/:id",
     title: "Instância por ID",
     summary: "Detalhe de uma instância específica.",
+    auth: "apiKey",
     params: [
-      {
-        key: "id",
-        label: "id",
-        in: "path",
-        required: true,
-        placeholder: "UUID da instância",
-      },
+      { key: "id", label: "id", in: "path", required: true, placeholder: "UUID da instância" },
     ],
     responseExample: `{
   "instance": {
@@ -169,7 +208,9 @@ const bookingEndpoints: Endpoint[] = [
     "name": "Atendimento",
     "instance_name": "atendimento-01",
     "status": "connected",
-    "phone_number": "5511999999999"
+    "connected": true,
+    "phone_number": "5511999999999",
+    "last_connected_at": "2026-07-05T10:00:00Z"
   }
 }`,
     responseCodes: [
@@ -182,28 +223,35 @@ const bookingEndpoints: Endpoint[] = [
     method: "GET",
     path: "/bots",
     title: "Listar bots",
-    summary: "Lista bots do workspace (publicados por padrão).",
+    summary: "Lista bots do workspace. Por padrão retorna apenas publicados.",
+    auth: "apiKey",
     params: [
       {
         key: "published",
         label: "published",
         in: "query",
         placeholder: "true | false",
-        description: "Se false, inclui rascunhos e inativos.",
+        description: "Se false, inclui rascunhos e inativos. Padrão: true.",
       },
     ],
     responseExample: `{
-  "bots": [{
-    "id": "uuid",
-    "name": "Bot de Agendamento",
-    "description": "Fluxo principal",
-    "is_published": true,
-    "is_active": true,
-    "status": "published",
-    "public_id": "abc123",
-    "published_at": "2026-07-01T12:00:00Z"
-  }]
+  "bots": [
+    {
+      "id": "uuid",
+      "name": "Bot de Agendamento",
+      "description": "Fluxo principal",
+      "is_published": true,
+      "is_active": true,
+      "status": "published",
+      "public_id": "abc123",
+      "published_at": "2026-07-01T12:00:00Z",
+      "updated_at": "2026-07-04T09:00:00Z",
+      "created_at": "2026-06-01T10:00:00Z"
+    }
+  ]
 }`,
+    notes: ['status pode ser: "published", "draft" ou "inactive".'],
+    responseCodes: [{ code: 200, label: "OK" }],
   },
   {
     id: "bot-by-id",
@@ -211,21 +259,21 @@ const bookingEndpoints: Endpoint[] = [
     path: "/bots/:id",
     title: "Bot por ID",
     summary: "Detalhe completo de um bot (inclui settings).",
+    auth: "apiKey",
     params: [
-      {
-        key: "id",
-        label: "id",
-        in: "path",
-        required: true,
-        placeholder: "UUID do bot",
-      },
+      { key: "id", label: "id", in: "path", required: true, placeholder: "UUID do bot" },
     ],
     responseExample: `{
   "bot": {
     "id": "uuid",
     "name": "Bot de Agendamento",
+    "description": "Fluxo principal",
+    "is_published": true,
+    "is_active": true,
     "status": "published",
-    "settings": { "...": "..." }
+    "public_id": "abc123",
+    "published_at": "2026-07-01T12:00:00Z",
+    "settings": { "welcome_message": "Olá!" }
   }
 }`,
     responseCodes: [
@@ -236,85 +284,398 @@ const bookingEndpoints: Endpoint[] = [
 ];
 
 /* -------------------------------------------------------------------------- */
-/* Data — Flow Runtime API (existente)                                        */
+/* Chatbot Runtime API                                                         */
 /* -------------------------------------------------------------------------- */
-
-const RUNTIME_BASE = "https://fwoescubnnagdvwasbjl.supabase.co/functions/v1/chatbot-runtime";
 
 const runtimeEndpoints: Endpoint[] = [
   {
     id: "runtime-start",
     method: "POST",
-    path: "/start",
-    title: "Iniciar sessão",
-    summary: "Inicializa uma sessão de execução do bot para um usuário.",
+    path: "/",
+    title: "Iniciar sessão (action=start)",
+    summary: "Inicializa uma execução do bot para um contato.",
     description:
-      "Retorna o primeiro bloco de mensagens do bot e um sessionId a ser usado nos próximos requests.",
+      "O endpoint é único (POST na raiz da função). O comportamento muda pelo campo action. Use start para (re)iniciar do começo, message para enviar entrada do usuário. flow_id aceita tanto o UUID interno quanto o public_id publicado.",
+    auth: "none",
     params: [
-      {
-        key: "bot_id",
-        label: "bot_id",
-        in: "body",
-        required: true,
-        placeholder: "UUID do bot publicado",
-      },
-      {
-        key: "user_id",
-        label: "user_id",
-        in: "body",
-        placeholder: "Identificador único do usuário final",
-      },
+      { key: "action", label: "action", in: "body", placeholder: "start", description: 'Padrão: "start" se omitido.' },
+      { key: "flow_id", label: "flow_id", in: "body", required: true, placeholder: "UUID ou public_id do bot" },
+      { key: "contact_id", label: "contact_id", in: "body", required: true, placeholder: "Identificador do contato (ex: telefone, user id)" },
+      { key: "channel", label: "channel", in: "body", placeholder: "webchat | whatsapp | api", description: "Detectado automaticamente quando ausente." },
+      { key: "payload", label: "payload", in: "body", description: "Objeto opcional com variáveis iniciais." },
     ],
     bodyExample: `{
-  "bot_id": "uuid",
-  "user_id": "user-123"
+  "action": "start",
+  "flow_id": "abc123",
+  "contact_id": "user-5511999999999",
+  "channel": "webchat"
 }`,
     responseExample: `{
-  "session_id": "uuid",
   "messages": [
     { "type": "text", "content": "Olá! Como posso ajudar?" }
-  ]
+  ],
+  "waiting_for": "text",
+  "buttons": null,
+  "wait_ms": 0,
+  "session_id": "uuid",
+  "runtime_state": {
+    "current_node_id": "node_2",
+    "variables": {},
+    "waiting_for_input": true,
+    "mode": "flow"
+  },
+  "debug": { "node": "node_2", "status": "waiting_input" }
 }`,
+    responseCodes: [
+      { code: 200, label: "OK" },
+      { code: 400, label: "flow_id ou contact_id ausente" },
+      { code: 404, label: "Flow não encontrado" },
+      { code: 500, label: "Erro interno de execução" },
+    ],
   },
   {
     id: "runtime-message",
     method: "POST",
-    path: "/message",
-    title: "Enviar mensagem",
-    summary: "Envia uma mensagem do usuário e recebe a resposta do bot.",
+    path: "/",
+    title: "Enviar mensagem (action=message)",
+    summary: "Continua a execução do bot com uma resposta do usuário.",
+    description:
+      "Envie o texto (ou payload estruturado) do usuário no campo payload. Reutilize o mesmo contact_id e flow_id para manter a sessão.",
+    auth: "none",
     params: [
-      { key: "session_id", label: "session_id", in: "body", required: true },
-      { key: "message", label: "message", in: "body", required: true },
+      { key: "action", label: "action", in: "body", required: true, placeholder: "message" },
+      { key: "flow_id", label: "flow_id", in: "body", required: true },
+      { key: "contact_id", label: "contact_id", in: "body", required: true },
+      { key: "payload", label: "payload", in: "body", required: true, description: "Contém a mensagem do usuário e/ou variáveis." },
     ],
     bodyExample: `{
-  "session_id": "uuid",
-  "message": "Quero agendar um horário"
+  "action": "message",
+  "flow_id": "abc123",
+  "contact_id": "user-5511999999999",
+  "payload": { "text": "Quero agendar um horário" }
 }`,
     responseExample: `{
   "messages": [
     { "type": "text", "content": "Claro! Para qual dia?" }
   ],
-  "finished": false
+  "waiting_for": "text",
+  "buttons": null,
+  "session_id": "uuid",
+  "runtime_state": {
+    "current_node_id": "node_5",
+    "variables": { "intent": "book" },
+    "waiting_for_input": true,
+    "mode": "flow"
+  }
 }`,
+    responseCodes: [
+      { code: 200, label: "OK" },
+      { code: 400, label: "Campos obrigatórios ausentes" },
+      { code: 404, label: "Flow não encontrado" },
+    ],
   },
 ];
 
 /* -------------------------------------------------------------------------- */
-/* References                                                                  */
+/* Provisioning & plan sync APIs (JWT HS256)                                   */
 /* -------------------------------------------------------------------------- */
+
+const provisioningEndpoints: Endpoint[] = [
+  {
+    id: "provision-account",
+    method: "POST",
+    path: "/provision-account",
+    title: "Provisionar conta",
+    summary: "Cria (ou upserta) usuário + workspace no Flow a partir do Booking.",
+    description:
+      "Autenticação via JWT HS256 assinado com EMBED_SHARED_SECRET. Se o e-mail já existir, o profile é atualizado. Um workspace é criado automaticamente pelo trigger handle_new_user.",
+    auth: "jwtHs256",
+    params: [
+      { key: "email", label: "email", in: "body", required: true },
+      { key: "password", label: "password", in: "body", required: true },
+      { key: "slug", label: "slug", in: "body", required: true },
+      { key: "display_name", label: "display_name", in: "body" },
+      { key: "company_id", label: "company_id", in: "body", description: "ID externo (Booking)." },
+      { key: "embed_source", label: "embed_source", in: "body", placeholder: "booking", description: "Padrão: booking." },
+      { key: "embed_plan_tier", label: "embed_plan_tier", in: "body", placeholder: "starter | pro | business" },
+      { key: "limits", label: "limits", in: "body", description: "Objeto opcional com max_chatbots, max_messages, max_integrations." },
+    ],
+    bodyExample: `{
+  "email": "user@empresa.com",
+  "password": "SenhaForte#123",
+  "slug": "empresa-x",
+  "display_name": "Empresa X",
+  "company_id": "external-uuid-123",
+  "embed_source": "booking",
+  "embed_plan_tier": "pro",
+  "limits": {
+    "max_chatbots": 5,
+    "max_messages": 10000,
+    "max_integrations": 10
+  }
+}`,
+    responseExample: `{
+  "ok": true,
+  "user_id": "uuid",
+  "workspace_id": "uuid",
+  "slug": "empresa-x"
+}`,
+    responseCodes: [
+      { code: 200, label: "OK" },
+      { code: 400, label: "JSON inválido ou slug ausente" },
+      { code: 401, label: "JWT ausente/expirado/assinatura inválida" },
+      { code: 405, label: "Method not allowed" },
+      { code: 500, label: "EMBED_SHARED_SECRET não configurado ou erro interno" },
+    ],
+  },
+  {
+    id: "sync-embed-plan",
+    method: "POST",
+    path: "/sync-embed-plan",
+    title: "Sincronizar plano",
+    summary: "Atualiza tier e limites do workspace externo.",
+    description:
+      "Localiza o profile por (embed_company_id, embed_source) ou por slug como fallback. Requer JWT HS256.",
+    auth: "jwtHs256",
+    params: [
+      { key: "company_id", label: "company_id", in: "body", required: true },
+      { key: "source", label: "source", in: "body", placeholder: "booking" },
+      { key: "slug", label: "slug", in: "body", description: "Fallback caso company_id não seja encontrado." },
+      { key: "tier", label: "tier", in: "body", required: true, placeholder: "starter | pro | business | suspended" },
+      { key: "limits", label: "limits", in: "body", description: "max_chatbots, max_messages, max_integrations." },
+    ],
+    bodyExample: `{
+  "company_id": "external-uuid-123",
+  "source": "booking",
+  "slug": "empresa-x",
+  "tier": "business",
+  "limits": {
+    "max_chatbots": 20,
+    "max_messages": 50000,
+    "max_integrations": 999
+  }
+}`,
+    responseExample: `{ "ok": true, "message": "Plan updated successfully" }`,
+    responseCodes: [
+      { code: 200, label: "OK" },
+      { code: 401, label: "Unauthorized" },
+      { code: 404, label: "User not found" },
+      { code: 500, label: "Erro interno" },
+    ],
+  },
+  {
+    id: "embed-plan-status",
+    method: "GET",
+    path: "/embed-plan-status",
+    title: "Consultar plano (auditoria)",
+    summary: "Read-only. Retorna tier atual sincronizado.",
+    description:
+      "Requer JWT HS256 com iss=flow-appoint, aud=builder-flow-api e purpose ∈ { read-plan, sync-plan }.",
+    auth: "jwtHs256",
+    params: [
+      { key: "company_id", label: "company_id", in: "query", required: true },
+      { key: "source", label: "source", in: "query", placeholder: "flow-appoint", description: "Padrão: flow-appoint." },
+    ],
+    responseExample: `{
+  "ok": true,
+  "source": "booking",
+  "slug": "empresa-x",
+  "tier": "pro",
+  "synced_at": "2026-07-05T10:00:00.000Z"
+}`,
+    responseCodes: [
+      { code: 200, label: "OK" },
+      { code: 400, label: "company_id obrigatório" },
+      { code: 401, label: "Token inválido/expirado" },
+      { code: 404, label: "Workspace não encontrado" },
+      { code: 405, label: "Method not allowed" },
+    ],
+  },
+];
+
+/* -------------------------------------------------------------------------- */
+/* Webhooks & utilitários                                                      */
+/* -------------------------------------------------------------------------- */
+
+const webhookEndpoints: Endpoint[] = [
+  {
+    id: "whatsapp-webhook",
+    method: "POST",
+    path: "/whatsapp-webhook",
+    title: "Webhook Evolution API",
+    summary: "Recebe eventos da Evolution API e dispara o runtime.",
+    description:
+      "Configure esta URL como webhook da instância na Evolution API. Eventos suportados: MESSAGES_UPSERT / messages.upsert. Respostas do bot são enviadas de volta via Evolution API automaticamente.",
+    auth: "webhook",
+    params: [
+      { key: "event", label: "event", in: "body", placeholder: "MESSAGES_UPSERT" },
+      { key: "instance", label: "instance", in: "body", required: true, description: "Nome da instância na Evolution." },
+      { key: "apikey", label: "apikey", in: "body", description: "API Key da Evolution (fallback: EVO_GLOBAL_KEY)." },
+      { key: "data", label: "data", in: "body", required: true, description: "Payload nativo da Evolution API." },
+    ],
+    bodyExample: `{
+  "event": "MESSAGES_UPSERT",
+  "instance": "atendimento-01",
+  "apikey": "evo_...",
+  "data": {
+    "key": { "remoteJid": "5511999999999@s.whatsapp.net", "fromMe": false },
+    "message": { "conversation": "Oi, quero agendar" }
+  }
+}`,
+    responseExample: `{ "status": "ok" }`,
+    notes: [
+      "Retorna 200 mesmo em payloads inválidos, para evitar reenvios agressivos da Evolution.",
+      "Grupos e mensagens fromMe são ignorados automaticamente.",
+    ],
+    responseCodes: [
+      { code: 200, label: "OK (mesmo para eventos ignorados)" },
+      { code: 500, label: "Erro interno" },
+    ],
+  },
+  {
+    id: "crawl",
+    method: "POST",
+    path: "/crawl",
+    title: "Crawler de base de conhecimento",
+    summary: "Rastreia um site (sitemap + rotas comuns) e devolve o conteúdo textual.",
+    description:
+      "Usado pela feature de Knowledge Base. Rastreia até 12 páginas, respeitando robots.txt e priorizando páginas com palavras-chave (preços, planos, sobre etc.).",
+    auth: "none",
+    params: [
+      { key: "url", label: "url", in: "body", required: true, placeholder: "https://exemplo.com" },
+      { key: "depth", label: "depth", in: "body", placeholder: "1", description: "Profundidade máxima. Padrão: 1." },
+    ],
+    bodyExample: `{
+  "url": "https://empresa.com",
+  "depth": 1
+}`,
+    responseExample: `{
+  "content": "[FONTE: https://empresa.com]\\nTexto extraído...\\n\\n---\\n\\n[FONTE: https://empresa.com/precos]\\n...",
+  "pages_crawled": 8
+}`,
+    responseCodes: [
+      { code: 200, label: "OK" },
+      { code: 400, label: "URL obrigatória" },
+      { code: 500, label: "Erro ao rastrear" },
+    ],
+  },
+];
+
+/* -------------------------------------------------------------------------- */
+/* Overview & references                                                       */
+/* -------------------------------------------------------------------------- */
+
+const overviewDoc: ReferenceDoc = {
+  id: "overview",
+  title: "Bem-vindo à documentação do Zailom Flow",
+  body: (
+    <div className="space-y-6 text-sm leading-relaxed">
+      <p className="text-muted-foreground">
+        O Zailom Flow expõe diferentes APIs conforme o caso de uso. Escolha a aba correta no topo
+        para acessar endpoints, exemplos e o testador interativo.
+      </p>
+
+      <div className="grid sm:grid-cols-2 gap-3">
+        {[
+          {
+            icon: Plug,
+            title: "Booking Integration API",
+            desc: "Read-only para o Zailom Booking. Autenticada por API Key.",
+            base: BOOKING_BASE,
+          },
+          {
+            icon: Bot,
+            title: "Chatbot Runtime API",
+            desc: "Executa fluxos de bot em canais externos (webchat, apps).",
+            base: RUNTIME_BASE,
+          },
+          {
+            icon: Workflow,
+            title: "Provisioning & Plan Sync",
+            desc: "Criação de conta e sincronização de planos via JWT HS256.",
+            base: `${SUPABASE_URL}/functions/v1`,
+          },
+          {
+            icon: Webhook,
+            title: "Webhooks & Utilitários",
+            desc: "Webhook da Evolution API e crawler de knowledge base.",
+            base: `${SUPABASE_URL}/functions/v1`,
+          },
+        ].map(({ icon: Icon, title, desc, base }) => (
+          <div key={title} className="border border-border rounded-lg p-4 bg-card">
+            <div className="flex items-center gap-2 mb-1">
+              <Icon className="w-4 h-4 text-primary" />
+              <div className="font-semibold text-sm">{title}</div>
+            </div>
+            <p className="text-xs text-muted-foreground mb-2">{desc}</p>
+            <code className="text-[11px] font-mono text-muted-foreground break-all">{base}</code>
+          </div>
+        ))}
+      </div>
+
+      <div>
+        <h3 className="font-semibold mb-2 flex items-center gap-2">
+          <Zap className="w-4 h-4 text-primary" /> Como testar
+        </h3>
+        <ol className="list-decimal pl-5 space-y-1 text-muted-foreground">
+          <li>Gere uma API Key em <strong>Configurações → API Keys</strong> do workspace.</li>
+          <li>Clique em <strong>Configurar API Key</strong> no topo e cole a chave (fica salva neste navegador).</li>
+          <li>Escolha um endpoint na sidebar e clique em <strong>Enviar requisição</strong>.</li>
+        </ol>
+      </div>
+
+      <div className="border border-amber-500/30 bg-amber-500/5 rounded-lg p-4">
+        <div className="font-semibold text-amber-600 dark:text-amber-400 mb-1 flex items-center gap-2">
+          <Shield className="w-4 h-4" /> Escopo automático
+        </div>
+        <p className="text-xs text-muted-foreground">
+          Toda requisição autenticada é escopada exclusivamente ao workspace dono da chave/JWT.
+          Parâmetros do cliente nunca alteram esse escopo — não é possível acessar recursos de
+          outro workspace.
+        </p>
+      </div>
+    </div>
+  ),
+};
 
 const references: ReferenceDoc[] = [
   {
     id: "auth",
-    title: "Autenticação",
+    title: "Autenticação por API Key",
     body: (
       <div className="space-y-3 text-sm">
-        <p>Todas as requisições precisam enviar a API Key em <strong>um</strong> dos headers:</p>
+        <p>Todas as requisições da Booking API precisam enviar a API Key em <strong>um</strong> dos headers:</p>
         <CodeBlock code={`x-api-key: <API_KEY>
 # ou
 Authorization: Bearer <API_KEY>`} />
         <p className="text-muted-foreground">
-          Toda requisição é escopada automaticamente ao workspace dono da chave.
+          A chave identifica o workspace. O campo <code>last_used_at</code> é atualizado a cada
+          request bem-sucedido, permitindo auditoria.
+        </p>
+      </div>
+    ),
+  },
+  {
+    id: "auth-jwt",
+    title: "Autenticação JWT HS256",
+    body: (
+      <div className="space-y-3 text-sm">
+        <p>
+          Os endpoints de provisionamento e sync de plano usam JWT HS256 assinado com o segredo
+          compartilhado <code>EMBED_SHARED_SECRET</code>.
+        </p>
+        <CodeBlock code={`Authorization: Bearer <JWT>
+
+// Claims esperadas
+{
+  "iss": "flow-appoint",
+  "aud": "builder-flow-api",
+  "purpose": "sync-plan",   // ou "read-plan"
+  "exp": 1730000000
+}`} />
+        <p className="text-muted-foreground">
+          Tokens expirados retornam 401. Nunca exponha <code>EMBED_SHARED_SECRET</code> no
+          front-end.
         </p>
       </div>
     ),
@@ -323,32 +684,96 @@ Authorization: Bearer <API_KEY>`} />
     id: "status-codes",
     title: "Códigos HTTP",
     body: (
-      <div className="space-y-2 text-sm">
+      <div className="space-y-1.5 text-sm">
         {[
           [200, "OK"],
-          [400, "Requisição inválida"],
-          [401, "API Key ausente ou inválida"],
-          [403, "API Key desativada"],
+          [204, "No Content (CORS preflight)"],
+          [400, "Requisição inválida ou campos obrigatórios ausentes"],
+          [401, "Autenticação ausente/inválida (API Key ou JWT)"],
+          [403, "Chave desativada"],
           [404, "Recurso não encontrado ou fora do workspace"],
+          [405, "Método HTTP não permitido"],
           [500, "Erro interno"],
         ].map(([code, label]) => (
-          <div key={code} className="flex items-center gap-3 py-1 border-b border-border/60">
+          <div key={code} className="flex items-center gap-3 py-1.5 border-b border-border/60">
             <Badge variant="outline" className="font-mono min-w-[3rem] justify-center">{code}</Badge>
-            <span>{label}</span>
+            <span className="text-muted-foreground">{label}</span>
           </div>
         ))}
       </div>
     ),
   },
   {
-    id: "curl",
-    title: "Exemplos curl",
+    id: "plans",
+    title: "Planos e limites",
     body: (
-      <div className="space-y-3">
-        <CodeBlock code={`curl -H "x-api-key: SUA_API_KEY" \\
+      <div className="space-y-3 text-sm">
+        <div className="overflow-x-auto border border-border rounded-lg">
+          <table className="w-full text-sm">
+            <thead className="bg-muted/50">
+              <tr>
+                <th className="text-left p-3 font-semibold">Plano</th>
+                <th className="text-left p-3 font-semibold">Bots</th>
+                <th className="text-left p-3 font-semibold">Msgs/mês</th>
+                <th className="text-left p-3 font-semibold">Integrações</th>
+              </tr>
+            </thead>
+            <tbody className="[&_td]:p-3 [&_tr]:border-t [&_tr]:border-border">
+              <tr><td>Starter</td><td>1</td><td>1.000</td><td>2</td></tr>
+              <tr><td>Pro</td><td>5</td><td>10.000</td><td>10</td></tr>
+              <tr><td>Business</td><td>20</td><td>50.000</td><td>Ilimitado</td></tr>
+              <tr><td>Suspenso</td><td>0</td><td>0</td><td>0</td></tr>
+            </tbody>
+          </table>
+        </div>
+        <p className="text-muted-foreground text-xs">
+          Limites podem ser sobrescritos por workspace via <code>sync-embed-plan</code>.
+        </p>
+      </div>
+    ),
+  },
+  {
+    id: "cors",
+    title: "CORS",
+    body: (
+      <div className="space-y-3 text-sm">
+        <p>
+          Todas as funções respondem com <code>Access-Control-Allow-Origin: *</code> e aceitam
+          preflight <code>OPTIONS</code> (204). Headers permitidos: <code>authorization</code>,{" "}
+          <code>x-api-key</code>, <code>content-type</code>, <code>apikey</code>,{" "}
+          <code>x-client-info</code>.
+        </p>
+      </div>
+    ),
+  },
+  {
+    id: "curl",
+    title: "Exemplos curl completos",
+    body: (
+      <div className="space-y-4">
+        <div>
+          <div className="text-xs font-semibold mb-1 text-muted-foreground uppercase tracking-wider">Health (Booking API)</div>
+          <CodeBlock code={`curl -H "x-api-key: SUA_API_KEY" \\
   ${BOOKING_BASE}/health`} />
-        <CodeBlock code={`curl -H "Authorization: Bearer SUA_API_KEY" \\
-  ${BOOKING_BASE}/bots`} />
+        </div>
+        <div>
+          <div className="text-xs font-semibold mb-1 text-muted-foreground uppercase tracking-wider">Listar bots publicados</div>
+          <CodeBlock code={`curl -H "Authorization: Bearer SUA_API_KEY" \\
+  "${BOOKING_BASE}/bots?published=true"`} />
+        </div>
+        <div>
+          <div className="text-xs font-semibold mb-1 text-muted-foreground uppercase tracking-wider">Iniciar runtime</div>
+          <CodeBlock code={`curl -X POST ${RUNTIME_BASE} \\
+  -H "Content-Type: application/json" \\
+  -d '{"action":"start","flow_id":"abc123","contact_id":"user-1"}'`} />
+        </div>
+        <div>
+          <div className="text-xs font-semibold mb-1 text-muted-foreground uppercase tracking-wider">Sync de plano</div>
+          <CodeBlock code={`curl -X POST ${SYNC_PLAN_BASE} \\
+  -H "Authorization: Bearer <JWT_HS256>" \\
+  -H "Content-Type: application/json" \\
+  -d '{"company_id":"ext-1","tier":"pro","source":"booking"}'`} />
+        </div>
       </div>
     ),
   },
@@ -357,10 +782,11 @@ Authorization: Bearer <API_KEY>`} />
     title: "Regras de segurança",
     body: (
       <ul className="list-disc pl-5 space-y-2 text-sm text-muted-foreground">
-        <li>A API é read-only — não há endpoints de escrita.</li>
-        <li>O escopo é determinado <strong>exclusivamente</strong> pela API Key. Parâmetros do cliente nunca definem workspace.</li>
-        <li>Cada request atualiza o <code>last_used_at</code> da chave, permitindo auditoria.</li>
+        <li>A Booking API é <strong>read-only</strong>.</li>
+        <li>O escopo é determinado <strong>exclusivamente</strong> pela API Key. Parâmetros do cliente não alteram o workspace.</li>
         <li>Chaves desativadas retornam <Badge variant="outline">403</Badge> imediatamente.</li>
+        <li>Cada request atualiza <code>last_used_at</code>. Rotacione chaves periodicamente.</li>
+        <li>Provisionamento e sync usam JWT HS256 com claims obrigatórias (iss/aud/purpose).</li>
       </ul>
     ),
   },
@@ -372,27 +798,19 @@ Authorization: Bearer <API_KEY>`} />
 
 const sections: ApiSection[] = [
   {
-    id: "flow-runtime",
-    label: "API Flow (Runtime)",
-    icon: Bot,
-    baseUrl: RUNTIME_BASE,
-    description: "API usada pelo runtime dos bots do Zailom Flow.",
-    auth: {
-      type: "apiKey",
-      description: "Header x-api-key ou Authorization: Bearer <key>.",
-      example: "x-api-key: zf_...",
-    },
-    sidebar: [
-      {
-        label: "Runtime",
-        items: runtimeEndpoints.map((e) => ({ id: e.id, label: e.title, method: e.method })),
-      },
-    ],
-    endpoints: Object.fromEntries(runtimeEndpoints.map((e) => [e.id, e])),
+    id: "overview",
+    label: "Visão Geral",
+    icon: Compass,
+    baseUrl: SUPABASE_URL,
+    description: "Comece por aqui.",
+    auth: { type: "none", description: "Página inicial." },
+    sidebar: [{ label: "Início", items: [{ id: "overview", label: "Visão Geral" }] }],
+    endpoints: {},
+    overview: overviewDoc,
   },
   {
     id: "booking",
-    label: "Booking Integration API",
+    label: "Booking Integration",
     icon: Plug,
     baseUrl: BOOKING_BASE,
     description: "API pública read-only para integração Flow ↔ Booking.",
@@ -427,17 +845,76 @@ const sections: ApiSection[] = [
     endpoints: Object.fromEntries(bookingEndpoints.map((e) => [e.id, e])),
   },
   {
+    id: "runtime",
+    label: "Chatbot Runtime",
+    icon: Bot,
+    baseUrl: RUNTIME_BASE,
+    description: "Runtime de execução dos bots. POST único na raiz da função.",
+    auth: { type: "none", description: "Sem autenticação (validação por flow_id/public_id)." },
+    sidebar: [
+      {
+        label: "Runtime",
+        items: runtimeEndpoints.map((e) => ({ id: e.id, label: e.title, method: e.method })),
+      },
+    ],
+    endpoints: Object.fromEntries(runtimeEndpoints.map((e) => [e.id, e])),
+  },
+  {
+    id: "provisioning",
+    label: "Provisioning & Plans",
+    icon: Workflow,
+    baseUrl: `${SUPABASE_URL}/functions/v1`,
+    description: "Provisionamento de contas e sincronização de planos externos.",
+    auth: {
+      type: "jwtHs256",
+      description: "JWT HS256 com EMBED_SHARED_SECRET.",
+      example: "Authorization: Bearer eyJhbGciOiJIUzI1NiJ9...",
+    },
+    sidebar: [
+      {
+        label: "Contas",
+        items: [
+          { id: "provision-account", label: "Provisionar conta", method: "POST" },
+        ],
+      },
+      {
+        label: "Planos",
+        items: [
+          { id: "sync-embed-plan", label: "Sincronizar plano", method: "POST" },
+          { id: "embed-plan-status", label: "Consultar plano", method: "GET" },
+        ],
+      },
+    ],
+    endpoints: Object.fromEntries(provisioningEndpoints.map((e) => [e.id, e])),
+  },
+  {
+    id: "webhooks",
+    label: "Webhooks",
+    icon: Webhook,
+    baseUrl: `${SUPABASE_URL}/functions/v1`,
+    description: "Webhook da Evolution API e utilitários.",
+    auth: { type: "webhook", description: "Autenticação por payload/instance." },
+    sidebar: [
+      {
+        label: "WhatsApp",
+        items: [{ id: "whatsapp-webhook", label: "Evolution webhook", method: "POST" }],
+      },
+      {
+        label: "Utilitários",
+        items: [{ id: "crawl", label: "Crawler KB", method: "POST" }],
+      },
+    ],
+    endpoints: Object.fromEntries(webhookEndpoints.map((e) => [e.id, e])),
+  },
+  {
     id: "reference",
     label: "Referências",
     icon: BookOpen,
-    baseUrl: BOOKING_BASE,
-    description: "Guia geral: autenticação, códigos, exemplos e segurança.",
+    baseUrl: SUPABASE_URL,
+    description: "Guias transversais: autenticação, códigos, planos, CORS e segurança.",
     auth: { type: "none", description: "Documentação estática." },
     sidebar: [
-      {
-        label: "Guias",
-        items: references.map((r) => ({ id: r.id, label: r.title })),
-      },
+      { label: "Guias", items: references.map((r) => ({ id: r.id, label: r.title })) },
     ],
     endpoints: {},
     reference: references,
@@ -445,7 +922,7 @@ const sections: ApiSection[] = [
 ];
 
 /* -------------------------------------------------------------------------- */
-/* Small UI helpers                                                            */
+/* UI helpers                                                                  */
 /* -------------------------------------------------------------------------- */
 
 function CodeBlock({ code }: { code: string }) {
@@ -480,18 +957,33 @@ function MethodBadge({ method }: { method: HttpMethod }) {
   );
 }
 
+function AuthPill({ auth }: { auth?: AuthKind }) {
+  if (!auth || auth === "none") {
+    return <Badge variant="outline" className="text-[10px] gap-1"><Globe className="w-3 h-3" /> Público</Badge>;
+  }
+  if (auth === "apiKey") {
+    return <Badge variant="outline" className="text-[10px] gap-1 border-emerald-500/30 text-emerald-500"><Key className="w-3 h-3" /> API Key</Badge>;
+  }
+  if (auth === "jwtHs256") {
+    return <Badge variant="outline" className="text-[10px] gap-1 border-purple-500/30 text-purple-500"><Shield className="w-3 h-3" /> JWT HS256</Badge>;
+  }
+  return <Badge variant="outline" className="text-[10px] gap-1"><Webhook className="w-3 h-3" /> Webhook</Badge>;
+}
+
 /* -------------------------------------------------------------------------- */
 /* Endpoint view + tester                                                      */
 /* -------------------------------------------------------------------------- */
 
 function EndpointView({
   endpoint,
-  baseUrl,
+  section,
   apiKey,
+  jwt,
 }: {
   endpoint: Endpoint;
-  baseUrl: string;
+  section: ApiSection;
   apiKey: string;
+  jwt: string;
 }) {
   const [pathParams, setPathParams] = useState<Record<string, string>>({});
   const [queryParams, setQueryParams] = useState<Record<string, string>>({});
@@ -501,7 +993,6 @@ function EndpointView({
   const [response, setResponse] = useState<string>("");
   const [duration, setDuration] = useState<number | null>(null);
 
-  // Reset when endpoint changes
   useEffect(() => {
     setPathParams({});
     setQueryParams({});
@@ -513,9 +1004,12 @@ function EndpointView({
 
   const pathDefs = endpoint.params?.filter((p) => p.in === "path") ?? [];
   const queryDefs = endpoint.params?.filter((p) => p.in === "query") ?? [];
+  const bodyDefs = endpoint.params?.filter((p) => p.in === "body") ?? [];
   const hasBody = endpoint.method !== "GET" && endpoint.method !== "DELETE";
 
   const finalUrl = useMemo(() => {
+    // For provisioning/webhooks section base is /functions/v1 and path already includes fn name
+    const base = section.baseUrl.replace(/\/$/, "");
     let p = endpoint.path;
     pathDefs.forEach((pd) => {
       const v = pathParams[pd.key] ?? "";
@@ -526,12 +1020,23 @@ function EndpointView({
       const v = queryParams[qd.key];
       if (v) qs.set(qd.key, v);
     });
-    return `${baseUrl.replace(/\/$/, "")}${p}${qs.toString() ? `?${qs}` : ""}`;
-  }, [endpoint.path, pathParams, queryParams, baseUrl, pathDefs, queryDefs]);
+    return `${base}${p === "/" ? "" : p}${qs.toString() ? `?${qs}` : ""}` || base;
+  }, [endpoint.path, pathParams, queryParams, section.baseUrl, pathDefs, queryDefs]);
+
+  const authHeaders = useMemo(() => {
+    const h: Record<string, string> = { "Content-Type": "application/json" };
+    if (endpoint.auth === "apiKey" && apiKey) h["x-api-key"] = apiKey;
+    if (endpoint.auth === "jwtHs256" && jwt) h["Authorization"] = `Bearer ${jwt}`;
+    return h;
+  }, [endpoint.auth, apiKey, jwt]);
 
   async function run() {
-    if (!apiKey) {
-      toast.error("Configure sua API Key acima");
+    if (endpoint.auth === "apiKey" && !apiKey) {
+      toast.error("Configure sua API Key no topo");
+      return;
+    }
+    if (endpoint.auth === "jwtHs256" && !jwt) {
+      toast.error("Configure o JWT HS256 no topo");
       return;
     }
     for (const pd of pathDefs) {
@@ -545,13 +1050,7 @@ function EndpointView({
     setResponse("");
     const start = performance.now();
     try {
-      const init: RequestInit = {
-        method: endpoint.method,
-        headers: {
-          "x-api-key": apiKey,
-          "Content-Type": "application/json",
-        },
-      };
+      const init: RequestInit = { method: endpoint.method, headers: authHeaders };
       if (hasBody && bodyStr.trim()) init.body = bodyStr;
       const res = await fetch(finalUrl, init);
       setStatus(res.status);
@@ -569,18 +1068,26 @@ function EndpointView({
     }
   }
 
+  const curlCmd = useMemo(() => {
+    const headers = Object.entries(authHeaders)
+      .map(([k, v]) => ` \\\n  -H "${k}: ${k === "x-api-key" ? (apiKey || "SUA_API_KEY") : k === "Authorization" ? `Bearer ${jwt || "SEU_JWT"}` : v}"`)
+      .join("");
+    const bodyPart = hasBody && bodyStr.trim() ? ` \\\n  -d '${bodyStr.replace(/'/g, "'\\''")}'` : "";
+    return `curl -X ${endpoint.method} "${finalUrl}"${headers}${bodyPart}`;
+  }, [endpoint.method, finalUrl, authHeaders, hasBody, bodyStr, apiKey, jwt]);
+
   return (
-    <div className="max-w-5xl">
-      {/* Header */}
+    <div className="max-w-6xl">
       <div className="mb-6">
-        <div className="flex items-center gap-3 mb-2">
+        <div className="flex items-center gap-3 mb-2 flex-wrap">
           <MethodBadge method={endpoint.method} />
           <code className="text-sm font-mono text-muted-foreground">{endpoint.path}</code>
+          <AuthPill auth={endpoint.auth} />
         </div>
         <h1 className="text-2xl font-semibold tracking-tight mb-1">{endpoint.title}</h1>
         <p className="text-muted-foreground">{endpoint.summary}</p>
         {endpoint.description && (
-          <p className="text-sm text-muted-foreground mt-2">{endpoint.description}</p>
+          <p className="text-sm text-muted-foreground mt-2 leading-relaxed">{endpoint.description}</p>
         )}
       </div>
 
@@ -592,7 +1099,7 @@ function EndpointView({
               <Settings2 className="w-4 h-4" /> Parâmetros
             </h2>
 
-            {pathDefs.length === 0 && queryDefs.length === 0 && !hasBody && (
+            {endpoint.params?.length === 0 && !hasBody && (
               <p className="text-xs text-muted-foreground">Este endpoint não possui parâmetros.</p>
             )}
 
@@ -622,7 +1129,10 @@ function EndpointView({
                 <div className="text-xs font-semibold uppercase text-muted-foreground tracking-wider">Query</div>
                 {queryDefs.map((qd) => (
                   <div key={qd.key} className="space-y-1">
-                    <Label className="text-xs">{qd.label}</Label>
+                    <Label className="text-xs flex items-center gap-2">
+                      {qd.label}
+                      {qd.required && <span className="text-red-500">*</span>}
+                    </Label>
                     <Input
                       value={queryParams[qd.key] ?? ""}
                       onChange={(e) => setQueryParams((v) => ({ ...v, [qd.key]: e.target.value }))}
@@ -637,18 +1147,42 @@ function EndpointView({
 
             {hasBody && (
               <div className="space-y-1 mb-4">
-                <div className="text-xs font-semibold uppercase text-muted-foreground tracking-wider">Body (JSON)</div>
+                <div className="text-xs font-semibold uppercase text-muted-foreground tracking-wider flex items-center justify-between">
+                  <span>Body (JSON)</span>
+                  {endpoint.bodyExample && (
+                    <button
+                      onClick={() => setBodyStr(endpoint.bodyExample!)}
+                      className="text-[10px] normal-case font-medium text-muted-foreground hover:text-foreground flex items-center gap-1"
+                    >
+                      <RefreshCcw className="w-3 h-3" /> reset
+                    </button>
+                  )}
+                </div>
                 <Textarea
                   value={bodyStr}
                   onChange={(e) => setBodyStr(e.target.value)}
-                  className="font-mono text-xs min-h-[120px]"
+                  className="font-mono text-xs min-h-[160px]"
                   spellCheck={false}
                 />
+                {bodyDefs.length > 0 && (
+                  <details className="text-xs text-muted-foreground mt-2">
+                    <summary className="cursor-pointer hover:text-foreground">Campos aceitos</summary>
+                    <ul className="mt-2 space-y-1 pl-4">
+                      {bodyDefs.map((b) => (
+                        <li key={b.key}>
+                          <code className="text-foreground">{b.key}</code>
+                          {b.required && <span className="text-red-500 ml-1">*</span>}
+                          {b.description && <span className="ml-2 text-muted-foreground">— {b.description}</span>}
+                        </li>
+                      ))}
+                    </ul>
+                  </details>
+                )}
               </div>
             )}
 
-            <div className="pt-2 border-t border-border">
-              <div className="text-xs text-muted-foreground mb-2 font-mono break-all">{finalUrl}</div>
+            <div className="pt-2 border-t border-border space-y-2">
+              <div className="text-xs text-muted-foreground font-mono break-all bg-muted/40 rounded px-2 py-1.5">{finalUrl}</div>
               <Button onClick={run} disabled={loading} size="sm" className="w-full">
                 {loading ? (
                   <><Loader2 className="w-4 h-4 mr-2 animate-spin" /> Enviando...</>
@@ -692,7 +1226,7 @@ function EndpointView({
           )}
         </div>
 
-        {/* Right: example + codes */}
+        {/* Right: docs */}
         <div className="space-y-5">
           <section>
             <h2 className="text-sm font-semibold mb-3 flex items-center gap-2">
@@ -700,6 +1234,15 @@ function EndpointView({
             </h2>
             <CodeBlock code={endpoint.responseExample} />
           </section>
+
+          {endpoint.notes && endpoint.notes.length > 0 && (
+            <section className="border border-border rounded-lg p-4 bg-muted/20">
+              <h2 className="text-xs font-semibold mb-2 uppercase tracking-wider text-muted-foreground">Notas</h2>
+              <ul className="list-disc pl-5 space-y-1 text-sm text-muted-foreground">
+                {endpoint.notes.map((n, i) => <li key={i}>{n}</li>)}
+              </ul>
+            </section>
+          )}
 
           {endpoint.responseCodes && (
             <section>
@@ -717,14 +1260,9 @@ function EndpointView({
 
           <section>
             <h2 className="text-sm font-semibold mb-3 flex items-center gap-2">
-              <Webhook className="w-4 h-4" /> curl
+              <Play className="w-4 h-4" /> curl
             </h2>
-            <CodeBlock
-              code={`curl -X ${endpoint.method} "${finalUrl}" \\
-  -H "x-api-key: ${apiKey || "SUA_API_KEY"}"${
-                hasBody && bodyStr.trim() ? ` \\\n  -H "Content-Type: application/json" \\\n  -d '${bodyStr.replace(/'/g, "'\\''")}'` : ""
-              }`}
-            />
+            <CodeBlock code={curlCmd} />
           </section>
         </div>
       </div>
@@ -738,8 +1276,8 @@ function EndpointView({
 
 function ReferenceView({ doc }: { doc: ReferenceDoc }) {
   return (
-    <div className="max-w-3xl">
-      <h1 className="text-2xl font-semibold tracking-tight mb-4">{doc.title}</h1>
+    <div className="max-w-4xl">
+      <h1 className="text-2xl font-semibold tracking-tight mb-5">{doc.title}</h1>
       <div>{doc.body}</div>
     </div>
   );
@@ -750,30 +1288,32 @@ function ReferenceView({ doc }: { doc: ReferenceDoc }) {
 /* -------------------------------------------------------------------------- */
 
 export default function DocsPage() {
-  const [activeSectionId, setActiveSectionId] = useState<string>("booking");
-  const [activeItemId, setActiveItemId] = useState<string>("health");
+  const [activeSectionId, setActiveSectionId] = useState<string>("overview");
+  const [activeItemId, setActiveItemId] = useState<string>("overview");
   const [apiKey, setApiKey] = useState("");
+  const [jwt, setJwt] = useState("");
   const [showConfig, setShowConfig] = useState(false);
 
   useEffect(() => {
-    const saved = localStorage.getItem("zailom_docs_api_key");
-    if (saved) setApiKey(saved);
+    const k = localStorage.getItem("zailom_docs_api_key");
+    const j = localStorage.getItem("zailom_docs_jwt");
+    if (k) setApiKey(k);
+    if (j) setJwt(j);
   }, []);
 
-  useEffect(() => {
-    if (apiKey) localStorage.setItem("zailom_docs_api_key", apiKey);
-  }, [apiKey]);
+  useEffect(() => { if (apiKey) localStorage.setItem("zailom_docs_api_key", apiKey); }, [apiKey]);
+  useEffect(() => { if (jwt) localStorage.setItem("zailom_docs_jwt", jwt); }, [jwt]);
 
   const section = sections.find((s) => s.id === activeSectionId)!;
 
-  // When switching header tab, jump to the first sidebar item
   useEffect(() => {
     const first = section.sidebar[0]?.items[0]?.id;
     if (first) setActiveItemId(first);
   }, [activeSectionId]); // eslint-disable-line
 
   const isReference = section.id === "reference";
-  const endpoint = !isReference ? section.endpoints[activeItemId] : undefined;
+  const isOverview = section.id === "overview";
+  const endpoint = !isReference && !isOverview ? section.endpoints[activeItemId] : undefined;
   const refDoc = isReference ? section.reference?.find((r) => r.id === activeItemId) : undefined;
 
   return (
@@ -785,10 +1325,13 @@ export default function DocsPage() {
             <div className="w-7 h-7 rounded-md bg-primary/15 flex items-center justify-center">
               <Shield className="w-4 h-4 text-primary" />
             </div>
-            <span className="font-semibold text-sm">Zailom Docs</span>
+            <div className="leading-tight">
+              <div className="font-semibold text-sm">Zailom Docs</div>
+              <div className="text-[10px] text-muted-foreground -mt-0.5">API Reference</div>
+            </div>
           </a>
 
-          <nav className="flex items-center gap-1">
+          <nav className="flex items-center gap-1 overflow-x-auto">
             {sections.map((s) => {
               const Icon = s.icon;
               const active = s.id === activeSectionId;
@@ -796,7 +1339,7 @@ export default function DocsPage() {
                 <button
                   key={s.id}
                   onClick={() => setActiveSectionId(s.id)}
-                  className={`px-3 h-9 rounded-md text-sm font-medium flex items-center gap-2 transition-colors ${
+                  className={`px-3 h-9 rounded-md text-sm font-medium flex items-center gap-2 transition-colors whitespace-nowrap ${
                     active
                       ? "bg-primary/10 text-primary"
                       : "text-muted-foreground hover:text-foreground hover:bg-accent"
@@ -818,15 +1361,17 @@ export default function DocsPage() {
             className="gap-2"
           >
             <Key className="w-4 h-4" />
-            {apiKey ? "API Key configurada" : "Configurar API Key"}
+            <span className="hidden sm:inline">
+              {apiKey || jwt ? "Credenciais configuradas" : "Configurar credenciais"}
+            </span>
           </Button>
         </div>
 
         {showConfig && (
           <div className="border-t border-border bg-card/60 px-6 py-4">
-            <div className="max-w-3xl grid sm:grid-cols-[1fr_auto] gap-3 items-end">
+            <div className="max-w-4xl grid sm:grid-cols-2 gap-4">
               <div className="space-y-1">
-                <Label className="text-xs">API Key</Label>
+                <Label className="text-xs flex items-center gap-2"><Key className="w-3 h-3" /> API Key (Booking)</Label>
                 <Input
                   type="password"
                   value={apiKey}
@@ -838,9 +1383,22 @@ export default function DocsPage() {
                   Gerada em Configurações → API Keys. Fica salva neste navegador.
                 </p>
               </div>
-              <Button variant="secondary" size="sm" onClick={() => setShowConfig(false)}>
-                Fechar
-              </Button>
+              <div className="space-y-1">
+                <Label className="text-xs flex items-center gap-2"><Shield className="w-3 h-3" /> JWT HS256 (Provisioning)</Label>
+                <Input
+                  type="password"
+                  value={jwt}
+                  onChange={(e) => setJwt(e.target.value)}
+                  placeholder="eyJhbGciOiJIUzI1NiJ9..."
+                  className="font-mono h-9"
+                />
+                <p className="text-xs text-muted-foreground">
+                  Assinado com EMBED_SHARED_SECRET. Use apenas em ambiente confiável.
+                </p>
+              </div>
+              <div className="sm:col-span-2 flex justify-end">
+                <Button variant="secondary" size="sm" onClick={() => setShowConfig(false)}>Fechar</Button>
+              </div>
             </div>
           </div>
         )}
@@ -854,29 +1412,31 @@ export default function DocsPage() {
               Base URL
             </div>
             <div className="text-xs font-mono text-foreground break-all">{section.baseUrl}</div>
+            <div className="mt-2"><AuthPill auth={section.auth.type} /></div>
+            <p className="text-xs text-muted-foreground mt-2 leading-relaxed">{section.description}</p>
           </div>
 
           <nav className="p-3 space-y-5">
             {section.sidebar.map((group) => (
               <div key={group.label}>
-                <div className="text-xs uppercase text-muted-foreground font-semibold tracking-wider px-2 mb-2">
+                <div className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground px-2 mb-1.5">
                   {group.label}
                 </div>
                 <div className="space-y-0.5">
-                  {group.items.map((item) => {
-                    const active = item.id === activeItemId;
+                  {group.items.map((it) => {
+                    const active = it.id === activeItemId;
                     return (
                       <button
-                        key={item.id}
-                        onClick={() => setActiveItemId(item.id)}
-                        className={`w-full text-left px-2 py-1.5 rounded-md text-sm flex items-center gap-2 transition-colors ${
+                        key={it.id}
+                        onClick={() => setActiveItemId(it.id)}
+                        className={`w-full text-left px-2 py-1.5 rounded text-sm flex items-center gap-2 transition-colors ${
                           active
-                            ? "bg-accent text-foreground"
-                            : "text-muted-foreground hover:bg-accent/50 hover:text-foreground"
+                            ? "bg-primary/10 text-primary font-medium"
+                            : "text-muted-foreground hover:text-foreground hover:bg-accent"
                         }`}
                       >
-                        {item.method && <MethodBadge method={item.method} />}
-                        <span className="truncate">{item.label}</span>
+                        {it.method && <MethodBadge method={it.method} />}
+                        <span className="flex-1 truncate">{it.label}</span>
                       </button>
                     );
                   })}
@@ -887,13 +1447,12 @@ export default function DocsPage() {
         </aside>
 
         {/* Main */}
-        <main className="flex-1 overflow-y-auto p-8">
-          {endpoint && (
-            <EndpointView endpoint={endpoint} baseUrl={section.baseUrl} apiKey={apiKey} />
-          )}
+        <main className="flex-1 overflow-y-auto p-6 lg:p-10">
+          {isOverview && section.overview && <ReferenceView doc={section.overview} />}
+          {endpoint && <EndpointView endpoint={endpoint} section={section} apiKey={apiKey} jwt={jwt} />}
           {refDoc && <ReferenceView doc={refDoc} />}
-          {!endpoint && !refDoc && (
-            <div className="text-muted-foreground text-sm">Selecione um item na barra lateral.</div>
+          {!isOverview && !endpoint && !refDoc && (
+            <div className="text-sm text-muted-foreground">Selecione um item na sidebar.</div>
           )}
         </main>
       </div>
