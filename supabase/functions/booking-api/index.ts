@@ -150,22 +150,18 @@ Deno.serve(async (req) => {
       .replace(/\/+$/, "");
 
   try {
-    // Public health check requires a valid key too (that's the whole point of the ping)
-    const auth = await resolveWorkspace(req);
-    if ("error" in auth) return auth.error;
-    const workspaceId = auth.workspaceId;
-
     // GET /health
     if (req.method === "GET" && (path === "/" || path === "/health")) {
-      const ws = await getWorkspaceInfo(workspaceId);
-      if (!ws) return json({ ok: false, error: "Workspace not found" }, 404);
       return json({
         ok: true,
-        workspace_id: ws.id,
-        workspace_slug: ws.slug,
+        service: "booking-api",
         timestamp: new Date().toISOString(),
       });
     }
+
+    const auth = await resolveWorkspace(req);
+    if ("error" in auth) return auth.error;
+    const workspaceId = auth.workspaceId;
 
     // GET /workspace
     if (req.method === "GET" && path === "/workspace") {
