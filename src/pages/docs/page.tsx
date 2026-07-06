@@ -911,6 +911,21 @@ const sections: ApiSection[] = [
     endpoints: Object.fromEntries(webhookEndpoints.map((e) => [e.id, e])),
   },
   {
+    id: "bots",
+    label: "Bots & Nodes",
+    icon: Blocks,
+    baseUrl: "editor://bots",
+    description: "Catálogo completo dos blocos disponíveis no editor de fluxos.",
+    auth: { type: "none", description: "Referência conceitual — não faz chamada HTTP." },
+    sidebar: nodeCategories.map((cat) => ({
+      label: cat.label,
+      items: nodeDocs
+        .filter((n) => n.category === cat.id)
+        .map((n) => ({ id: n.id, label: n.title })),
+    })),
+    endpoints: {},
+  },
+  {
     id: "reference",
     label: "Referências",
     icon: BookOpen,
