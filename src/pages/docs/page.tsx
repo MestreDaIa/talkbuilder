@@ -94,7 +94,7 @@ type ApiSection = {
 /* Constants                                                                   */
 /* -------------------------------------------------------------------------- */
 
-const SUPABASE_URL = "https://fwoescubnnagdvwasbjl.supabase.co";
+const SUPABASE_URL = "https://api-flowbuilder.zailom.com";
 const FN = (name: string) => `${SUPABASE_URL}/functions/v1/${name}`;
 
 const BOOKING_BASE = FN("booking-api");
