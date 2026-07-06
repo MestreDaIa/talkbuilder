@@ -944,15 +944,18 @@ const sections: ApiSection[] = [
 /* UI helpers                                                                  */
 /* -------------------------------------------------------------------------- */
 
-function CodeBlock({ code }: { code: string }) {
+function CodeBlock({ code, lang }: { code: string; lang?: string }) {
   return (
-    <div className="relative group">
-      <pre className="rounded-lg bg-muted/60 border border-border p-4 text-xs overflow-x-auto font-mono leading-relaxed">
+    <div className="docs-code relative group">
+      {lang && (
+        <div className="docs-code__lang">{lang}</div>
+      )}
+      <pre className="docs-code__pre">
         <code>{code}</code>
       </pre>
       <button
         onClick={() => { navigator.clipboard.writeText(code); toast.success("Copiado"); }}
-        className="absolute top-2 right-2 opacity-0 group-hover:opacity-100 transition-opacity bg-background border border-border rounded p-1.5 hover:bg-accent"
+        className="docs-code__copy"
         aria-label="Copiar"
       >
         <Copy className="w-3.5 h-3.5" />
@@ -961,36 +964,41 @@ function CodeBlock({ code }: { code: string }) {
   );
 }
 
-function MethodBadge({ method }: { method: HttpMethod }) {
-  const colors: Record<HttpMethod, string> = {
-    GET: "bg-emerald-500/15 text-emerald-500 border-emerald-500/30",
-    POST: "bg-blue-500/15 text-blue-500 border-blue-500/30",
-    PUT: "bg-amber-500/15 text-amber-500 border-amber-500/30",
-    PATCH: "bg-purple-500/15 text-purple-500 border-purple-500/30",
-    DELETE: "bg-red-500/15 text-red-500 border-red-500/30",
-  };
-  return (
-    <span className={`text-[10px] font-mono font-bold px-1.5 py-0.5 rounded border ${colors[method]}`}>
-      {method}
-    </span>
-  );
+function MethodBadge({ method, size = "sm" }: { method: HttpMethod; size?: "sm" | "md" }) {
+  const cls = `docs-method docs-method--${method.toLowerCase()} ${size === "md" ? "docs-method--md" : ""}`;
+  return <span className={cls}>{method}</span>;
 }
 
 function AuthPill({ auth }: { auth?: AuthKind }) {
-  if (!auth || auth === "none") {
-    return <Badge variant="outline" className="text-[10px] gap-1"><Globe className="w-3 h-3" /> Público</Badge>;
-  }
-  if (auth === "apiKey") {
-    return <Badge variant="outline" className="text-[10px] gap-1 border-emerald-500/30 text-emerald-500"><Key className="w-3 h-3" /> API Key</Badge>;
-  }
-  if (auth === "jwtHs256") {
-    return <Badge variant="outline" className="text-[10px] gap-1 border-purple-500/30 text-purple-500"><Shield className="w-3 h-3" /> JWT HS256</Badge>;
-  }
-  return <Badge variant="outline" className="text-[10px] gap-1"><Webhook className="w-3 h-3" /> Webhook</Badge>;
+  if (!auth || auth === "none") return <span className="docs-pill docs-pill--muted"><Globe className="w-3 h-3" /> Público</span>;
+  if (auth === "apiKey") return <span className="docs-pill docs-pill--emerald"><Key className="w-3 h-3" /> API Key</span>;
+  if (auth === "jwtHs256") return <span className="docs-pill docs-pill--violet"><Shield className="w-3 h-3" /> JWT HS256</span>;
+  return <span className="docs-pill docs-pill--amber"><Webhook className="w-3 h-3" /> Webhook</span>;
+}
+
+function SectionHeading({ children, id }: { children: React.ReactNode; id?: string }) {
+  return <h2 id={id} className="text-[13px] font-semibold uppercase tracking-[0.12em] text-muted-foreground mt-8 mb-3">{children}</h2>;
+}
+
+function PropTable({ rows }: { rows: { name: string; type: string; required?: boolean; description: string }[] }) {
+  return (
+    <div className="docs-proptable">
+      {rows.map((r) => (
+        <div key={r.name} className="docs-proptable__row">
+          <div className="docs-proptable__head">
+            <code className="docs-proptable__name">{r.name}</code>
+            <span className="docs-proptable__type">{r.type}</span>
+            {r.required && <span className="docs-proptable__req">required</span>}
+          </div>
+          <p className="docs-proptable__desc">{r.description}</p>
+        </div>
+      ))}
+    </div>
+  );
 }
 
 /* -------------------------------------------------------------------------- */
-/* Endpoint view + tester                                                      */
+/* Endpoint view (Mintlify-style: docs left, code right sticky)                */
 /* -------------------------------------------------------------------------- */
 
 function EndpointView({
@@ -1011,14 +1019,11 @@ function EndpointView({
   const [status, setStatus] = useState<number | null>(null);
   const [response, setResponse] = useState<string>("");
   const [duration, setDuration] = useState<number | null>(null);
+  const [tab, setTab] = useState<"curl" | "js" | "python">("curl");
 
   useEffect(() => {
-    setPathParams({});
-    setQueryParams({});
-    setBodyStr(endpoint.bodyExample ?? "");
-    setStatus(null);
-    setResponse("");
-    setDuration(null);
+    setPathParams({}); setQueryParams({}); setBodyStr(endpoint.bodyExample ?? "");
+    setStatus(null); setResponse(""); setDuration(null);
   }, [endpoint.id]);
 
   const pathDefs = endpoint.params?.filter((p) => p.in === "path") ?? [];
@@ -1027,7 +1032,6 @@ function EndpointView({
   const hasBody = endpoint.method !== "GET" && endpoint.method !== "DELETE";
 
   const finalUrl = useMemo(() => {
-    // For provisioning/webhooks section base is /functions/v1 and path already includes fn name
     const base = section.baseUrl.replace(/\/$/, "");
     let p = endpoint.path;
     pathDefs.forEach((pd) => {
@@ -1035,38 +1039,22 @@ function EndpointView({
       p = p.replace(`:${pd.key}`, v ? encodeURIComponent(v) : `:${pd.key}`);
     });
     const qs = new URLSearchParams();
-    queryDefs.forEach((qd) => {
-      const v = queryParams[qd.key];
-      if (v) qs.set(qd.key, v);
-    });
+    queryDefs.forEach((qd) => { const v = queryParams[qd.key]; if (v) qs.set(qd.key, v); });
     return `${base}${p === "/" ? "" : p}${qs.toString() ? `?${qs}` : ""}` || base;
   }, [endpoint.path, pathParams, queryParams, section.baseUrl, pathDefs, queryDefs]);
 
   const authHeaders = useMemo(() => {
     const h: Record<string, string> = { "Content-Type": "application/json" };
-    if (endpoint.auth === "apiKey" && apiKey) h["x-api-key"] = apiKey;
-    if (endpoint.auth === "jwtHs256" && jwt) h["Authorization"] = `Bearer ${jwt}`;
+    if (endpoint.auth === "apiKey") h["x-api-key"] = apiKey || "SUA_API_KEY";
+    if (endpoint.auth === "jwtHs256") h["Authorization"] = `Bearer ${jwt || "SEU_JWT"}`;
     return h;
   }, [endpoint.auth, apiKey, jwt]);
 
   async function run() {
-    if (endpoint.auth === "apiKey" && !apiKey) {
-      toast.error("Configure sua API Key no topo");
-      return;
-    }
-    if (endpoint.auth === "jwtHs256" && !jwt) {
-      toast.error("Configure o JWT HS256 no topo");
-      return;
-    }
-    for (const pd of pathDefs) {
-      if (pd.required && !pathParams[pd.key]) {
-        toast.error(`Informe ${pd.label}`);
-        return;
-      }
-    }
-    setLoading(true);
-    setStatus(null);
-    setResponse("");
+    if (endpoint.auth === "apiKey" && !apiKey) return toast.error("Configure sua API Key no topo");
+    if (endpoint.auth === "jwtHs256" && !jwt) return toast.error("Configure o JWT HS256 no topo");
+    for (const pd of pathDefs) if (pd.required && !pathParams[pd.key]) return toast.error(`Informe ${pd.label}`);
+    setLoading(true); setStatus(null); setResponse("");
     const start = performance.now();
     try {
       const init: RequestInit = { method: endpoint.method, headers: authHeaders };
@@ -1074,11 +1062,7 @@ function EndpointView({
       const res = await fetch(finalUrl, init);
       setStatus(res.status);
       const text = await res.text();
-      try {
-        setResponse(JSON.stringify(JSON.parse(text), null, 2));
-      } catch {
-        setResponse(text);
-      }
+      try { setResponse(JSON.stringify(JSON.parse(text), null, 2)); } catch { setResponse(text); }
     } catch (e: any) {
       setResponse(`Erro de rede: ${e?.message ?? e}`);
     } finally {
@@ -1088,203 +1072,208 @@ function EndpointView({
   }
 
   const curlCmd = useMemo(() => {
-    const headers = Object.entries(authHeaders)
-      .map(([k, v]) => ` \\\n  -H "${k}: ${k === "x-api-key" ? (apiKey || "SUA_API_KEY") : k === "Authorization" ? `Bearer ${jwt || "SEU_JWT"}` : v}"`)
-      .join("");
+    const headers = Object.entries(authHeaders).map(([k, v]) => ` \\\n  -H "${k}: ${v}"`).join("");
     const bodyPart = hasBody && bodyStr.trim() ? ` \\\n  -d '${bodyStr.replace(/'/g, "'\\''")}'` : "";
     return `curl -X ${endpoint.method} "${finalUrl}"${headers}${bodyPart}`;
-  }, [endpoint.method, finalUrl, authHeaders, hasBody, bodyStr, apiKey, jwt]);
+  }, [endpoint.method, finalUrl, authHeaders, hasBody, bodyStr]);
+
+  const jsCmd = useMemo(() => {
+    return `const res = await fetch("${finalUrl}", {
+  method: "${endpoint.method}",
+  headers: ${JSON.stringify(authHeaders, null, 2).replace(/\n/g, "\n  ")}${hasBody && bodyStr.trim() ? `,
+  body: JSON.stringify(${bodyStr.trim()})` : ""}
+});
+const data = await res.json();`;
+  }, [finalUrl, endpoint.method, authHeaders, hasBody, bodyStr]);
+
+  const pyCmd = useMemo(() => {
+    const headersPy = JSON.stringify(authHeaders, null, 4);
+    return `import requests
+
+r = requests.${endpoint.method.toLowerCase()}(
+    "${finalUrl}",
+    headers=${headersPy}${hasBody && bodyStr.trim() ? `,
+    json=${bodyStr.trim()}` : ""},
+)
+print(r.status_code, r.json())`;
+  }, [finalUrl, endpoint.method, authHeaders, hasBody, bodyStr]);
 
   return (
-    <div className="max-w-6xl">
-      <div className="mb-6">
-        <div className="flex items-center gap-3 mb-2 flex-wrap">
-          <MethodBadge method={endpoint.method} />
-          <code className="text-sm font-mono text-muted-foreground">{endpoint.path}</code>
-          <AuthPill auth={endpoint.auth} />
+    <div className="docs-endpoint">
+      {/* LEFT — content */}
+      <div className="docs-endpoint__main">
+        <div className="mb-6">
+          <div className="flex items-center gap-2 mb-3 flex-wrap">
+            <MethodBadge method={endpoint.method} size="md" />
+            <code className="docs-path">{endpoint.path}</code>
+          </div>
+          <h1 className="text-3xl font-semibold tracking-tight text-foreground">{endpoint.title}</h1>
+          <p className="text-muted-foreground mt-2 text-[15px] leading-relaxed">{endpoint.summary}</p>
+          {endpoint.description && (
+            <p className="text-sm text-muted-foreground mt-3 leading-relaxed">{endpoint.description}</p>
+          )}
+          <div className="mt-4"><AuthPill auth={endpoint.auth} /></div>
         </div>
-        <h1 className="text-2xl font-semibold tracking-tight mb-1">{endpoint.title}</h1>
-        <p className="text-muted-foreground">{endpoint.summary}</p>
-        {endpoint.description && (
-          <p className="text-sm text-muted-foreground mt-2 leading-relaxed">{endpoint.description}</p>
+
+        {pathDefs.length > 0 && (<><SectionHeading>Path parameters</SectionHeading><PropTable rows={pathDefs.map((p) => ({ name: p.key, type: "string", required: p.required, description: p.description ?? p.placeholder ?? "" }))} /></>)}
+        {queryDefs.length > 0 && (<><SectionHeading>Query parameters</SectionHeading><PropTable rows={queryDefs.map((p) => ({ name: p.key, type: "string", required: p.required, description: p.description ?? p.placeholder ?? "" }))} /></>)}
+        {hasBody && bodyDefs.length > 0 && (<><SectionHeading>Body</SectionHeading><PropTable rows={bodyDefs.map((p) => ({ name: p.key, type: "json", required: p.required, description: p.description ?? "" }))} /></>)}
+
+        {endpoint.notes && endpoint.notes.length > 0 && (
+          <div className="docs-callout mt-6">
+            <div className="docs-callout__title">Notas</div>
+            <ul className="list-disc pl-5 space-y-1 text-sm text-muted-foreground">
+              {endpoint.notes.map((n, i) => <li key={i}>{n}</li>)}
+            </ul>
+          </div>
+        )}
+
+        {endpoint.responseCodes && (
+          <>
+            <SectionHeading>Códigos de resposta</SectionHeading>
+            <div className="docs-codes">
+              {endpoint.responseCodes.map((rc) => (
+                <div key={rc.code} className={`docs-codes__row docs-codes__row--${rc.code < 300 ? "ok" : rc.code < 500 ? "warn" : "err"}`}>
+                  <span className="docs-codes__code">{rc.code}</span>
+                  <span className="docs-codes__label">{rc.label}</span>
+                </div>
+              ))}
+            </div>
+          </>
+        )}
+
+        {/* Interactive tester */}
+        <SectionHeading>Testar endpoint</SectionHeading>
+        <div className="docs-tester">
+          {pathDefs.map((pd) => (
+            <div key={pd.key} className="docs-tester__field">
+              <Label className="text-xs font-mono">{pd.key}{pd.required && <span className="text-rose-400 ml-0.5">*</span>}</Label>
+              <Input value={pathParams[pd.key] ?? ""} onChange={(e) => setPathParams((v) => ({ ...v, [pd.key]: e.target.value }))} placeholder={pd.placeholder} className="docs-input" />
+            </div>
+          ))}
+          {queryDefs.map((qd) => (
+            <div key={qd.key} className="docs-tester__field">
+              <Label className="text-xs font-mono">?{qd.key}</Label>
+              <Input value={queryParams[qd.key] ?? ""} onChange={(e) => setQueryParams((v) => ({ ...v, [qd.key]: e.target.value }))} placeholder={qd.placeholder} className="docs-input" />
+            </div>
+          ))}
+          {hasBody && (
+            <div className="docs-tester__field">
+              <div className="flex items-center justify-between mb-1">
+                <Label className="text-xs font-mono">body</Label>
+                {endpoint.bodyExample && (
+                  <button onClick={() => setBodyStr(endpoint.bodyExample!)} className="text-[10px] text-muted-foreground hover:text-foreground flex items-center gap-1">
+                    <RefreshCcw className="w-3 h-3" /> reset
+                  </button>
+                )}
+              </div>
+              <Textarea value={bodyStr} onChange={(e) => setBodyStr(e.target.value)} className="docs-input font-mono text-xs min-h-[140px]" spellCheck={false} />
+            </div>
+          )}
+          <Button onClick={run} disabled={loading} className="docs-tester__run">
+            {loading ? <><Loader2 className="w-4 h-4 mr-2 animate-spin" /> Enviando…</> : <><Send className="w-4 h-4 mr-2" /> Enviar requisição</>}
+          </Button>
+
+          {status !== null && (
+            <div className="docs-tester__response">
+              <div className="flex items-center gap-2 mb-2">
+                <span className={`docs-status docs-status--${status < 300 ? "ok" : status < 500 ? "warn" : "err"}`}>{status}</span>
+                {duration !== null && <span className="text-xs text-muted-foreground">{duration}ms</span>}
+                <div className="flex-1" />
+                <button onClick={() => { navigator.clipboard.writeText(response); toast.success("Copiado"); }} className="docs-code__copy docs-code__copy--static">
+                  <Copy className="w-3.5 h-3.5" />
+                </button>
+              </div>
+              <pre className="docs-code__pre max-h-[360px]"><code>{response}</code></pre>
+            </div>
+          )}
+        </div>
+      </div>
+
+      {/* RIGHT — sticky code panel */}
+      <aside className="docs-endpoint__aside">
+        <div className="docs-endpoint__stick">
+          <div className="docs-tabs">
+            {(["curl", "js", "python"] as const).map((t) => (
+              <button key={t} onClick={() => setTab(t)} className={`docs-tabs__btn ${tab === t ? "docs-tabs__btn--active" : ""}`}>
+                {t === "curl" ? "cURL" : t === "js" ? "JavaScript" : "Python"}
+              </button>
+            ))}
+          </div>
+          <div className="docs-panel">
+            <div className="docs-panel__bar">
+              <MethodBadge method={endpoint.method} />
+              <span className="docs-panel__url">{finalUrl}</span>
+            </div>
+            <CodeBlock code={tab === "curl" ? curlCmd : tab === "js" ? jsCmd : pyCmd} />
+          </div>
+          <div className="docs-panel mt-4">
+            <div className="docs-panel__bar">
+              <span className="text-xs text-muted-foreground font-mono">200 · application/json</span>
+            </div>
+            <CodeBlock code={endpoint.responseExample} lang="json" />
+          </div>
+        </div>
+      </aside>
+    </div>
+  );
+}
+
+/* -------------------------------------------------------------------------- */
+/* Node doc view                                                               */
+/* -------------------------------------------------------------------------- */
+
+function NodeDocView({ node }: { node: NodeDoc }) {
+  const cat = nodeCategories.find((c) => c.id === node.category)!;
+  const Icon = node.icon;
+  return (
+    <div className="docs-endpoint">
+      <div className="docs-endpoint__main">
+        <div className="mb-6">
+          <div className="flex items-center gap-2 mb-3">
+            <span className={`docs-pill ${cat.color.replace("text-", "text-").replace("bg-", "bg-").replace("border-", "border-")}`}>
+              <Icon className="w-3 h-3" /> {cat.label}
+            </span>
+            <code className="docs-path">type: "{node.id}"</code>
+          </div>
+          <h1 className="text-3xl font-semibold tracking-tight text-foreground flex items-center gap-3">
+            <span className="docs-node-icon"><Icon className="w-5 h-5" /></span>
+            {node.title}
+          </h1>
+          <p className="text-muted-foreground mt-2 text-[15px] leading-relaxed">{node.summary}</p>
+          <p className="text-sm text-muted-foreground mt-3 leading-relaxed">{node.description}</p>
+        </div>
+
+        <SectionHeading>Quando usar</SectionHeading>
+        <ul className="list-disc pl-5 space-y-1 text-sm text-muted-foreground">
+          {node.useCases.map((u, i) => <li key={i}>{u}</li>)}
+        </ul>
+
+        <SectionHeading>Campos de configuração</SectionHeading>
+        <PropTable rows={node.fields} />
+
+        {node.outputs && node.outputs.length > 0 && (
+          <>
+            <SectionHeading>Handles de saída</SectionHeading>
+            <div className="flex flex-wrap gap-2">
+              {node.outputs.map((o) => (
+                <span key={o} className="docs-pill docs-pill--muted"><ChevronRight className="w-3 h-3" /> {o}</span>
+              ))}
+            </div>
+          </>
         )}
       </div>
 
-      <div className="grid lg:grid-cols-2 gap-6">
-        {/* Left: params + tester */}
-        <div className="space-y-5">
-          <section className="border border-border rounded-lg p-4 bg-card">
-            <h2 className="text-sm font-semibold mb-3 flex items-center gap-2">
-              <Settings2 className="w-4 h-4" /> Parâmetros
-            </h2>
-
-            {endpoint.params?.length === 0 && !hasBody && (
-              <p className="text-xs text-muted-foreground">Este endpoint não possui parâmetros.</p>
-            )}
-
-            {pathDefs.length > 0 && (
-              <div className="space-y-3 mb-4">
-                <div className="text-xs font-semibold uppercase text-muted-foreground tracking-wider">Path</div>
-                {pathDefs.map((pd) => (
-                  <div key={pd.key} className="space-y-1">
-                    <Label className="text-xs flex items-center gap-2">
-                      {pd.label}
-                      {pd.required && <span className="text-red-500">*</span>}
-                    </Label>
-                    <Input
-                      value={pathParams[pd.key] ?? ""}
-                      onChange={(e) => setPathParams((v) => ({ ...v, [pd.key]: e.target.value }))}
-                      placeholder={pd.placeholder}
-                      className="font-mono text-sm h-9"
-                    />
-                    {pd.description && <p className="text-xs text-muted-foreground">{pd.description}</p>}
-                  </div>
-                ))}
-              </div>
-            )}
-
-            {queryDefs.length > 0 && (
-              <div className="space-y-3 mb-4">
-                <div className="text-xs font-semibold uppercase text-muted-foreground tracking-wider">Query</div>
-                {queryDefs.map((qd) => (
-                  <div key={qd.key} className="space-y-1">
-                    <Label className="text-xs flex items-center gap-2">
-                      {qd.label}
-                      {qd.required && <span className="text-red-500">*</span>}
-                    </Label>
-                    <Input
-                      value={queryParams[qd.key] ?? ""}
-                      onChange={(e) => setQueryParams((v) => ({ ...v, [qd.key]: e.target.value }))}
-                      placeholder={qd.placeholder}
-                      className="font-mono text-sm h-9"
-                    />
-                    {qd.description && <p className="text-xs text-muted-foreground">{qd.description}</p>}
-                  </div>
-                ))}
-              </div>
-            )}
-
-            {hasBody && (
-              <div className="space-y-1 mb-4">
-                <div className="text-xs font-semibold uppercase text-muted-foreground tracking-wider flex items-center justify-between">
-                  <span>Body (JSON)</span>
-                  {endpoint.bodyExample && (
-                    <button
-                      onClick={() => setBodyStr(endpoint.bodyExample!)}
-                      className="text-[10px] normal-case font-medium text-muted-foreground hover:text-foreground flex items-center gap-1"
-                    >
-                      <RefreshCcw className="w-3 h-3" /> reset
-                    </button>
-                  )}
-                </div>
-                <Textarea
-                  value={bodyStr}
-                  onChange={(e) => setBodyStr(e.target.value)}
-                  className="font-mono text-xs min-h-[160px]"
-                  spellCheck={false}
-                />
-                {bodyDefs.length > 0 && (
-                  <details className="text-xs text-muted-foreground mt-2">
-                    <summary className="cursor-pointer hover:text-foreground">Campos aceitos</summary>
-                    <ul className="mt-2 space-y-1 pl-4">
-                      {bodyDefs.map((b) => (
-                        <li key={b.key}>
-                          <code className="text-foreground">{b.key}</code>
-                          {b.required && <span className="text-red-500 ml-1">*</span>}
-                          {b.description && <span className="ml-2 text-muted-foreground">— {b.description}</span>}
-                        </li>
-                      ))}
-                    </ul>
-                  </details>
-                )}
-              </div>
-            )}
-
-            <div className="pt-2 border-t border-border space-y-2">
-              <div className="text-xs text-muted-foreground font-mono break-all bg-muted/40 rounded px-2 py-1.5">{finalUrl}</div>
-              <Button onClick={run} disabled={loading} size="sm" className="w-full">
-                {loading ? (
-                  <><Loader2 className="w-4 h-4 mr-2 animate-spin" /> Enviando...</>
-                ) : (
-                  <><Send className="w-4 h-4 mr-2" /> Enviar requisição</>
-                )}
-              </Button>
+      <aside className="docs-endpoint__aside">
+        <div className="docs-endpoint__stick">
+          <div className="docs-panel">
+            <div className="docs-panel__bar">
+              <span className="text-xs text-muted-foreground font-mono">exemplo · JSON</span>
             </div>
-          </section>
-
-          {status !== null && (
-            <section className="border border-border rounded-lg p-4 bg-card">
-              <div className="flex items-center justify-between mb-3">
-                <h2 className="text-sm font-semibold flex items-center gap-2">
-                  <Activity className="w-4 h-4" /> Resposta
-                </h2>
-                <div className="flex items-center gap-2">
-                  <Badge
-                    variant={status >= 200 && status < 300 ? "default" : "destructive"}
-                    className="font-mono"
-                  >
-                    {status}
-                  </Badge>
-                  {duration !== null && (
-                    <span className="text-xs text-muted-foreground">{duration}ms</span>
-                  )}
-                  <Button
-                    size="sm"
-                    variant="ghost"
-                    className="h-7 w-7 p-0"
-                    onClick={() => { navigator.clipboard.writeText(response); toast.success("Copiado"); }}
-                  >
-                    <Copy className="w-3.5 h-3.5" />
-                  </Button>
-                </div>
-              </div>
-              <pre className="rounded bg-muted/60 border border-border p-3 text-xs overflow-x-auto max-h-[420px] font-mono leading-relaxed">
-                <code>{response}</code>
-              </pre>
-            </section>
-          )}
+            <CodeBlock code={node.example} lang="json" />
+          </div>
         </div>
-
-        {/* Right: docs */}
-        <div className="space-y-5">
-          <section>
-            <h2 className="text-sm font-semibold mb-3 flex items-center gap-2">
-              <Terminal className="w-4 h-4" /> Exemplo de resposta
-            </h2>
-            <CodeBlock code={endpoint.responseExample} />
-          </section>
-
-          {endpoint.notes && endpoint.notes.length > 0 && (
-            <section className="border border-border rounded-lg p-4 bg-muted/20">
-              <h2 className="text-xs font-semibold mb-2 uppercase tracking-wider text-muted-foreground">Notas</h2>
-              <ul className="list-disc pl-5 space-y-1 text-sm text-muted-foreground">
-                {endpoint.notes.map((n, i) => <li key={i}>{n}</li>)}
-              </ul>
-            </section>
-          )}
-
-          {endpoint.responseCodes && (
-            <section>
-              <h2 className="text-sm font-semibold mb-3">Códigos de resposta</h2>
-              <div className="space-y-1">
-                {endpoint.responseCodes.map((rc) => (
-                  <div key={rc.code} className="flex items-center gap-3 py-1.5 text-sm border-b border-border/50">
-                    <Badge variant="outline" className="font-mono min-w-[3rem] justify-center">{rc.code}</Badge>
-                    <span className="text-muted-foreground">{rc.label}</span>
-                  </div>
-                ))}
-              </div>
-            </section>
-          )}
-
-          <section>
-            <h2 className="text-sm font-semibold mb-3 flex items-center gap-2">
-              <Play className="w-4 h-4" /> curl
-            </h2>
-            <CodeBlock code={curlCmd} />
-          </section>
-        </div>
-      </div>
+      </aside>
     </div>
   );
 }
@@ -1295,9 +1284,9 @@ function EndpointView({
 
 function ReferenceView({ doc }: { doc: ReferenceDoc }) {
   return (
-    <div className="max-w-4xl">
-      <h1 className="text-2xl font-semibold tracking-tight mb-5">{doc.title}</h1>
-      <div>{doc.body}</div>
+    <div className="docs-endpoint__main max-w-4xl">
+      <h1 className="text-3xl font-semibold tracking-tight text-foreground mb-6">{doc.title}</h1>
+      <div className="prose-docs">{doc.body}</div>
     </div>
   );
 }
@@ -1312,6 +1301,7 @@ export default function DocsPage() {
   const [apiKey, setApiKey] = useState("");
   const [jwt, setJwt] = useState("");
   const [showConfig, setShowConfig] = useState(false);
+  const [search, setSearch] = useState("");
 
   useEffect(() => {
     const k = localStorage.getItem("zailom_docs_api_key");
@@ -1319,7 +1309,6 @@ export default function DocsPage() {
     if (k) setApiKey(k);
     if (j) setJwt(j);
   }, []);
-
   useEffect(() => { if (apiKey) localStorage.setItem("zailom_docs_api_key", apiKey); }, [apiKey]);
   useEffect(() => { if (jwt) localStorage.setItem("zailom_docs_jwt", jwt); }, [jwt]);
 
@@ -1332,90 +1321,71 @@ export default function DocsPage() {
 
   const isReference = section.id === "reference";
   const isOverview = section.id === "overview";
-  const endpoint = !isReference && !isOverview ? section.endpoints[activeItemId] : undefined;
+  const isBots = section.id === "bots";
+  const endpoint = !isReference && !isOverview && !isBots ? section.endpoints[activeItemId] : undefined;
   const refDoc = isReference ? section.reference?.find((r) => r.id === activeItemId) : undefined;
+  const nodeDoc = isBots ? nodeDocs.find((n) => n.id === activeItemId) : undefined;
+
+  const filteredSidebar = useMemo(() => {
+    if (!search.trim()) return section.sidebar;
+    const q = search.toLowerCase();
+    return section.sidebar
+      .map((g) => ({ ...g, items: g.items.filter((it) => it.label.toLowerCase().includes(q) || it.id.toLowerCase().includes(q)) }))
+      .filter((g) => g.items.length > 0);
+  }, [section.sidebar, search]);
 
   return (
-    <div className="min-h-screen bg-background text-foreground flex flex-col">
+    <div className="docs-scope">
       {/* Top header */}
-      <header className="border-b border-border bg-card/40 backdrop-blur sticky top-0 z-30">
-        <div className="flex items-center h-14 px-6 gap-6">
-          <a href="/" className="flex items-center gap-2 shrink-0">
-            <div className="w-7 h-7 rounded-md bg-primary/15 flex items-center justify-center">
-              <Shield className="w-4 h-4 text-primary" />
-            </div>
-            <div className="leading-tight">
-              <div className="font-semibold text-sm">Zailom Docs</div>
-              <div className="text-[10px] text-muted-foreground -mt-0.5">API Reference</div>
+      <header className="docs-header">
+        <div className="docs-header__inner">
+          <a href="/" className="docs-brand">
+            <div className="docs-brand__mark"><Zap className="w-4 h-4" /></div>
+            <div className="docs-brand__text">
+              <div className="docs-brand__title">Zailom</div>
+              <div className="docs-brand__sub">Developer Docs</div>
             </div>
           </a>
 
-          <nav className="flex items-center gap-1 overflow-x-auto">
+          <nav className="docs-tabs docs-tabs--top">
             {sections.map((s) => {
               const Icon = s.icon;
               const active = s.id === activeSectionId;
               return (
-                <button
-                  key={s.id}
-                  onClick={() => setActiveSectionId(s.id)}
-                  className={`px-3 h-9 rounded-md text-sm font-medium flex items-center gap-2 transition-colors whitespace-nowrap ${
-                    active
-                      ? "bg-primary/10 text-primary"
-                      : "text-muted-foreground hover:text-foreground hover:bg-accent"
-                  }`}
-                >
-                  <Icon className="w-4 h-4" />
-                  {s.label}
+                <button key={s.id} onClick={() => setActiveSectionId(s.id)} className={`docs-tabs__btn ${active ? "docs-tabs__btn--active" : ""}`}>
+                  <Icon className="w-4 h-4" /> {s.label}
                 </button>
               );
             })}
           </nav>
 
-          <div className="flex-1" />
-
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={() => setShowConfig((v) => !v)}
-            className="gap-2"
-          >
-            <Key className="w-4 h-4" />
-            <span className="hidden sm:inline">
-              {apiKey || jwt ? "Credenciais configuradas" : "Configurar credenciais"}
-            </span>
-          </Button>
+          <div className="docs-header__right">
+            <div className="docs-search">
+              <Search className="w-3.5 h-3.5 text-muted-foreground" />
+              <input value={search} onChange={(e) => setSearch(e.target.value)} placeholder="Buscar…" />
+            </div>
+            <Button variant="outline" size="sm" onClick={() => setShowConfig((v) => !v)} className="docs-cred-btn">
+              <Key className="w-4 h-4" />
+              <span className="hidden md:inline">{apiKey || jwt ? "Credenciais" : "Credenciais"}</span>
+              {(apiKey || jwt) && <span className="docs-dot" />}
+            </Button>
+          </div>
         </div>
 
         {showConfig && (
-          <div className="border-t border-border bg-card/60 px-6 py-4">
-            <div className="max-w-4xl grid sm:grid-cols-2 gap-4">
+          <div className="docs-cred-panel">
+            <div className="docs-cred-panel__inner">
               <div className="space-y-1">
                 <Label className="text-xs flex items-center gap-2"><Key className="w-3 h-3" /> API Key (Booking)</Label>
-                <Input
-                  type="password"
-                  value={apiKey}
-                  onChange={(e) => setApiKey(e.target.value)}
-                  placeholder="zf_..."
-                  className="font-mono h-9"
-                />
-                <p className="text-xs text-muted-foreground">
-                  Gerada em Configurações → API Keys. Fica salva neste navegador.
-                </p>
+                <Input type="password" value={apiKey} onChange={(e) => setApiKey(e.target.value)} placeholder="zf_..." className="docs-input font-mono" />
+                <p className="text-xs text-muted-foreground">Gerada em Configurações → API Keys. Salva neste navegador.</p>
               </div>
               <div className="space-y-1">
                 <Label className="text-xs flex items-center gap-2"><Shield className="w-3 h-3" /> JWT HS256 (Provisioning)</Label>
-                <Input
-                  type="password"
-                  value={jwt}
-                  onChange={(e) => setJwt(e.target.value)}
-                  placeholder="eyJhbGciOiJIUzI1NiJ9..."
-                  className="font-mono h-9"
-                />
-                <p className="text-xs text-muted-foreground">
-                  Assinado com EMBED_SHARED_SECRET. Use apenas em ambiente confiável.
-                </p>
+                <Input type="password" value={jwt} onChange={(e) => setJwt(e.target.value)} placeholder="eyJhbGciOiJIUzI1NiJ9..." className="docs-input font-mono" />
+                <p className="text-xs text-muted-foreground">Assinado com EMBED_SHARED_SECRET.</p>
               </div>
-              <div className="sm:col-span-2 flex justify-end">
+              <div className="md:col-span-2 flex justify-end">
                 <Button variant="secondary" size="sm" onClick={() => setShowConfig(false)}>Fechar</Button>
               </div>
             </div>
@@ -1423,37 +1393,25 @@ export default function DocsPage() {
         )}
       </header>
 
-      <div className="flex flex-1 min-h-0">
+      <div className="docs-shell">
         {/* Sidebar */}
-        <aside className="w-64 border-r border-border bg-card/20 overflow-y-auto shrink-0">
-          <div className="p-4 border-b border-border">
-            <div className="text-xs uppercase text-muted-foreground font-semibold tracking-wider mb-1">
-              Base URL
-            </div>
-            <div className="text-xs font-mono text-foreground break-all">{section.baseUrl}</div>
-            <div className="mt-2"><AuthPill auth={section.auth.type} /></div>
-            <p className="text-xs text-muted-foreground mt-2 leading-relaxed">{section.description}</p>
+        <aside className="docs-sidebar">
+          <div className="docs-sidebar__meta">
+            <div className="text-[10px] uppercase tracking-[0.14em] text-muted-foreground font-semibold mb-1">Base URL</div>
+            <div className="text-xs font-mono text-foreground/90 break-all mb-2">{section.baseUrl}</div>
+            <AuthPill auth={section.auth.type} />
+            <p className="text-xs text-muted-foreground mt-3 leading-relaxed">{section.description}</p>
           </div>
 
-          <nav className="p-3 space-y-5">
-            {section.sidebar.map((group) => (
-              <div key={group.label}>
-                <div className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground px-2 mb-1.5">
-                  {group.label}
-                </div>
+          <nav className="docs-sidebar__nav">
+            {filteredSidebar.map((group) => (
+              <div key={group.label} className="mb-5">
+                <div className="docs-sidebar__group">{group.label}</div>
                 <div className="space-y-0.5">
                   {group.items.map((it) => {
                     const active = it.id === activeItemId;
                     return (
-                      <button
-                        key={it.id}
-                        onClick={() => setActiveItemId(it.id)}
-                        className={`w-full text-left px-2 py-1.5 rounded text-sm flex items-center gap-2 transition-colors ${
-                          active
-                            ? "bg-primary/10 text-primary font-medium"
-                            : "text-muted-foreground hover:text-foreground hover:bg-accent"
-                        }`}
-                      >
+                      <button key={it.id} onClick={() => setActiveItemId(it.id)} className={`docs-sidebar__item ${active ? "docs-sidebar__item--active" : ""}`}>
                         {it.method && <MethodBadge method={it.method} />}
                         <span className="flex-1 truncate">{it.label}</span>
                       </button>
@@ -1462,16 +1420,20 @@ export default function DocsPage() {
                 </div>
               </div>
             ))}
+            {filteredSidebar.length === 0 && (
+              <div className="text-xs text-muted-foreground px-2 py-4">Nenhum resultado.</div>
+            )}
           </nav>
         </aside>
 
         {/* Main */}
-        <main className="flex-1 overflow-y-auto p-6 lg:p-10">
+        <main className="docs-main">
           {isOverview && section.overview && <ReferenceView doc={section.overview} />}
           {endpoint && <EndpointView endpoint={endpoint} section={section} apiKey={apiKey} jwt={jwt} />}
           {refDoc && <ReferenceView doc={refDoc} />}
-          {!isOverview && !endpoint && !refDoc && (
-            <div className="text-sm text-muted-foreground">Selecione um item na sidebar.</div>
+          {nodeDoc && <NodeDocView node={nodeDoc} />}
+          {!isOverview && !endpoint && !refDoc && !nodeDoc && (
+            <div className="text-sm text-muted-foreground p-8">Selecione um item na sidebar.</div>
           )}
         </main>
       </div>
