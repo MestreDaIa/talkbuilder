@@ -115,14 +115,13 @@ const bookingEndpoints: Endpoint[] = [
     method: "GET",
     path: "/health",
     title: "Health Check",
-    summary: "Valida a API Key e retorna o workspace vinculado.",
+    summary: "Confirma que a API pública está online.",
     description:
-      "Use logo após o usuário clicar em 'Conectar' no Booking. Confirma que a chave é válida, está ativa e retorna o workspace/slug ao qual pertence.",
-    auth: "apiKey",
+      "Use para testar rapidamente se a URL profissional da API está respondendo, sem expor URLs internas aos usuários.",
+    auth: "none",
     responseExample: `{
   "ok": true,
-  "workspace_id": "9b4fce4a-05f7-494d-aaf8-c2159244e99d",
-  "workspace_slug": "empresa-x",
+  "service": "booking-api",
   "timestamp": "2026-07-05T12:00:00.000Z"
 }`,
     responseCodes: [
