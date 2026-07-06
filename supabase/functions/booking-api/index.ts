@@ -64,31 +64,37 @@ async function resolveWorkspace(req: Request) {
 }
 
 async function getWorkspaceInfo(workspaceId: string) {
-  const { data, error } = await supabase
-    .from("profiles")
-    .select(
-      "id, slug, full_name, email, plan, embed_source, embed_company_id, embed_plan_tier, embed_max_chatbots, embed_max_messages, embed_max_integrations, created_at"
-    )
+  const { data: ws, error: wsErr } = await supabase
+    .from("workspaces")
+    .select("id, slug, name, owner_id, created_at")
     .eq("id", workspaceId)
     .maybeSingle();
 
-  if (error || !data) return null;
+  if (wsErr || !ws) return null;
+
+  const { data: owner } = await supabase
+    .from("profiles")
+    .select(
+      "email, full_name, plan, embed_source, embed_company_id, embed_plan_tier, embed_max_chatbots, embed_max_messages, embed_max_integrations"
+    )
+    .eq("id", ws.owner_id)
+    .maybeSingle();
 
   return {
-    id: data.id,
-    slug: data.slug,
-    name: data.full_name ?? data.slug,
-    email: data.email,
+    id: ws.id,
+    slug: ws.slug,
+    name: ws.name ?? owner?.full_name ?? ws.slug,
+    email: owner?.email ?? null,
     status: "active",
-    plan: data.embed_plan_tier ?? data.plan ?? "starter",
-    source: data.embed_source ?? "flow",
-    external_company_id: data.embed_company_id ?? null,
+    plan: owner?.embed_plan_tier ?? owner?.plan ?? "starter",
+    source: owner?.embed_source ?? "flow",
+    external_company_id: owner?.embed_company_id ?? null,
     limits: {
-      max_chatbots: data.embed_max_chatbots,
-      max_messages: data.embed_max_messages,
-      max_integrations: data.embed_max_integrations,
+      max_chatbots: owner?.embed_max_chatbots ?? null,
+      max_messages: owner?.embed_max_messages ?? null,
+      max_integrations: owner?.embed_max_integrations ?? null,
     },
-    created_at: data.created_at,
+    created_at: ws.created_at,
   };
 }
 
