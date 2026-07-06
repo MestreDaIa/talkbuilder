@@ -5,12 +5,10 @@ API pública **read-only** do Zailom Flow, destinada exclusivamente ao consumo p
 ## Base URL
 
 ```
-https://<PROJECT_REF>.supabase.co/functions/v1/booking-api
+https://api-flowbuilder.zailom.com/booking-api
 ```
 
-> No ambiente atual: `https://fwoescubnnagdvwasbjl.supabase.co/functions/v1/booking-api`
-
-Se preferir um subdomínio próprio (ex.: `api.zailomflow.com`), aponte na VPS via reverse proxy para essa URL — a API funciona igualmente sem isso.
+Use sempre essa URL pública profissional nos exemplos, integrações e testes. A URL interna do backend externo não precisa aparecer para os usuários.
 
 ## Autenticação
 

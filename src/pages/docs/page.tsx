@@ -94,10 +94,10 @@ type ApiSection = {
 /* Constants                                                                   */
 /* -------------------------------------------------------------------------- */
 
-const SUPABASE_URL = "https://api-flowbuilder.zailom.com";
-const FN = (name: string) => `${SUPABASE_URL}/functions/v1/${name}`;
+const API_PROXY_URL = "https://api-flowbuilder.zailom.com";
+const FN = (name: string) => `${API_PROXY_URL}/functions/v1/${name}`;
 
-const BOOKING_BASE = FN("booking-api");
+const BOOKING_BASE = `${API_PROXY_URL}/booking-api`;
 const RUNTIME_BASE = FN("chatbot-runtime");
 const PROVISION_BASE = FN("provision-account");
 const SYNC_PLAN_BASE = FN("sync-embed-plan");
