@@ -7,8 +7,10 @@ import { Textarea } from "@/components/ui/textarea";
 import { toast } from "sonner";
 import {
   Activity,
+  Blocks,
   Bot,
   BookOpen,
+  ChevronRight,
   Compass,
   Copy,
   Globe,
@@ -17,6 +19,7 @@ import {
   Play,
   Plug,
   RefreshCcw,
+  Search,
   Send,
   Settings2,
   Shield,
@@ -25,6 +28,7 @@ import {
   Workflow,
   Zap,
 } from "lucide-react";
+import { nodeCategories, nodeDocs, type NodeDoc } from "./nodesCatalog";
 
 /* -------------------------------------------------------------------------- */
 /* Types                                                                       */
