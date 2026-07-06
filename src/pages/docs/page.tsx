@@ -756,8 +756,7 @@ Authorization: Bearer <API_KEY>`} />
       <div className="space-y-4">
         <div>
           <div className="text-xs font-semibold mb-1 text-muted-foreground uppercase tracking-wider">Health (Booking API)</div>
-          <CodeBlock code={`curl -H "x-api-key: SUA_API_KEY" \\
-  ${BOOKING_BASE}/health`} />
+          <CodeBlock code={`curl ${BOOKING_BASE}/health`} />
         </div>
         <div>
           <div className="text-xs font-semibold mb-1 text-muted-foreground uppercase tracking-wider">Listar bots publicados</div>
