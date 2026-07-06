@@ -28,11 +28,13 @@ services:
     image: nginx:1.27-alpine
     container_name: chatbot-booking-proxy
     restart: always
+    environment:
+      - SUPABASE_ANON_KEY=${VITE_SUPABASE_ANON_KEY}
     command:
       - /bin/sh
       - -c
       - |
-        cat > /etc/nginx/nginx.conf <<'NGINX_CONF'
+        cat > /etc/nginx/nginx.conf <<NGINX_CONF
         worker_processes 1;
         events { worker_connections 1024; }
 
@@ -47,9 +49,11 @@ services:
             location /booking-api/ {
               proxy_http_version 1.1;
               proxy_set_header Host              fwoescubnnagdvwasbjl.supabase.co;
-              proxy_set_header X-Real-IP         $$remote_addr;
-              proxy_set_header X-Forwarded-For   $$proxy_add_x_forwarded_for;
-              proxy_set_header X-Forwarded-Proto $$scheme;
+              proxy_set_header X-Real-IP         \$$remote_addr;
+              proxy_set_header X-Forwarded-For   \$$proxy_add_x_forwarded_for;
+              proxy_set_header X-Forwarded-Proto \$$scheme;
+              proxy_set_header Authorization     "Bearer ${SUPABASE_ANON_KEY}";
+              proxy_set_header apikey            "${SUPABASE_ANON_KEY}";
               proxy_ssl_server_name on;
               proxy_ssl_name        fwoescubnnagdvwasbjl.supabase.co;
               proxy_pass https://fwoescubnnagdvwasbjl.supabase.co/functions/v1/booking-api/;
