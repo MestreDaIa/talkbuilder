@@ -871,3 +871,13 @@ a[href*="lovable.dev"][target="_blank"] {
 .prose-docs a { color: var(--docs-accent); }
 .prose-docs ul { margin-left: 20px; margin-bottom: 12px; color: var(--docs-muted); }
 .prose-docs li { margin-bottom: 6px; }
+
+/* Docs scope fixes */
+.docs-scope, .docs-scope * { text-align: left; }
+.docs-scope .docs-tabs--top { flex: 1 1 auto; min-width: 0; }
+.docs-scope .docs-tabs__btn { flex-shrink: 0; }
+.docs-scope .docs-header__inner { gap: 16px; }
+.docs-scope .docs-search { min-width: 180px; }
+@media (max-width: 1280px) {
+  .docs-scope .docs-search { display: none; }
+}
