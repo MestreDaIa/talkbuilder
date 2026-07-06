@@ -5,12 +5,10 @@ API pública **read-only** do Zailom Flow, destinada exclusivamente ao consumo p
 ## Base URL
 
 ```
-https://<PROJECT_REF>.supabase.co/functions/v1/booking-api
+https://api-flowbuilder.zailom.com/booking-api
 ```
 
-> No ambiente atual: `https://fwoescubnnagdvwasbjl.supabase.co/functions/v1/booking-api`
-
-Se preferir um subdomínio próprio (ex.: `api.zailomflow.com`), aponte na VPS via reverse proxy para essa URL — a API funciona igualmente sem isso.
+Use sempre essa URL pública profissional nos exemplos, integrações e testes. A URL interna do backend externo não precisa aparecer para os usuários.
 
 ## Autenticação
 
@@ -36,14 +34,13 @@ Respostas de erro de autenticação:
 ## Endpoints
 
 ### `GET /health`
-Ping rápido para validar chave + workspace. Deve ser chamado logo após o usuário clicar em "Conectar" no Booking.
+Ping rápido para confirmar que a API pública está online. Não exige API Key.
 
 **200**
 ```json
 {
   "ok": true,
-  "workspace_id": "9b4fce4a-05f7-494d-aaf8-c2159244e99d",
-  "workspace_slug": "testando-03",
+  "service": "booking-api",
   "timestamp": "2026-07-05T12:00:00.000Z"
 }
 ```

@@ -94,10 +94,10 @@ type ApiSection = {
 /* Constants                                                                   */
 /* -------------------------------------------------------------------------- */
 
-const SUPABASE_URL = "https://api-flowbuilder.zailom.com";
-const FN = (name: string) => `${SUPABASE_URL}/functions/v1/${name}`;
+const API_PROXY_URL = "https://api-flowbuilder.zailom.com";
+const FN = (name: string) => `${API_PROXY_URL}/functions/v1/${name}`;
 
-const BOOKING_BASE = FN("booking-api");
+const BOOKING_BASE = `${API_PROXY_URL}/booking-api`;
 const RUNTIME_BASE = FN("chatbot-runtime");
 const PROVISION_BASE = FN("provision-account");
 const SYNC_PLAN_BASE = FN("sync-embed-plan");
@@ -115,14 +115,13 @@ const bookingEndpoints: Endpoint[] = [
     method: "GET",
     path: "/health",
     title: "Health Check",
-    summary: "Valida a API Key e retorna o workspace vinculado.",
+    summary: "Confirma que a API pública está online.",
     description:
-      "Use logo após o usuário clicar em 'Conectar' no Booking. Confirma que a chave é válida, está ativa e retorna o workspace/slug ao qual pertence.",
-    auth: "apiKey",
+      "Use para testar rapidamente se a URL profissional da API está respondendo, sem expor URLs internas aos usuários.",
+    auth: "none",
     responseExample: `{
   "ok": true,
-  "workspace_id": "9b4fce4a-05f7-494d-aaf8-c2159244e99d",
-  "workspace_slug": "empresa-x",
+  "service": "booking-api",
   "timestamp": "2026-07-05T12:00:00.000Z"
 }`,
     responseCodes: [
@@ -597,13 +596,13 @@ const overviewDoc: ReferenceDoc = {
             icon: Workflow,
             title: "Provisioning & Plan Sync",
             desc: "Criação de conta e sincronização de planos via JWT HS256.",
-            base: `${SUPABASE_URL}/functions/v1`,
+            base: `${API_PROXY_URL}/functions/v1`,
           },
           {
             icon: Webhook,
             title: "Webhooks & Utilitários",
             desc: "Webhook da Evolution API e crawler de knowledge base.",
-            base: `${SUPABASE_URL}/functions/v1`,
+            base: `${API_PROXY_URL}/functions/v1`,
           },
         ].map(({ icon: Icon, title, desc, base }) => (
           <div key={title} className="border border-border rounded-lg p-4 bg-card">
@@ -757,8 +756,7 @@ Authorization: Bearer <API_KEY>`} />
       <div className="space-y-4">
         <div>
           <div className="text-xs font-semibold mb-1 text-muted-foreground uppercase tracking-wider">Health (Booking API)</div>
-          <CodeBlock code={`curl -H "x-api-key: SUA_API_KEY" \\
-  ${BOOKING_BASE}/health`} />
+          <CodeBlock code={`curl ${BOOKING_BASE}/health`} />
         </div>
         <div>
           <div className="text-xs font-semibold mb-1 text-muted-foreground uppercase tracking-wider">Listar bots publicados</div>
@@ -805,7 +803,7 @@ const sections: ApiSection[] = [
     id: "overview",
     label: "Visão Geral",
     icon: Compass,
-    baseUrl: SUPABASE_URL,
+    baseUrl: API_PROXY_URL,
     description: "Comece por aqui.",
     auth: { type: "none", description: "Página inicial." },
     sidebar: [{ label: "Início", items: [{ id: "overview", label: "Visão Geral" }] }],
@@ -867,7 +865,7 @@ const sections: ApiSection[] = [
     id: "provisioning",
     label: "Provisioning & Plans",
     icon: Workflow,
-    baseUrl: `${SUPABASE_URL}/functions/v1`,
+    baseUrl: `${API_PROXY_URL}/functions/v1`,
     description: "Provisionamento de contas e sincronização de planos externos.",
     auth: {
       type: "jwtHs256",
@@ -895,7 +893,7 @@ const sections: ApiSection[] = [
     id: "webhooks",
     label: "Webhooks",
     icon: Webhook,
-    baseUrl: `${SUPABASE_URL}/functions/v1`,
+    baseUrl: `${API_PROXY_URL}/functions/v1`,
     description: "Webhook da Evolution API e utilitários.",
     auth: { type: "webhook", description: "Autenticação por payload/instance." },
     sidebar: [
@@ -929,7 +927,7 @@ const sections: ApiSection[] = [
     id: "reference",
     label: "Referências",
     icon: BookOpen,
-    baseUrl: SUPABASE_URL,
+    baseUrl: API_PROXY_URL,
     description: "Guias transversais: autenticação, códigos, planos, CORS e segurança.",
     auth: { type: "none", description: "Documentação estática." },
     sidebar: [
