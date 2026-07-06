@@ -597,13 +597,13 @@ const overviewDoc: ReferenceDoc = {
             icon: Workflow,
             title: "Provisioning & Plan Sync",
             desc: "Criação de conta e sincronização de planos via JWT HS256.",
-            base: `${SUPABASE_URL}/functions/v1`,
+            base: `${API_PROXY_URL}/functions/v1`,
           },
           {
             icon: Webhook,
             title: "Webhooks & Utilitários",
             desc: "Webhook da Evolution API e crawler de knowledge base.",
-            base: `${SUPABASE_URL}/functions/v1`,
+            base: `${API_PROXY_URL}/functions/v1`,
           },
         ].map(({ icon: Icon, title, desc, base }) => (
           <div key={title} className="border border-border rounded-lg p-4 bg-card">
@@ -805,7 +805,7 @@ const sections: ApiSection[] = [
     id: "overview",
     label: "Visão Geral",
     icon: Compass,
-    baseUrl: SUPABASE_URL,
+    baseUrl: API_PROXY_URL,
     description: "Comece por aqui.",
     auth: { type: "none", description: "Página inicial." },
     sidebar: [{ label: "Início", items: [{ id: "overview", label: "Visão Geral" }] }],
@@ -867,7 +867,7 @@ const sections: ApiSection[] = [
     id: "provisioning",
     label: "Provisioning & Plans",
     icon: Workflow,
-    baseUrl: `${SUPABASE_URL}/functions/v1`,
+    baseUrl: `${API_PROXY_URL}/functions/v1`,
     description: "Provisionamento de contas e sincronização de planos externos.",
     auth: {
       type: "jwtHs256",
@@ -895,7 +895,7 @@ const sections: ApiSection[] = [
     id: "webhooks",
     label: "Webhooks",
     icon: Webhook,
-    baseUrl: `${SUPABASE_URL}/functions/v1`,
+    baseUrl: `${API_PROXY_URL}/functions/v1`,
     description: "Webhook da Evolution API e utilitários.",
     auth: { type: "webhook", description: "Autenticação por payload/instance." },
     sidebar: [
@@ -929,7 +929,7 @@ const sections: ApiSection[] = [
     id: "reference",
     label: "Referências",
     icon: BookOpen,
-    baseUrl: SUPABASE_URL,
+    baseUrl: API_PROXY_URL,
     description: "Guias transversais: autenticação, códigos, planos, CORS e segurança.",
     auth: { type: "none", description: "Documentação estática." },
     sidebar: [
