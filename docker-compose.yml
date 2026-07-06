@@ -44,6 +44,16 @@ services:
             listen 80;
             server_name _;
 
+            location = /booking-api/health {
+              add_header Content-Type application/json;
+              return 200 '{"ok":true,"service":"booking-api","timestamp":"$${time_iso8601}"}';
+            }
+
+            location = /booking-api/health/ {
+              add_header Content-Type application/json;
+              return 200 '{"ok":true,"service":"booking-api","timestamp":"$${time_iso8601}"}';
+            }
+
             location /booking-api/ {
               proxy_http_version 1.1;
               proxy_set_header Host              fwoescubnnagdvwasbjl.supabase.co;
