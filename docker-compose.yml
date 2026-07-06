@@ -25,11 +25,11 @@ services:
       - "traefik.docker.network=builderchat_net"
 
   booking-proxy:
-    build:
-      context: ./booking-proxy
-      dockerfile: Dockerfile
+    image: nginx:1.27-alpine
     container_name: chatbot-booking-proxy
     restart: always
+    volumes:
+      - ./booking-proxy/nginx.conf:/etc/nginx/nginx.conf:ro
     networks:
       - builderchat_net
     labels:
