@@ -1047,6 +1047,102 @@ export const TestPanel = ({
               isHtml: false,
             } as Message);
           }
+        } else if (nodeType === "http-request") {
+          try {
+            const method = String(cfg.method || "GET").toUpperCase();
+            let url = replaceVars(String(cfg.url || ""));
+
+            const qp: string[] = [];
+            (Array.isArray(cfg.queryParams) ? cfg.queryParams : []).forEach((p: any) => {
+              const key = p?.name || p?.key;
+              if (key) qp.push(`${encodeURIComponent(key)}=${encodeURIComponent(replaceVars(String(p.value ?? "")))}`);
+            });
+            if (qp.length) url += (url.includes("?") ? "&" : "?") + qp.join("&");
+
+            const headers: Record<string, string> = {};
+            (Array.isArray(cfg.headers) ? cfg.headers : []).forEach((h: any) => {
+              const key = h?.name || h?.key;
+              if (key) headers[key] = replaceVars(String(h.value ?? ""));
+            });
+
+            const auth = cfg.authCredentials || {};
+            if (cfg.authType === "basic" && auth.username) {
+              headers["Authorization"] = "Basic " + btoa(`${replaceVars(auth.username || "")}:${replaceVars(auth.password || "")}`);
+            } else if (cfg.authType === "bearer" && auth.token) {
+              headers["Authorization"] = `Bearer ${replaceVars(auth.token)}`;
+            } else if (cfg.authType === "apiKey" && auth.apiKeyName) {
+              if ((auth.apiKeyLocation || "header") === "header") {
+                headers[auth.apiKeyName] = replaceVars(auth.apiKeyValue || "");
+              } else {
+                url += (url.includes("?") ? "&" : "?") + `${encodeURIComponent(auth.apiKeyName)}=${encodeURIComponent(replaceVars(auth.apiKeyValue || ""))}`;
+              }
+            } else if (cfg.authType === "customHeader" && auth.headerName) {
+              headers[auth.headerName] = replaceVars(auth.headerValue || "");
+            }
+
+            let body: string | undefined;
+            if (["POST", "PUT", "PATCH", "DELETE"].includes(method) && cfg.sendBody !== false) {
+              const bct = cfg.bodyContentType || "json";
+              if (bct === "json") {
+                body = replaceVars(String(cfg.bodyJson || "{}"));
+                if (!headers["Content-Type"]) headers["Content-Type"] = "application/json";
+              } else if (bct === "form-urlencoded") {
+                const params = new URLSearchParams();
+                (cfg.bodyParams || []).forEach((p: any) => {
+                  const k = p?.name || p?.key;
+                  if (k) params.append(k, replaceVars(String(p.value ?? "")));
+                });
+                body = params.toString();
+                if (!headers["Content-Type"]) headers["Content-Type"] = "application/x-www-form-urlencoded";
+              } else {
+                body = replaceVars(String(cfg.bodyRaw || ""));
+              }
+            }
+
+            console.log(`[node:http-request] ${method} ${url}`);
+            const res = await fetch(url, { method, headers, body });
+            const responseText = await res.text();
+            let responseData: any;
+            try { responseData = JSON.parse(responseText); } catch { responseData = responseText; }
+
+            const varName = (cfg.responseVariable || "httpResponse").trim();
+            if (varName) {
+              variables[varName] = responseData;
+              console.log(`[node:http-request] saved response in "${varName}"`);
+            }
+
+            const getByPath = (obj: any, path: string): any => {
+              if (!path) return obj;
+              const parts = path.split(".");
+              const remaining = parts[0] === "data" ? parts.slice(1) : parts;
+              let cur = obj;
+              for (const p of remaining) {
+                if (cur == null || typeof cur !== "object") return undefined;
+                cur = cur[p];
+              }
+              return cur;
+            };
+
+            (cfg.responseMappings || []).forEach((m: any) => {
+              if (!m?.variableName) return;
+              const val = getByPath(responseData, m.jsonPath || "");
+              if (val !== undefined) {
+                variables[m.variableName.trim()] = val;
+                console.log(`[node:http-request] mapped ${m.jsonPath} -> ${m.variableName}`);
+              }
+            });
+
+            const handle = res.ok ? "success" : "error";
+            const branchNext = nextFromNodeIn(node.id, container.id, containers, edgesList, handle, true);
+            if (branchNext) {
+              currentNodeId = branchNext;
+              continue;
+            }
+          } catch (err) {
+            console.error("[node:http-request] error", err);
+            const branchNext = nextFromNodeIn(node.id, container.id, containers, edgesList, "error", true);
+            if (branchNext) { currentNodeId = branchNext; continue; }
+          }
         } else if (nodeType === "condition") {
           const conditions: ConditionGroup[] = cfg.conditions || [];
           const matchedCondition = conditions.find((condition) => evaluateCondition(condition, variables, replaceVars));
