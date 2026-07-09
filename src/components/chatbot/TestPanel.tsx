@@ -660,8 +660,11 @@ export const TestPanel = ({
             }
           }
         }
-        // Input já foi consumido pelo node em waiting_for_input — não deve afetar próximos input nodes
-        input = undefined;
+        // Input já foi consumido pelo node em waiting_for_input — não deve afetar próximos input nodes.
+        // Exceção: no modo agente, o input precisa chegar ao handler do ai-agent para gerar a resposta.
+        if (!(mode === "agent" && activeAgentNodeId && currentNodeId === activeAgentNodeId)) {
+          input = undefined;
+        }
       }
 
       console.log("[Runtime] Loop start", { mode, currentNodeId, steps });
