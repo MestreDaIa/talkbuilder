@@ -951,6 +951,7 @@ export const TestPanel = ({
               if (notice) nextMessages.push({ id: crypto.randomUUID(), conversation_id: conversationId || "temp", role: "assistant", type: "bot", content: notice, isHtml: false } as Message);
             }
 
+            const varsBefore = JSON.parse(JSON.stringify(variables));
             const skillResult = await runLocalFlow(
               {
                 mode: "flow",
@@ -969,15 +970,49 @@ export const TestPanel = ({
               visitedRedirects
             );
 
+            const skillVars = skillResult.runtime_state?.variables || {};
+            Object.assign(variables, skillVars);
             nextMessages.push(...(skillResult.messages || []));
-            return {
-              ...skillResult,
-              messages: nextMessages,
-              runtime_state: {
-                ...skillResult.runtime_state,
-                variables: { ...variables, ...(skillResult.runtime_state?.variables || {}) }
-              }
+
+            // Se a skill pausou aguardando input do usuário, entrega o controle e sai.
+            const skillPaused = skillResult.status === "waiting_input" || !!skillResult.runtime_state?.waiting_for;
+            if (skillPaused) {
+              return {
+                ...skillResult,
+                messages: nextMessages,
+                runtime_state: {
+                  ...skillResult.runtime_state,
+                  variables: { ...variables },
+                  active_agent_node_id: activeAgentNodeId,
+                  mode: "agent"
+                }
+              };
+            }
+
+            // Skill finalizou — devolve resultado ao Agent IA para gerar a resposta final ao usuário.
+            const skillMeta = skills.find((s) => s.id === skillCall.skill_id);
+            const diff: Record<string, any> = {};
+            Object.keys(skillVars).forEach((k) => {
+              if (JSON.stringify(skillVars[k]) !== JSON.stringify(varsBefore[k])) diff[k] = skillVars[k];
+            });
+            const payload = Object.keys(diff).length ? diff : skillVars;
+            let payloadStr: string;
+            try { payloadStr = JSON.stringify(payload); } catch { payloadStr = String(payload); }
+            if (payloadStr.length > 4000) payloadStr = payloadStr.slice(0, 4000) + "…";
+
+            const toolMsg: RuntimeMessage = {
+              id: crypto.randomUUID(),
+              conversation_id: conversationId || "temp",
+              role: "user",
+              content: `[Resultado da skill "${skillMeta?.label || skillCall.skill_id}"]:\n${payloadStr}\n\nCom base neste resultado, responda ao usuário de forma natural e útil (em português). Não chame a mesma skill novamente a menos que seja realmente necessário.`,
+              created_at: new Date().toISOString()
             };
+            messageHistory.push(toolMsg);
+
+            // Reexecuta o node do Agent IA com o input sintético para gerar a resposta final.
+            currentNodeId = activeAgentNodeId;
+            input = { message: toolMsg.content, __fromSkill: true } as any;
+            continue;
           }
 
           if (aiReply) {
