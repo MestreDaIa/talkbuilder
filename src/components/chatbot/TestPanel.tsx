@@ -1086,95 +1086,190 @@ export const TestPanel = ({
             } as Message);
           }
         } else if (nodeType === "http-request") {
-          try {
-            const method = String(cfg.method || "GET").toUpperCase();
-            let url = replaceVars(String(cfg.url || ""));
-
-            const qp: string[] = [];
-            (Array.isArray(cfg.queryParams) ? cfg.queryParams : []).forEach((p: any) => {
-              const key = p?.name || p?.key;
-              if (key) qp.push(`${encodeURIComponent(key)}=${encodeURIComponent(replaceVars(String(p.value ?? "")))}`);
-            });
-            if (qp.length) url += (url.includes("?") ? "&" : "?") + qp.join("&");
-
-            const headers: Record<string, string> = {};
-            (Array.isArray(cfg.headers) ? cfg.headers : []).forEach((h: any) => {
-              const key = h?.name || h?.key;
-              if (key) headers[key] = replaceVars(String(h.value ?? ""));
-            });
-
-            const auth = cfg.authCredentials || {};
-            if (cfg.authType === "basic" && auth.username) {
-              headers["Authorization"] = "Basic " + btoa(`${replaceVars(auth.username || "")}:${replaceVars(auth.password || "")}`);
-            } else if (cfg.authType === "bearer" && auth.token) {
-              headers["Authorization"] = `Bearer ${replaceVars(auth.token)}`;
-            } else if (cfg.authType === "apiKey" && auth.apiKeyName) {
-              if ((auth.apiKeyLocation || "header") === "header") {
-                headers[auth.apiKeyName] = replaceVars(auth.apiKeyValue || "");
-              } else {
-                url += (url.includes("?") ? "&" : "?") + `${encodeURIComponent(auth.apiKeyName)}=${encodeURIComponent(replaceVars(auth.apiKeyValue || ""))}`;
-              }
-            } else if (cfg.authType === "customHeader" && auth.headerName) {
-              headers[auth.headerName] = replaceVars(auth.headerValue || "");
-            }
-
-            let body: string | undefined;
-            if (["POST", "PUT", "PATCH", "DELETE"].includes(method) && cfg.sendBody !== false) {
-              const bct = cfg.bodyContentType || "json";
-              if (bct === "json") {
-                body = replaceVars(String(cfg.bodyJson || "{}"));
-                if (!headers["Content-Type"]) headers["Content-Type"] = "application/json";
-              } else if (bct === "form-urlencoded") {
-                const params = new URLSearchParams();
-                (cfg.bodyParams || []).forEach((p: any) => {
-                  const k = p?.name || p?.key;
-                  if (k) params.append(k, replaceVars(String(p.value ?? "")));
-                });
-                body = params.toString();
-                if (!headers["Content-Type"]) headers["Content-Type"] = "application/x-www-form-urlencoded";
-              } else {
-                body = replaceVars(String(cfg.bodyRaw || ""));
-              }
-            }
-
-            console.log(`[node:http-request] ${method} ${url}`);
-            const res = await fetch(url, { method, headers, body });
-            const responseText = await res.text();
-            let responseData: any;
-            try { responseData = JSON.parse(responseText); } catch { responseData = responseText; }
-
-            const varName = (cfg.responseVariable || "httpResponse").trim();
-            if (varName) {
-              variables[varName] = responseData;
-              console.log(`[node:http-request] saved response in "${varName}"`);
-            }
-
-            const getByPath = (obj: any, path: string): any => {
-              if (!path) return obj;
-              const parts = path.split(".");
-              const remaining = parts[0] === "data" ? parts.slice(1) : parts;
-              let cur = obj;
-              for (const p of remaining) {
-                if (cur == null || typeof cur !== "object") return undefined;
-                cur = cur[p];
+          // Helper: navega em objeto JSON por dot-path. Aceita "data.foo" e "foo" indistintamente
+          // se a resposta tiver ou não wrapper "data".
+          const getByPath = (obj: any, path: string): any => {
+            if (!path) return obj;
+            const parts = path.split(".").filter(Boolean);
+            const tryPath = (start: any, keys: string[]) => {
+              let cur = start;
+              for (const p of keys) {
+                if (Array.isArray(cur)) {
+                  // mapeia sobre arrays automaticamente
+                  cur = cur.map((it) => (it && typeof it === "object" ? it[p] : undefined));
+                } else if (cur != null && typeof cur === "object") {
+                  cur = cur[p];
+                } else {
+                  return undefined;
+                }
               }
               return cur;
             };
+            const first = tryPath(obj, parts);
+            if (first !== undefined) return first;
+            if (parts[0] === "data") return tryPath(obj, parts.slice(1));
+            if (obj && typeof obj === "object" && "data" in obj) return tryPath((obj as any).data, parts);
+            return undefined;
+          };
 
-            (cfg.responseMappings || []).forEach((m: any) => {
+          const applyMappings = (responseData: any, mappings: any[]) => {
+            (mappings || []).forEach((m: any) => {
               if (!m?.variableName) return;
               const val = getByPath(responseData, m.jsonPath || "");
               if (val !== undefined) {
-                variables[m.variableName.trim()] = val;
+                variables[String(m.variableName).trim()] = val;
                 console.log(`[node:http-request] mapped ${m.jsonPath} -> ${m.variableName}`);
               }
             });
+          };
 
-            const handle = res.ok ? "success" : "error";
-            const branchNext = nextFromNodeIn(node.id, container.id, containers, edgesList, handle, true);
-            if (branchNext) {
-              currentNodeId = branchNext;
-              continue;
+          const operationMode = (cfg.operationMode as "generic" | "dynamic") || "generic";
+
+          try {
+            if (operationMode === "dynamic") {
+              // ---------- MODO DINÂMICO ----------
+              const endpoints: any[] = Array.isArray(cfg.endpoints) ? cfg.endpoints : [];
+              if (!endpoints.length) {
+                console.warn("[node:http-request] modo dinâmico sem endpoints configurados");
+                const branchNext = nextFromNodeIn(node.id, container.id, containers, edgesList, "error", true);
+                if (branchNext) { currentNodeId = branchNext; continue; }
+              } else {
+                let lastOk = true;
+                let lastData: any = null;
+                for (const ep of endpoints) {
+                  const method = String(ep.method || "GET").toUpperCase();
+                  let url = replaceVars(String(ep.url || ""));
+                  // path params (substitui {name} pelas variables com mesmo nome, se existirem)
+                  (ep.pathParams || []).forEach((p: string) => {
+                    const v = variables[p];
+                    if (v !== undefined) url = url.replace(`{${p}}`, encodeURIComponent(String(v)));
+                  });
+                  const qp: string[] = [];
+                  (ep.queryParams || []).forEach((p: any) => {
+                    if (p?.name) qp.push(`${encodeURIComponent(p.name)}=${encodeURIComponent(replaceVars(String(p.value ?? "")))}`);
+                  });
+                  if (qp.length) url += (url.includes("?") ? "&" : "?") + qp.join("&");
+
+                  const headers: Record<string, string> = {};
+                  (ep.headers || []).forEach((h: any) => {
+                    if (h?.name) headers[h.name] = replaceVars(String(h.value ?? ""));
+                  });
+                  const epAuth = ep.auth || {};
+                  if (epAuth.type === "bearer" && epAuth.token) {
+                    headers["Authorization"] = `Bearer ${replaceVars(String(epAuth.token))}`;
+                  } else if (epAuth.type === "basic" && epAuth.username) {
+                    headers["Authorization"] = "Basic " + btoa(`${replaceVars(epAuth.username)}:${replaceVars(epAuth.password || "")}`);
+                  } else if (epAuth.type === "apiKey" && epAuth.name) {
+                    if ((epAuth.location || "header") === "header") headers[epAuth.name] = replaceVars(String(epAuth.value || ""));
+                    else url += (url.includes("?") ? "&" : "?") + `${encodeURIComponent(epAuth.name)}=${encodeURIComponent(replaceVars(String(epAuth.value || "")))}`;
+                  }
+
+                  let body: string | undefined;
+                  if (!["GET", "HEAD"].includes(method) && ep.body) {
+                    body = replaceVars(String(ep.body));
+                    if (ep.bodyContentType === "json" && !headers["Content-Type"]) headers["Content-Type"] = "application/json";
+                    if (ep.bodyContentType === "form-urlencoded" && !headers["Content-Type"]) headers["Content-Type"] = "application/x-www-form-urlencoded";
+                  }
+
+                  if (!url) {
+                    console.warn(`[node:http-request][dynamic] endpoint ${ep.id} sem URL — pulando`);
+                    lastOk = false;
+                    continue;
+                  }
+
+                  console.log(`[node:http-request][dynamic] ${method} ${url}`);
+                  const res = await fetch(url, { method, headers, body });
+                  const text = await res.text();
+                  let data: any; try { data = JSON.parse(text); } catch { data = text; }
+                  lastOk = res.ok;
+                  lastData = data;
+                  console.log(`[node:http-request][dynamic] ${ep.id} → status ${res.status}`);
+
+                  // salva resposta completa em variável baseada no nome/id da skill
+                  const varBase = String(ep.name || ep.id || "endpoint")
+                    .replace(/[^a-zA-Z0-9_]/g, "_")
+                    .replace(/_+/g, "_")
+                    .replace(/^_|_$/g, "") || "endpoint";
+                  variables[varBase] = data;
+                  variables["httpResponse"] = data; // compat com nodes que leem httpResponse
+                  applyMappings(data, ep.responseMappings || []);
+                }
+
+                const handle = lastOk ? "success" : "error";
+                const branchNext = nextFromNodeIn(node.id, container.id, containers, edgesList, handle, true);
+                if (branchNext) { currentNodeId = branchNext; continue; }
+              }
+            } else {
+              // ---------- MODO GENÉRICO (legado) ----------
+              const method = String(cfg.method || "GET").toUpperCase();
+              let url = replaceVars(String(cfg.url || ""));
+
+              const qp: string[] = [];
+              (Array.isArray(cfg.queryParams) ? cfg.queryParams : []).forEach((p: any) => {
+                const key = p?.name || p?.key;
+                if (key) qp.push(`${encodeURIComponent(key)}=${encodeURIComponent(replaceVars(String(p.value ?? "")))}`);
+              });
+              if (qp.length) url += (url.includes("?") ? "&" : "?") + qp.join("&");
+
+              const headers: Record<string, string> = {};
+              (Array.isArray(cfg.headers) ? cfg.headers : []).forEach((h: any) => {
+                const key = h?.name || h?.key;
+                if (key) headers[key] = replaceVars(String(h.value ?? ""));
+              });
+
+              const auth = cfg.authCredentials || {};
+              if (cfg.authType === "basic" && auth.username) {
+                headers["Authorization"] = "Basic " + btoa(`${replaceVars(auth.username || "")}:${replaceVars(auth.password || "")}`);
+              } else if (cfg.authType === "bearer" && auth.token) {
+                headers["Authorization"] = `Bearer ${replaceVars(auth.token)}`;
+              } else if (cfg.authType === "apiKey" && auth.apiKeyName) {
+                if ((auth.apiKeyLocation || "header") === "header") {
+                  headers[auth.apiKeyName] = replaceVars(auth.apiKeyValue || "");
+                } else {
+                  url += (url.includes("?") ? "&" : "?") + `${encodeURIComponent(auth.apiKeyName)}=${encodeURIComponent(replaceVars(auth.apiKeyValue || ""))}`;
+                }
+              } else if (cfg.authType === "customHeader" && auth.headerName) {
+                headers[auth.headerName] = replaceVars(auth.headerValue || "");
+              }
+
+              let body: string | undefined;
+              if (["POST", "PUT", "PATCH", "DELETE"].includes(method) && cfg.sendBody !== false) {
+                const bct = cfg.bodyContentType || "json";
+                if (bct === "json") {
+                  body = replaceVars(String(cfg.bodyJson || "{}"));
+                  if (!headers["Content-Type"]) headers["Content-Type"] = "application/json";
+                } else if (bct === "form-urlencoded") {
+                  const params = new URLSearchParams();
+                  (cfg.bodyParams || []).forEach((p: any) => {
+                    const k = p?.name || p?.key;
+                    if (k) params.append(k, replaceVars(String(p.value ?? "")));
+                  });
+                  body = params.toString();
+                  if (!headers["Content-Type"]) headers["Content-Type"] = "application/x-www-form-urlencoded";
+                } else {
+                  body = replaceVars(String(cfg.bodyRaw || ""));
+                }
+              }
+
+              console.log(`[node:http-request] ${method} ${url}`);
+              const res = await fetch(url, { method, headers, body });
+              const responseText = await res.text();
+              let responseData: any;
+              try { responseData = JSON.parse(responseText); } catch { responseData = responseText; }
+
+              const varName = (cfg.responseVariable || "httpResponse").trim();
+              if (varName) {
+                variables[varName] = responseData;
+                console.log(`[node:http-request] saved response in "${varName}"`);
+              }
+              applyMappings(responseData, cfg.responseMappings || []);
+
+              const handle = res.ok ? "success" : "error";
+              const branchNext = nextFromNodeIn(node.id, container.id, containers, edgesList, handle, true);
+              if (branchNext) {
+                currentNodeId = branchNext;
+                continue;
+              }
             }
           } catch (err) {
             console.error("[node:http-request] error", err);
