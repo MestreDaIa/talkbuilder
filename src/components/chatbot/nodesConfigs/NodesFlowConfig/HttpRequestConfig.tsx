@@ -464,6 +464,7 @@ export const HttpRequestConfig = ({
 
       <VariableModal open={variableModalOpen.open} onClose={() => setVariableModalOpen({ ...variableModalOpen, open: false })} onSelect={(v) => handleResponseMappingChange(variableModalOpen.index, "variableName", v)} />
       <SkillConfig config={config} setConfig={setConfig} />
+      </>)}
     </div>
   );
 };
