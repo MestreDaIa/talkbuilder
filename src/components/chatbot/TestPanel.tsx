@@ -604,11 +604,16 @@ export const TestPanel = ({
     if (!jsonMatch) return null;
     try {
       const parsed = JSON.parse(jsonMatch[0]);
-      return parsed?.skill_id ? { skill_id: String(parsed.skill_id), message: parsed.message ? String(parsed.message) : "" } : null;
+      return parsed?.skill_id ? {
+        skill_id: String(parsed.skill_id),
+        message: parsed.message ? String(parsed.message) : "",
+        arguments: (parsed.arguments && typeof parsed.arguments === "object") ? parsed.arguments : undefined,
+      } : null;
     } catch {
       return null;
     }
   };
+
 
     const runLocalFlow = async (
       state: RuntimeState | null, 
