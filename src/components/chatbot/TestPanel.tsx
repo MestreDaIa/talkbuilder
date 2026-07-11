@@ -614,6 +614,47 @@ export const TestPanel = ({
     }
   };
 
+  const parseProviderError = (provider: string, status: number, body: string, model?: string) => {
+    let parsed: any = null;
+    try { parsed = JSON.parse(body); } catch { parsed = null; }
+    const message = String(parsed?.error?.message || body || "Erro desconhecido");
+    const quota = parsed?.error?.details?.find((d: any) => String(d?.["@type"] || "").includes("QuotaFailure"));
+    const retry = parsed?.error?.details?.find((d: any) => String(d?.["@type"] || "").includes("RetryInfo"));
+    const quotaValue = quota?.violations?.[0]?.quotaValue;
+    const quotaId = quota?.violations?.[0]?.quotaId;
+    const retryDelay = retry?.retryDelay;
+
+    if (status === 429 || parsed?.error?.status === "RESOURCE_EXHAUSTED") {
+      const limitInfo = quotaValue ? ` Limite informado: ${quotaValue} requisições para este projeto/modelo.` : "";
+      const retryInfo = retryDelay ? ` Tente novamente após ${retryDelay}, ou aguarde a renovação da cota diária.` : "";
+      return `⚠️ Cota do ${provider} excedida${model ? ` no modelo ${model}` : ""}.${limitInfo}${retryInfo} Isso não indica chave inválida; é limite de uso/billing do provedor.${quotaId ? ` (${quotaId})` : ""}`;
+    }
+
+    if (status === 401 || status === 403) {
+      return `⚠️ Erro ${status} no ${provider}: chave sem permissão, inválida ou projeto sem acesso ao modelo${model ? ` ${model}` : ""}.`;
+    }
+
+    return `⚠️ Erro ${status} do provedor de IA (${provider}). Detalhes: ${message.slice(0, 500)}`;
+  };
+
+  const buildSkillResultReply = (skillLabel: string, payload: any) => {
+    const data = payload?.httpResponse ?? payload;
+    const candidate = Array.isArray(data) ? data : Array.isArray(data?.data) ? data.data : Array.isArray(data?.items) ? data.items : null;
+    if (candidate?.length) {
+      const names = candidate
+        .map((item: any) => item?.name || item?.title || item?.label || item?.description || item?.id)
+        .filter(Boolean)
+        .slice(0, 8);
+      if (names.length) return `Encontrei estas opções: ${names.join(", ")}. Qual delas você prefere?`;
+      return `Encontrei ${candidate.length} resultado(s) em ${skillLabel}. Qual opção você prefere?`;
+    }
+    if (data && typeof data === "object") {
+      const name = data.name || data.title || data.label;
+      if (name) return `Pronto, encontrei: ${name}. Como deseja continuar?`;
+    }
+    return `Pronto, consultei ${skillLabel}. Como deseja continuar?`;
+  };
+
 
     const runLocalFlow = async (
       state: RuntimeState | null, 
@@ -625,6 +666,7 @@ export const TestPanel = ({
         base64?: string;
         fileName?: string;
         mimetype?: string;
+        __fromSkill?: boolean;
       },
       containersIn?: Container[],
       edgesIn?: Edge[],
