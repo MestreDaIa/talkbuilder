@@ -1029,10 +1029,16 @@ export const TestPanel = ({
                   const parts = data.candidates?.[0]?.content?.parts || [];
                   const fn = parts.find((part: any) => part.functionCall?.name === "use_skill")?.functionCall;
                   if (fn?.args?.skill_id) {
+                    let parsedArgs: Record<string, any> | undefined;
+                    if (fn.args.arguments && typeof fn.args.arguments === "object") {
+                      parsedArgs = fn.args.arguments;
+                    } else if (typeof fn.args.arguments_json === "string") {
+                      try { parsedArgs = JSON.parse(fn.args.arguments_json); } catch { parsedArgs = undefined; }
+                    }
                     skillCall = {
                       skill_id: String(fn.args.skill_id),
                       message: fn.args.message,
-                      arguments: (fn.args.arguments && typeof fn.args.arguments === "object") ? fn.args.arguments : undefined,
+                      arguments: parsedArgs,
                     };
                   }
                   aiReply = parts.map((part: any) => part.text).filter(Boolean).join("\n").trim() || null;
