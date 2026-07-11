@@ -1185,16 +1185,29 @@ export const TestPanel = ({
             const toolMsg: RuntimeMessage = {
               id: crypto.randomUUID(),
               conversation_id: conversationId || "temp",
-              role: "user",
-              content: `[Resultado da skill "${skillMeta?.label || skillCall.skill_id}"]:\n${payloadStr}\n\nCom base neste resultado, responda ao usuário de forma natural e útil (em português). Não chame a mesma skill novamente a menos que seja realmente necessário.`,
+              role: "tool",
+              content: `[Resultado da skill "${skillMeta?.label || skillCall.skill_id}"]:\n${payloadStr}`,
               created_at: new Date().toISOString()
             };
             messageHistory.push(toolMsg);
 
-            // Reexecuta o node do Agent IA com o input sintético para gerar a resposta final.
-            currentNodeId = activeAgentNodeId;
-            input = { message: toolMsg.content, __fromSkill: true } as any;
-            continue;
+            // Evita uma segunda chamada ao modelo apenas para resumir o resultado da skill.
+            // Isso reduz consumo e impede loops que estouram cotas baixas do Gemini Free Tier.
+            const finalReply = buildSkillResultReply(skillMeta?.label || skillCall.skill_id, payload);
+            const botMsg: RuntimeMessage = {
+              id: crypto.randomUUID(),
+              conversation_id: conversationId || "temp",
+              role: "assistant",
+              content: finalReply,
+              created_at: new Date().toISOString()
+            };
+            messageHistory.push(botMsg);
+            if (conversationId) conversationService.saveMessage(botMsg);
+            nextMessages.push({ ...botMsg, type: "bot", content: finalReply, isHtml: false } as Message);
+            waitingFor = "input-text";
+            waitingForCfg = { placeholder: "Converse com o agente..." };
+            status = "waiting_input";
+            break;
           }
 
           if (aiReply) {
