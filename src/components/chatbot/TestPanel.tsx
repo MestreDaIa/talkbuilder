@@ -1024,6 +1024,11 @@ export const TestPanel = ({
                     } : {})
                   }),
                 });
+                if (!res.ok) {
+                  const errBody = await res.text().catch(() => "");
+                  console.error(`[agent-node] Gemini ${res.status}:`, errBody);
+                  aiReply = `⚠️ Erro ${res.status} do provedor de IA (Gemini). Verifique a chave, o modelo (${model}) ou a configuração das skills. Detalhes: ${errBody.slice(0, 300)}`;
+                }
                 if (res.ok) {
                   const data = await res.json();
                   const parts = data.candidates?.[0]?.content?.parts || [];
