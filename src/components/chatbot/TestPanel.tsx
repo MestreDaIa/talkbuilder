@@ -1000,21 +1000,50 @@ export const TestPanel = ({
                       tools: [{ function_declarations: [{
                         name: useSkillTool.function.name,
                         description: useSkillTool.function.description,
-                        parameters: useSkillTool.function.parameters
+                        parameters: {
+                          type: "object",
+                          properties: {
+                            skill_id: {
+                              type: "string",
+                              enum: (useSkillTool.function.parameters as any)?.properties?.skill_id?.enum || [],
+                              description: "ID exato da skill que deve ser executada."
+                            },
+                            arguments_json: {
+                              type: "string",
+                              description: "JSON string com os argumentos (path/query/body). Ex: '{\"id\":\"...\"}'. Use '{}' se não houver argumentos."
+                            },
+                            message: {
+                              type: "string",
+                              description: "Mensagem curta para o usuário antes de executar a skill."
+                            }
+                          },
+                          required: ["skill_id"]
+                        }
                       }] }],
                       tool_config: { function_calling_config: { mode: "AUTO" } }
                     } : {})
                   }),
                 });
+                if (!res.ok) {
+                  const errBody = await res.text().catch(() => "");
+                  console.error(`[agent-node] Gemini ${res.status}:`, errBody);
+                  aiReply = `⚠️ Erro ${res.status} do provedor de IA (Gemini). Verifique a chave, o modelo (${model}) ou a configuração das skills. Detalhes: ${errBody.slice(0, 300)}`;
+                }
                 if (res.ok) {
                   const data = await res.json();
                   const parts = data.candidates?.[0]?.content?.parts || [];
                   const fn = parts.find((part: any) => part.functionCall?.name === "use_skill")?.functionCall;
                   if (fn?.args?.skill_id) {
+                    let parsedArgs: Record<string, any> | undefined;
+                    if (fn.args.arguments && typeof fn.args.arguments === "object") {
+                      parsedArgs = fn.args.arguments;
+                    } else if (typeof fn.args.arguments_json === "string") {
+                      try { parsedArgs = JSON.parse(fn.args.arguments_json); } catch { parsedArgs = undefined; }
+                    }
                     skillCall = {
                       skill_id: String(fn.args.skill_id),
                       message: fn.args.message,
-                      arguments: (fn.args.arguments && typeof fn.args.arguments === "object") ? fn.args.arguments : undefined,
+                      arguments: parsedArgs,
                     };
                   }
                   aiReply = parts.map((part: any) => part.text).filter(Boolean).join("\n").trim() || null;
