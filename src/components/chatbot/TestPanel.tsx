@@ -977,7 +977,11 @@ export const TestPanel = ({
                   const toolCall = msg?.tool_calls?.find((call: any) => call?.function?.name === "use_skill");
                   if (toolCall?.function?.arguments) {
                     const args = JSON.parse(toolCall.function.arguments);
-                    skillCall = args?.skill_id ? { skill_id: String(args.skill_id), message: args.message } : null;
+                    skillCall = args?.skill_id ? {
+                      skill_id: String(args.skill_id),
+                      message: args.message,
+                      arguments: (args.arguments && typeof args.arguments === "object") ? args.arguments : undefined,
+                    } : null;
                   }
                   aiReply = msg?.content || null;
                 }
