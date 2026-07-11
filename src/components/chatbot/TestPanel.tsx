@@ -958,7 +958,7 @@ export const TestPanel = ({
           });
 
           let aiReply: string | null = null;
-          let skillCall: { skill_id: string; message?: string } | null = null;
+          let skillCall: { skill_id: string; message?: string; arguments?: Record<string, any> } | null = null;
           if (activeKey) {
             try {
               if (selectedProvider === "openai") {
