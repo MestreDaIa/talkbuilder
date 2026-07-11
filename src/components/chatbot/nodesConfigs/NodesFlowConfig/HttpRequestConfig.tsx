@@ -18,6 +18,8 @@ import { useVariables } from "@/context/VariablesContext";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import { VariableModal } from "../../VariableModal";
 import { SkillConfig } from "../SkillConfig";
+import { HttpDynamicConfig } from "./HttpDynamicConfig";
+import { Sparkles, Wrench } from "lucide-react";
 
 interface KeyValuePair {
   name: string;
@@ -242,8 +244,45 @@ export const HttpRequestConfig = ({
     }
   };
 
+  const operationMode: "generic" | "dynamic" = (config as any).operationMode || "generic";
+
   return (
     <div className="space-y-4 p-4">
+      {/* Modo de Operação */}
+      <div className="rounded-md border bg-muted/30 p-2">
+        <Label className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">Modo de Operação</Label>
+        <div className="grid grid-cols-2 gap-2 mt-2">
+          <button
+            type="button"
+            onClick={() => updateConfig({ operationMode: "generic" } as any)}
+            className={`flex items-center gap-2 rounded-md border p-2 text-xs transition ${operationMode === "generic" ? "border-primary bg-primary/10" : "border-border hover:bg-accent"}`}
+          >
+            <Wrench className="h-4 w-4" />
+            <div className="text-left">
+              <div className="font-semibold">Genérico</div>
+              <div className="text-[10px] text-muted-foreground">Um endpoint, controle total.</div>
+            </div>
+          </button>
+          <button
+            type="button"
+            onClick={() => updateConfig({ operationMode: "dynamic" } as any)}
+            className={`flex items-center gap-2 rounded-md border p-2 text-xs transition ${operationMode === "dynamic" ? "border-primary bg-primary/10" : "border-border hover:bg-accent"}`}
+          >
+            <Sparkles className="h-4 w-4" />
+            <div className="text-left">
+              <div className="font-semibold">Dinâmico</div>
+              <div className="text-[10px] text-muted-foreground">Skills para o Agente IA.</div>
+            </div>
+          </button>
+        </div>
+      </div>
+
+      {operationMode === "dynamic" ? (
+        <>
+          <HttpDynamicConfig config={config as any} setConfig={setConfig as any} />
+          <SkillConfig config={config} setConfig={setConfig} />
+        </>
+      ) : (<>
       {/* Informação sobre variáveis */}
       <div className="bg-blue-50 border border-blue-200 rounded p-3 flex gap-2">
         <Info className="h-4 w-4 text-blue-500 shrink-0 mt-0.5" />
@@ -425,6 +464,7 @@ export const HttpRequestConfig = ({
 
       <VariableModal open={variableModalOpen.open} onClose={() => setVariableModalOpen({ ...variableModalOpen, open: false })} onSelect={(v) => handleResponseMappingChange(variableModalOpen.index, "variableName", v)} />
       <SkillConfig config={config} setConfig={setConfig} />
+      </>)}
     </div>
   );
 };
