@@ -25,7 +25,7 @@ services:
       - "traefik.docker.network=builderchat_net"
 
   booking-proxy:
-    image: nginx:1.27-alpine
+    image: mirror.gcr.io/library/nginx:1.27-alpine
     container_name: chatbot-booking-proxy
     restart: always
     command:
