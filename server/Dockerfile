@@ -1,5 +1,5 @@
 # Build stage
-FROM node:20-slim AS builder
+FROM mirror.gcr.io/library/node:20-slim AS builder
 WORKDIR /app
 COPY package.json ./
 COPY tsconfig.json ./
@@ -8,7 +8,7 @@ COPY . .
 RUN npm run build
 
 # Production stage
-FROM node:20-slim
+FROM mirror.gcr.io/library/node:20-slim
 WORKDIR /app
 COPY package*.json ./
 RUN npm install --production
