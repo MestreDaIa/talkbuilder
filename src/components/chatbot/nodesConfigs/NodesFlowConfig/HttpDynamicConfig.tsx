@@ -52,6 +52,12 @@ export interface DynamicEndpoint {
   responseMappings: { jsonPath: string; variableName: string; contextKey?: string }[];
   resultType: "context" | "live";
   lastTestResponse?: any;
+  argsSchema?: {
+    pathParams?: { name: string; description: string; example?: string }[];
+    queryParams?: { name: string; description: string; example?: string }[];
+    bodyDescription?: string;
+    bodyExample?: string;
+  };
 }
 
 interface Props {
