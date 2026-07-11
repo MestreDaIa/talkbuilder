@@ -1011,7 +1011,11 @@ export const TestPanel = ({
                   const parts = data.candidates?.[0]?.content?.parts || [];
                   const fn = parts.find((part: any) => part.functionCall?.name === "use_skill")?.functionCall;
                   if (fn?.args?.skill_id) {
-                    skillCall = { skill_id: String(fn.args.skill_id), message: fn.args.message };
+                    skillCall = {
+                      skill_id: String(fn.args.skill_id),
+                      message: fn.args.message,
+                      arguments: (fn.args.arguments && typeof fn.args.arguments === "object") ? fn.args.arguments : undefined,
+                    };
                   }
                   aiReply = parts.map((part: any) => part.text).filter(Boolean).join("\n").trim() || null;
                 }
