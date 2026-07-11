@@ -1000,7 +1000,25 @@ export const TestPanel = ({
                       tools: [{ function_declarations: [{
                         name: useSkillTool.function.name,
                         description: useSkillTool.function.description,
-                        parameters: useSkillTool.function.parameters
+                        parameters: {
+                          type: "object",
+                          properties: {
+                            skill_id: {
+                              type: "string",
+                              enum: (useSkillTool.function.parameters as any)?.properties?.skill_id?.enum || [],
+                              description: "ID exato da skill que deve ser executada."
+                            },
+                            arguments_json: {
+                              type: "string",
+                              description: "JSON string com os argumentos (path/query/body). Ex: '{\"id\":\"...\"}'. Use '{}' se não houver argumentos."
+                            },
+                            message: {
+                              type: "string",
+                              description: "Mensagem curta para o usuário antes de executar a skill."
+                            }
+                          },
+                          required: ["skill_id"]
+                        }
                       }] }],
                       tool_config: { function_calling_config: { mode: "AUTO" } }
                     } : {})
