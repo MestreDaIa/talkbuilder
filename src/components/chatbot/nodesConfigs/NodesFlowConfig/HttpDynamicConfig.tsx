@@ -52,6 +52,12 @@ export interface DynamicEndpoint {
   responseMappings: { jsonPath: string; variableName: string; contextKey?: string }[];
   resultType: "context" | "live";
   lastTestResponse?: any;
+  argsSchema?: {
+    pathParams?: { name: string; description: string; example?: string }[];
+    queryParams?: { name: string; description: string; example?: string }[];
+    bodyDescription?: string;
+    bodyExample?: string;
+  };
 }
 
 interface Props {
@@ -394,6 +400,9 @@ function EndpointCard({
           </p>
         </div>
 
+        {/* Args Schema — o que o Agente IA precisa fornecer para chamar este endpoint */}
+        <ArgsSchemaEditor endpoint={endpoint} onChange={onChange} />
+
         {/* Test result + mapping */}
         {testResult && (
           <div>
@@ -437,5 +446,153 @@ function EndpointCard({
         </div>
       </CollapsibleContent>
     </Collapsible>
+  );
+}
+
+// =============================================================================
+// Editor de "Schema de Argumentos" — descreve, para o Agente IA, o que ele
+// precisa preencher quando invocar este endpoint (path params, query params,
+// body). Sem isto, o modelo não sabe qual valor injetar em `{id}`, `?date=...`,
+// nem que estrutura JSON o body espera.
+// =============================================================================
+function ArgsSchemaEditor({
+  endpoint, onChange,
+}: {
+  endpoint: DynamicEndpoint;
+  onChange: (p: Partial<DynamicEndpoint>) => void;
+}) {
+  const schema = endpoint.argsSchema || {};
+
+  // Sincroniza a lista de path params com os placeholders {name} / :name detectados na URL.
+  const detectedPathParams = useMemo(() => {
+    const url = endpoint.url || "";
+    const set = new Set<string>();
+    for (const m of url.matchAll(/\{([^}]+)\}/g)) set.add(m[1]);
+    for (const m of url.matchAll(/(?<=\/):([a-zA-Z0-9_]+)/g)) set.add(m[1]);
+    // fallback: pathParams originais do parse do CURL
+    (endpoint.pathParams || []).forEach((p) => set.add(p));
+    return Array.from(set);
+  }, [endpoint.url, endpoint.pathParams]);
+
+  const pathParams = schema.pathParams || [];
+  const queryParams = schema.queryParams || [];
+
+  const updateSchema = (patch: Partial<NonNullable<DynamicEndpoint["argsSchema"]>>) =>
+    onChange({ argsSchema: { ...schema, ...patch } });
+
+  const syncFromDetected = () => {
+    const existingByName = new Map(pathParams.map((p) => [p.name, p]));
+    const merged = detectedPathParams.map(
+      (n) => existingByName.get(n) || { name: n, description: "", example: "" }
+    );
+    updateSchema({ pathParams: merged });
+  };
+
+  return (
+    <div className="rounded-md border p-2 space-y-3 bg-muted/20">
+      <div className="flex items-center justify-between">
+        <Label className="text-[10px] font-semibold flex items-center gap-1">
+          <Sparkles className="h-3 w-3 text-primary" /> Schema de argumentos p/ o Agente IA
+        </Label>
+        {detectedPathParams.length > 0 && (
+          <Button size="sm" variant="ghost" className="h-6 text-[10px]" onClick={syncFromDetected}>
+            Sincronizar da URL ({detectedPathParams.length})
+          </Button>
+        )}
+      </div>
+      <p className="text-[10px] text-muted-foreground">
+        Descreva cada valor que o Agente IA deve fornecer. Se um valor não estiver aqui,
+        o modelo não saberá que precisa enviá-lo — e a chamada pode falhar (400 / 422).
+      </p>
+
+      {/* Path params */}
+      <div className="space-y-1">
+        <div className="flex items-center justify-between">
+          <Label className="text-[10px] font-semibold">Path params (ex.: {"{id}"} na URL)</Label>
+          <Button size="sm" variant="outline" className="h-6 text-[10px]" onClick={() =>
+            updateSchema({ pathParams: [...pathParams, { name: "", description: "", example: "" }] })
+          }>
+            <Plus className="h-3 w-3 mr-1" /> Novo
+          </Button>
+        </div>
+        {pathParams.length === 0 && (
+          <p className="text-[10px] text-muted-foreground italic">Nenhum path param definido.</p>
+        )}
+        {pathParams.map((p, i) => (
+          <div key={i} className="grid grid-cols-[1fr_1.4fr_1fr_auto] gap-1">
+            <Input value={p.name} placeholder="id" className="h-7 text-[10px] font-mono" onChange={(e) => {
+              const list = [...pathParams]; list[i] = { ...list[i], name: e.target.value };
+              updateSchema({ pathParams: list });
+            }} />
+            <Input value={p.description} placeholder="Descrição p/ IA (ex.: ID do serviço escolhido)" className="h-7 text-[10px]" onChange={(e) => {
+              const list = [...pathParams]; list[i] = { ...list[i], description: e.target.value };
+              updateSchema({ pathParams: list });
+            }} />
+            <Input value={p.example || ""} placeholder="exemplo" className="h-7 text-[10px] font-mono" onChange={(e) => {
+              const list = [...pathParams]; list[i] = { ...list[i], example: e.target.value };
+              updateSchema({ pathParams: list });
+            }} />
+            <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() =>
+              updateSchema({ pathParams: pathParams.filter((_, x) => x !== i) })
+            }><Trash2 className="h-3 w-3 text-destructive" /></Button>
+          </div>
+        ))}
+      </div>
+
+      {/* Query params */}
+      <div className="space-y-1">
+        <div className="flex items-center justify-between">
+          <Label className="text-[10px] font-semibold">Query params</Label>
+          <Button size="sm" variant="outline" className="h-6 text-[10px]" onClick={() =>
+            updateSchema({ queryParams: [...queryParams, { name: "", description: "", example: "" }] })
+          }>
+            <Plus className="h-3 w-3 mr-1" /> Novo
+          </Button>
+        </div>
+        {queryParams.length === 0 && (
+          <p className="text-[10px] text-muted-foreground italic">Nenhum query param declarado.</p>
+        )}
+        {queryParams.map((p, i) => (
+          <div key={i} className="grid grid-cols-[1fr_1.4fr_1fr_auto] gap-1">
+            <Input value={p.name} placeholder="date" className="h-7 text-[10px] font-mono" onChange={(e) => {
+              const list = [...queryParams]; list[i] = { ...list[i], name: e.target.value };
+              updateSchema({ queryParams: list });
+            }} />
+            <Input value={p.description} placeholder="Descrição p/ IA" className="h-7 text-[10px]" onChange={(e) => {
+              const list = [...queryParams]; list[i] = { ...list[i], description: e.target.value };
+              updateSchema({ queryParams: list });
+            }} />
+            <Input value={p.example || ""} placeholder="2025-01-30" className="h-7 text-[10px] font-mono" onChange={(e) => {
+              const list = [...queryParams]; list[i] = { ...list[i], example: e.target.value };
+              updateSchema({ queryParams: list });
+            }} />
+            <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() =>
+              updateSchema({ queryParams: queryParams.filter((_, x) => x !== i) })
+            }><Trash2 className="h-3 w-3 text-destructive" /></Button>
+          </div>
+        ))}
+      </div>
+
+      {/* Body schema/example */}
+      <div className="space-y-1">
+        <Label className="text-[10px] font-semibold">Body — descrição + exemplo JSON</Label>
+        <Input
+          value={schema.bodyDescription || ""}
+          placeholder="Descrição do que o body representa (ex.: dados do agendamento)"
+          className="h-7 text-[10px]"
+          onChange={(e) => updateSchema({ bodyDescription: e.target.value })}
+        />
+        <Textarea
+          value={schema.bodyExample || ""}
+          onChange={(e) => updateSchema({ bodyExample: e.target.value })}
+          placeholder={`{\n  "service_id": "<uuid do serviço>",\n  "employee_id": "<uuid do profissional>",\n  "start_at": "2025-01-30T14:00:00Z"\n}`}
+          className="text-[10px] font-mono min-h-[80px]"
+        />
+        <p className="text-[10px] text-muted-foreground">
+          O Agente enviará um JSON com <strong>a mesma estrutura</strong> do exemplo,
+          substituindo os placeholders pelos valores extraídos da conversa.
+        </p>
+      </div>
+    </div>
   );
 }

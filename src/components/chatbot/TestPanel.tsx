@@ -473,22 +473,85 @@ export const TestPanel = ({
   };
 
   const collectAgentSkills = (containersToScan: Container[], agentNodeId?: string | null) => {
-    return containersToScan.flatMap((container) =>
-      (container.nodes || [])
-        .filter((node) => node.id !== agentNodeId && node.config?.isSkill)
-        .map((node) => ({
+    const skills: Array<{
+      id: string;
+      type: string;
+      containerId: string;
+      containerName: string;
+      description: string;
+      label: string;
+      argsSchema?: any;                 // schema livre p/ o agente preencher
+      // meta interna para o dispatcher
+      _http?: { nodeId: string; endpointId: string; permissions: any };
+    }> = [];
+
+    for (const container of containersToScan) {
+      for (const node of container.nodes || []) {
+        if (node.id === agentNodeId) continue;
+        if (!node.config?.isSkill) continue;
+
+        const containerName = container.nameContainer || `Bloco #${container.id.slice(-4)}`;
+        const cfg: any = node.config || {};
+
+        // HTTP-Request em modo dinâmico → expõe UMA skill por endpoint,
+        // cada uma com seu próprio argsSchema para o Agente IA saber o que preencher.
+        if (node.type === "http-request" && cfg.operationMode === "dynamic" && Array.isArray(cfg.endpoints)) {
+          for (const ep of cfg.endpoints) {
+            const epId: string = ep.id || `${ep.method || "GET"} ${ep.url || ""}`;
+            skills.push({
+              id: `${node.id}::${epId}`,
+              type: "http-endpoint",
+              containerId: container.id,
+              containerName,
+              description: String(ep.description || ep.name || "Chame este endpoint quando fizer sentido para atender o usuário."),
+              label: `${ep.method || "GET"} ${ep.name || epId}`,
+              argsSchema: ep.argsSchema || null,
+              _http: { nodeId: node.id, endpointId: epId, permissions: ep.permissions || {} },
+            });
+          }
+          continue;
+        }
+
+        skills.push({
           id: node.id,
           type: node.type,
           containerId: container.id,
-          containerName: container.nameContainer || `Bloco #${container.id.slice(-4)}`,
-          description: String(node.config?.skillDescription || "Use quando esta ação for útil para atender o usuário."),
+          containerName,
+          description: String(cfg.skillDescription || "Use quando esta ação for útil para atender o usuário."),
           label: node.type === "redirect"
-            ? `Redirecionar para ${node.config?.targetFlowName || node.config?.targetFlow || "outro fluxo"}`
+            ? `Redirecionar para ${cfg.targetFlowName || cfg.targetFlow || "outro fluxo"}`
             : node.type === "go-to"
-              ? `Ir para ${node.config?.targetContainerName || node.config?.targetContainerId || "outro bloco"}`
-              : String(node.config?.name || node.config?.label || node.type),
-        }))
-    );
+              ? `Ir para ${cfg.targetContainerName || cfg.targetContainerId || "outro bloco"}`
+              : String(cfg.name || cfg.label || node.type),
+        });
+      }
+    }
+    return skills;
+  };
+
+  const describeSkillArgs = (skill: ReturnType<typeof collectAgentSkills>[number]) => {
+    const s = skill.argsSchema;
+    if (!s) return "";
+    const lines: string[] = [];
+    if (Array.isArray(s.pathParams) && s.pathParams.length) {
+      lines.push("  path params:");
+      for (const p of s.pathParams) {
+        if (!p?.name) continue;
+        lines.push(`    - ${p.name}${p.description ? `: ${p.description}` : ""}${p.example ? ` (ex.: ${p.example})` : ""}`);
+      }
+    }
+    if (Array.isArray(s.queryParams) && s.queryParams.length) {
+      lines.push("  query params:");
+      for (const p of s.queryParams) {
+        if (!p?.name) continue;
+        lines.push(`    - ${p.name}${p.description ? `: ${p.description}` : ""}${p.example ? ` (ex.: ${p.example})` : ""}`);
+      }
+    }
+    if (s.bodyExample || s.bodyDescription) {
+      lines.push(`  body${s.bodyDescription ? ` (${s.bodyDescription})` : ""}:`);
+      if (s.bodyExample) lines.push(`    exemplo: ${String(s.bodyExample).replace(/\s+/g, " ").slice(0, 400)}`);
+    }
+    return lines.length ? `\n  Argumentos esperados:\n${lines.join("\n")}` : "";
   };
 
   const buildSkillSystemPrompt = (skills: ReturnType<typeof collectAgentSkills>) => {
@@ -497,10 +560,10 @@ export const TestPanel = ({
     }
 
     const list = skills.map((skill, index) => (
-      `${index + 1}. ID: ${skill.id}\nTipo: ${skill.type}\nBloco: ${skill.containerName}\nNome: ${skill.label}\nInstrução da skill: ${skill.description}`
+      `${index + 1}. ID: ${skill.id}\nTipo: ${skill.type}\nBloco: ${skill.containerName}\nNome: ${skill.label}\nInstrução da skill: ${skill.description}${describeSkillArgs(skill)}`
     )).join("\n\n");
 
-    return `\n\n[SKILLS DISPONÍVEIS PARA O AGENTE]\n${list}\n\nQuando a mensagem do usuário combinar com a instrução de uma skill, use a ferramenta use_skill com o ID exato da skill. Se a chamada de ferramenta não estiver disponível, responda apenas com JSON neste formato: {"skill_id":"ID_DA_SKILL","message":"mensagem opcional"}. Não invente perguntas antes de usar uma skill claramente solicitada.`;
+    return `\n\n[SKILLS DISPONÍVEIS PARA O AGENTE]\n${list}\n\nQuando a mensagem do usuário combinar com a instrução de uma skill, use a ferramenta use_skill com o ID exato da skill. Sempre que a skill listar "Argumentos esperados", preencha o objeto \`arguments\` com esses campos (use os path params/query params/body descritos, extraindo os valores do contexto da conversa e das variáveis já coletadas). Se a chamada de ferramenta não estiver disponível, responda apenas com JSON: {"skill_id":"ID","arguments":{...},"message":"opcional"}. Não invente perguntas antes de usar uma skill claramente solicitada.`;
   };
 
   const buildUseSkillTool = (skills: ReturnType<typeof collectAgentSkills>) => {
@@ -509,14 +572,19 @@ export const TestPanel = ({
       type: "function",
       function: {
         name: "use_skill",
-        description: "Executa um node marcado como Skill/Ferramenta IA no fluxo atual.",
+        description: "Executa uma skill (ferramenta) do fluxo. Inclua os argumentos quando a skill declarar path/query/body.",
         parameters: {
           type: "object",
           properties: {
             skill_id: {
               type: "string",
               enum: skills.map((skill) => skill.id),
-              description: "ID exato do node skill que deve ser executado."
+              description: "ID exato da skill que deve ser executada."
+            },
+            arguments: {
+              type: "object",
+              description: "Valores para preencher path params, query params e body do endpoint (quando aplicável). Use as chaves declaradas em 'Argumentos esperados'.",
+              additionalProperties: true,
             },
             message: {
               type: "string",
@@ -529,17 +597,23 @@ export const TestPanel = ({
     };
   };
 
+
   const parseSkillFromText = (reply: string | null) => {
     if (!reply) return null;
     const jsonMatch = reply.match(/\{[\s\S]*"skill_id"[\s\S]*\}/);
     if (!jsonMatch) return null;
     try {
       const parsed = JSON.parse(jsonMatch[0]);
-      return parsed?.skill_id ? { skill_id: String(parsed.skill_id), message: parsed.message ? String(parsed.message) : "" } : null;
+      return parsed?.skill_id ? {
+        skill_id: String(parsed.skill_id),
+        message: parsed.message ? String(parsed.message) : "",
+        arguments: (parsed.arguments && typeof parsed.arguments === "object") ? parsed.arguments : undefined,
+      } : null;
     } catch {
       return null;
     }
   };
+
 
     const runLocalFlow = async (
       state: RuntimeState | null, 
@@ -884,7 +958,7 @@ export const TestPanel = ({
           });
 
           let aiReply: string | null = null;
-          let skillCall: { skill_id: string; message?: string } | null = null;
+          let skillCall: { skill_id: string; message?: string; arguments?: Record<string, any> } | null = null;
           if (activeKey) {
             try {
               if (selectedProvider === "openai") {
@@ -903,7 +977,11 @@ export const TestPanel = ({
                   const toolCall = msg?.tool_calls?.find((call: any) => call?.function?.name === "use_skill");
                   if (toolCall?.function?.arguments) {
                     const args = JSON.parse(toolCall.function.arguments);
-                    skillCall = args?.skill_id ? { skill_id: String(args.skill_id), message: args.message } : null;
+                    skillCall = args?.skill_id ? {
+                      skill_id: String(args.skill_id),
+                      message: args.message,
+                      arguments: (args.arguments && typeof args.arguments === "object") ? args.arguments : undefined,
+                    } : null;
                   }
                   aiReply = msg?.content || null;
                 }
@@ -933,7 +1011,11 @@ export const TestPanel = ({
                   const parts = data.candidates?.[0]?.content?.parts || [];
                   const fn = parts.find((part: any) => part.functionCall?.name === "use_skill")?.functionCall;
                   if (fn?.args?.skill_id) {
-                    skillCall = { skill_id: String(fn.args.skill_id), message: fn.args.message };
+                    skillCall = {
+                      skill_id: String(fn.args.skill_id),
+                      message: fn.args.message,
+                      arguments: (fn.args.arguments && typeof fn.args.arguments === "object") ? fn.args.arguments : undefined,
+                    };
                   }
                   aiReply = parts.map((part: any) => part.text).filter(Boolean).join("\n").trim() || null;
                 }
@@ -945,17 +1027,32 @@ export const TestPanel = ({
 
           skillCall = skillCall || parseSkillFromText(aiReply);
 
-          if (skillCall?.skill_id && skills.some((skill) => skill.id === skillCall?.skill_id)) {
+          const matchedSkill = skillCall?.skill_id ? skills.find((s) => s.id === skillCall!.skill_id) : null;
+          if (skillCall?.skill_id && matchedSkill) {
             if (skillCall.message) {
               const notice = String(skillCall.message).trim();
               if (notice) nextMessages.push({ id: crypto.randomUUID(), conversation_id: conversationId || "temp", role: "assistant", type: "bot", content: notice, isHtml: false } as Message);
+            }
+
+            // Composite id `${nodeId}::${endpointId}` para HTTP-Request dinâmico:
+            // extraímos o endpoint alvo e os argumentos do Agente, e injetamos
+            // como diretiva efêmera consumida pelo executor do node.
+            let targetNodeId = skillCall.skill_id;
+            if (matchedSkill._http) {
+              targetNodeId = matchedSkill._http.nodeId;
+              (variables as any).__dynamicSkillDispatch = {
+                nodeId: matchedSkill._http.nodeId,
+                endpointId: matchedSkill._http.endpointId,
+                args: skillCall.arguments || {},
+                permissions: matchedSkill._http.permissions || {},
+              };
             }
 
             const varsBefore = JSON.parse(JSON.stringify(variables));
             const skillResult = await runLocalFlow(
               {
                 mode: "flow",
-                current_node_id: skillCall.skill_id,
+                current_node_id: targetNodeId,
                 active_agent_node_id: null,
                 variables,
                 message_history: messageHistory,
@@ -969,6 +1066,8 @@ export const TestPanel = ({
               edgesList,
               visitedRedirects
             );
+            delete (variables as any).__dynamicSkillDispatch;
+
 
             const skillVars = skillResult.runtime_state?.variables || {};
             Object.assign(variables, skillVars);
@@ -1128,7 +1227,21 @@ export const TestPanel = ({
           try {
             if (operationMode === "dynamic") {
               // ---------- MODO DINÂMICO ----------
-              const endpoints: any[] = Array.isArray(cfg.endpoints) ? cfg.endpoints : [];
+              const allEndpoints: any[] = Array.isArray(cfg.endpoints) ? cfg.endpoints : [];
+
+              // Diretiva injetada pelo Agente IA (skill dispatch): quando presente,
+              // executa APENAS o endpoint escolhido e aplica os argumentos fornecidos
+              // pelo modelo — respeitando as permissões configuradas.
+              const dispatch = (variables as any).__dynamicSkillDispatch;
+              const isDispatched = dispatch && dispatch.nodeId === node.id;
+              const endpoints: any[] = isDispatched
+                ? allEndpoints.filter((e) => e.id === dispatch.endpointId)
+                : allEndpoints;
+
+              if (isDispatched && !endpoints.length) {
+                console.warn(`[node:http-request][dynamic] endpoint "${dispatch.endpointId}" não encontrado`);
+              }
+
               if (!endpoints.length) {
                 console.warn("[node:http-request] modo dinâmico sem endpoints configurados");
                 const branchNext = nextFromNodeIn(node.id, container.id, containers, edgesList, "error", true);
@@ -1138,16 +1251,52 @@ export const TestPanel = ({
                 let lastData: any = null;
                 for (const ep of endpoints) {
                   const method = String(ep.method || "GET").toUpperCase();
+
+                  // Argumentos vindos do Agente IA (só para o endpoint despachado).
+                  const agentArgs: Record<string, any> = isDispatched ? (dispatch.args || {}) : {};
+                  const perms = isDispatched ? (dispatch.permissions || ep.permissions || {}) : (ep.permissions || {});
+                  const agentPath: Record<string, any> = (agentArgs.pathParams && typeof agentArgs.pathParams === "object") ? agentArgs.pathParams : {};
+                  const agentQuery: Record<string, any> = (agentArgs.queryParams && typeof agentArgs.queryParams === "object") ? agentArgs.queryParams : {};
+                  const agentBody = agentArgs.body;
+                  // Também aceita argumentos "flat" no nível raiz (fallback).
+                  const pickAgentValue = (name: string) =>
+                    agentPath[name] ?? agentQuery[name] ?? (name in agentArgs ? agentArgs[name] : undefined);
+
                   let url = replaceVars(String(ep.url || ""));
-                  // path params (substitui {name} pelas variables com mesmo nome, se existirem)
-                  (ep.pathParams || []).forEach((p: string) => {
-                    const v = variables[p];
-                    if (v !== undefined) url = url.replace(`{${p}}`, encodeURIComponent(String(v)));
+
+                  // Path params: substitui {name} e :name pelos valores do agente (se permitido) ou variáveis do fluxo.
+                  const pathNames = new Set<string>([
+                    ...(ep.pathParams || []),
+                    ...[...url.matchAll(/\{([^}]+)\}/g)].map((m) => m[1]),
+                    ...[...url.matchAll(/(?<=\/):([a-zA-Z0-9_]+)/g)].map((m) => m[1]),
+                  ]);
+                  pathNames.forEach((p) => {
+                    const fromAgent = perms.pathParams === false ? undefined : pickAgentValue(p);
+                    const v = fromAgent !== undefined ? fromAgent : variables[p];
+                    if (v !== undefined) {
+                      const enc = encodeURIComponent(String(v));
+                      url = url.replace(`{${p}}`, enc).replace(new RegExp(`(?<=/):${p}(?=/|$|\\?)`), enc);
+                      // Também aceita `%3A${p}` (dois-pontos url-encoded, comum quando copiado da doc).
+                      url = url.replace(`%3A${p}`, enc);
+                    }
                   });
+
                   const qp: string[] = [];
+                  const usedQuery = new Set<string>();
                   (ep.queryParams || []).forEach((p: any) => {
-                    if (p?.name) qp.push(`${encodeURIComponent(p.name)}=${encodeURIComponent(replaceVars(String(p.value ?? "")))}`);
+                    if (!p?.name) return;
+                    const fromAgent = perms.queryParams === false ? undefined : agentQuery[p.name] ?? (p.name in agentArgs ? agentArgs[p.name] : undefined);
+                    const val = fromAgent !== undefined ? String(fromAgent) : replaceVars(String(p.value ?? ""));
+                    qp.push(`${encodeURIComponent(p.name)}=${encodeURIComponent(val)}`);
+                    usedQuery.add(p.name);
                   });
+                  // Query params extras do agente (declarados no argsSchema mas ausentes na config).
+                  if (perms.queryParams !== false) {
+                    Object.entries(agentQuery).forEach(([k, v]) => {
+                      if (usedQuery.has(k) || v === undefined || v === null) return;
+                      qp.push(`${encodeURIComponent(k)}=${encodeURIComponent(String(v))}`);
+                    });
+                  }
                   if (qp.length) url += (url.includes("?") ? "&" : "?") + qp.join("&");
 
                   const headers: Record<string, string> = {};
@@ -1165,10 +1314,17 @@ export const TestPanel = ({
                   }
 
                   let body: string | undefined;
-                  if (!["GET", "HEAD"].includes(method) && ep.body) {
-                    body = replaceVars(String(ep.body));
-                    if (ep.bodyContentType === "json" && !headers["Content-Type"]) headers["Content-Type"] = "application/json";
-                    if (ep.bodyContentType === "form-urlencoded" && !headers["Content-Type"]) headers["Content-Type"] = "application/x-www-form-urlencoded";
+                  if (!["GET", "HEAD"].includes(method)) {
+                    // Body do agente tem prioridade (se permitido). Aceita objeto ou string JSON.
+                    const canAgentBody = perms.body !== false;
+                    if (canAgentBody && agentBody !== undefined && agentBody !== null && agentBody !== "") {
+                      body = typeof agentBody === "string" ? replaceVars(agentBody) : JSON.stringify(agentBody);
+                      if (!headers["Content-Type"]) headers["Content-Type"] = "application/json";
+                    } else if (ep.body) {
+                      body = replaceVars(String(ep.body));
+                      if (ep.bodyContentType === "json" && !headers["Content-Type"]) headers["Content-Type"] = "application/json";
+                      if (ep.bodyContentType === "form-urlencoded" && !headers["Content-Type"]) headers["Content-Type"] = "application/x-www-form-urlencoded";
+                    }
                   }
 
                   if (!url) {
@@ -1177,13 +1333,14 @@ export const TestPanel = ({
                     continue;
                   }
 
-                  console.log(`[node:http-request][dynamic] ${method} ${url}`);
+                  console.log(`[node:http-request][dynamic] ${method} ${url}`, { dispatched: isDispatched, agentArgs });
                   const res = await fetch(url, { method, headers, body });
                   const text = await res.text();
                   let data: any; try { data = JSON.parse(text); } catch { data = text; }
                   lastOk = res.ok;
                   lastData = data;
                   console.log(`[node:http-request][dynamic] ${ep.id} → status ${res.status}`);
+
 
                   // salva resposta completa em variável baseada no nome/id da skill
                   const varBase = String(ep.name || ep.id || "endpoint")
