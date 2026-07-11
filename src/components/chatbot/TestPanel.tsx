@@ -1027,17 +1027,32 @@ export const TestPanel = ({
 
           skillCall = skillCall || parseSkillFromText(aiReply);
 
-          if (skillCall?.skill_id && skills.some((skill) => skill.id === skillCall?.skill_id)) {
+          const matchedSkill = skillCall?.skill_id ? skills.find((s) => s.id === skillCall!.skill_id) : null;
+          if (skillCall?.skill_id && matchedSkill) {
             if (skillCall.message) {
               const notice = String(skillCall.message).trim();
               if (notice) nextMessages.push({ id: crypto.randomUUID(), conversation_id: conversationId || "temp", role: "assistant", type: "bot", content: notice, isHtml: false } as Message);
+            }
+
+            // Composite id `${nodeId}::${endpointId}` para HTTP-Request dinâmico:
+            // extraímos o endpoint alvo e os argumentos do Agente, e injetamos
+            // como diretiva efêmera consumida pelo executor do node.
+            let targetNodeId = skillCall.skill_id;
+            if (matchedSkill._http) {
+              targetNodeId = matchedSkill._http.nodeId;
+              (variables as any).__dynamicSkillDispatch = {
+                nodeId: matchedSkill._http.nodeId,
+                endpointId: matchedSkill._http.endpointId,
+                args: skillCall.arguments || {},
+                permissions: matchedSkill._http.permissions || {},
+              };
             }
 
             const varsBefore = JSON.parse(JSON.stringify(variables));
             const skillResult = await runLocalFlow(
               {
                 mode: "flow",
-                current_node_id: skillCall.skill_id,
+                current_node_id: targetNodeId,
                 active_agent_node_id: null,
                 variables,
                 message_history: messageHistory,
@@ -1051,6 +1066,8 @@ export const TestPanel = ({
               edgesList,
               visitedRedirects
             );
+            delete (variables as any).__dynamicSkillDispatch;
+
 
             const skillVars = skillResult.runtime_state?.variables || {};
             Object.assign(variables, skillVars);
