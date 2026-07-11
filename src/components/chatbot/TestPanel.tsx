@@ -473,22 +473,85 @@ export const TestPanel = ({
   };
 
   const collectAgentSkills = (containersToScan: Container[], agentNodeId?: string | null) => {
-    return containersToScan.flatMap((container) =>
-      (container.nodes || [])
-        .filter((node) => node.id !== agentNodeId && node.config?.isSkill)
-        .map((node) => ({
+    const skills: Array<{
+      id: string;
+      type: string;
+      containerId: string;
+      containerName: string;
+      description: string;
+      label: string;
+      argsSchema?: any;                 // schema livre p/ o agente preencher
+      // meta interna para o dispatcher
+      _http?: { nodeId: string; endpointId: string; permissions: any };
+    }> = [];
+
+    for (const container of containersToScan) {
+      for (const node of container.nodes || []) {
+        if (node.id === agentNodeId) continue;
+        if (!node.config?.isSkill) continue;
+
+        const containerName = container.nameContainer || `Bloco #${container.id.slice(-4)}`;
+        const cfg: any = node.config || {};
+
+        // HTTP-Request em modo dinâmico → expõe UMA skill por endpoint,
+        // cada uma com seu próprio argsSchema para o Agente IA saber o que preencher.
+        if (node.type === "http-request" && cfg.operationMode === "dynamic" && Array.isArray(cfg.endpoints)) {
+          for (const ep of cfg.endpoints) {
+            const epId: string = ep.id || `${ep.method || "GET"} ${ep.url || ""}`;
+            skills.push({
+              id: `${node.id}::${epId}`,
+              type: "http-endpoint",
+              containerId: container.id,
+              containerName,
+              description: String(ep.description || ep.name || "Chame este endpoint quando fizer sentido para atender o usuário."),
+              label: `${ep.method || "GET"} ${ep.name || epId}`,
+              argsSchema: ep.argsSchema || null,
+              _http: { nodeId: node.id, endpointId: epId, permissions: ep.permissions || {} },
+            });
+          }
+          continue;
+        }
+
+        skills.push({
           id: node.id,
           type: node.type,
           containerId: container.id,
-          containerName: container.nameContainer || `Bloco #${container.id.slice(-4)}`,
-          description: String(node.config?.skillDescription || "Use quando esta ação for útil para atender o usuário."),
+          containerName,
+          description: String(cfg.skillDescription || "Use quando esta ação for útil para atender o usuário."),
           label: node.type === "redirect"
-            ? `Redirecionar para ${node.config?.targetFlowName || node.config?.targetFlow || "outro fluxo"}`
+            ? `Redirecionar para ${cfg.targetFlowName || cfg.targetFlow || "outro fluxo"}`
             : node.type === "go-to"
-              ? `Ir para ${node.config?.targetContainerName || node.config?.targetContainerId || "outro bloco"}`
-              : String(node.config?.name || node.config?.label || node.type),
-        }))
-    );
+              ? `Ir para ${cfg.targetContainerName || cfg.targetContainerId || "outro bloco"}`
+              : String(cfg.name || cfg.label || node.type),
+        });
+      }
+    }
+    return skills;
+  };
+
+  const describeSkillArgs = (skill: ReturnType<typeof collectAgentSkills>[number]) => {
+    const s = skill.argsSchema;
+    if (!s) return "";
+    const lines: string[] = [];
+    if (Array.isArray(s.pathParams) && s.pathParams.length) {
+      lines.push("  path params:");
+      for (const p of s.pathParams) {
+        if (!p?.name) continue;
+        lines.push(`    - ${p.name}${p.description ? `: ${p.description}` : ""}${p.example ? ` (ex.: ${p.example})` : ""}`);
+      }
+    }
+    if (Array.isArray(s.queryParams) && s.queryParams.length) {
+      lines.push("  query params:");
+      for (const p of s.queryParams) {
+        if (!p?.name) continue;
+        lines.push(`    - ${p.name}${p.description ? `: ${p.description}` : ""}${p.example ? ` (ex.: ${p.example})` : ""}`);
+      }
+    }
+    if (s.bodyExample || s.bodyDescription) {
+      lines.push(`  body${s.bodyDescription ? ` (${s.bodyDescription})` : ""}:`);
+      if (s.bodyExample) lines.push(`    exemplo: ${String(s.bodyExample).replace(/\s+/g, " ").slice(0, 400)}`);
+    }
+    return lines.length ? `\n  Argumentos esperados:\n${lines.join("\n")}` : "";
   };
 
   const buildSkillSystemPrompt = (skills: ReturnType<typeof collectAgentSkills>) => {
@@ -497,10 +560,10 @@ export const TestPanel = ({
     }
 
     const list = skills.map((skill, index) => (
-      `${index + 1}. ID: ${skill.id}\nTipo: ${skill.type}\nBloco: ${skill.containerName}\nNome: ${skill.label}\nInstrução da skill: ${skill.description}`
+      `${index + 1}. ID: ${skill.id}\nTipo: ${skill.type}\nBloco: ${skill.containerName}\nNome: ${skill.label}\nInstrução da skill: ${skill.description}${describeSkillArgs(skill)}`
     )).join("\n\n");
 
-    return `\n\n[SKILLS DISPONÍVEIS PARA O AGENTE]\n${list}\n\nQuando a mensagem do usuário combinar com a instrução de uma skill, use a ferramenta use_skill com o ID exato da skill. Se a chamada de ferramenta não estiver disponível, responda apenas com JSON neste formato: {"skill_id":"ID_DA_SKILL","message":"mensagem opcional"}. Não invente perguntas antes de usar uma skill claramente solicitada.`;
+    return `\n\n[SKILLS DISPONÍVEIS PARA O AGENTE]\n${list}\n\nQuando a mensagem do usuário combinar com a instrução de uma skill, use a ferramenta use_skill com o ID exato da skill. Sempre que a skill listar "Argumentos esperados", preencha o objeto \`arguments\` com esses campos (use os path params/query params/body descritos, extraindo os valores do contexto da conversa e das variáveis já coletadas). Se a chamada de ferramenta não estiver disponível, responda apenas com JSON: {"skill_id":"ID","arguments":{...},"message":"opcional"}. Não invente perguntas antes de usar uma skill claramente solicitada.`;
   };
 
   const buildUseSkillTool = (skills: ReturnType<typeof collectAgentSkills>) => {
@@ -509,14 +572,19 @@ export const TestPanel = ({
       type: "function",
       function: {
         name: "use_skill",
-        description: "Executa um node marcado como Skill/Ferramenta IA no fluxo atual.",
+        description: "Executa uma skill (ferramenta) do fluxo. Inclua os argumentos quando a skill declarar path/query/body.",
         parameters: {
           type: "object",
           properties: {
             skill_id: {
               type: "string",
               enum: skills.map((skill) => skill.id),
-              description: "ID exato do node skill que deve ser executado."
+              description: "ID exato da skill que deve ser executada."
+            },
+            arguments: {
+              type: "object",
+              description: "Valores para preencher path params, query params e body do endpoint (quando aplicável). Use as chaves declaradas em 'Argumentos esperados'.",
+              additionalProperties: true,
             },
             message: {
               type: "string",
@@ -528,6 +596,7 @@ export const TestPanel = ({
       }
     };
   };
+
 
   const parseSkillFromText = (reply: string | null) => {
     if (!reply) return null;
