@@ -881,7 +881,11 @@ export const TestPanel = ({
                     messages: [{ role: "system", content: system }, { role: "user", content: variables["last_message"] || "Olá" }],
                   }),
                 });
-                if (res.ok) {
+                if (!res.ok) {
+                  const errBody = await res.text().catch(() => "");
+                  console.error(`[ai-node] OpenAI ${res.status}:`, errBody);
+                  aiReply = parseProviderError("OpenAI", res.status, errBody, cfg.model || "gpt-4o-mini");
+                } else {
                   const data = await res.json();
                   aiReply = data.choices?.[0]?.message?.content || null;
                 }
@@ -895,7 +899,11 @@ export const TestPanel = ({
                     contents: [{ parts: [{ text: variables["last_message"] || "Olá" }] }]
                   }),
                 });
-                if (res.ok) {
+                if (!res.ok) {
+                  const errBody = await res.text().catch(() => "");
+                  console.error(`[ai-node] Gemini ${res.status}:`, errBody);
+                  aiReply = parseProviderError("Gemini", res.status, errBody, model);
+                } else {
                   const data = await res.json();
                   aiReply = data.candidates?.[0]?.content?.parts?.[0]?.text || null;
                 }
@@ -1013,7 +1021,11 @@ export const TestPanel = ({
                     ...(useSkillTool ? { tools: [useSkillTool], tool_choice: "auto" } : {}),
                   }),
                 });
-                if (res.ok) {
+                if (!res.ok) {
+                  const errBody = await res.text().catch(() => "");
+                  console.error(`[agent-node] OpenAI ${res.status}:`, errBody);
+                  aiReply = parseProviderError("OpenAI", res.status, errBody, cfg.model || "gpt-4o-mini");
+                } else {
                   const data = await res.json();
                   const msg = data.choices?.[0]?.message;
                   const toolCall = msg?.tool_calls?.find((call: any) => call?.function?.name === "use_skill");
@@ -1069,7 +1081,7 @@ export const TestPanel = ({
                 if (!res.ok) {
                   const errBody = await res.text().catch(() => "");
                   console.error(`[agent-node] Gemini ${res.status}:`, errBody);
-                  aiReply = `⚠️ Erro ${res.status} do provedor de IA (Gemini). Verifique a chave, o modelo (${model}) ou a configuração das skills. Detalhes: ${errBody.slice(0, 300)}`;
+                  aiReply = parseProviderError("Gemini", res.status, errBody, model);
                 }
                 if (res.ok) {
                   const data = await res.json();
