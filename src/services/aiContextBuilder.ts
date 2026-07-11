@@ -65,7 +65,7 @@ export const buildAgentContext = ({
   return {
     system: fullSystemPrompt,
     messages: recentHistory.map(msg => ({
-      role: msg.role === "assistant" ? "assistant" : msg.role,
+      role: msg.role === "assistant" ? "assistant" : "user",
       content: msg.content
     }))
   };
