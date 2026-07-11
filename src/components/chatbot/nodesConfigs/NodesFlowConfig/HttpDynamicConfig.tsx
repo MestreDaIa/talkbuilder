@@ -400,6 +400,9 @@ function EndpointCard({
           </p>
         </div>
 
+        {/* Args Schema — o que o Agente IA precisa fornecer para chamar este endpoint */}
+        <ArgsSchemaEditor endpoint={endpoint} onChange={onChange} />
+
         {/* Test result + mapping */}
         {testResult && (
           <div>
