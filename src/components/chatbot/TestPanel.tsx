@@ -1397,9 +1397,10 @@ export const TestPanel = ({
                       Object.values(obj).forEach((value) => inspect(value, depth + 1));
                     };
                     inspect(variables);
-                    if (best && best.score >= 3) {
-                      console.log(`[node:http-request][dynamic] path param "${paramName}" inferido por contexto: ${best.label}`);
-                      return best.id;
+                    const match = best as { id: string | number; score: number; label: string } | null;
+                    if (match && match.score >= 3) {
+                      console.log(`[node:http-request][dynamic] path param "${paramName}" inferido por contexto: ${match.label}`);
+                      return match.id;
                     }
                     return undefined;
                   };
