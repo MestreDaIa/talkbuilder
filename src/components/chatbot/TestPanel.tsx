@@ -614,47 +614,6 @@ export const TestPanel = ({
     }
   };
 
-  const parseProviderError = (provider: string, status: number, body: string, model?: string) => {
-    let parsed: any = null;
-    try { parsed = JSON.parse(body); } catch { parsed = null; }
-    const message = String(parsed?.error?.message || body || "Erro desconhecido");
-    const quota = parsed?.error?.details?.find((d: any) => String(d?.["@type"] || "").includes("QuotaFailure"));
-    const retry = parsed?.error?.details?.find((d: any) => String(d?.["@type"] || "").includes("RetryInfo"));
-    const quotaValue = quota?.violations?.[0]?.quotaValue;
-    const quotaId = quota?.violations?.[0]?.quotaId;
-    const retryDelay = retry?.retryDelay;
-
-    if (status === 429 || parsed?.error?.status === "RESOURCE_EXHAUSTED") {
-      const limitInfo = quotaValue ? ` Limite informado: ${quotaValue} requisições para este projeto/modelo.` : "";
-      const retryInfo = retryDelay ? ` Tente novamente após ${retryDelay}, ou aguarde a renovação da cota diária.` : "";
-      return `⚠️ Cota do ${provider} excedida${model ? ` no modelo ${model}` : ""}.${limitInfo}${retryInfo} Isso não indica chave inválida; é limite de uso/billing do provedor.${quotaId ? ` (${quotaId})` : ""}`;
-    }
-
-    if (status === 401 || status === 403) {
-      return `⚠️ Erro ${status} no ${provider}: chave sem permissão, inválida ou projeto sem acesso ao modelo${model ? ` ${model}` : ""}.`;
-    }
-
-    return `⚠️ Erro ${status} do provedor de IA (${provider}). Detalhes: ${message.slice(0, 500)}`;
-  };
-
-  const buildSkillResultReply = (skillLabel: string, payload: any) => {
-    const data = payload?.httpResponse ?? payload;
-    const candidate = Array.isArray(data) ? data : Array.isArray(data?.data) ? data.data : Array.isArray(data?.items) ? data.items : null;
-    if (candidate?.length) {
-      const names = candidate
-        .map((item: any) => item?.name || item?.title || item?.label || item?.description || item?.id)
-        .filter(Boolean)
-        .slice(0, 8);
-      if (names.length) return `Encontrei estas opções: ${names.join(", ")}. Qual delas você prefere?`;
-      return `Encontrei ${candidate.length} resultado(s) em ${skillLabel}. Qual opção você prefere?`;
-    }
-    if (data && typeof data === "object") {
-      const name = data.name || data.title || data.label;
-      if (name) return `Pronto, encontrei: ${name}. Como deseja continuar?`;
-    }
-    return `Pronto, consultei ${skillLabel}. Como deseja continuar?`;
-  };
-
 
     const runLocalFlow = async (
       state: RuntimeState | null, 
@@ -666,7 +625,6 @@ export const TestPanel = ({
         base64?: string;
         fileName?: string;
         mimetype?: string;
-        __fromSkill?: boolean;
       },
       containersIn?: Container[],
       edgesIn?: Edge[],
@@ -881,11 +839,7 @@ export const TestPanel = ({
                     messages: [{ role: "system", content: system }, { role: "user", content: variables["last_message"] || "Olá" }],
                   }),
                 });
-                if (!res.ok) {
-                  const errBody = await res.text().catch(() => "");
-                  console.error(`[ai-node] OpenAI ${res.status}:`, errBody);
-                  aiReply = parseProviderError("OpenAI", res.status, errBody, cfg.model || "gpt-4o-mini");
-                } else {
+                if (res.ok) {
                   const data = await res.json();
                   aiReply = data.choices?.[0]?.message?.content || null;
                 }
@@ -899,11 +853,7 @@ export const TestPanel = ({
                     contents: [{ parts: [{ text: variables["last_message"] || "Olá" }] }]
                   }),
                 });
-                if (!res.ok) {
-                  const errBody = await res.text().catch(() => "");
-                  console.error(`[ai-node] Gemini ${res.status}:`, errBody);
-                  aiReply = parseProviderError("Gemini", res.status, errBody, model);
-                } else {
+                if (res.ok) {
                   const data = await res.json();
                   aiReply = data.candidates?.[0]?.content?.parts?.[0]?.text || null;
                 }
@@ -1021,11 +971,7 @@ export const TestPanel = ({
                     ...(useSkillTool ? { tools: [useSkillTool], tool_choice: "auto" } : {}),
                   }),
                 });
-                if (!res.ok) {
-                  const errBody = await res.text().catch(() => "");
-                  console.error(`[agent-node] OpenAI ${res.status}:`, errBody);
-                  aiReply = parseProviderError("OpenAI", res.status, errBody, cfg.model || "gpt-4o-mini");
-                } else {
+                if (res.ok) {
                   const data = await res.json();
                   const msg = data.choices?.[0]?.message;
                   const toolCall = msg?.tool_calls?.find((call: any) => call?.function?.name === "use_skill");
@@ -1081,7 +1027,7 @@ export const TestPanel = ({
                 if (!res.ok) {
                   const errBody = await res.text().catch(() => "");
                   console.error(`[agent-node] Gemini ${res.status}:`, errBody);
-                  aiReply = parseProviderError("Gemini", res.status, errBody, model);
+                  aiReply = `⚠️ Erro ${res.status} do provedor de IA (Gemini). Verifique a chave, o modelo (${model}) ou a configuração das skills. Detalhes: ${errBody.slice(0, 300)}`;
                 }
                 if (res.ok) {
                   const data = await res.json();
@@ -1185,29 +1131,16 @@ export const TestPanel = ({
             const toolMsg: RuntimeMessage = {
               id: crypto.randomUUID(),
               conversation_id: conversationId || "temp",
-              role: "tool",
-              content: `[Resultado da skill "${skillMeta?.label || skillCall.skill_id}"]:\n${payloadStr}`,
+              role: "user",
+              content: `[Resultado da skill "${skillMeta?.label || skillCall.skill_id}"]:\n${payloadStr}\n\nCom base neste resultado, responda ao usuário de forma natural e útil (em português). Não chame a mesma skill novamente a menos que seja realmente necessário.`,
               created_at: new Date().toISOString()
             };
             messageHistory.push(toolMsg);
 
-            // Evita uma segunda chamada ao modelo apenas para resumir o resultado da skill.
-            // Isso reduz consumo e impede loops que estouram cotas baixas do Gemini Free Tier.
-            const finalReply = buildSkillResultReply(skillMeta?.label || skillCall.skill_id, payload);
-            const botMsg: RuntimeMessage = {
-              id: crypto.randomUUID(),
-              conversation_id: conversationId || "temp",
-              role: "assistant",
-              content: finalReply,
-              created_at: new Date().toISOString()
-            };
-            messageHistory.push(botMsg);
-            if (conversationId) conversationService.saveMessage(botMsg);
-            nextMessages.push({ ...botMsg, type: "bot", content: finalReply, isHtml: false } as Message);
-            waitingFor = "input-text";
-            waitingForCfg = { placeholder: "Converse com o agente..." };
-            status = "waiting_input";
-            break;
+            // Reexecuta o node do Agent IA com o input sintético para gerar a resposta final.
+            currentNodeId = activeAgentNodeId;
+            input = { message: toolMsg.content, __fromSkill: true } as any;
+            continue;
           }
 
           if (aiReply) {
