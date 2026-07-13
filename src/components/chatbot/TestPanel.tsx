@@ -563,7 +563,7 @@ export const TestPanel = ({
       `${index + 1}. ID: ${skill.id}\nTipo: ${skill.type}\nBloco: ${skill.containerName}\nNome: ${skill.label}\nInstrução da skill: ${skill.description}${describeSkillArgs(skill)}`
     )).join("\n\n");
 
-    return `\n\n[SKILLS DISPONÍVEIS PARA O AGENTE]\n${list}\n\nQuando a mensagem do usuário combinar com a instrução de uma skill, use a ferramenta use_skill com o ID exato da skill. Sempre que a skill listar "Argumentos esperados", preencha o objeto \`arguments\` com esses campos (use os path params/query params/body descritos, extraindo os valores do contexto da conversa e das variáveis já coletadas). Se a chamada de ferramenta não estiver disponível, responda apenas com JSON: {"skill_id":"ID","arguments":{...},"message":"opcional"}. Não invente perguntas antes de usar uma skill claramente solicitada.`;
+    return `\n\n[SKILLS DISPONÍVEIS PARA O AGENTE]\n${list}\n\nQuando a mensagem do usuário combinar com a instrução de uma skill, use a ferramenta use_skill com o ID exato da skill. Sempre que a skill listar "Argumentos esperados", preencha o objeto \`arguments\` com esses campos (use os path params/query params/body descritos, extraindo os valores do contexto da conversa e das variáveis já coletadas). Para path params chamados \`id\`, use sempre o ID real do item escolhido em resultados anteriores (ex.: serviço Barba => id UUID do serviço), nunca o nome do item. Se um resultado de skill retornar erro ou parâmetro ausente, não chame a mesma skill de novo com os mesmos argumentos; responda ao usuário ou peça a informação faltante. Se a chamada de ferramenta não estiver disponível, responda apenas com JSON: {"skill_id":"ID","arguments":{...},"message":"opcional"}. Não invente perguntas antes de usar uma skill claramente solicitada.`;
   };
 
   const buildUseSkillTool = (skills: ReturnType<typeof collectAgentSkills>) => {
@@ -653,6 +653,7 @@ export const TestPanel = ({
       let waitMs = 0;
       let steps = 0;
       let status: NodeExecutionStatus = "running";
+      const skillCallsThisRun: Record<string, number> = {};
 
       const firstText = (...values: any[]) => String(values.find((v) => typeof v === "string" && v.trim()) || "");
       const cleanText = (text: string) => richToPlainText(text);
@@ -1058,6 +1059,25 @@ export const TestPanel = ({
 
           const matchedSkill = skillCall?.skill_id ? skills.find((s) => s.id === skillCall!.skill_id) : null;
           if (skillCall?.skill_id && matchedSkill) {
+            const skillCallKey = `${skillCall.skill_id}:${JSON.stringify(skillCall.arguments || {})}`;
+            skillCallsThisRun[skillCallKey] = (skillCallsThisRun[skillCallKey] || 0) + 1;
+            if (skillCallsThisRun[skillCallKey] > 1) {
+              const stopMsg = "Não consegui concluir essa consulta com os dados disponíveis. Pode confirmar a opção desejada ou tentar novamente em instantes?";
+              const botMsg: RuntimeMessage = {
+                id: crypto.randomUUID(),
+                conversation_id: conversationId || "temp",
+                role: "assistant",
+                content: stopMsg,
+                created_at: new Date().toISOString()
+              };
+              messageHistory.push(botMsg);
+              nextMessages.push({ ...botMsg, type: "bot", content: stopMsg, isHtml: false } as Message);
+              waitingFor = "input-text";
+              waitingForCfg = { placeholder: "Converse com o agente..." };
+              status = "waiting_input";
+              break;
+            }
+
             if (skillCall.message) {
               const notice = String(skillCall.message).trim();
               if (notice) nextMessages.push({ id: crypto.randomUUID(), conversation_id: conversationId || "temp", role: "assistant", type: "bot", content: notice, isHtml: false } as Message);
@@ -1123,10 +1143,12 @@ export const TestPanel = ({
             Object.keys(skillVars).forEach((k) => {
               if (JSON.stringify(skillVars[k]) !== JSON.stringify(varsBefore[k])) diff[k] = skillVars[k];
             });
-            const payload = Object.keys(diff).length ? diff : skillVars;
+            const payload = Object.keys(diff).length
+              ? diff
+              : { httpResponse: skillVars.httpResponse ?? { ok: true, message: "Consulta executada sem novas variáveis." } };
             let payloadStr: string;
             try { payloadStr = JSON.stringify(payload); } catch { payloadStr = String(payload); }
-            if (payloadStr.length > 4000) payloadStr = payloadStr.slice(0, 4000) + "…";
+            if (payloadStr.length > 1800) payloadStr = payloadStr.slice(0, 1800) + "…";
 
             const toolMsg: RuntimeMessage = {
               id: crypto.randomUUID(),
@@ -1316,6 +1338,72 @@ export const TestPanel = ({
                     return deepFindValue(agentArgs, name);
                   };
 
+                  const normalizeLookupText = (value: unknown) => String(value ?? "")
+                    .normalize("NFD")
+                    .replace(/[\u0300-\u036f]/g, "")
+                    .toLowerCase()
+                    .replace(/[^a-z0-9]+/g, " ")
+                    .trim();
+
+                  const collectLookupTerms = () => {
+                    const terms = new Set<string>();
+                    const add = (value: unknown) => {
+                      const normalized = normalizeLookupText(value);
+                      if (!normalized) return;
+                      terms.add(normalized);
+                      normalized.split(" ").filter((part) => part.length >= 3).forEach((part) => terms.add(part));
+                    };
+                    add(variables.last_message);
+                    add((variables as any).last_user_message);
+                    const scanArgs = (obj: any, depth = 0) => {
+                      if (obj == null || depth > 3) return;
+                      if (typeof obj === "string" || typeof obj === "number") { add(obj); return; }
+                      if (Array.isArray(obj)) { obj.forEach((item) => scanArgs(item, depth + 1)); return; }
+                      if (typeof obj === "object") Object.values(obj).forEach((value) => scanArgs(value, depth + 1));
+                    };
+                    scanArgs(agentArgs);
+                    return Array.from(terms).filter((term) => term && !/^[0-9a-f-]{20,}$/i.test(term));
+                  };
+
+                  const inferIdFromKnownLists = (paramName: string) => {
+                    if (!/(^id$|_id$)/i.test(paramName)) return undefined;
+                    const terms = collectLookupTerms();
+                    if (!terms.length) return undefined;
+                    const seen = new WeakSet<object>();
+                    let best: { id: string | number; score: number; label: string } | null = null;
+                    const scoreLabel = (label: string) => {
+                      const normalized = normalizeLookupText(label);
+                      if (!normalized) return 0;
+                      let score = 0;
+                      for (const term of terms) {
+                        if (normalized === term) score = Math.max(score, 100);
+                        else if (term.includes(normalized) || normalized.includes(term)) score = Math.max(score, Math.min(normalized.length, term.length));
+                      }
+                      return score;
+                    };
+                    const inspect = (obj: any, depth = 0) => {
+                      if (obj == null || depth > 7) return;
+                      if (Array.isArray(obj)) { obj.forEach((item) => inspect(item, depth + 1)); return; }
+                      if (typeof obj !== "object") return;
+                      if (seen.has(obj)) return;
+                      seen.add(obj);
+
+                      const id = obj.id ?? obj.service_id ?? obj.serviceId ?? obj.uuid;
+                      const label = obj.name ?? obj.title ?? obj.label ?? obj.description;
+                      if ((typeof id === "string" || typeof id === "number") && typeof label === "string") {
+                        const score = scoreLabel(label);
+                        if (score > (best?.score || 0)) best = { id, score, label };
+                      }
+                      Object.values(obj).forEach((value) => inspect(value, depth + 1));
+                    };
+                    inspect(variables);
+                    if (best && best.score >= 3) {
+                      console.log(`[node:http-request][dynamic] path param "${paramName}" inferido por contexto: ${best.label}`);
+                      return best.id;
+                    }
+                    return undefined;
+                  };
+
                   let url = replaceVars(String(ep.url || ""));
 
                   // Path params: substitui {name} e :name pelos valores do agente (se permitido) ou variáveis do fluxo.
@@ -1338,7 +1426,8 @@ export const TestPanel = ({
                   );
                   pathNames.forEach((p) => {
                     const fromAgent = perms.pathParams === false ? undefined : pickAgentValue(p);
-                    const v = fromAgent !== undefined ? fromAgent : variables[p];
+                    const inferred = fromAgent !== undefined ? undefined : inferIdFromKnownLists(p);
+                    const v = fromAgent !== undefined ? fromAgent : (inferred !== undefined ? inferred : variables[p]);
                     if (v !== undefined && v !== null && v !== "") {
                       const enc = encodeURIComponent(String(v));
                       url = url
@@ -1354,6 +1443,13 @@ export const TestPanel = ({
                   if (/\/(?::[a-zA-Z0-9_]+|\{[^}]+\}|%3A[a-zA-Z0-9_]+)(?=\/|$|\?)/i.test(url)) {
                     console.warn(`[node:http-request][dynamic] URL ainda contém placeholder não resolvido — chamada abortada: ${url}`);
                     lastOk = false;
+                    lastData = {
+                      ok: false,
+                      error: "missing_path_param",
+                      message: "Endpoint não executado porque faltou valor para um parâmetro da URL.",
+                      url,
+                    };
+                    variables.httpResponse = lastData;
                     continue;
                   }
 
