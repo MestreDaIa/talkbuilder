@@ -1287,21 +1287,55 @@ export const TestPanel = ({
                   const agentPath: Record<string, any> = (agentArgs.pathParams && typeof agentArgs.pathParams === "object") ? agentArgs.pathParams : {};
                   const agentQuery: Record<string, any> = (agentArgs.queryParams && typeof agentArgs.queryParams === "object") ? agentArgs.queryParams : {};
                   const agentBody = agentArgs.body;
-                  // Também aceita argumentos "flat" no nível raiz (fallback).
-                  const pickAgentValue = (name: string) =>
-                    agentPath[name] ?? agentQuery[name] ?? (name in agentArgs ? agentArgs[name] : undefined);
+                  // Busca recursiva por um valor no objeto de argumentos do agente
+                  // (tolera formatos como { id: "..." }, { pathParams: { id } }, { arguments: {...} },
+                  //  arrays [{ id, name }], nomes com case diferente, etc.).
+                  const deepFindValue = (obj: any, name: string, depth = 0): any => {
+                    if (obj == null || depth > 4) return undefined;
+                    if (Array.isArray(obj)) {
+                      for (const item of obj) {
+                        const v = deepFindValue(item, name, depth + 1);
+                        if (v !== undefined) return v;
+                      }
+                      return undefined;
+                    }
+                    if (typeof obj !== "object") return undefined;
+                    const lower = name.toLowerCase();
+                    for (const [k, v] of Object.entries(obj)) {
+                      if (k.toLowerCase() === lower && (typeof v === "string" || typeof v === "number")) return v;
+                    }
+                    for (const v of Object.values(obj)) {
+                      const found = deepFindValue(v, name, depth + 1);
+                      if (found !== undefined) return found;
+                    }
+                    return undefined;
+                  };
+                  const pickAgentValue = (name: string) => {
+                    const direct = agentPath[name] ?? agentQuery[name] ?? (name in agentArgs ? agentArgs[name] : undefined);
+                    if (direct !== undefined) return direct;
+                    return deepFindValue(agentArgs, name);
+                  };
 
                   let url = replaceVars(String(ep.url || ""));
 
                   // Path params: substitui {name} e :name pelos valores do agente (se permitido) ou variáveis do fluxo.
-                  // Decodifica `%3A` -> `:` para tratar URLs que passaram por new URL().toString()
-                  url = url.replace(/%3A([a-zA-Z0-9_]+)/gi, ":$1");
-                  const pathNames = new Set<string>([
+                  // Decodifica `%3A` / `%7B` / `%7D` que podem ter vindo de new URL().toString()
+                  url = url
+                    .replace(/%3A([a-zA-Z0-9_]+)/gi, ":$1")
+                    .replace(/%7B/gi, "{")
+                    .replace(/%7D/gi, "}");
+                  const rawNames = [
                     ...(ep.pathParams || []),
                     ...(ep.argsSchema?.pathParams || []).map((p: any) => p?.name).filter(Boolean),
                     ...[...url.matchAll(/\{([^}]+)\}/g)].map((m) => m[1]),
                     ...[...url.matchAll(/(?<=\/):([a-zA-Z0-9_]+)/g)].map((m) => m[1]),
-                  ]);
+                  ];
+                  // Filtra nomes inválidos que sobraram de configs antigas (ex.: "%3Aid").
+                  const pathNames = new Set<string>(
+                    rawNames
+                      .map((n: string) => String(n).replace(/^%3A/i, "").replace(/^:/, ""))
+                      .filter((n: string) => /^[a-zA-Z_][a-zA-Z0-9_]*$/.test(n))
+                  );
                   pathNames.forEach((p) => {
                     const fromAgent = perms.pathParams === false ? undefined : pickAgentValue(p);
                     const v = fromAgent !== undefined ? fromAgent : variables[p];
@@ -1314,6 +1348,14 @@ export const TestPanel = ({
                       console.warn(`[node:http-request][dynamic] path param "${p}" sem valor — URL ficará com placeholder`);
                     }
                   });
+
+                  // Se ainda restou placeholder (ex.: /:algo/ ou /{algo}/ ou /%3Aalgo/),
+                  // aborta a chamada — evita 500 no servidor por causa de placeholder literal.
+                  if (/\/(?::[a-zA-Z0-9_]+|\{[^}]+\}|%3A[a-zA-Z0-9_]+)(?=\/|$|\?)/i.test(url)) {
+                    console.warn(`[node:http-request][dynamic] URL ainda contém placeholder não resolvido — chamada abortada: ${url}`);
+                    lastOk = false;
+                    continue;
+                  }
 
                   const qp: string[] = [];
                   const usedQuery = new Set<string>();
