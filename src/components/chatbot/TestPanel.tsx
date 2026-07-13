@@ -1078,7 +1078,7 @@ export const TestPanel = ({
               break;
             }
 
-            if (skillCall.message) {
+            if (skillCall.message && !matchedSkill._http) {
               const notice = String(skillCall.message).trim();
               if (notice) nextMessages.push({ id: crypto.randomUUID(), conversation_id: conversationId || "temp", role: "assistant", type: "bot", content: notice, isHtml: false } as Message);
             }
@@ -1146,8 +1146,19 @@ export const TestPanel = ({
             const payload = Object.keys(diff).length
               ? diff
               : { httpResponse: skillVars.httpResponse ?? { ok: true, message: "Consulta executada sem novas variáveis." } };
+            const compactForAgent = (value: any, depth = 0): any => {
+              if (value == null || typeof value === "boolean" || typeof value === "number") return value;
+              if (typeof value === "string") return value.length > 500 ? `${value.slice(0, 500)}…` : value;
+              if (depth > 4) return Array.isArray(value) ? `[${value.length} itens]` : "[objeto]";
+              if (Array.isArray(value)) return value.slice(0, 8).map((item) => compactForAgent(item, depth + 1));
+              if (typeof value === "object") {
+                const entries = Object.entries(value).slice(0, 24);
+                return Object.fromEntries(entries.map(([k, v]) => [k, compactForAgent(v, depth + 1)]));
+              }
+              return String(value);
+            };
             let payloadStr: string;
-            try { payloadStr = JSON.stringify(payload); } catch { payloadStr = String(payload); }
+            try { payloadStr = JSON.stringify(compactForAgent(payload)); } catch { payloadStr = String(payload); }
             if (payloadStr.length > 1800) payloadStr = payloadStr.slice(0, 1800) + "…";
 
             const toolMsg: RuntimeMessage = {
@@ -1432,12 +1443,11 @@ export const TestPanel = ({
                       || /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(String(fromAgent))
                       || /^[a-zA-Z0-9_-]{12,}$/.test(String(fromAgent));
                     const inferred = agentValueLooksLikeId ? undefined : inferIdFromKnownLists(p);
-                    const fallbackInferred = inferred !== undefined ? inferred : inferIdFromKnownLists(p);
                     const v = inferred !== undefined
                       ? inferred
                       : (fromAgent !== undefined && agentValueLooksLikeId)
                         ? fromAgent
-                        : (fallbackInferred !== undefined ? fallbackInferred : variables[p]);
+                        : variables[p];
                     if (v !== undefined && v !== null && v !== "") {
                       const enc = encodeURIComponent(String(v));
                       url = url
