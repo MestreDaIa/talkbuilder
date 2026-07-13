@@ -1294,19 +1294,24 @@ export const TestPanel = ({
                   let url = replaceVars(String(ep.url || ""));
 
                   // Path params: substitui {name} e :name pelos valores do agente (se permitido) ou variáveis do fluxo.
+                  // Decodifica `%3A` -> `:` para tratar URLs que passaram por new URL().toString()
+                  url = url.replace(/%3A([a-zA-Z0-9_]+)/gi, ":$1");
                   const pathNames = new Set<string>([
                     ...(ep.pathParams || []),
+                    ...(ep.argsSchema?.pathParams || []).map((p: any) => p?.name).filter(Boolean),
                     ...[...url.matchAll(/\{([^}]+)\}/g)].map((m) => m[1]),
                     ...[...url.matchAll(/(?<=\/):([a-zA-Z0-9_]+)/g)].map((m) => m[1]),
                   ]);
                   pathNames.forEach((p) => {
                     const fromAgent = perms.pathParams === false ? undefined : pickAgentValue(p);
                     const v = fromAgent !== undefined ? fromAgent : variables[p];
-                    if (v !== undefined) {
+                    if (v !== undefined && v !== null && v !== "") {
                       const enc = encodeURIComponent(String(v));
-                      url = url.replace(`{${p}}`, enc).replace(new RegExp(`(?<=/):${p}(?=/|$|\\?)`), enc);
-                      // Também aceita `%3A${p}` (dois-pontos url-encoded, comum quando copiado da doc).
-                      url = url.replace(`%3A${p}`, enc);
+                      url = url
+                        .replace(new RegExp(`\\{${p}\\}`, "g"), enc)
+                        .replace(new RegExp(`(?<=/):${p}(?=/|$|\\?)`, "g"), enc);
+                    } else {
+                      console.warn(`[node:http-request][dynamic] path param "${p}" sem valor — URL ficará com placeholder`);
                     }
                   });
 
