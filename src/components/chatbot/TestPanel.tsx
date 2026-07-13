@@ -1427,8 +1427,17 @@ export const TestPanel = ({
                   );
                   pathNames.forEach((p) => {
                     const fromAgent = perms.pathParams === false ? undefined : pickAgentValue(p);
-                    const inferred = fromAgent !== undefined ? undefined : inferIdFromKnownLists(p);
-                    const v = fromAgent !== undefined ? fromAgent : (inferred !== undefined ? inferred : variables[p]);
+                    const agentValueLooksLikeId = fromAgent === undefined
+                      || typeof fromAgent === "number"
+                      || /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(String(fromAgent))
+                      || /^[a-zA-Z0-9_-]{12,}$/.test(String(fromAgent));
+                    const inferred = agentValueLooksLikeId ? undefined : inferIdFromKnownLists(p);
+                    const fallbackInferred = inferred !== undefined ? inferred : inferIdFromKnownLists(p);
+                    const v = inferred !== undefined
+                      ? inferred
+                      : (fromAgent !== undefined && agentValueLooksLikeId)
+                        ? fromAgent
+                        : (fallbackInferred !== undefined ? fallbackInferred : variables[p]);
                     if (v !== undefined && v !== null && v !== "") {
                       const enc = encodeURIComponent(String(v));
                       url = url
