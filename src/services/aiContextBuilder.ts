@@ -65,7 +65,7 @@ export const buildAgentContext = ({
 
 
   // 5. Montagem do prompt do sistema
-  const fullSystemPrompt = `${systemPrompt}${memoryStr}${varsStr}${kbStr}\n\nResponda sempre de forma natural e prestativa.`;
+  const fullSystemPrompt = `${systemPrompt}${dateStr}${memoryStr}${varsStr}${kbStr}\n\nResponda sempre de forma natural e prestativa.`;
 
   console.log("[aiContextBuilder] Full System Prompt created. KB present:", !!kbStr);
 
