@@ -118,8 +118,14 @@ export const AIConfig = ({ config, setConfig }: AIConfigProps) => {
             <Input 
               className="mt-2"
               placeholder="Nome do modelo..."
+              value={config.customModel || ""}
               onChange={(e) => setConfig({ ...config, customModel: e.target.value })}
             />
+          )}
+          {provider === "gemini" && model === "gemini-2.0-flash" && (
+            <p className="text-xs text-muted-foreground leading-relaxed">
+              O gemini-2.0-flash costuma retornar limite 0 no Free Tier. No teste, ele será substituído automaticamente por gemini-2.5-flash.
+            </p>
           )}
         </div>
       </div>
