@@ -1442,10 +1442,10 @@ export const TestPanel = ({
                       || typeof fromAgent === "number"
                       || /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(String(fromAgent))
                       || /^[a-zA-Z0-9_-]{12,}$/.test(String(fromAgent));
-                    const inferred = agentValueLooksLikeId ? undefined : inferIdFromKnownLists(p);
+                    const inferred = (fromAgent === undefined || !agentValueLooksLikeId) ? inferIdFromKnownLists(p) : undefined;
                     const v = inferred !== undefined
                       ? inferred
-                      : (fromAgent !== undefined && agentValueLooksLikeId)
+                      : fromAgent !== undefined
                         ? fromAgent
                         : variables[p];
                     if (v !== undefined && v !== null && v !== "") {
