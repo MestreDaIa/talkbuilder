@@ -1148,18 +1148,28 @@ export const TestPanel = ({
               : { httpResponse: skillVars.httpResponse ?? { ok: true, message: "Consulta executada sem novas variáveis." } };
             const compactForAgent = (value: any, depth = 0): any => {
               if (value == null || typeof value === "boolean" || typeof value === "number") return value;
-              if (typeof value === "string") return value.length > 500 ? `${value.slice(0, 500)}…` : value;
-              if (depth > 4) return Array.isArray(value) ? `[${value.length} itens]` : "[objeto]";
-              if (Array.isArray(value)) return value.slice(0, 8).map((item) => compactForAgent(item, depth + 1));
+              if (typeof value === "string") return value.length > 800 ? `${value.slice(0, 800)}…` : value;
+              if (depth > 5) return Array.isArray(value) ? `[${value.length} itens]` : "[objeto]";
+              if (Array.isArray(value)) {
+                // Preserva arrays de primitivos (strings/números curtos) inteiros — ex: listas de horários, IDs.
+                const isPrimitiveArray = value.every(
+                  (v) => v == null || typeof v === "string" || typeof v === "number" || typeof v === "boolean",
+                );
+                if (isPrimitiveArray) return value.map((item) => compactForAgent(item, depth + 1));
+                const MAX_ITEMS = 50;
+                const sliced = value.slice(0, MAX_ITEMS).map((item) => compactForAgent(item, depth + 1));
+                if (value.length > MAX_ITEMS) sliced.push(`… (+${value.length - MAX_ITEMS} itens omitidos)`);
+                return sliced;
+              }
               if (typeof value === "object") {
-                const entries = Object.entries(value).slice(0, 24);
+                const entries = Object.entries(value).slice(0, 48);
                 return Object.fromEntries(entries.map(([k, v]) => [k, compactForAgent(v, depth + 1)]));
               }
               return String(value);
             };
             let payloadStr: string;
             try { payloadStr = JSON.stringify(compactForAgent(payload)); } catch { payloadStr = String(payload); }
-            if (payloadStr.length > 1800) payloadStr = payloadStr.slice(0, 1800) + "…";
+            if (payloadStr.length > 6000) payloadStr = payloadStr.slice(0, 6000) + "…";
 
             const toolMsg: RuntimeMessage = {
               id: crypto.randomUUID(),
