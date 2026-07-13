@@ -614,6 +614,16 @@ export const TestPanel = ({
     }
   };
 
+  const DEFAULT_GEMINI_MODEL = "gemini-2.5-flash";
+  const ZERO_FREE_TIER_GEMINI_MODELS = new Set(["gemini-2.0-flash"]);
+
+  const resolveGeminiModel = (cfg: any) => {
+    const configuredModel = cfg?.model === "custom" ? cfg?.customModel : cfg?.model;
+    const model = String(configuredModel || "").trim();
+    if (!model || ZERO_FREE_TIER_GEMINI_MODELS.has(model)) return DEFAULT_GEMINI_MODEL;
+    return model;
+  };
+
   const parseProviderError = (provider: string, status: number, body: string, model?: string) => {
     let parsed: any = null;
     try { parsed = JSON.parse(body); } catch { parsed = null; }
@@ -623,11 +633,13 @@ export const TestPanel = ({
     const quotaValue = quota?.violations?.[0]?.quotaValue;
     const quotaId = quota?.violations?.[0]?.quotaId;
     const retryDelay = retry?.retryDelay;
+    const hasZeroLimit = /limit:\s*0\b/i.test(message);
 
     if (status === 429 || parsed?.error?.status === "RESOURCE_EXHAUSTED") {
       const limitInfo = quotaValue ? ` Limite informado: ${quotaValue} requisições para este projeto/modelo.` : "";
       const retryInfo = retryDelay ? ` Tente novamente após ${retryDelay}, ou aguarde a renovação da cota diária.` : "";
-      return `⚠️ Cota do ${provider} excedida${model ? ` no modelo ${model}` : ""}.${limitInfo}${retryInfo} Isso não indica chave inválida; é limite de uso/billing do provedor.${quotaId ? ` (${quotaId})` : ""}`;
+      const zeroLimitInfo = hasZeroLimit ? " O provedor informou limite 0 para este modelo no Free Tier do projeto; isso normalmente exige trocar de modelo ou habilitar billing no provedor." : "";
+      return `⚠️ Cota do ${provider} excedida${model ? ` no modelo ${model}` : ""}.${limitInfo}${retryInfo}${zeroLimitInfo} Isso não indica chave inválida nem falta de tokens no app; é limite de uso/billing do provedor.${quotaId ? ` (${quotaId})` : ""}`;
     }
 
     if (status === 401 || status === 403) {
@@ -890,7 +902,7 @@ export const TestPanel = ({
                   aiReply = data.choices?.[0]?.message?.content || null;
                 }
               } else if (selectedProvider === "google") {
-                const model = (cfg.model || "gemini-2.0-flash").trim();
+                const model = resolveGeminiModel(cfg);
                 const res = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${activeKey}`, {
                   method: "POST",
                   headers: { "Content-Type": "application/json" },
@@ -1040,7 +1052,7 @@ export const TestPanel = ({
                   aiReply = msg?.content || null;
                 }
               } else if (selectedProvider === "google") {
-                const model = (cfg.model || "gemini-2.0-flash").trim();
+                const model = resolveGeminiModel(cfg);
                 const res = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${activeKey}`, {
                   method: "POST",
                   headers: { "Content-Type": "application/json" },
