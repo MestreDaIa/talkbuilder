@@ -123,22 +123,8 @@ export const AgentConfig = ({ config, setConfig }: AgentConfigProps) => {
               {MODELS_BY_PROVIDER[provider]?.map((m) => (
                 <SelectItem key={m} value={m}>{m}</SelectItem>
               ))}
-              <SelectItem value="custom">Outro (especificar...)</SelectItem>
             </SelectContent>
           </Select>
-          {model === "custom" && (
-            <Input
-              className="mt-2"
-              placeholder="Nome do modelo..."
-              value={config.customModel || ""}
-              onChange={(e) => setConfig({ ...config, customModel: e.target.value })}
-            />
-          )}
-          {provider === "gemini" && model === "gemini-2.0-flash" && (
-            <p className="text-xs text-muted-foreground leading-relaxed">
-              O gemini-2.0-flash costuma retornar limite 0 no Free Tier. No teste, ele será substituído automaticamente por gemini-2.5-flash.
-            </p>
-          )}
         </div>
       </div>
 
