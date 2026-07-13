@@ -465,7 +465,9 @@ function ArgsSchemaEditor({
 
   // Sincroniza a lista de path params com os placeholders {name} / :name detectados na URL.
   const detectedPathParams = useMemo(() => {
-    const url = endpoint.url || "";
+    const raw = endpoint.url || "";
+    // Decodifica `%3A` -> `:` (URLs colados/importados costumam vir url-encoded)
+    const url = raw.replace(/%3A([a-zA-Z0-9_]+)/gi, ":$1");
     const set = new Set<string>();
     for (const m of url.matchAll(/\{([^}]+)\}/g)) set.add(m[1]);
     for (const m of url.matchAll(/(?<=\/):([a-zA-Z0-9_]+)/g)) set.add(m[1]);
