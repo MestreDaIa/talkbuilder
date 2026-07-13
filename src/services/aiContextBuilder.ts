@@ -38,6 +38,13 @@ export const buildAgentContext = ({
     ? `\n\n[VARIÁVEIS DO FLUXO]\n${JSON.stringify(variables, null, 2)}`
     : "";
 
+  // 3.5. Data/hora atual (injetada automaticamente para o agente nunca "viajar no tempo")
+  const now = new Date();
+  const tz = Intl.DateTimeFormat().resolvedOptions().timeZone || "UTC";
+  const isoDate = now.toISOString().slice(0, 10); // YYYY-MM-DD
+  const humanDate = now.toLocaleString("pt-BR", { dateStyle: "full", timeStyle: "short" });
+  const dateStr = `\n\n[DATA E HORA ATUAL - FONTE DA VERDADE]\nHoje é ${humanDate} (${tz}).\nData ISO (use este formato em APIs): ${isoDate}\nTimestamp: ${now.toISOString()}\n\nREGRAS OBRIGATÓRIAS SOBRE DATA:\n- NUNCA invente datas nem use datas de treinamento. A ÚNICA data válida é a informada acima.\n- Quando o usuário disser "hoje", "amanhã", "próxima semana", etc., calcule a partir da data acima.\n- Ao chamar APIs que exigem datas (from/to, agendamentos, etc.), use SEMPRE datas iguais ou posteriores a ${isoDate}, nunca no passado.`;
+
   // 4. Formatação da Base de Conhecimento
   let kbStr = "";
   if (knowledgeBase) {
