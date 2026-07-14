@@ -689,8 +689,8 @@ export const TestPanel = ({
           return -1;
         })();
         return messageHistory.filter((msg, index) => {
-          if (!isSkillResultHistoryMessage(msg)) return true;
           if (latestConfirmationIndex >= 0 && index !== latestConfirmationIndex && msg.role === "assistant" && /confirm/i.test(String(msg.content || ""))) return false;
+          if (!isSkillResultHistoryMessage(msg)) return true;
           return includeLatestSkillResult && index === lastIndex;
         });
       };
