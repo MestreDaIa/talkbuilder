@@ -33,9 +33,30 @@ export const buildAgentContext = ({
     ? `\n\n[MEMÓRIA DO USUÁRIO]\n${JSON.stringify(persistentMemory, null, 2)}`
     : "";
 
-  // 3. Formatação das variáveis
-  const varsStr = Object.keys(variables).length > 0
-    ? `\n\n[VARIÁVEIS DO FLUXO]\n${JSON.stringify(variables, null, 2)}`
+  // 3. Formatação das variáveis (sanitizadas)
+  // Remove chaves internas do runtime e blobs grandes (respostas de API cacheadas),
+  // que poluem o contexto e fazem o agente reutilizar dados antigos em novas operações.
+  const INTERNAL_VAR_KEYS = new Set([
+    "httpResponse",
+    "last_message",
+    "last_user_message",
+  ]);
+  const isLargeBlob = (v: any) => {
+    if (v == null || typeof v !== "object") return false;
+    try {
+      const s = JSON.stringify(v);
+      return s.length > 400; // respostas completas de endpoints não devem entrar no prompt
+    } catch { return true; }
+  };
+  const cleanVariables: Record<string, any> = {};
+  for (const [k, v] of Object.entries(variables || {})) {
+    if (k.startsWith("__")) continue;              // flags internas (ex.: __dynamicSkillDispatch)
+    if (INTERNAL_VAR_KEYS.has(k)) continue;        // caches genéricos do runtime
+    if (isLargeBlob(v)) continue;                  // respostas completas de API cacheadas
+    cleanVariables[k] = v;
+  }
+  const varsStr = Object.keys(cleanVariables).length > 0
+    ? `\n\n[VARIÁVEIS DO FLUXO]\n${JSON.stringify(cleanVariables, null, 2)}\n\nATENÇÃO: os valores acima podem ter sido coletados em interações ANTERIORES. Ao iniciar uma NOVA operação (novo agendamento, novo cadastro, nova compra, etc.), NÃO os reutilize automaticamente — confirme cada campo com o usuário novamente antes de chamar skills que criem, atualizem ou apaguem dados (POST/PUT/PATCH/DELETE).`
     : "";
 
   // 3.5. Data/hora atual (injetada automaticamente para o agente nunca "viajar no tempo")
@@ -43,7 +64,7 @@ export const buildAgentContext = ({
   const tz = Intl.DateTimeFormat().resolvedOptions().timeZone || "UTC";
   const isoDate = now.toISOString().slice(0, 10); // YYYY-MM-DD
   const humanDate = now.toLocaleString("pt-BR", { dateStyle: "full", timeStyle: "short" });
-  const dateStr = `\n\n[DATA E HORA ATUAL - FONTE DA VERDADE]\nHoje é ${humanDate} (${tz}).\nData ISO (use este formato em APIs): ${isoDate}\nTimestamp: ${now.toISOString()}\n\nREGRAS OBRIGATÓRIAS SOBRE DATA:\n- NUNCA invente datas nem use datas de treinamento. A ÚNICA data válida é a informada acima.\n- Quando o usuário disser "hoje", "amanhã", "próxima semana", etc., calcule a partir da data acima.\n- Ao chamar APIs que exigem datas (from/to, agendamentos, etc.), use SEMPRE datas iguais ou posteriores a ${isoDate}, nunca no passado.`;
+  const dateStr = `\n\n[DATA E HORA ATUAL - FONTE DA VERDADE]\nHoje é ${humanDate} (${tz}).\nData ISO (use este formato em APIs): ${isoDate}\nTimestamp: ${now.toISOString()}\n\nREGRAS OBRIGATÓRIAS SOBRE DATA:\n- NUNCA invente datas nem use datas de treinamento. A ÚNICA data válida é a informada acima.\n- Quando o usuário disser "hoje", "amanhã", "próxima semana", etc., calcule a partir da data acima.\n- Ao chamar APIs que exigem datas (from/to, agendamentos, etc.), use SEMPRE datas iguais ou posteriores a ${isoDate}, nunca no passado.\n\nREGRA OBRIGATÓRIA SOBRE REUSO DE DADOS:\n- Cada nova solicitação do usuário é uma operação NOVA. Não copie datas, horários, IDs, nomes, e-mails ou qualquer valor de uma operação anterior — mesmo que estejam em [VARIÁVEIS DO FLUXO] ou apareçam no histórico. Sempre pergunte/valide com o usuário antes de submeter.`;
 
   // 4. Formatação da Base de Conhecimento
   let kbStr = "";
