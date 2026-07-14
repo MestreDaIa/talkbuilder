@@ -795,6 +795,10 @@ export const TestPanel = ({
         };
 
         const nextArgs = JSON.parse(JSON.stringify(fallbackArgs || {}));
+        if (typeof nextArgs.body === "string") {
+          const parsedBody = extractJsonFromText(nextArgs.body);
+          if (parsedBody && typeof parsedBody === "object" && !Array.isArray(parsedBody)) nextArgs.body = parsedBody;
+        }
         if ((!nextArgs.body || typeof nextArgs.body !== "object" || Array.isArray(nextArgs.body)) && nextArgs.body !== "") {
           const flatBody = Object.fromEntries(
             Object.entries(nextArgs).filter(([key]) => !["pathParams", "queryParams", "body"].includes(key))
