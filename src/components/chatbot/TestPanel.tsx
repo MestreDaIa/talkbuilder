@@ -482,7 +482,7 @@ export const TestPanel = ({
       label: string;
       argsSchema?: any;                 // schema livre p/ o agente preencher
       // meta interna para o dispatcher
-      _http?: { nodeId: string; endpointId: string; permissions: any };
+      _http?: { nodeId: string; endpointId: string; permissions: any; resultType: "context" | "live"; method: string };
     }> = [];
 
     for (const container of containersToScan) {
@@ -506,7 +506,13 @@ export const TestPanel = ({
               description: String(ep.description || ep.name || "Chame este endpoint quando fizer sentido para atender o usuário."),
               label: `${ep.method || "GET"} ${ep.name || epId}`,
               argsSchema: ep.argsSchema || null,
-              _http: { nodeId: node.id, endpointId: epId, permissions: ep.permissions || {} },
+              _http: {
+                nodeId: node.id,
+                endpointId: epId,
+                permissions: ep.permissions || {},
+                resultType: ep.resultType === "live" ? "live" : "context",
+                method: String(ep.method || "GET").toUpperCase(),
+              },
             });
           }
           continue;
@@ -559,11 +565,14 @@ export const TestPanel = ({
       return "\n\n[SKILLS DISPONÍVEIS]\nNenhuma skill foi habilitada nos outros nodes deste fluxo.";
     }
 
-    const list = skills.map((skill, index) => (
-      `${index + 1}. ID: ${skill.id}\nTipo: ${skill.type}\nBloco: ${skill.containerName}\nNome: ${skill.label}\nInstrução da skill: ${skill.description}${describeSkillArgs(skill)}`
-    )).join("\n\n");
+    const list = skills.map((skill, index) => {
+      const resultTypeLine = skill._http
+        ? `\nTipo de Resultado: ${skill._http.resultType === "live" ? "Live Data — sempre reconsultar; nunca reutilize resultado antigo" : "Context Data — pode ser usado como contexto"}`
+        : "";
+      return `${index + 1}. ID: ${skill.id}\nTipo: ${skill.type}${resultTypeLine}\nBloco: ${skill.containerName}\nNome: ${skill.label}\nInstrução da skill: ${skill.description}${describeSkillArgs(skill)}`;
+    }).join("\n\n");
 
-    return `\n\n[SKILLS DISPONÍVEIS PARA O AGENTE]\n${list}\n\nQuando a mensagem do usuário combinar com a instrução de uma skill, use a ferramenta use_skill com o ID exato da skill. Sempre que a skill listar "Argumentos esperados", preencha o objeto \`arguments\` com esses campos (use os path params/query params/body descritos, extraindo os valores do contexto da conversa e das variáveis já coletadas). Para path params chamados \`id\`, use sempre o ID real do item escolhido em resultados anteriores (ex.: serviço Barba => id UUID do serviço), nunca o nome do item. Se um resultado de skill retornar erro ou parâmetro ausente, não chame a mesma skill de novo com os mesmos argumentos; responda ao usuário ou peça a informação faltante. Se a chamada de ferramenta não estiver disponível, responda apenas com JSON: {"skill_id":"ID","arguments":{...},"message":"opcional"}. Não invente perguntas antes de usar uma skill claramente solicitada.`;
+    return `\n\n[SKILLS DISPONÍVEIS PARA O AGENTE]\n${list}\n\nQuando a mensagem do usuário combinar com a instrução de uma skill, use a ferramenta use_skill com o ID exato da skill. Sempre que a skill listar "Argumentos esperados", preencha o objeto \`arguments\` com esses campos (use os path params/query params/body descritos, extraindo os valores do contexto da conversa e das variáveis já coletadas). Para path params chamados \`id\`, use sempre o ID real do item escolhido em resultados anteriores (ex.: serviço Barba => id UUID do serviço), nunca o nome do item. Skills marcadas como Live Data são voláteis: sempre chame a skill novamente quando precisar desses dados, ignore resultados antigos no histórico e não use valores antigos para criar/alterar/excluir dados. Se um resultado de skill retornar erro ou parâmetro ausente, não chame a mesma skill de novo com os mesmos argumentos; responda ao usuário ou peça a informação faltante. Se a chamada de ferramenta não estiver disponível, responda apenas com JSON: {"skill_id":"ID","arguments":{...},"message":"opcional"}. Não invente perguntas antes de usar uma skill claramente solicitada.`;
   };
 
   const buildUseSkillTool = (skills: ReturnType<typeof collectAgentSkills>) => {
@@ -662,6 +671,17 @@ export const TestPanel = ({
         if (val === undefined) return `{{${key}}}`;
         return typeof val === 'object' ? JSON.stringify(val) : String(val);
       });
+      const isSkillResultHistoryMessage = (msg: RuntimeMessage) => {
+        const meta = (msg as any).metadata || {};
+        return meta.kind === "skill_result" || String(msg.content || "").startsWith("[Resultado da skill");
+      };
+      const getAgentHistory = (includeLatestSkillResult: boolean) => {
+        const lastIndex = messageHistory.length - 1;
+        return messageHistory.filter((msg, index) => {
+          if (!isSkillResultHistoryMessage(msg)) return true;
+          return includeLatestSkillResult && index === lastIndex;
+        });
+      };
 
       const parseWaitMs = (cfg: any) => {
         const amount = Math.max(1, Number(cfg.waitTime ?? cfg.duration ?? cfg.seconds ?? 5) || 5);
@@ -947,7 +967,7 @@ export const TestPanel = ({
 
           const { system, messages: contextMessages } = buildAgentContext({
             systemPrompt: `Objetivo: ${objective}\nInstruções: ${instructions}${buildSkillSystemPrompt(skills)}`,
-            history: messageHistory,
+            history: getAgentHistory(!!(input as any)?.__fromSkill),
             persistentMemory,
             variables,
             knowledgeBase: {
@@ -1141,6 +1161,7 @@ export const TestPanel = ({
             const skillMeta = skills.find((s) => s.id === skillCall.skill_id);
             const diff: Record<string, any> = {};
             Object.keys(skillVars).forEach((k) => {
+              if (k.startsWith("__")) return;
               if (JSON.stringify(skillVars[k]) !== JSON.stringify(varsBefore[k])) diff[k] = skillVars[k];
             });
             const payload = Object.keys(diff).length
@@ -1176,6 +1197,11 @@ export const TestPanel = ({
               conversation_id: conversationId || "temp",
               role: "user",
               content: `[Resultado da skill "${skillMeta?.label || skillCall.skill_id}"]:\n${payloadStr}\n\nCom base neste resultado, responda ao usuário de forma natural e útil (em português). Não chame a mesma skill novamente a menos que seja realmente necessário.`,
+              metadata: {
+                kind: "skill_result",
+                skill_id: skillCall.skill_id,
+                result_type: skillMeta?._http?.resultType || "context",
+              },
               created_at: new Date().toISOString()
             };
             messageHistory.push(toolMsg);
@@ -1283,15 +1309,19 @@ export const TestPanel = ({
             return undefined;
           };
 
-          const applyMappings = (responseData: any, mappings: any[]) => {
+            const applyMappings = (responseData: any, mappings: any[]) => {
+              const mappedKeys: string[] = [];
             (mappings || []).forEach((m: any) => {
               if (!m?.variableName) return;
               const val = getByPath(responseData, m.jsonPath || "");
               if (val !== undefined) {
-                variables[String(m.variableName).trim()] = val;
-                console.log(`[node:http-request] mapped ${m.jsonPath} -> ${m.variableName}`);
+                  const targetKey = String(m.variableName).trim();
+                  variables[targetKey] = val;
+                  mappedKeys.push(targetKey);
+                  console.log(`[node:http-request] mapped ${m.jsonPath} -> ${m.variableName}`);
               }
             });
+              return mappedKeys;
           };
 
           const operationMode = (cfg.operationMode as "generic" | "dynamic") || "generic";
@@ -1402,7 +1432,13 @@ export const TestPanel = ({
                       }
                       return score;
                     };
-                    const inspect = (obj: any, depth = 0) => {
+                    const liveVariableKeys = new Set(
+                      Array.isArray((variables as any).__liveVariableKeys)
+                        ? (variables as any).__liveVariableKeys.map((key: unknown) => String(key))
+                        : []
+                    );
+                    const inspect = (obj: any, depth = 0, keyHint?: string) => {
+                      if (keyHint && liveVariableKeys.has(keyHint)) return;
                       if (obj == null || depth > 7) return;
                       if (Array.isArray(obj)) { obj.forEach((item) => inspect(item, depth + 1)); return; }
                       if (typeof obj !== "object") return;
@@ -1415,7 +1451,7 @@ export const TestPanel = ({
                         const score = scoreLabel(label);
                         if (score > (best?.score || 0)) best = { id, score, label };
                       }
-                      Object.values(obj).forEach((value) => inspect(value, depth + 1));
+                      Object.entries(obj).forEach(([childKey, value]) => inspect(value, depth + 1, childKey));
                     };
                     inspect(variables);
                     const match = best as { id: string | number; score: number; label: string } | null;
@@ -1551,7 +1587,18 @@ export const TestPanel = ({
                     .replace(/^_|_$/g, "") || "endpoint";
                   variables[varBase] = data;
                   variables["httpResponse"] = data; // compat com nodes que leem httpResponse
-                  applyMappings(data, ep.responseMappings || []);
+                  const mappedKeys = applyMappings(data, ep.responseMappings || []);
+                  if (ep.resultType === "live") {
+                    const liveKeys = new Set(
+                      Array.isArray((variables as any).__liveVariableKeys)
+                        ? (variables as any).__liveVariableKeys.map((key: unknown) => String(key))
+                        : []
+                    );
+                    liveKeys.add(varBase);
+                    liveKeys.add("httpResponse");
+                    mappedKeys.forEach((key) => liveKeys.add(key));
+                    (variables as any).__liveVariableKeys = Array.from(liveKeys);
+                  }
                 }
 
                 const handle = lastOk ? "success" : "error";
