@@ -576,7 +576,7 @@ export const TestPanel = ({
       return `${index + 1}. ID: ${skill.id}\nTipo: ${skill.type}${resultTypeLine}${mutationLine}\nBloco: ${skill.containerName}\nNome: ${skill.label}\nInstrução da skill: ${skill.description}${describeSkillArgs(skill)}`;
     }).join("\n\n");
 
-    return `\n\n[SKILLS DISPONÍVEIS PARA O AGENTE]\n${list}\n\nQuando a mensagem do usuário combinar com a instrução de uma skill, use a ferramenta use_skill com o ID exato da skill. Sempre que a skill listar "Argumentos esperados", preencha o objeto \`arguments\` com esses campos (use os path params/query params/body descritos, extraindo os valores do contexto da conversa e das variáveis já coletadas). Para path params chamados \`id\`, use sempre o ID real do item escolhido em resultados anteriores (ex.: serviço Barba => id UUID do serviço), nunca o nome do item. Skills marcadas como Live Data são voláteis: sempre chame a skill novamente quando precisar desses dados, ignore resultados antigos no histórico e não use valores antigos para criar/alterar/excluir dados. Antes de chamar uma skill crítica (POST/PUT/PATCH/DELETE), use apenas os dados atuais que você acabou de confirmar com o usuário; se o usuário respondeu apenas "sim/pode", use exclusivamente a última mensagem de confirmação que você enviou, não valores mais antigos do histórico. Para skills críticas, envie o body completo em arguments.body quando o endpoint tiver body permitido; não confie em templates/variáveis antigas. Se um resultado de skill retornar erro ou parâmetro ausente, não chame a mesma skill de novo com os mesmos argumentos; responda ao usuário ou peça a informação faltante. Se a chamada de ferramenta não estiver disponível, responda apenas com JSON: {"skill_id":"ID","arguments":{...},"message":"opcional"}. Não invente perguntas antes de usar uma skill claramente solicitada.`;
+    return `\n\n[SKILLS DISPONÍVEIS PARA O AGENTE]\n${list}\n\nQuando a mensagem do usuário combinar com a instrução de uma skill, use a ferramenta use_skill com o ID exato da skill. Sempre que a skill listar "Argumentos esperados", preencha o objeto \`arguments\` com esses campos (use os path params/query params/body descritos, extraindo os valores do contexto da conversa e das variáveis já coletadas). Para qualquer campo de ID (id, *_id, *Id, uuid), use somente IDs reais retornados por uma skill anterior nesta sessão; se você só souber o nome/label do item escolhido, envie o nome/label e deixe o runtime resolver para o ID real — nunca invente UUIDs ou IDs. Skills marcadas como Live Data são voláteis: sempre chame a skill novamente quando precisar desses dados, ignore resultados antigos no histórico e não use valores antigos para criar/alterar/excluir dados. Antes de chamar uma skill crítica (POST/PUT/PATCH/DELETE), use apenas os dados atuais que você acabou de confirmar com o usuário; se o usuário respondeu apenas "sim/pode", use exclusivamente a última mensagem de confirmação que você enviou, não valores mais antigos do histórico. Para skills críticas, envie o body completo em arguments.body quando o endpoint tiver body permitido; não confie em templates/variáveis antigas. Se um resultado de skill retornar erro ou parâmetro ausente, não chame a mesma skill de novo com os mesmos argumentos; responda ao usuário ou peça a informação faltante. Se a chamada de ferramenta não estiver disponível, responda apenas com JSON: {"skill_id":"ID","arguments":{...},"message":"opcional"}. Não invente perguntas antes de usar uma skill claramente solicitada.`;
   };
 
   const buildUseSkillTool = (skills: ReturnType<typeof collectAgentSkills>) => {
@@ -1559,6 +1559,100 @@ export const TestPanel = ({
                     .replace(/[^a-z0-9]+/g, " ")
                     .trim();
 
+                  const splitNameTerms = (value: unknown) => normalizeLookupText(
+                    String(value ?? "").replace(/([a-z0-9])([A-Z])/g, "$1 $2")
+                  ).split(" ").filter((term) => term && term !== "id" && term !== "uuid");
+
+                  const singularize = (term: string) => term
+                    .replace(/oes$/i, "ao")
+                    .replace(/ais$/i, "al")
+                    .replace(/eis$/i, "el")
+                    .replace(/res$/i, "r")
+                    .replace(/s$/i, "");
+
+                  const isIdLikeParam = (name: string) => {
+                    const raw = String(name || "");
+                    const normalized = normalizeKeyName(raw);
+                    return normalized === "id" || normalized === "uuid" || normalized.endsWith("id") || /(^|[_-])id$/i.test(raw);
+                  };
+
+                  const valueLooksLikeIdentifier = (value: unknown) => {
+                    const raw = String(value ?? "").trim();
+                    if (!raw) return false;
+                    return /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(raw)
+                      || /^[a-zA-Z0-9_-]{12,}$/.test(raw);
+                  };
+
+                  const paramTypeHints = (paramName: string) => splitNameTerms(paramName)
+                    .map(singularize)
+                    .filter((term) => term.length >= 3 && !["param", "query", "body", "code", "value"].includes(term));
+
+                  type KnownEntity = {
+                    id: string;
+                    label: string;
+                    aliases: string[];
+                    typeHints: string[];
+                    source: string;
+                    updatedAt: string;
+                  };
+
+                  const getKnownEntities = (): KnownEntity[] => Array.isArray((variables as any).__knownEntities)
+                    ? ((variables as any).__knownEntities as KnownEntity[])
+                    : [];
+
+                  const rememberKnownEntities = (responseData: any, sourceParts: unknown[]) => {
+                    const source = sourceParts.map((part) => String(part || "")).filter(Boolean).join(" ");
+                    const sourceHints = splitNameTerms(source).map(singularize).filter((term) => term.length >= 3);
+                    const existing = getKnownEntities();
+                    const byKey = new Map(existing.map((entity) => [`${entity.id}|${entity.source}`, entity]));
+                    const labelFields = ["name", "title", "label", "description", "full_name", "display_name", "email", "phone", "telefone"];
+                    const idFields = ["id", "uuid", "_id"];
+                    const seen = new WeakSet<object>();
+
+                    const inspect = (obj: any, pathHints: string[] = [], depth = 0) => {
+                      if (obj == null || depth > 8) return;
+                      if (Array.isArray(obj)) {
+                        obj.forEach((item) => inspect(item, pathHints, depth + 1));
+                        return;
+                      }
+                      if (typeof obj !== "object") return;
+                      if (seen.has(obj)) return;
+                      seen.add(obj);
+
+                      const idKey = idFields.find((key) => typeof obj[key] === "string" || typeof obj[key] === "number");
+                      const rawId = idKey ? obj[idKey] : undefined;
+                      const labelKey = labelFields.find((key) => typeof obj[key] === "string" && String(obj[key]).trim());
+                      const label = labelKey ? String(obj[labelKey]).trim() : "";
+                      const aliases = Object.entries(obj)
+                        .filter(([key, value]) => !isIdLikeParam(key) && (typeof value === "string" || typeof value === "number") && String(value).trim().length <= 140)
+                        .map(([, value]) => String(value).trim())
+                        .filter(Boolean);
+
+                      if (rawId !== undefined && (label || aliases.length)) {
+                        const typeHints = Array.from(new Set([...sourceHints, ...pathHints.map(singularize)].filter((term) => term.length >= 3)));
+                        const entity: KnownEntity = {
+                          id: String(rawId),
+                          label: label || aliases[0],
+                          aliases: Array.from(new Set(aliases)),
+                          typeHints,
+                          source,
+                          updatedAt: new Date().toISOString(),
+                        };
+                        byKey.set(`${entity.id}|${entity.source}`, entity);
+                      }
+
+                      Object.entries(obj).forEach(([childKey, value]) => {
+                        const childHints = [...pathHints, ...splitNameTerms(childKey).map(singularize)];
+                        inspect(value, childHints, depth + 1);
+                      });
+                    };
+
+                    inspect(responseData, sourceHints);
+                    const entities = Array.from(byKey.values()).slice(-500);
+                    (variables as any).__knownEntities = entities;
+                    if (entities.length) console.log(`[node:http-request][dynamic] entidades conhecidas na sessão: ${entities.length}`);
+                  };
+
                   const collectLookupTerms = () => {
                     const terms = new Set<string>();
                     const add = (value: unknown) => {
@@ -1579,6 +1673,125 @@ export const TestPanel = ({
                     return Array.from(terms).filter((term) => term && !/^[0-9a-f-]{20,}$/i.test(term));
                   };
 
+                  const entityMatchesType = (entity: KnownEntity, hints: string[]) => {
+                    if (!hints.length) return true;
+                    const entityHints = new Set((entity.typeHints || []).map(singularize));
+                    const source = normalizeLookupText(entity.source);
+                    return hints.some((hint) => entityHints.has(hint) || source.includes(hint));
+                  };
+
+                  const identifierExistsInSession = (identifier: string) => {
+                    const seen = new WeakSet<object>();
+                    const inspect = (obj: any, depth = 0, keyHint = ""): boolean => {
+                      if (obj == null || depth > 8 || keyHint === "__dynamicSkillDispatch") return false;
+                      if (typeof obj === "string" || typeof obj === "number") return String(obj) === identifier;
+                      if (typeof obj !== "object") return false;
+                      if (seen.has(obj)) return false;
+                      seen.add(obj);
+                      if (Array.isArray(obj)) return obj.some((item) => inspect(item, depth + 1, keyHint));
+                      return Object.entries(obj).some(([childKey, value]) => inspect(value, depth + 1, childKey));
+                    };
+                    return inspect(variables);
+                  };
+
+                  const scoreEntity = (entity: KnownEntity, terms: string[]) => {
+                    const labels = [entity.label, ...(entity.aliases || [])].map(normalizeLookupText).filter(Boolean);
+                    let score = 0;
+                    for (const term of terms) {
+                      if (!term || valueLooksLikeIdentifier(term)) continue;
+                      for (const label of labels) {
+                        if (label === term) score = Math.max(score, 100);
+                        else if (label.includes(term) || term.includes(label)) score = Math.max(score, Math.min(label.length, term.length));
+                      }
+                    }
+                    return score;
+                  };
+
+                  const resolveKnownEntityId = (paramName: string, proposedValue: any) => {
+                    if (!isIdLikeParam(paramName)) return { ok: true, value: proposedValue };
+                    const hints = paramTypeHints(paramName);
+                    const allEntities = getKnownEntities();
+                    const typedEntities = allEntities.filter((entity) => entityMatchesType(entity, hints));
+                    const candidates = typedEntities.length ? typedEntities : allEntities;
+                    const rawValue = proposedValue && typeof proposedValue === "object"
+                      ? (proposedValue.id ?? proposedValue.uuid ?? proposedValue._id ?? proposedValue.name ?? proposedValue.label ?? proposedValue.title)
+                      : proposedValue;
+                    const hasValue = rawValue !== undefined && rawValue !== null && String(rawValue).trim() !== "";
+                    const rawText = hasValue ? String(rawValue).trim() : "";
+
+                    if (hasValue && valueLooksLikeIdentifier(rawText)) {
+                      const exact = allEntities.find((entity) => String(entity.id) === rawText);
+                      if (exact) return { ok: true, value: rawText };
+                      if (isDispatched && !identifierExistsInSession(rawText)) {
+                        return {
+                          ok: false,
+                          error: "unverified_entity_id",
+                          message: `O valor enviado para ${paramName} não foi retornado por nenhuma consulta desta sessão.`,
+                          param: paramName,
+                          value: rawText,
+                        };
+                      }
+                      return { ok: true, value: proposedValue };
+                    }
+
+                    const terms = new Set<string>(collectLookupTerms());
+                    if (hasValue) {
+                      const normalized = normalizeLookupText(rawText);
+                      if (normalized) {
+                        terms.add(normalized);
+                        normalized.split(" ").filter((part) => part.length >= 3).forEach((part) => terms.add(part));
+                      }
+                    }
+                    const lookupTerms = Array.from(terms);
+                    let best: { entity: KnownEntity; score: number } | null = null;
+                    for (const entity of candidates) {
+                      const score = scoreEntity(entity, lookupTerms);
+                      if (score > (best?.score || 0)) best = { entity, score };
+                    }
+                    if (best && best.score >= 3) {
+                      console.log(`[node:http-request][dynamic] ${paramName} resolvido por entidade da sessão: ${best.entity.label}`);
+                      return { ok: true, value: best.entity.id };
+                    }
+                    if (hasValue && candidates.length && isDispatched) {
+                      return {
+                        ok: false,
+                        error: "unresolved_entity_id",
+                        message: `Não encontrei um ID real para ${paramName} usando os dados retornados nesta sessão.`,
+                        param: paramName,
+                        value: rawText,
+                      };
+                    }
+                    return { ok: true, value: proposedValue };
+                  };
+
+                  const sanitizeIdLikeValues = (value: any): { ok: boolean; value: any; error?: any } => {
+                    if (Array.isArray(value)) {
+                      const next: any[] = [];
+                      for (const item of value) {
+                        const resolved = sanitizeIdLikeValues(item);
+                        if (!resolved.ok) return resolved;
+                        next.push(resolved.value);
+                      }
+                      return { ok: true, value: next };
+                    }
+                    if (value && typeof value === "object") {
+                      const next: Record<string, any> = {};
+                      for (const [key, child] of Object.entries(value)) {
+                        if (isIdLikeParam(key) && (typeof child !== "object" || child === null)) {
+                          const resolved = resolveKnownEntityId(key, child);
+                          if (!resolved.ok) return { ok: false, value, error: resolved };
+                          next[key] = resolved.value;
+                        } else {
+                          const resolved = sanitizeIdLikeValues(child);
+                          if (!resolved.ok) return resolved;
+                          next[key] = resolved.value;
+                        }
+                      }
+                      return { ok: true, value: next };
+                    }
+                    return { ok: true, value };
+                  };
+
                   const inferIdFromKnownLists = (paramName: string) => {
                     if (!/(^id$|_id$)/i.test(paramName)) return undefined;
                     const terms = collectLookupTerms();
@@ -1595,13 +1808,7 @@ export const TestPanel = ({
                       }
                       return score;
                     };
-                    const liveVariableKeys = new Set(
-                      Array.isArray((variables as any).__liveVariableKeys)
-                        ? (variables as any).__liveVariableKeys.map((key: unknown) => String(key))
-                        : []
-                    );
                     const inspect = (obj: any, depth = 0, keyHint?: string) => {
-                      if (keyHint && liveVariableKeys.has(keyHint)) return;
                       if (obj == null || depth > 7) return;
                       if (Array.isArray(obj)) { obj.forEach((item) => inspect(item, depth + 1)); return; }
                       if (typeof obj !== "object") return;
@@ -1645,18 +1852,26 @@ export const TestPanel = ({
                       .map((n: string) => String(n).replace(/^%3A/i, "").replace(/^:/, ""))
                       .filter((n: string) => /^[a-zA-Z_][a-zA-Z0-9_]*$/.test(n))
                   );
+                  let shouldSkipEndpoint = false;
                   pathNames.forEach((p) => {
                     const fromAgent = perms.pathParams === false ? undefined : pickAgentValue(p);
-                    const agentValueLooksLikeId = fromAgent === undefined
-                      || typeof fromAgent === "number"
-                      || /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(String(fromAgent))
-                      || /^[a-zA-Z0-9_-]{12,}$/.test(String(fromAgent));
+                    const agentValueLooksLikeId = fromAgent === undefined || typeof fromAgent === "number" || valueLooksLikeIdentifier(fromAgent);
                     const inferred = (fromAgent === undefined || !agentValueLooksLikeId) ? inferIdFromKnownLists(p) : undefined;
-                    const v = inferred !== undefined
+                    const rawValue = inferred !== undefined
                       ? inferred
                       : fromAgent !== undefined
                         ? fromAgent
                         : variables[p];
+                    const resolved = resolveKnownEntityId(p, rawValue);
+                    if (!resolved.ok) {
+                      lastOk = false;
+                      lastData = { ...resolved, ok: false };
+                      variables.httpResponse = lastData;
+                      shouldSkipEndpoint = true;
+                      console.warn(`[node:http-request][dynamic] ID inválido em path param "${p}" — chamada abortada`, resolved);
+                      return;
+                    }
+                    const v = resolved.value;
                     if (v !== undefined && v !== null && v !== "") {
                       const enc = encodeURIComponent(String(v));
                       url = url
@@ -1666,6 +1881,7 @@ export const TestPanel = ({
                       console.warn(`[node:http-request][dynamic] path param "${p}" sem valor — URL ficará com placeholder`);
                     }
                   });
+                  if (shouldSkipEndpoint) continue;
 
                   // Se ainda restou placeholder (ex.: /:algo/ ou /{algo}/ ou /%3Aalgo/),
                   // aborta a chamada — evita 500 no servidor por causa de placeholder literal.
@@ -1687,17 +1903,38 @@ export const TestPanel = ({
                   (ep.queryParams || []).forEach((p: any) => {
                     if (!p?.name) return;
                     const fromAgent = perms.queryParams === false ? undefined : agentQuery[p.name] ?? (p.name in agentArgs ? agentArgs[p.name] : undefined);
-                    const val = fromAgent !== undefined ? String(fromAgent) : replaceVars(String(p.value ?? ""));
+                    const candidate = fromAgent !== undefined ? fromAgent : replaceVars(String(p.value ?? ""));
+                    const resolved = resolveKnownEntityId(p.name, candidate);
+                    if (!resolved.ok) {
+                      lastOk = false;
+                      lastData = { ...resolved, ok: false };
+                      variables.httpResponse = lastData;
+                      shouldSkipEndpoint = true;
+                      console.warn(`[node:http-request][dynamic] ID inválido em query param "${p.name}" — chamada abortada`, resolved);
+                      return;
+                    }
+                    const val = resolved.value;
                     qp.push(`${encodeURIComponent(p.name)}=${encodeURIComponent(val)}`);
                     usedQuery.add(p.name);
                   });
+                  if (shouldSkipEndpoint) continue;
                   // Query params extras do agente (declarados no argsSchema mas ausentes na config).
                   if (perms.queryParams !== false) {
                     Object.entries(agentQuery).forEach(([k, v]) => {
                       if (usedQuery.has(k) || v === undefined || v === null) return;
-                      qp.push(`${encodeURIComponent(k)}=${encodeURIComponent(String(v))}`);
+                      const resolved = resolveKnownEntityId(k, v);
+                      if (!resolved.ok) {
+                        lastOk = false;
+                        lastData = { ...resolved, ok: false };
+                        variables.httpResponse = lastData;
+                        shouldSkipEndpoint = true;
+                        console.warn(`[node:http-request][dynamic] ID inválido em query param extra "${k}" — chamada abortada`, resolved);
+                        return;
+                      }
+                      qp.push(`${encodeURIComponent(k)}=${encodeURIComponent(String(resolved.value))}`);
                     });
                   }
+                  if (shouldSkipEndpoint) continue;
                   if (qp.length) url += (url.includes("?") ? "&" : "?") + qp.join("&");
 
                   const headers: Record<string, string> = {};
@@ -1719,7 +1956,16 @@ export const TestPanel = ({
                     // Body do agente tem prioridade (se permitido). Aceita objeto ou string JSON.
                     const canAgentBody = perms.body !== false;
                     if (canAgentBody && agentBody !== undefined && agentBody !== null && agentBody !== "") {
-                      body = typeof agentBody === "string" ? replaceVars(agentBody) : JSON.stringify(agentBody);
+                      const bodyValue = typeof agentBody === "string" ? extractJsonFromText(replaceVars(agentBody)) ?? replaceVars(agentBody) : agentBody;
+                      const sanitizedBody = sanitizeIdLikeValues(bodyValue);
+                      if (!sanitizedBody.ok) {
+                        lastOk = false;
+                        lastData = { ...sanitizedBody.error, ok: false };
+                        variables.httpResponse = lastData;
+                        console.warn(`[node:http-request][dynamic] ID inválido no body — chamada abortada`, sanitizedBody.error);
+                        continue;
+                      }
+                      body = typeof sanitizedBody.value === "string" ? sanitizedBody.value : JSON.stringify(sanitizedBody.value);
                       if (!headers["Content-Type"]) headers["Content-Type"] = "application/json";
                     } else if (ep.body) {
                       if (isDispatched && isMutatingDispatch && canAgentBody) {
@@ -1762,6 +2008,7 @@ export const TestPanel = ({
                   variables[varBase] = data;
                   variables["httpResponse"] = data; // compat com nodes que leem httpResponse
                   const mappedKeys = applyMappings(data, ep.responseMappings || []);
+                  rememberKnownEntities(data, [varBase, ep.name, ep.id, ep.url]);
                   if (ep.resultType === "live") {
                     const liveKeys = new Set(
                       Array.isArray((variables as any).__liveVariableKeys)
