@@ -49,9 +49,15 @@ export const buildAgentContext = ({
     } catch { return true; }
   };
   const cleanVariables: Record<string, any> = {};
+  const liveVariableKeys = new Set(
+    Array.isArray((variables as any)?.__liveVariableKeys)
+      ? (variables as any).__liveVariableKeys.map((key: unknown) => String(key))
+      : []
+  );
   for (const [k, v] of Object.entries(variables || {})) {
     if (k.startsWith("__")) continue;              // flags internas (ex.: __dynamicSkillDispatch)
     if (INTERNAL_VAR_KEYS.has(k)) continue;        // caches genéricos do runtime
+    if (liveVariableKeys.has(k)) continue;         // resultados Live Data são voláteis e precisam ser reconsultados
     if (isLargeBlob(v)) continue;                  // respostas completas de API cacheadas
     cleanVariables[k] = v;
   }
