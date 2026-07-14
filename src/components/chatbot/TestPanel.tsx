@@ -1596,6 +1596,17 @@ export const TestPanel = ({
                     updatedAt: string;
                   };
 
+                  type VerifiedEntitySelection = {
+                    id: string;
+                    paramName: string;
+                    key: string;
+                    label: string;
+                    aliases: string[];
+                    typeHints: string[];
+                    source: string;
+                    updatedAt: string;
+                  };
+
                   const getKnownEntities = (): KnownEntity[] => Array.isArray((variables as any).__knownEntities)
                     ? ((variables as any).__knownEntities as KnownEntity[])
                     : [];
@@ -1680,6 +1691,72 @@ export const TestPanel = ({
                     return hints.some((hint) => entityHints.has(hint) || source.includes(hint));
                   };
 
+                  const getVerifiedEntitySelections = (): Record<string, VerifiedEntitySelection> => {
+                    const raw = (variables as any).__verifiedEntitySelections;
+                    return raw && typeof raw === "object" && !Array.isArray(raw)
+                      ? raw as Record<string, VerifiedEntitySelection>
+                      : {};
+                  };
+
+                  const selectionKeysForParam = (paramName: string) => {
+                    const normalized = normalizeKeyName(paramName);
+                    const hints = paramTypeHints(paramName);
+                    const keys = [normalized];
+                    hints.forEach((hint) => {
+                      keys.push(`${hint}id`, `${hint}_id`);
+                    });
+                    return Array.from(new Set(keys.filter(Boolean)));
+                  };
+
+                  const findKnownEntityById = (id: unknown) => {
+                    const text = String(id ?? "").trim();
+                    if (!text) return undefined;
+                    return getKnownEntities().find((entity) => String(entity.id) === text);
+                  };
+
+                  const rememberVerifiedEntitySelection = (paramName: string, id: unknown) => {
+                    if (!isIdLikeParam(paramName)) return;
+                    const text = String(id ?? "").trim();
+                    if (!text || !valueLooksLikeIdentifier(text)) return;
+                    const entity = findKnownEntityById(text);
+                    if (!entity) return;
+                    const hints = paramTypeHints(paramName);
+                    if (!entityMatchesType(entity, hints)) return;
+                    const selections = { ...getVerifiedEntitySelections() };
+                    const updatedAt = new Date().toISOString();
+                    selectionKeysForParam(paramName).forEach((key) => {
+                      selections[key] = {
+                        id: text,
+                        paramName,
+                        key,
+                        label: entity.label,
+                        aliases: entity.aliases || [],
+                        typeHints: entity.typeHints || [],
+                        source: entity.source,
+                        updatedAt,
+                      };
+                    });
+                    (variables as any).__verifiedEntitySelections = selections;
+                  };
+
+                  const getVerifiedSelectionForParam = (paramName: string, candidates: KnownEntity[]) => {
+                    const normalized = normalizeKeyName(paramName);
+                    const hints = paramTypeHints(paramName);
+                    // Um parâmetro genérico "id" não tem tipo suficiente para reaproveitar uma seleção anterior com segurança.
+                    if ((normalized === "id" || normalized === "uuid") && !hints.length) return null;
+                    const selections = getVerifiedEntitySelections();
+                    for (const key of selectionKeysForParam(paramName)) {
+                      const selection = selections[key];
+                      if (!selection?.id) continue;
+                      const entity = findKnownEntityById(selection.id);
+                      if (!entity) continue;
+                      if (hints.length && !entityMatchesType(entity, hints)) continue;
+                      if (candidates.length && !candidates.some((candidate) => String(candidate.id) === String(selection.id))) continue;
+                      return { selection, entity };
+                    }
+                    return null;
+                  };
+
                   const identifierExistsInSession = (identifier: string) => {
                     const seen = new WeakSet<object>();
                     const inspect = (obj: any, depth = 0, keyHint = ""): boolean => {
@@ -1720,8 +1797,17 @@ export const TestPanel = ({
                     const rawText = hasValue ? String(rawValue).trim() : "";
 
                     if (hasValue && valueLooksLikeIdentifier(rawText)) {
-                      const exact = allEntities.find((entity) => String(entity.id) === rawText);
-                      if (exact) return { ok: true, value: rawText };
+                      const exact = candidates.find((entity) => String(entity.id) === rawText)
+                        || (!hints.length ? allEntities.find((entity) => String(entity.id) === rawText) : undefined);
+                      if (exact) {
+                        rememberVerifiedEntitySelection(paramName, rawText);
+                        return { ok: true, value: rawText };
+                      }
+                      const verifiedSelection = getVerifiedSelectionForParam(paramName, candidates);
+                      if (verifiedSelection) {
+                        console.warn(`[node:http-request][dynamic] ${paramName} recebido com ID não verificado (${rawText}); usando seleção validada da sessão: ${verifiedSelection.selection.id} (${verifiedSelection.selection.label})`);
+                        return { ok: true, value: verifiedSelection.selection.id };
+                      }
                       if (isDispatched && !identifierExistsInSession(rawText)) {
                         return {
                           ok: false,
@@ -1750,6 +1836,7 @@ export const TestPanel = ({
                     }
                     if (best && best.score >= 3) {
                       console.log(`[node:http-request][dynamic] ${paramName} resolvido por entidade da sessão: ${best.entity.label}`);
+                      rememberVerifiedEntitySelection(paramName, best.entity.id);
                       return { ok: true, value: best.entity.id };
                     }
                     if (hasValue && candidates.length && isDispatched) {
