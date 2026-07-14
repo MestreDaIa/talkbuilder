@@ -681,8 +681,16 @@ export const TestPanel = ({
       };
       const getAgentHistory = (includeLatestSkillResult: boolean) => {
         const lastIndex = messageHistory.length - 1;
+        const latestConfirmationIndex = (() => {
+          for (let i = messageHistory.length - 1; i >= 0; i--) {
+            const msg = messageHistory[i];
+            if (msg.role === "assistant" && /confirm/i.test(String(msg.content || "")) && !isSkillResultHistoryMessage(msg)) return i;
+          }
+          return -1;
+        })();
         return messageHistory.filter((msg, index) => {
           if (!isSkillResultHistoryMessage(msg)) return true;
+          if (latestConfirmationIndex >= 0 && index !== latestConfirmationIndex && msg.role === "assistant" && /confirm/i.test(String(msg.content || ""))) return false;
           return includeLatestSkillResult && index === lastIndex;
         });
       };
