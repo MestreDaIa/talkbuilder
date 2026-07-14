@@ -735,6 +735,32 @@ export const TestPanel = ({
           if (key && value) confirmedValues[key] = value;
         }
 
+        const getConfirmedByAliases = (aliases: string[]) => {
+          const wanted = new Set(aliases.map(normalizeKeyName));
+          for (const [key, value] of Object.entries(confirmedValues)) {
+            const normalizedKey = normalizeKeyName(key.split(".").pop() || key);
+            if (wanted.has(normalizedKey)) return value;
+          }
+          return undefined;
+        };
+
+        const confirmedDate = getConfirmedByAliases(["data", "dia", "date"]);
+        const confirmedTime = getConfirmedByAliases(["horário", "horario", "hora", "time"]);
+
+        const toIsoDate = (value: unknown) => {
+          const raw = String(value ?? "").trim();
+          const br = raw.match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})$/);
+          if (br) return `${br[3]}-${br[2].padStart(2, "0")}-${br[1].padStart(2, "0")}`;
+          const iso = raw.match(/^(\d{4}-\d{2}-\d{2})/);
+          return iso?.[1] || raw;
+        };
+
+        const toTime = (value: unknown) => {
+          const raw = String(value ?? "").trim();
+          const m = raw.match(/(\d{1,2}):(\d{2})/);
+          return m ? `${m[1].padStart(2, "0")}:${m[2]}` : raw;
+        };
+
         const resolveConfirmedValue = (targetKey: string) => {
           const normalizedTarget = normalizeKeyName(targetKey);
           if (/(^id$|id$|uuid$)/i.test(normalizedTarget)) return undefined;
@@ -769,10 +795,35 @@ export const TestPanel = ({
         };
 
         const nextArgs = JSON.parse(JSON.stringify(fallbackArgs || {}));
+        if ((!nextArgs.body || typeof nextArgs.body !== "object" || Array.isArray(nextArgs.body)) && nextArgs.body !== "") {
+          const flatBody = Object.fromEntries(
+            Object.entries(nextArgs).filter(([key]) => !["pathParams", "queryParams", "body"].includes(key))
+          );
+          if (Object.keys(flatBody).length) nextArgs.body = flatBody;
+        }
         if (nextArgs.body && typeof nextArgs.body === "object") {
           Object.keys(nextArgs.body).forEach((key) => {
             const confirmed = resolveConfirmedValue(key);
-            if (confirmed !== undefined) nextArgs.body[key] = confirmed;
+            const normalizedKey = normalizeKeyName(key);
+            const currentValue = nextArgs.body[key];
+            if (confirmed !== undefined) {
+              nextArgs.body[key] = confirmed;
+            } else if (confirmedDate !== undefined && confirmedTime !== undefined && /(schedule|appointment|booking|start|end|slot).*(at|date|time)|^(datetime|date_time|starts_at|ends_at|scheduled_at)$/i.test(key)) {
+              const date = toIsoDate(confirmedDate);
+              const time = toTime(confirmedTime);
+              if (/time|hora|horario/i.test(key) && !/date|data|at/i.test(key)) nextArgs.body[key] = time;
+              else if (/date|data/i.test(key) && !/time|hora|horario/i.test(key)) nextArgs.body[key] = date;
+              else if (typeof currentValue === "string" && currentValue.includes("T")) {
+                const suffix = currentValue.match(/(:\d{2}(?:\.\d{3})?(?:Z|[+-]\d{2}:?\d{2})?)$/)?.[1] || ":00";
+                nextArgs.body[key] = `${date}T${time}${suffix.startsWith(":") ? suffix : ":00"}`;
+              } else {
+                nextArgs.body[key] = `${date} ${time}`;
+              }
+            } else if (confirmedDate !== undefined && (normalizedKey.includes("date") || normalizedKey.includes("data"))) {
+              nextArgs.body[key] = toIsoDate(confirmedDate);
+            } else if (confirmedTime !== undefined && (normalizedKey.includes("time") || normalizedKey.includes("hora") || normalizedKey.includes("horario"))) {
+              nextArgs.body[key] = toTime(confirmedTime);
+            }
           });
         }
         return nextArgs;
