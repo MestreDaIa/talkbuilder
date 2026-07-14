@@ -482,7 +482,7 @@ export const TestPanel = ({
       label: string;
       argsSchema?: any;                 // schema livre p/ o agente preencher
       // meta interna para o dispatcher
-      _http?: { nodeId: string; endpointId: string; permissions: any; resultType: "context" | "live"; method: string };
+      _http?: { nodeId: string; endpointId: string; permissions: any; resultType: "context" | "live"; method: string; isMutating: boolean };
     }> = [];
 
     for (const container of containersToScan) {
@@ -512,6 +512,7 @@ export const TestPanel = ({
                 permissions: ep.permissions || {},
                 resultType: ep.resultType === "live" ? "live" : "context",
                 method: String(ep.method || "GET").toUpperCase(),
+                isMutating: ["POST", "PUT", "PATCH", "DELETE"].includes(String(ep.method || "GET").toUpperCase()),
               },
             });
           }
@@ -569,10 +570,13 @@ export const TestPanel = ({
       const resultTypeLine = skill._http
         ? `\nTipo de Resultado: ${skill._http.resultType === "live" ? "Live Data — sempre reconsultar; nunca reutilize resultado antigo" : "Context Data — pode ser usado como contexto"}`
         : "";
-      return `${index + 1}. ID: ${skill.id}\nTipo: ${skill.type}${resultTypeLine}\nBloco: ${skill.containerName}\nNome: ${skill.label}\nInstrução da skill: ${skill.description}${describeSkillArgs(skill)}`;
+      const mutationLine = skill._http?.isMutating
+        ? "\nOperação crítica: sim — preencha o body/query/path com os dados atuais confirmados nesta conversa; nunca deixe o executor completar campos com variáveis antigas."
+        : "";
+      return `${index + 1}. ID: ${skill.id}\nTipo: ${skill.type}${resultTypeLine}${mutationLine}\nBloco: ${skill.containerName}\nNome: ${skill.label}\nInstrução da skill: ${skill.description}${describeSkillArgs(skill)}`;
     }).join("\n\n");
 
-    return `\n\n[SKILLS DISPONÍVEIS PARA O AGENTE]\n${list}\n\nQuando a mensagem do usuário combinar com a instrução de uma skill, use a ferramenta use_skill com o ID exato da skill. Sempre que a skill listar "Argumentos esperados", preencha o objeto \`arguments\` com esses campos (use os path params/query params/body descritos, extraindo os valores do contexto da conversa e das variáveis já coletadas). Para path params chamados \`id\`, use sempre o ID real do item escolhido em resultados anteriores (ex.: serviço Barba => id UUID do serviço), nunca o nome do item. Skills marcadas como Live Data são voláteis: sempre chame a skill novamente quando precisar desses dados, ignore resultados antigos no histórico e não use valores antigos para criar/alterar/excluir dados. Se um resultado de skill retornar erro ou parâmetro ausente, não chame a mesma skill de novo com os mesmos argumentos; responda ao usuário ou peça a informação faltante. Se a chamada de ferramenta não estiver disponível, responda apenas com JSON: {"skill_id":"ID","arguments":{...},"message":"opcional"}. Não invente perguntas antes de usar uma skill claramente solicitada.`;
+    return `\n\n[SKILLS DISPONÍVEIS PARA O AGENTE]\n${list}\n\nQuando a mensagem do usuário combinar com a instrução de uma skill, use a ferramenta use_skill com o ID exato da skill. Sempre que a skill listar "Argumentos esperados", preencha o objeto \`arguments\` com esses campos (use os path params/query params/body descritos, extraindo os valores do contexto da conversa e das variáveis já coletadas). Para path params chamados \`id\`, use sempre o ID real do item escolhido em resultados anteriores (ex.: serviço Barba => id UUID do serviço), nunca o nome do item. Skills marcadas como Live Data são voláteis: sempre chame a skill novamente quando precisar desses dados, ignore resultados antigos no histórico e não use valores antigos para criar/alterar/excluir dados. Antes de chamar uma skill crítica (POST/PUT/PATCH/DELETE), use apenas os dados atuais que você acabou de confirmar com o usuário; se o usuário respondeu apenas "sim/pode", use exclusivamente a última mensagem de confirmação que você enviou, não valores mais antigos do histórico. Para skills críticas, envie o body completo em arguments.body quando o endpoint tiver body permitido; não confie em templates/variáveis antigas. Se um resultado de skill retornar erro ou parâmetro ausente, não chame a mesma skill de novo com os mesmos argumentos; responda ao usuário ou peça a informação faltante. Se a chamada de ferramenta não estiver disponível, responda apenas com JSON: {"skill_id":"ID","arguments":{...},"message":"opcional"}. Não invente perguntas antes de usar uma skill claramente solicitada.`;
   };
 
   const buildUseSkillTool = (skills: ReturnType<typeof collectAgentSkills>) => {
@@ -677,10 +681,164 @@ export const TestPanel = ({
       };
       const getAgentHistory = (includeLatestSkillResult: boolean) => {
         const lastIndex = messageHistory.length - 1;
+        const latestConfirmationIndex = (() => {
+          for (let i = messageHistory.length - 1; i >= 0; i--) {
+            const msg = messageHistory[i];
+            if (msg.role === "assistant" && /confirm/i.test(String(msg.content || "")) && !isSkillResultHistoryMessage(msg)) return i;
+          }
+          return -1;
+        })();
         return messageHistory.filter((msg, index) => {
+          if (latestConfirmationIndex >= 0 && index !== latestConfirmationIndex && msg.role === "assistant" && /confirm/i.test(String(msg.content || ""))) return false;
           if (!isSkillResultHistoryMessage(msg)) return true;
           return includeLatestSkillResult && index === lastIndex;
         });
+      };
+
+      const extractJsonFromText = (text: string): any => {
+        const trimmed = String(text || "").trim();
+        if (!trimmed) return null;
+        const candidates = [
+          trimmed.match(/```(?:json)?\s*([\s\S]*?)```/i)?.[1],
+          trimmed.match(/\{[\s\S]*\}/)?.[0],
+          trimmed.match(/\[[\s\S]*\]/)?.[0],
+        ].filter(Boolean) as string[];
+        for (const candidate of candidates) {
+          try { return JSON.parse(candidate); } catch { /* try next */ }
+        }
+        return null;
+      };
+
+      const flattenObject = (value: any, prefix = "", out: Record<string, any> = {}) => {
+        if (value == null || typeof value !== "object" || Array.isArray(value)) {
+          if (prefix) out[prefix] = value;
+          return out;
+        }
+        Object.entries(value).forEach(([key, child]) => {
+          const path = prefix ? `${prefix}.${key}` : key;
+          if (child != null && typeof child === "object" && !Array.isArray(child)) flattenObject(child, path, out);
+          else out[path] = child;
+        });
+        return out;
+      };
+
+      const normalizeKeyName = (key: string) => String(key || "").toLowerCase().replace(/[^a-z0-9]/g, "");
+
+      const deriveLatestConfirmedArgs = (skill: ReturnType<typeof collectAgentSkills>[number] | undefined, fallbackArgs: Record<string, any> = {}) => {
+        if (!skill?._http?.isMutating) return fallbackArgs;
+        const latestAssistantConfirmation = [...messageHistory]
+          .reverse()
+          .find((msg) => msg.role === "assistant" && /confirm/i.test(String(msg.content || "")) && !isSkillResultHistoryMessage(msg));
+        const confirmationText = latestAssistantConfirmation?.content || "";
+        const parsed = extractJsonFromText(confirmationText);
+        const confirmedValues: Record<string, any> = {
+          ...flattenObject(parsed || {}),
+        };
+
+        const linePattern = /^\s*[-*•]?\s*([^:\n]{2,80})\s*:\s*(.+?)\s*$/gm;
+        let match: RegExpExecArray | null;
+        while ((match = linePattern.exec(confirmationText)) !== null) {
+          const key = match[1].trim();
+          const value = match[2].trim();
+          if (key && value) confirmedValues[key] = value;
+        }
+
+        const getConfirmedByAliases = (aliases: string[]) => {
+          const wanted = new Set(aliases.map(normalizeKeyName));
+          for (const [key, value] of Object.entries(confirmedValues)) {
+            const normalizedKey = normalizeKeyName(key.split(".").pop() || key);
+            if (wanted.has(normalizedKey)) return value;
+          }
+          return undefined;
+        };
+
+        const confirmedDate = getConfirmedByAliases(["data", "dia", "date"]);
+        const confirmedTime = getConfirmedByAliases(["horário", "horario", "hora", "time"]);
+
+        const toIsoDate = (value: unknown) => {
+          const raw = String(value ?? "").trim();
+          const br = raw.match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})$/);
+          if (br) return `${br[3]}-${br[2].padStart(2, "0")}-${br[1].padStart(2, "0")}`;
+          const iso = raw.match(/^(\d{4}-\d{2}-\d{2})/);
+          return iso?.[1] || raw;
+        };
+
+        const toTime = (value: unknown) => {
+          const raw = String(value ?? "").trim();
+          const m = raw.match(/(\d{1,2}):(\d{2})/);
+          return m ? `${m[1].padStart(2, "0")}:${m[2]}` : raw;
+        };
+
+        const resolveConfirmedValue = (targetKey: string) => {
+          const normalizedTarget = normalizeKeyName(targetKey);
+          if (/(^id$|id$|uuid$)/i.test(normalizedTarget)) return undefined;
+          const aliases: Record<string, string[]> = {
+            date: ["data", "dia"],
+            appointmentdate: ["data", "dia"],
+            scheduleddate: ["data", "dia"],
+            startdate: ["data", "dia"],
+            enddate: ["data", "dia"],
+            time: ["horario", "hora"],
+            appointmenttime: ["horario", "hora"],
+            scheduledtime: ["horario", "hora"],
+            starttime: ["horario", "hora"],
+            endtime: ["horario", "hora"],
+            hour: ["horario", "hora"],
+            service: ["servico"],
+            employee: ["profissional", "funcionario"],
+            customer: ["cliente", "contato"],
+            phone: ["telefone", "celular"],
+          };
+          const inferredAliases = normalizedTarget.includes("date") || normalizedTarget.includes("data")
+            ? ["data", "dia"]
+            : normalizedTarget.includes("time") || normalizedTarget.includes("hour") || normalizedTarget.includes("hora") || normalizedTarget.includes("horario")
+              ? ["horario", "hora"]
+              : [];
+          const wanted = new Set([normalizedTarget, ...(aliases[normalizedTarget] || []), ...inferredAliases]);
+          for (const [key, value] of Object.entries(confirmedValues)) {
+            const normalizedKey = normalizeKeyName(key.split(".").pop() || key);
+            if (wanted.has(normalizedKey)) return value;
+          }
+          return undefined;
+        };
+
+        const nextArgs = JSON.parse(JSON.stringify(fallbackArgs || {}));
+        if (typeof nextArgs.body === "string") {
+          const parsedBody = extractJsonFromText(nextArgs.body);
+          if (parsedBody && typeof parsedBody === "object" && !Array.isArray(parsedBody)) nextArgs.body = parsedBody;
+        }
+        if ((!nextArgs.body || typeof nextArgs.body !== "object" || Array.isArray(nextArgs.body)) && nextArgs.body !== "") {
+          const flatBody = Object.fromEntries(
+            Object.entries(nextArgs).filter(([key]) => !["pathParams", "queryParams", "body"].includes(key))
+          );
+          if (Object.keys(flatBody).length) nextArgs.body = flatBody;
+        }
+        if (nextArgs.body && typeof nextArgs.body === "object") {
+          Object.keys(nextArgs.body).forEach((key) => {
+            const confirmed = resolveConfirmedValue(key);
+            const normalizedKey = normalizeKeyName(key);
+            const currentValue = nextArgs.body[key];
+            if (confirmed !== undefined) {
+              nextArgs.body[key] = confirmed;
+            } else if (confirmedDate !== undefined && confirmedTime !== undefined && /(schedule|appointment|booking|start|end|slot).*(at|date|time)|^(datetime|date_time|starts_at|ends_at|scheduled_at)$/i.test(key)) {
+              const date = toIsoDate(confirmedDate);
+              const time = toTime(confirmedTime);
+              if (/time|hora|horario/i.test(key) && !/date|data|at/i.test(key)) nextArgs.body[key] = time;
+              else if (/date|data/i.test(key) && !/time|hora|horario/i.test(key)) nextArgs.body[key] = date;
+              else if (typeof currentValue === "string" && currentValue.includes("T")) {
+                const suffix = currentValue.match(/(:\d{2}(?:\.\d{3})?(?:Z|[+-]\d{2}:?\d{2})?)$/)?.[1] || ":00";
+                nextArgs.body[key] = `${date}T${time}${suffix.startsWith(":") ? suffix : ":00"}`;
+              } else {
+                nextArgs.body[key] = `${date} ${time}`;
+              }
+            } else if (confirmedDate !== undefined && (normalizedKey.includes("date") || normalizedKey.includes("data"))) {
+              nextArgs.body[key] = toIsoDate(confirmedDate);
+            } else if (confirmedTime !== undefined && (normalizedKey.includes("time") || normalizedKey.includes("hora") || normalizedKey.includes("horario"))) {
+              nextArgs.body[key] = toTime(confirmedTime);
+            }
+          });
+        }
+        return nextArgs;
       };
 
       const parseWaitMs = (cfg: any) => {
@@ -1108,12 +1266,16 @@ export const TestPanel = ({
             // como diretiva efêmera consumida pelo executor do node.
             let targetNodeId = skillCall.skill_id;
             if (matchedSkill._http) {
+              const sanitizedArgs = matchedSkill._http.isMutating
+                ? deriveLatestConfirmedArgs(matchedSkill, skillCall.arguments || {})
+                : (skillCall.arguments || {});
               targetNodeId = matchedSkill._http.nodeId;
               (variables as any).__dynamicSkillDispatch = {
                 nodeId: matchedSkill._http.nodeId,
                 endpointId: matchedSkill._http.endpointId,
-                args: skillCall.arguments || {},
+                args: sanitizedArgs,
                 permissions: matchedSkill._http.permissions || {},
+                isMutating: matchedSkill._http.isMutating,
               };
             }
 
@@ -1360,6 +1522,7 @@ export const TestPanel = ({
                   const agentPath: Record<string, any> = (agentArgs.pathParams && typeof agentArgs.pathParams === "object") ? agentArgs.pathParams : {};
                   const agentQuery: Record<string, any> = (agentArgs.queryParams && typeof agentArgs.queryParams === "object") ? agentArgs.queryParams : {};
                   const agentBody = agentArgs.body;
+                  const isMutatingDispatch = !!dispatch?.isMutating || ["POST", "PUT", "PATCH", "DELETE"].includes(method);
                   // Busca recursiva por um valor no objeto de argumentos do agente
                   // (tolera formatos como { id: "..." }, { pathParams: { id } }, { arguments: {...} },
                   //  arrays [{ id, name }], nomes com case diferente, etc.).
@@ -1559,6 +1722,17 @@ export const TestPanel = ({
                       body = typeof agentBody === "string" ? replaceVars(agentBody) : JSON.stringify(agentBody);
                       if (!headers["Content-Type"]) headers["Content-Type"] = "application/json";
                     } else if (ep.body) {
+                      if (isDispatched && isMutatingDispatch && canAgentBody) {
+                        lastOk = false;
+                        lastData = {
+                          ok: false,
+                          error: "missing_body_from_agent",
+                          message: "Operação crítica não executada porque o agente não enviou body atual em arguments.body.",
+                        };
+                        variables.httpResponse = lastData;
+                        console.warn(`[node:http-request][dynamic] operação crítica sem arguments.body — chamada abortada`);
+                        continue;
+                      }
                       body = replaceVars(String(ep.body));
                       if (ep.bodyContentType === "json" && !headers["Content-Type"]) headers["Content-Type"] = "application/json";
                       if (ep.bodyContentType === "form-urlencoded" && !headers["Content-Type"]) headers["Content-Type"] = "application/x-www-form-urlencoded";
