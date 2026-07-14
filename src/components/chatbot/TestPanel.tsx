@@ -482,7 +482,7 @@ export const TestPanel = ({
       label: string;
       argsSchema?: any;                 // schema livre p/ o agente preencher
       // meta interna para o dispatcher
-      _http?: { nodeId: string; endpointId: string; permissions: any; resultType: "context" | "live"; method: string };
+      _http?: { nodeId: string; endpointId: string; permissions: any; resultType: "context" | "live"; method: string; isMutating: boolean };
     }> = [];
 
     for (const container of containersToScan) {
@@ -512,6 +512,7 @@ export const TestPanel = ({
                 permissions: ep.permissions || {},
                 resultType: ep.resultType === "live" ? "live" : "context",
                 method: String(ep.method || "GET").toUpperCase(),
+                isMutating: ["POST", "PUT", "PATCH", "DELETE"].includes(String(ep.method || "GET").toUpperCase()),
               },
             });
           }
@@ -569,10 +570,13 @@ export const TestPanel = ({
       const resultTypeLine = skill._http
         ? `\nTipo de Resultado: ${skill._http.resultType === "live" ? "Live Data — sempre reconsultar; nunca reutilize resultado antigo" : "Context Data — pode ser usado como contexto"}`
         : "";
-      return `${index + 1}. ID: ${skill.id}\nTipo: ${skill.type}${resultTypeLine}\nBloco: ${skill.containerName}\nNome: ${skill.label}\nInstrução da skill: ${skill.description}${describeSkillArgs(skill)}`;
+      const mutationLine = skill._http?.isMutating
+        ? "\nOperação crítica: sim — preencha o body/query/path com os dados atuais confirmados nesta conversa; nunca deixe o executor completar campos com variáveis antigas."
+        : "";
+      return `${index + 1}. ID: ${skill.id}\nTipo: ${skill.type}${resultTypeLine}${mutationLine}\nBloco: ${skill.containerName}\nNome: ${skill.label}\nInstrução da skill: ${skill.description}${describeSkillArgs(skill)}`;
     }).join("\n\n");
 
-    return `\n\n[SKILLS DISPONÍVEIS PARA O AGENTE]\n${list}\n\nQuando a mensagem do usuário combinar com a instrução de uma skill, use a ferramenta use_skill com o ID exato da skill. Sempre que a skill listar "Argumentos esperados", preencha o objeto \`arguments\` com esses campos (use os path params/query params/body descritos, extraindo os valores do contexto da conversa e das variáveis já coletadas). Para path params chamados \`id\`, use sempre o ID real do item escolhido em resultados anteriores (ex.: serviço Barba => id UUID do serviço), nunca o nome do item. Skills marcadas como Live Data são voláteis: sempre chame a skill novamente quando precisar desses dados, ignore resultados antigos no histórico e não use valores antigos para criar/alterar/excluir dados. Se um resultado de skill retornar erro ou parâmetro ausente, não chame a mesma skill de novo com os mesmos argumentos; responda ao usuário ou peça a informação faltante. Se a chamada de ferramenta não estiver disponível, responda apenas com JSON: {"skill_id":"ID","arguments":{...},"message":"opcional"}. Não invente perguntas antes de usar uma skill claramente solicitada.`;
+    return `\n\n[SKILLS DISPONÍVEIS PARA O AGENTE]\n${list}\n\nQuando a mensagem do usuário combinar com a instrução de uma skill, use a ferramenta use_skill com o ID exato da skill. Sempre que a skill listar "Argumentos esperados", preencha o objeto \`arguments\` com esses campos (use os path params/query params/body descritos, extraindo os valores do contexto da conversa e das variáveis já coletadas). Para path params chamados \`id\`, use sempre o ID real do item escolhido em resultados anteriores (ex.: serviço Barba => id UUID do serviço), nunca o nome do item. Skills marcadas como Live Data são voláteis: sempre chame a skill novamente quando precisar desses dados, ignore resultados antigos no histórico e não use valores antigos para criar/alterar/excluir dados. Antes de chamar uma skill crítica (POST/PUT/PATCH/DELETE), use apenas os dados atuais que você acabou de confirmar com o usuário; se o usuário respondeu apenas "sim/pode", use exclusivamente a última mensagem de confirmação que você enviou, não valores mais antigos do histórico. Para skills críticas, envie o body completo em arguments.body quando o endpoint tiver body permitido; não confie em templates/variáveis antigas. Se um resultado de skill retornar erro ou parâmetro ausente, não chame a mesma skill de novo com os mesmos argumentos; responda ao usuário ou peça a informação faltante. Se a chamada de ferramenta não estiver disponível, responda apenas com JSON: {"skill_id":"ID","arguments":{...},"message":"opcional"}. Não invente perguntas antes de usar uma skill claramente solicitada.`;
   };
 
   const buildUseSkillTool = (skills: ReturnType<typeof collectAgentSkills>) => {
