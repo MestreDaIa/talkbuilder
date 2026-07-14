@@ -737,22 +737,30 @@ export const TestPanel = ({
 
         const resolveConfirmedValue = (targetKey: string) => {
           const normalizedTarget = normalizeKeyName(targetKey);
+          if (/(^id$|id$|uuid$)/i.test(normalizedTarget)) return undefined;
           const aliases: Record<string, string[]> = {
             date: ["data", "dia"],
             appointmentdate: ["data", "dia"],
             scheduleddate: ["data", "dia"],
+            startdate: ["data", "dia"],
+            enddate: ["data", "dia"],
             time: ["horario", "hora"],
             appointmenttime: ["horario", "hora"],
             scheduledtime: ["horario", "hora"],
+            starttime: ["horario", "hora"],
+            endtime: ["horario", "hora"],
+            hour: ["horario", "hora"],
             service: ["servico"],
-            serviceid: ["servico", "servicoid", "idservico"],
             employee: ["profissional", "funcionario"],
-            employeeid: ["profissional", "funcionario", "profissionalid", "funcionarioid"],
             customer: ["cliente", "contato"],
-            customerid: ["cliente", "contato", "clienteid", "contatoid"],
             phone: ["telefone", "celular"],
           };
-          const wanted = new Set([normalizedTarget, ...(aliases[normalizedTarget] || [])]);
+          const inferredAliases = normalizedTarget.includes("date") || normalizedTarget.includes("data")
+            ? ["data", "dia"]
+            : normalizedTarget.includes("time") || normalizedTarget.includes("hour") || normalizedTarget.includes("hora") || normalizedTarget.includes("horario")
+              ? ["horario", "hora"]
+              : [];
+          const wanted = new Set([normalizedTarget, ...(aliases[normalizedTarget] || []), ...inferredAliases]);
           for (const [key, value] of Object.entries(confirmedValues)) {
             const normalizedKey = normalizeKeyName(key.split(".").pop() || key);
             if (wanted.has(normalizedKey)) return value;
