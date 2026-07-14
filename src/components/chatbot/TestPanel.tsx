@@ -1799,11 +1799,20 @@ export const TestPanel = ({
                     if (hasValue && valueLooksLikeIdentifier(rawText)) {
                       const exact = candidates.find((entity) => String(entity.id) === rawText)
                         || (!hints.length ? allEntities.find((entity) => String(entity.id) === rawText) : undefined);
+                      const verifiedSelection = getVerifiedSelectionForParam(paramName, candidates);
+                      if (exact && verifiedSelection && String(verifiedSelection.selection.id) !== rawText) {
+                        const terms = collectLookupTerms();
+                        const exactScore = scoreEntity(exact, terms);
+                        const selectedScore = scoreEntity(verifiedSelection.entity, terms);
+                        if (exactScore < 3 || exactScore <= selectedScore) {
+                          console.warn(`[node:http-request][dynamic] ${paramName} tentou trocar ID validado (${verifiedSelection.selection.id}) por ${rawText}; mantendo seleção da sessão: ${verifiedSelection.selection.label}`);
+                          return { ok: true, value: verifiedSelection.selection.id };
+                        }
+                      }
                       if (exact) {
                         rememberVerifiedEntitySelection(paramName, rawText);
                         return { ok: true, value: rawText };
                       }
-                      const verifiedSelection = getVerifiedSelectionForParam(paramName, candidates);
                       if (verifiedSelection) {
                         console.warn(`[node:http-request][dynamic] ${paramName} recebido com ID não verificado (${rawText}); usando seleção validada da sessão: ${verifiedSelection.selection.id} (${verifiedSelection.selection.label})`);
                         return { ok: true, value: verifiedSelection.selection.id };
