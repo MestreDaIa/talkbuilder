@@ -687,6 +687,89 @@ export const TestPanel = ({
         });
       };
 
+      const extractJsonFromText = (text: string): any => {
+        const trimmed = String(text || "").trim();
+        if (!trimmed) return null;
+        const candidates = [
+          trimmed.match(/```(?:json)?\s*([\s\S]*?)```/i)?.[1],
+          trimmed.match(/\{[\s\S]*\}/)?.[0],
+          trimmed.match(/\[[\s\S]*\]/)?.[0],
+        ].filter(Boolean) as string[];
+        for (const candidate of candidates) {
+          try { return JSON.parse(candidate); } catch { /* try next */ }
+        }
+        return null;
+      };
+
+      const flattenObject = (value: any, prefix = "", out: Record<string, any> = {}) => {
+        if (value == null || typeof value !== "object" || Array.isArray(value)) {
+          if (prefix) out[prefix] = value;
+          return out;
+        }
+        Object.entries(value).forEach(([key, child]) => {
+          const path = prefix ? `${prefix}.${key}` : key;
+          if (child != null && typeof child === "object" && !Array.isArray(child)) flattenObject(child, path, out);
+          else out[path] = child;
+        });
+        return out;
+      };
+
+      const normalizeKeyName = (key: string) => String(key || "").toLowerCase().replace(/[^a-z0-9]/g, "");
+
+      const deriveLatestConfirmedArgs = (skill: ReturnType<typeof collectAgentSkills>[number] | undefined, fallbackArgs: Record<string, any> = {}) => {
+        if (!skill?._http?.isMutating) return fallbackArgs;
+        const latestAssistantConfirmation = [...messageHistory]
+          .reverse()
+          .find((msg) => msg.role === "assistant" && /confirm/i.test(String(msg.content || "")) && !isSkillResultHistoryMessage(msg));
+        const confirmationText = latestAssistantConfirmation?.content || "";
+        const parsed = extractJsonFromText(confirmationText);
+        const confirmedValues: Record<string, any> = {
+          ...flattenObject(parsed || {}),
+        };
+
+        const linePattern = /^\s*[-*•]?\s*([^:\n]{2,80})\s*:\s*(.+?)\s*$/gm;
+        let match: RegExpExecArray | null;
+        while ((match = linePattern.exec(confirmationText)) !== null) {
+          const key = match[1].trim();
+          const value = match[2].trim();
+          if (key && value) confirmedValues[key] = value;
+        }
+
+        const resolveConfirmedValue = (targetKey: string) => {
+          const normalizedTarget = normalizeKeyName(targetKey);
+          const aliases: Record<string, string[]> = {
+            date: ["data", "dia"],
+            appointmentdate: ["data", "dia"],
+            scheduleddate: ["data", "dia"],
+            time: ["horario", "hora"],
+            appointmenttime: ["horario", "hora"],
+            scheduledtime: ["horario", "hora"],
+            service: ["servico"],
+            serviceid: ["servico", "servicoid", "idservico"],
+            employee: ["profissional", "funcionario"],
+            employeeid: ["profissional", "funcionario", "profissionalid", "funcionarioid"],
+            customer: ["cliente", "contato"],
+            customerid: ["cliente", "contato", "clienteid", "contatoid"],
+            phone: ["telefone", "celular"],
+          };
+          const wanted = new Set([normalizedTarget, ...(aliases[normalizedTarget] || [])]);
+          for (const [key, value] of Object.entries(confirmedValues)) {
+            const normalizedKey = normalizeKeyName(key.split(".").pop() || key);
+            if (wanted.has(normalizedKey)) return value;
+          }
+          return undefined;
+        };
+
+        const nextArgs = JSON.parse(JSON.stringify(fallbackArgs || {}));
+        if (nextArgs.body && typeof nextArgs.body === "object") {
+          Object.keys(nextArgs.body).forEach((key) => {
+            const confirmed = resolveConfirmedValue(key);
+            if (confirmed !== undefined) nextArgs.body[key] = confirmed;
+          });
+        }
+        return nextArgs;
+      };
+
       const parseWaitMs = (cfg: any) => {
         const amount = Math.max(1, Number(cfg.waitTime ?? cfg.duration ?? cfg.seconds ?? 5) || 5);
         const unit = String(cfg.timeUnit ?? cfg.unit ?? "seconds").toLowerCase();
@@ -1112,12 +1195,16 @@ export const TestPanel = ({
             // como diretiva efêmera consumida pelo executor do node.
             let targetNodeId = skillCall.skill_id;
             if (matchedSkill._http) {
+              const sanitizedArgs = matchedSkill._http.isMutating
+                ? deriveLatestConfirmedArgs(matchedSkill, skillCall.arguments || {})
+                : (skillCall.arguments || {});
               targetNodeId = matchedSkill._http.nodeId;
               (variables as any).__dynamicSkillDispatch = {
                 nodeId: matchedSkill._http.nodeId,
                 endpointId: matchedSkill._http.endpointId,
-                args: skillCall.arguments || {},
+                args: sanitizedArgs,
                 permissions: matchedSkill._http.permissions || {},
+                isMutating: matchedSkill._http.isMutating,
               };
             }
 
@@ -1364,6 +1451,7 @@ export const TestPanel = ({
                   const agentPath: Record<string, any> = (agentArgs.pathParams && typeof agentArgs.pathParams === "object") ? agentArgs.pathParams : {};
                   const agentQuery: Record<string, any> = (agentArgs.queryParams && typeof agentArgs.queryParams === "object") ? agentArgs.queryParams : {};
                   const agentBody = agentArgs.body;
+                  const isMutatingDispatch = !!dispatch?.isMutating || ["POST", "PUT", "PATCH", "DELETE"].includes(method);
                   // Busca recursiva por um valor no objeto de argumentos do agente
                   // (tolera formatos como { id: "..." }, { pathParams: { id } }, { arguments: {...} },
                   //  arrays [{ id, name }], nomes com case diferente, etc.).
@@ -1563,6 +1651,17 @@ export const TestPanel = ({
                       body = typeof agentBody === "string" ? replaceVars(agentBody) : JSON.stringify(agentBody);
                       if (!headers["Content-Type"]) headers["Content-Type"] = "application/json";
                     } else if (ep.body) {
+                      if (isDispatched && isMutatingDispatch && canAgentBody) {
+                        lastOk = false;
+                        lastData = {
+                          ok: false,
+                          error: "missing_body_from_agent",
+                          message: "Operação crítica não executada porque o agente não enviou body atual em arguments.body.",
+                        };
+                        variables.httpResponse = lastData;
+                        console.warn(`[node:http-request][dynamic] operação crítica sem arguments.body — chamada abortada`);
+                        continue;
+                      }
                       body = replaceVars(String(ep.body));
                       if (ep.bodyContentType === "json" && !headers["Content-Type"]) headers["Content-Type"] = "application/json";
                       if (ep.bodyContentType === "form-urlencoded" && !headers["Content-Type"]) headers["Content-Type"] = "application/x-www-form-urlencoded";
