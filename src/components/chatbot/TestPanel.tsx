@@ -1680,6 +1680,20 @@ export const TestPanel = ({
                     return hints.some((hint) => entityHints.has(hint) || source.includes(hint));
                   };
 
+                  const identifierExistsInSession = (identifier: string) => {
+                    const seen = new WeakSet<object>();
+                    const inspect = (obj: any, depth = 0, keyHint = ""): boolean => {
+                      if (obj == null || depth > 8 || keyHint === "__dynamicSkillDispatch") return false;
+                      if (typeof obj === "string" || typeof obj === "number") return String(obj) === identifier;
+                      if (typeof obj !== "object") return false;
+                      if (seen.has(obj)) return false;
+                      seen.add(obj);
+                      if (Array.isArray(obj)) return obj.some((item) => inspect(item, depth + 1, keyHint));
+                      return Object.entries(obj).some(([childKey, value]) => inspect(value, depth + 1, childKey));
+                    };
+                    return inspect(variables);
+                  };
+
                   const scoreEntity = (entity: KnownEntity, terms: string[]) => {
                     const labels = [entity.label, ...(entity.aliases || [])].map(normalizeLookupText).filter(Boolean);
                     let score = 0;
@@ -1708,7 +1722,7 @@ export const TestPanel = ({
                     if (hasValue && valueLooksLikeIdentifier(rawText)) {
                       const exact = allEntities.find((entity) => String(entity.id) === rawText);
                       if (exact) return { ok: true, value: rawText };
-                      if (candidates.length && isDispatched) {
+                      if (isDispatched && !identifierExistsInSession(rawText)) {
                         return {
                           ok: false,
                           error: "unverified_entity_id",
@@ -1838,6 +1852,7 @@ export const TestPanel = ({
                       .map((n: string) => String(n).replace(/^%3A/i, "").replace(/^:/, ""))
                       .filter((n: string) => /^[a-zA-Z_][a-zA-Z0-9_]*$/.test(n))
                   );
+                  let shouldSkipEndpoint = false;
                   pathNames.forEach((p) => {
                     const fromAgent = perms.pathParams === false ? undefined : pickAgentValue(p);
                     const agentValueLooksLikeId = fromAgent === undefined || typeof fromAgent === "number" || valueLooksLikeIdentifier(fromAgent);
@@ -1850,8 +1865,9 @@ export const TestPanel = ({
                     const resolved = resolveKnownEntityId(p, rawValue);
                     if (!resolved.ok) {
                       lastOk = false;
-                      lastData = { ok: false, ...resolved };
+                      lastData = { ...resolved, ok: false };
                       variables.httpResponse = lastData;
+                      shouldSkipEndpoint = true;
                       console.warn(`[node:http-request][dynamic] ID inválido em path param "${p}" — chamada abortada`, resolved);
                       return;
                     }
@@ -1865,6 +1881,7 @@ export const TestPanel = ({
                       console.warn(`[node:http-request][dynamic] path param "${p}" sem valor — URL ficará com placeholder`);
                     }
                   });
+                  if (shouldSkipEndpoint) continue;
 
                   // Se ainda restou placeholder (ex.: /:algo/ ou /{algo}/ ou /%3Aalgo/),
                   // aborta a chamada — evita 500 no servidor por causa de placeholder literal.
@@ -1883,7 +1900,6 @@ export const TestPanel = ({
 
                   const qp: string[] = [];
                   const usedQuery = new Set<string>();
-                  let shouldSkipEndpoint = false;
                   (ep.queryParams || []).forEach((p: any) => {
                     if (!p?.name) return;
                     const fromAgent = perms.queryParams === false ? undefined : agentQuery[p.name] ?? (p.name in agentArgs ? agentArgs[p.name] : undefined);
@@ -1891,7 +1907,7 @@ export const TestPanel = ({
                     const resolved = resolveKnownEntityId(p.name, candidate);
                     if (!resolved.ok) {
                       lastOk = false;
-                      lastData = { ok: false, ...resolved };
+                      lastData = { ...resolved, ok: false };
                       variables.httpResponse = lastData;
                       shouldSkipEndpoint = true;
                       console.warn(`[node:http-request][dynamic] ID inválido em query param "${p.name}" — chamada abortada`, resolved);
@@ -1909,7 +1925,7 @@ export const TestPanel = ({
                       const resolved = resolveKnownEntityId(k, v);
                       if (!resolved.ok) {
                         lastOk = false;
-                        lastData = { ok: false, ...resolved };
+                        lastData = { ...resolved, ok: false };
                         variables.httpResponse = lastData;
                         shouldSkipEndpoint = true;
                         console.warn(`[node:http-request][dynamic] ID inválido em query param extra "${k}" — chamada abortada`, resolved);
@@ -1944,7 +1960,7 @@ export const TestPanel = ({
                       const sanitizedBody = sanitizeIdLikeValues(bodyValue);
                       if (!sanitizedBody.ok) {
                         lastOk = false;
-                        lastData = { ok: false, ...sanitizedBody.error };
+                        lastData = { ...sanitizedBody.error, ok: false };
                         variables.httpResponse = lastData;
                         console.warn(`[node:http-request][dynamic] ID inválido no body — chamada abortada`, sanitizedBody.error);
                         continue;
