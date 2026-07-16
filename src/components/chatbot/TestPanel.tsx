@@ -823,16 +823,18 @@ export const TestPanel = ({
             const currentValue = nextArgs.body[key];
             if (confirmed !== undefined) {
               nextArgs.body[key] = confirmed;
-            } else if (confirmedDate !== undefined && confirmedTime !== undefined && /(schedule|appointment|booking|start|end|slot).*(at|date|time)|^(datetime|date_time|starts_at|ends_at|scheduled_at)$/i.test(key)) {
+            } else if (confirmedDate !== undefined && confirmedTime !== undefined && (
+              /(start|end|schedule|scheduled|booking|slot).*(at|date|time)/i.test(normalizedKey)
+              || /^(datetime|startsat|endsat|scheduledat)$/i.test(normalizedKey)
+              || (typeof currentValue === "string" && /(\d{4}-\d{2}-\d{2}|\d{1,2}\/\d{1,2}\/\d{4})/.test(currentValue))
+            )) {
               const date = toIsoDate(confirmedDate);
               const time = toTime(confirmedTime);
-              if (/time|hora|horario/i.test(key) && !/date|data|at/i.test(key)) nextArgs.body[key] = time;
-              else if (/date|data/i.test(key) && !/time|hora|horario/i.test(key)) nextArgs.body[key] = date;
-              else if (typeof currentValue === "string" && currentValue.includes("T")) {
+              if (typeof currentValue === "string" && currentValue.includes("T")) {
                 const suffix = currentValue.match(/(:\d{2}(?:\.\d{3})?(?:Z|[+-]\d{2}:?\d{2})?)$/)?.[1] || ":00";
                 nextArgs.body[key] = `${date}T${time}${suffix.startsWith(":") ? suffix : ":00"}`;
               } else {
-                nextArgs.body[key] = `${date} ${time}`;
+                nextArgs.body[key] = `${date}T${time}:00`;
               }
             } else if (confirmedDate !== undefined && (normalizedKey.includes("date") || normalizedKey.includes("data"))) {
               nextArgs.body[key] = toIsoDate(confirmedDate);
@@ -1898,6 +1900,14 @@ export const TestPanel = ({
                       .replace(/[\s*_`~]+$/, "")
                       .trim();
                     const normalizedKey = normalizeKeyName(key);
+                    const isoDateTime = cleaned.match(/(\d{4}-\d{2}-\d{2})[T\s]+(\d{1,2}):(\d{2})(?::(\d{2}))?/);
+                    if (isoDateTime && (normalizedKey.includes("time") || normalizedKey.includes("hora") || normalizedKey.includes("horario") || normalizedKey.includes("at") || normalizedKey.includes("start") || normalizedKey.includes("end"))) {
+                      return `${isoDateTime[1]}T${isoDateTime[2].padStart(2, "0")}:${isoDateTime[3]}:${isoDateTime[4] || "00"}`;
+                    }
+                    const brDateTime = cleaned.match(/(\d{1,2})\/(\d{1,2})\/(\d{4})\D+(\d{1,2}):(\d{2})(?::(\d{2}))?/);
+                    if (brDateTime && (normalizedKey.includes("time") || normalizedKey.includes("hora") || normalizedKey.includes("horario") || normalizedKey.includes("at") || normalizedKey.includes("start") || normalizedKey.includes("end"))) {
+                      return `${brDateTime[3]}-${brDateTime[2].padStart(2, "0")}-${brDateTime[1].padStart(2, "0")}T${brDateTime[4].padStart(2, "0")}:${brDateTime[5]}:${brDateTime[6] || "00"}`;
+                    }
                     if (normalizedKey.includes("date") || normalizedKey.includes("data")) {
                       const br = cleaned.match(/(\d{1,2})\/(\d{1,2})\/(\d{4})/);
                       if (br) return `${br[3]}-${br[2].padStart(2, "0")}-${br[1].padStart(2, "0")}`;
