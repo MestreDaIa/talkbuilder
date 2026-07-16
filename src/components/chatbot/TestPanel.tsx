@@ -756,10 +756,13 @@ export const TestPanel = ({
         const confirmedTime = getConfirmedByAliases(["horário", "horario", "hora", "time"]);
 
         const toIsoDate = (value: unknown) => {
-          const raw = String(value ?? "").trim();
-          const br = raw.match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})$/);
+          const raw = String(value ?? "")
+            .replace(/^[\s*_`~•-]+/, "")
+            .replace(/[\s*_`~]+$/, "")
+            .trim();
+          const br = raw.match(/(\d{1,2})\/(\d{1,2})\/(\d{4})/);
           if (br) return `${br[3]}-${br[2].padStart(2, "0")}-${br[1].padStart(2, "0")}`;
-          const iso = raw.match(/^(\d{4}-\d{2}-\d{2})/);
+          const iso = raw.match(/(\d{4}-\d{2}-\d{2})/);
           return iso?.[1] || raw;
         };
 
@@ -1888,6 +1891,37 @@ export const TestPanel = ({
                     return { ok: true, value };
                   };
 
+                  const normalizeBodyScalar = (key: string, value: any) => {
+                    if (typeof value !== "string") return value;
+                    const cleaned = value
+                      .replace(/^[\s*_`~•-]+/, "")
+                      .replace(/[\s*_`~]+$/, "")
+                      .trim();
+                    const normalizedKey = normalizeKeyName(key);
+                    if (normalizedKey.includes("date") || normalizedKey.includes("data")) {
+                      const br = cleaned.match(/(\d{1,2})\/(\d{1,2})\/(\d{4})/);
+                      if (br) return `${br[3]}-${br[2].padStart(2, "0")}-${br[1].padStart(2, "0")}`;
+                    }
+                    if (normalizedKey.includes("time") || normalizedKey.includes("hora") || normalizedKey.includes("horario")) {
+                      const time = cleaned.match(/(\d{1,2}):(\d{2})/);
+                      if (time) return `${time[1].padStart(2, "0")}:${time[2]}`;
+                    }
+                    return cleaned;
+                  };
+
+                  const normalizeBodyScalars = (value: any): any => {
+                    if (Array.isArray(value)) return value.map(normalizeBodyScalars);
+                    if (value && typeof value === "object") {
+                      return Object.fromEntries(
+                        Object.entries(value).map(([key, child]) => [
+                          key,
+                          child && typeof child === "object" ? normalizeBodyScalars(child) : normalizeBodyScalar(key, child),
+                        ])
+                      );
+                    }
+                    return value;
+                  };
+
                   const inferIdFromKnownLists = (paramName: string) => {
                     if (!/(^id$|_id$)/i.test(paramName)) return undefined;
                     const terms = collectLookupTerms();
@@ -2048,6 +2082,7 @@ export const TestPanel = ({
                   }
 
                   let body: string | undefined;
+                  let effectiveBody: any = undefined;
                   if (!["GET", "HEAD"].includes(method)) {
                     // Body do agente tem prioridade (se permitido). Aceita objeto ou string JSON.
                     const canAgentBody = perms.body !== false;
@@ -2061,7 +2096,9 @@ export const TestPanel = ({
                         console.warn(`[node:http-request][dynamic] ID inválido no body — chamada abortada`, sanitizedBody.error);
                         continue;
                       }
-                      body = typeof sanitizedBody.value === "string" ? sanitizedBody.value : JSON.stringify(sanitizedBody.value);
+                      effectiveBody = typeof sanitizedBody.value === "string" ? sanitizedBody.value : normalizeBodyScalars(sanitizedBody.value);
+                      agentArgs.body = effectiveBody;
+                      body = typeof effectiveBody === "string" ? effectiveBody : JSON.stringify(effectiveBody);
                       if (!headers["Content-Type"]) headers["Content-Type"] = "application/json";
                     } else if (ep.body) {
                       if (isDispatched && isMutatingDispatch && canAgentBody) {
@@ -2076,6 +2113,7 @@ export const TestPanel = ({
                         continue;
                       }
                       body = replaceVars(String(ep.body));
+                      effectiveBody = body;
                       if (ep.bodyContentType === "json" && !headers["Content-Type"]) headers["Content-Type"] = "application/json";
                       if (ep.bodyContentType === "form-urlencoded" && !headers["Content-Type"]) headers["Content-Type"] = "application/x-www-form-urlencoded";
                     }
@@ -2087,7 +2125,7 @@ export const TestPanel = ({
                     continue;
                   }
 
-                  console.log(`[node:http-request][dynamic] ${method} ${url}`, { dispatched: isDispatched, agentArgs });
+                  console.log(`[node:http-request][dynamic] ${method} ${url}`, { dispatched: isDispatched, agentArgs, effectiveBody });
                   const res = await fetch(url, { method, headers, body });
                   const text = await res.text();
                   let data: any; try { data = JSON.parse(text); } catch { data = text; }
