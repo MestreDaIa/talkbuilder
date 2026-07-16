@@ -821,13 +821,12 @@ export const TestPanel = ({
             const confirmed = resolveConfirmedValue(key);
             const normalizedKey = normalizeKeyName(key);
             const currentValue = nextArgs.body[key];
-            if (confirmed !== undefined) {
-              nextArgs.body[key] = confirmed;
-            } else if (confirmedDate !== undefined && confirmedTime !== undefined && (
+            const shouldBuildDateTime = confirmedDate !== undefined && confirmedTime !== undefined && (
               /(start|end|schedule|scheduled|booking|slot).*(at|date|time)/i.test(normalizedKey)
               || /^(datetime|startsat|endsat|scheduledat)$/i.test(normalizedKey)
               || (typeof currentValue === "string" && /(\d{4}-\d{2}-\d{2}|\d{1,2}\/\d{1,2}\/\d{4})/.test(currentValue))
-            )) {
+            );
+            if (shouldBuildDateTime) {
               const date = toIsoDate(confirmedDate);
               const time = toTime(confirmedTime);
               if (typeof currentValue === "string" && currentValue.includes("T")) {
@@ -836,6 +835,8 @@ export const TestPanel = ({
               } else {
                 nextArgs.body[key] = `${date}T${time}:00`;
               }
+            } else if (confirmed !== undefined) {
+              nextArgs.body[key] = confirmed;
             } else if (confirmedDate !== undefined && (normalizedKey.includes("date") || normalizedKey.includes("data"))) {
               nextArgs.body[key] = toIsoDate(confirmedDate);
             } else if (confirmedTime !== undefined && (normalizedKey.includes("time") || normalizedKey.includes("hora") || normalizedKey.includes("horario"))) {
