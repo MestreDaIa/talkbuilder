@@ -367,24 +367,24 @@ export default function BotPage() {
     };
   }, []);
 
-  // Carrega flow do Supabase + fallback local
+  // Carrega flow do Supabase — SEM fallback local. O servidor é a fonte da verdade.
+  // Enquanto não temos resposta do servidor, o canvas fica vazio e hydrated=false,
+  // o que impede o auto-save de disparar e sobrescrever o rascunho remoto por engano.
   useEffect(() => {
     let cancelled = false;
     async function load() {
-      // Sempre hidrata cache local primeiro pra não piscar tela vazia
-      const local = loadLocal(botId);
-      localLoadedAtRef.current = local.savedAt;
-      setContainers(local.containers);
-      setEdges(local.edges);
+      // Limpa qualquer resíduo do cache local antigo para nunca mais ser lido.
+      purgeLegacyLocalCache(botId);
 
       const supabase = getSupabase();
-      // Esperamos o currentWorkspace.id estar presente para garantir que o flow 
+      // Esperamos o currentWorkspace.id estar presente para garantir que o flow
       // seja criado/carregado com o workspace_id correto para permissões RLS.
       if (!supabase || !bot || !currentWorkspace?.id) {
         if (!currentWorkspace?.id && bot) {
-           console.log("[BotPage] Aguardando currentWorkspace.id para carregar flow real...");
-           return; // Não marca como hydrated ainda
+          console.log("[BotPage] Aguardando currentWorkspace.id para carregar flow real...");
+          return; // Não marca como hydrated ainda
         }
+        // Sem Supabase configurado: nada a hidratar.
         setHydrated(true);
         return;
       }
@@ -394,24 +394,25 @@ export default function BotPage() {
         const row = await ensureFlow(botId, bot.title || "Novo bot", currentWorkspace.id);
         if (cancelled) return;
         setFlow(row);
-        
-        // Carrega as variáveis se existirem no settings
+
         if (row.settings?.variables) {
           setBotVariables(row.settings.variables);
         }
 
-        // Se o servidor tem dados, só prefere o servidor quando ele é mais novo que o cache local.
-        // Isso evita o bug onde uma configuração recém-salva localmente volta para o default
-        // ao recarregar antes do banco responder com o último rascunho.
-        const hasServerData = row.draft_containers?.length || row.draft_edges?.length;
-        const serverUpdatedAt = row.draft_updated_at ? new Date(row.draft_updated_at).getTime() : 0;
-        const shouldUseServer = hasServerData && serverUpdatedAt >= localLoadedAtRef.current;
-        if (shouldUseServer) {
-          setContainers(row.draft_containers || []);
-          setEdges(row.draft_edges || []);
-        }
+        const serverContainers = row.draft_containers || [];
+        const serverEdges = row.draft_edges || [];
+        setContainers(serverContainers);
+        setEdges(serverEdges);
+        // Marca o "estado sincronizado" — o auto-save só grava se o usuário mudar algo depois disto.
+        lastSyncedRef.current = {
+          signature: JSON.stringify({ c: serverContainers, e: serverEdges }),
+        };
       } catch (err) {
-        console.error("Erro carregando flow:", err);
+        console.error("[BotPage] Erro carregando flow do servidor:", err);
+        toast.error("Não foi possível carregar o fluxo do servidor. Recarregue a página quando a conexão voltar — nada será sobrescrito enquanto isto não for resolvido.");
+        // Importante: NÃO marcamos hydrated=true no erro, para impedir que o auto-save
+        // dispare com o estado vazio e sobrescreva o rascunho remoto.
+        return;
       } finally {
         if (!cancelled) setHydrated(true);
       }
@@ -420,12 +421,13 @@ export default function BotPage() {
     return () => {
       cancelled = true;
     };
-  }, [botId, bot, currentWorkspace?.id]); // Adicionado currentWorkspace?.id como dependência
+  }, [botId, bot, currentWorkspace?.id]);
 
-  // Persiste cache local em toda alteração e gerencia histórico
+  // Gerencia histórico de undo/redo (sem mais gravar em localStorage)
   useEffect(() => {
     if (!hydrated) return;
-    saveLocal(botId, { containers, edges });
+
+
 
     if (isInternalChangeRef.current) {
       isInternalChangeRef.current = false;
