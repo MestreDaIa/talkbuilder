@@ -1072,25 +1072,34 @@ export const TestPanel = ({
           const welcomeMessage = cfg.welcomeMessage || "";
 
           // Welcome behavior
-          if (!input && startMode === "automatic" && welcomeMessage && nextMessages.length === 0) {
-            console.log("[node:start] Agent Welcome", node.id);
-            const html = richHtmlFor(welcomeMessage, { variables });
-            nextMessages.push({
-              id: crypto.randomUUID(),
-              conversation_id: conversationId || "temp",
-              role: "assistant",
-              type: "bot",
-              content: html,
-              isHtml: true,
-              created_at: new Date().toISOString()
-            });
-            waitingFor = "input-text";
-            waitingForCfg = { placeholder: "Converse com o agente..." };
-            status = "waiting_input";
-            break;
+          const hasNoInput = !input || (input.message === undefined && input.button_id === undefined);
+          let autoGreeting = false;
+          if (hasNoInput && startMode === "automatic" && nextMessages.length === 0) {
+            if (welcomeMessage) {
+              console.log("[node:start] Agent Welcome (pre-defined)", node.id);
+              const html = richHtmlFor(welcomeMessage, { variables });
+              nextMessages.push({
+                id: crypto.randomUUID(),
+                conversation_id: conversationId || "temp",
+                role: "assistant",
+                type: "bot",
+                content: html,
+                isHtml: true,
+                created_at: new Date().toISOString()
+              });
+              waitingFor = "input-text";
+              waitingForCfg = { placeholder: "Converse com o agente..." };
+              status = "waiting_input";
+              break;
+            } else {
+              // Sem mensagem pré-definida: deixamos o próprio agente gerar a saudação
+              // com base no objetivo/instruções configurados.
+              console.log("[node:start] Agent Welcome (AI-generated)", node.id);
+              autoGreeting = true;
+            }
           }
 
-          if (!input || (input.message === undefined && input.button_id === undefined)) {
+          if (!autoGreeting && hasNoInput) {
             console.log("[node:waiting_input] Agent", node.id);
             waitingFor = "input-text";
             waitingForCfg = { placeholder: "Converse com o agente..." };
