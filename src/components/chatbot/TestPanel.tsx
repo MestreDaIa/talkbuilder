@@ -1107,9 +1107,9 @@ export const TestPanel = ({
             break;
           }
 
-          const userMsgContent = String(input.message || "").toLowerCase();
+          const userMsgContent = String(input?.message || "").toLowerCase();
           const exitPhrases = ["voltar menu", "sair", "parar", "cancelar", "exit", "stop"];
-          if (exitPhrases.some(p => userMsgContent.includes(p))) {
+          if (!autoGreeting && exitPhrases.some(p => userMsgContent.includes(p))) {
             console.log("[node:agent_exit]", node.id);
             mode = "flow";
             activeAgentNodeId = null;
