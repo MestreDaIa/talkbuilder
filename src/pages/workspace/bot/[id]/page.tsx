@@ -103,7 +103,8 @@ function BotEditorInner({
   lbl,
   handleAddNode,
   setGetCenter,
-  hydrated // Adicionado aqui
+  hydrated,
+  lastSyncedRef,
 }: any) {
   const { variables, setVariables } = useVariables();
 
