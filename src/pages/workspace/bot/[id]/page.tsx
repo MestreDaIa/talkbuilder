@@ -672,14 +672,15 @@ export default function BotPage() {
   const slug = (params.slug as string | undefined) ?? profile?.slug;
 
   const handleBack = async () => {
-    // 1) Persiste rascunho pendente antes de sair.
+    // 1) Persiste rascunho pendente no servidor antes de sair (nada de localStorage).
     try {
-      saveLocal(botId, { containers, edges });
       if (flow) {
-        // Usamos await aqui para garantir que o save complete antes do reload/navegação
         await saveDraft(flow.id, containers, edges);
       }
     } catch (err) {
+      console.warn("[BotPage] Save on back failed:", err);
+    }
+
       console.warn("[BotPage] Save on back failed:", err);
     }
 
