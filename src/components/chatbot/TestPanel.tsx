@@ -2113,10 +2113,11 @@ export const TestPanel = ({
                       const resolved = resolveKnownEntityId(k, v, "query");
                       if (!resolved.ok) {
                         lastOk = false;
-                        lastData = { ...resolved, ok: false };
+                        lastData = { ...resolved, ok: false, id_audit: idAuditTrail };
                         variables.httpResponse = lastData;
                         shouldSkipEndpoint = true;
                         console.warn(`[node:http-request][dynamic] ID inválido em query param extra "${k}" — chamada abortada`, resolved);
+                        console.table(idAuditTrail);
                         return;
                       }
                       qp.push(`${encodeURIComponent(k)}=${encodeURIComponent(String(resolved.value))}`);
