@@ -2187,7 +2187,12 @@ export const TestPanel = ({
                     continue;
                   }
 
-                  console.log(`[node:http-request][dynamic] ${method} ${url}`, { dispatched: isDispatched, agentArgs, effectiveBody });
+                  if (idAuditTrail.length) {
+                    console.groupCollapsed(`[node:http-request][dynamic] auditoria de IDs (${ep.method} ${ep.url}) — strict=${strictIds}`);
+                    console.table(idAuditTrail);
+                    console.groupEnd();
+                  }
+                  console.log(`[node:http-request][dynamic] ${method} ${url}`, { dispatched: isDispatched, strictIds, agentArgs, effectiveBody, id_audit: idAuditTrail });
                   const res = await fetch(url, { method, headers, body });
                   const text = await res.text();
                   let data: any; try { data = JSON.parse(text); } catch { data = text; }
