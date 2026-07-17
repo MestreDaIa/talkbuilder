@@ -794,7 +794,7 @@ export const TestPanel = ({
           };
           const inferredAliases = normalizedTarget.includes("date") || normalizedTarget.includes("data")
             ? ["data", "dia"]
-            : normalizedTarget.includes("time") || normalizedTarget.includes("hour") || normalizedTarget.includes("hora") || normalizedTarget.includes("horario")
+              : normalizedTarget.includes("time") || normalizedTarget.includes("hour") || normalizedTarget.includes("hora") || normalizedTarget.includes("horario")
               ? ["horario", "hora"]
               : [];
           const wanted = new Set([normalizedTarget, ...(aliases[normalizedTarget] || []), ...inferredAliases]);
@@ -820,7 +820,6 @@ export const TestPanel = ({
           Object.keys(nextArgs.body).forEach((key) => {
             const confirmed = resolveConfirmedValue(key);
             const normalizedKey = normalizeKeyName(key);
-            const currentValue = nextArgs.body[key];
             if (confirmed !== undefined) {
               nextArgs.body[key] = confirmed;
             } else if (confirmedDate !== undefined && confirmedTime !== undefined && /(schedule|appointment|booking|start|end|slot).*(at|date|time)|^(datetime|date_time|starts_at|ends_at|scheduled_at)$/i.test(key)) {
@@ -828,12 +827,7 @@ export const TestPanel = ({
               const time = toTime(confirmedTime);
               if (/time|hora|horario/i.test(key) && !/date|data|at/i.test(key)) nextArgs.body[key] = time;
               else if (/date|data/i.test(key) && !/time|hora|horario/i.test(key)) nextArgs.body[key] = date;
-              else if (typeof currentValue === "string" && currentValue.includes("T")) {
-                const suffix = currentValue.match(/(:\d{2}(?:\.\d{3})?(?:Z|[+-]\d{2}:?\d{2})?)$/)?.[1] || ":00";
-                nextArgs.body[key] = `${date}T${time}${suffix.startsWith(":") ? suffix : ":00"}`;
-              } else {
-                nextArgs.body[key] = `${date} ${time}`;
-              }
+              else nextArgs.body[key] = `${date} ${time}`;
             } else if (confirmedDate !== undefined && (normalizedKey.includes("date") || normalizedKey.includes("data"))) {
               nextArgs.body[key] = toIsoDate(confirmedDate);
             } else if (confirmedTime !== undefined && (normalizedKey.includes("time") || normalizedKey.includes("hora") || normalizedKey.includes("horario"))) {
@@ -1677,6 +1671,10 @@ export const TestPanel = ({
                     };
                     add(variables.last_message);
                     add((variables as any).last_user_message);
+                    const latestAssistantConfirmation = [...messageHistory]
+                      .reverse()
+                      .find((msg) => msg.role === "assistant" && /confirm/i.test(String(msg.content || "")) && !isSkillResultHistoryMessage(msg));
+                    add(latestAssistantConfirmation?.content);
                     const scanArgs = (obj: any, depth = 0) => {
                       if (obj == null || depth > 3) return;
                       if (typeof obj === "string" || typeof obj === "number") { add(obj); return; }
@@ -1820,16 +1818,8 @@ export const TestPanel = ({
                         console.warn(`[node:http-request][dynamic] ${paramName} recebido com ID não verificado (${rawText}); usando seleção validada da sessão: ${verifiedSelection.selection.id} (${verifiedSelection.selection.label})`);
                         return { ok: true, value: verifiedSelection.selection.id };
                       }
-                      if (isDispatched && !identifierExistsInSession(rawText)) {
-                        return {
-                          ok: false,
-                          error: "unverified_entity_id",
-                          message: `O valor enviado para ${paramName} não foi retornado por nenhuma consulta desta sessão.`,
-                          param: paramName,
-                          value: rawText,
-                        };
-                      }
-                      return { ok: true, value: proposedValue };
+                      // UUID/ID inventado pelo agente não é fonte de verdade. Em vez de abortar de cara,
+                      // ignora esse valor e tenta resolver pelo texto do usuário/argumentos contra as entidades vistas na sessão.
                     }
 
                     const terms = new Set<string>(collectLookupTerms());
@@ -1847,9 +1837,22 @@ export const TestPanel = ({
                       if (score > (best?.score || 0)) best = { entity, score };
                     }
                     if (best && best.score >= 3) {
-                      console.log(`[node:http-request][dynamic] ${paramName} resolvido por entidade da sessão: ${best.entity.label}`);
+                      if (hasValue && valueLooksLikeIdentifier(rawText) && String(best.entity.id) !== rawText) {
+                        console.warn(`[node:http-request][dynamic] ${paramName} recebeu ID não verificado (${rawText}); usando entidade validada da sessão: ${best.entity.id} (${best.entity.label})`);
+                      } else {
+                        console.log(`[node:http-request][dynamic] ${paramName} resolvido por entidade da sessão: ${best.entity.label}`);
+                      }
                       rememberVerifiedEntitySelection(paramName, best.entity.id);
                       return { ok: true, value: best.entity.id };
+                    }
+                    if (hasValue && valueLooksLikeIdentifier(rawText) && isDispatched && !identifierExistsInSession(rawText)) {
+                      return {
+                        ok: false,
+                        error: "unverified_entity_id",
+                        message: `O valor enviado para ${paramName} não foi retornado por nenhuma consulta desta sessão.`,
+                        param: paramName,
+                        value: rawText,
+                      };
                     }
                     if (hasValue && candidates.length && isDispatched) {
                       return {
