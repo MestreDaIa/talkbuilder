@@ -1896,18 +1896,11 @@ export const TestPanel = ({
                     }
                     if (best && best.score >= 3) {
                       if (hasValue && valueLooksLikeIdentifier(rawText) && String(best.entity.id) !== rawText) {
-                        if (strictIds) {
-                          audit({ resolved: rawText, action: "rejected_strict", reason: "unverified_id_context_match_available", source: best.entity.source, sourceEntityLabel: best.entity.label });
-                          return {
-                            ok: false,
-                            error: "strict_unverified_id",
-                            message: `Modo estrito: ${paramName}=${rawText} não pertence à sessão (contexto sugere ${best.entity.id} — ${best.entity.label}).`,
-                            param: paramName,
-                            value: rawText,
-                          };
-                        }
+                        // Mesmo em modo estrito: se há entidade verificada da sessão que casa com o
+                        // rótulo/termos do usuário, substituímos silenciosamente em vez de rejeitar.
+                        // Strict só deve bloquear quando NÃO há match confiável no contexto.
                         console.warn(`[node:http-request][dynamic] ${paramName} recebeu ID não verificado (${rawText}); usando entidade validada da sessão: ${best.entity.id} (${best.entity.label})`);
-                        audit({ resolved: best.entity.id, action: "substituted", reason: "unverified_id_replaced_by_context_match", source: best.entity.source, sourceEntityLabel: best.entity.label });
+                        audit({ resolved: best.entity.id, action: "substituted", reason: strictIds ? "strict_auto_substituted_by_context_match" : "unverified_id_replaced_by_context_match", source: best.entity.source, sourceEntityLabel: best.entity.label });
                       } else {
                         console.log(`[node:http-request][dynamic] ${paramName} resolvido por entidade da sessão: ${best.entity.label}`);
                         audit({ resolved: best.entity.id, action: "resolved_by_context", source: best.entity.source, sourceEntityLabel: best.entity.label });
