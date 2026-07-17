@@ -79,12 +79,15 @@ export const AgentConfig = ({ config, setConfig }: AgentConfigProps) => {
           </div>
           {startMode === "automatic" && (
             <div className="space-y-2">
-              <Label>Mensagem de Boas-vindas</Label>
+              <Label>Mensagem de Boas-vindas <span className="text-muted-foreground font-normal">(opcional)</span></Label>
               <Input 
                 placeholder="Ex: Olá! Como posso ajudar?"
                 value={welcomeMessage}
                 onChange={(e) => setConfig({ ...config, welcomeMessage: e.target.value })}
               />
+              <p className="text-[10px] text-muted-foreground">
+                Se deixado em branco, o próprio agente inicia a saudação de forma natural, seguindo o objetivo e as instruções configuradas.
+              </p>
             </div>
           )}
         </div>
