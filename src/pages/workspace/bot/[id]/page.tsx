@@ -39,31 +39,20 @@ import { toast } from "sonner";
 
 const STORAGE_PREFIX = "bot_flow_";
 
-/** Cache local — fallback enquanto o flow não carrega ou o servidor ainda não recebeu o último save. */
-function loadLocal(botId: string): { containers: Container[]; edges: Edge[]; savedAt: number } {
-  if (typeof window === "undefined") return { containers: [], edges: [], savedAt: 0 };
-  try {
-    const raw = window.localStorage.getItem(`${STORAGE_PREFIX}${botId}`);
-    if (!raw) return { containers: [], edges: [], savedAt: 0 };
-    const parsed = JSON.parse(raw);
-    const containers = parsed.containers ?? [];
-    const edges = parsed.edges ?? [];
-    const hasFlowData = containers.length > 0 || edges.length > 0;
-    return {
-      containers,
-      edges,
-      // Caches antigos não tinham timestamp. Se tiverem dados, tratamos como recentes
-      // para não deixar o servidor sobrescrever uma edição recém-feita antes do auto-save.
-      savedAt: parsed.savedAt ?? (hasFlowData ? Date.now() : 0),
-    };
-  } catch {
-    return { containers: [], edges: [], savedAt: 0 };
-  }
-}
-
-function saveLocal(botId: string, data: { containers: Container[]; edges: Edge[] }) {
+/**
+ * Fonte da verdade = Supabase. NÃO usamos mais localStorage como cache autoritativo,
+ * porque um cache local vencendo contra um carregamento do servidor causou perda de
+ * dados no passado (limpar o storage → auto-save gravava [] por cima do rascunho real).
+ *
+ * Limpamos qualquer resíduo do cache antigo para evitar leituras acidentais.
+ */
+function purgeLegacyLocalCache(botId: string) {
   if (typeof window === "undefined") return;
-  window.localStorage.setItem(`${STORAGE_PREFIX}${botId}`, JSON.stringify({ ...data, savedAt: Date.now() }));
+  try {
+    window.localStorage.removeItem(`${STORAGE_PREFIX}${botId}`);
+  } catch {
+    /* noop */
+  }
 }
 
 function statusLabel(status: FlowStatus): { text: string; className: string } {
@@ -114,38 +103,37 @@ function BotEditorInner({
   lbl,
   handleAddNode,
   setGetCenter,
-  hydrated // Adicionado aqui
+  hydrated,
+  lastSyncedRef,
 }: any) {
   const { variables, setVariables } = useVariables();
 
-  // Auto-save logic: triggers saveDraft whenever containers or edges change after hydration
+  // Auto-save — só grava no Supabase se o estado atual difere do último snapshot sincronizado
+  // com o servidor. Isso impede o bug clássico: se o servidor demorou/falhou e o canvas ficou
+  // vazio na tela, o auto-save NÃO vai sobrescrever o rascunho real com [].
   useEffect(() => {
-    if (!hydrated || !flow?.id) return;
-    
-    // Evita loop se estivermos apenas reagindo ao carregamento inicial
-    if (historyIndex === -1) return;
+    if (!hydrated || !flow?.id || !lastSyncedRef?.current) return;
+
+    const currentSig = JSON.stringify({ c: containers, e: edges });
+    if (currentSig === lastSyncedRef.current.signature) return; // nada mudou desde o último save
 
     const timer = setTimeout(async () => {
       try {
-        // Log detalhado para depuração
-        const webhookNodes = containers
-          .flatMap((c: any) => c.nodes)
-          .filter((n: any) => n.type === 'webhook');
-        
         console.log("[BotPage] Auto-salvando rascunho...", {
           containersCount: containers.length,
           edgesCount: edges.length,
-          webhookNodesConfigs: webhookNodes.map((n: any) => ({ id: n.id, config: n.config }))
         });
-        
         await saveDraft(flow.id, containers, edges);
+        if (lastSyncedRef.current) lastSyncedRef.current.signature = currentSig;
       } catch (err) {
         console.error("[BotPage] Erro no auto-save:", err);
+        toast.error("Falha ao salvar rascunho no servidor. Verifique sua conexão — suas alterações ainda não foram salvas.");
       }
-    }, 1000); // Debounce de 1s para não sobrecarregar o banco
+    }, 1000);
 
     return () => clearTimeout(timer);
-  }, [containers, edges, flow?.id, hydrated, historyIndex]);
+  }, [containers, edges, flow?.id, hydrated, lastSyncedRef]);
+
 
   // Sync variables from initialVariables/Start node whenever containers change
   useEffect(() => {
@@ -172,10 +160,10 @@ function BotEditorInner({
   // Função de salvar manual (mantida para UX)
   const handleSaveWithVariables = async () => {
     if (!flow) {
-      saveLocal(botId, { containers, edges });
-      toast.success("Fluxo salvo localmente (aguardando conexão)");
+      toast.error("Sem conexão com o servidor — não é possível salvar. Verifique sua internet e tente novamente.");
       return;
     }
+
     
     setIsSaving(true);
     try {
@@ -361,6 +349,10 @@ export default function BotPage() {
   const [getCenter, setGetCenter] = useState<(() => { x: number; y: number }) | null>(null);
   const [testContainer, setTestContainer] = useState<Container | null>(null);
   const localLoadedAtRef = useRef(0);
+  // Assinatura JSON do último estado sincronizado com o servidor.
+  // O auto-save só grava se `signature` mudar em relação ao servidor.
+  const lastSyncedRef = useRef<{ signature: string } | null>(null);
+
   
   // Undo/Redo history
   const [history, setHistory] = useState<{ containers: Container[]; edges: Edge[] }[]>([]);
@@ -379,24 +371,24 @@ export default function BotPage() {
     };
   }, []);
 
-  // Carrega flow do Supabase + fallback local
+  // Carrega flow do Supabase — SEM fallback local. O servidor é a fonte da verdade.
+  // Enquanto não temos resposta do servidor, o canvas fica vazio e hydrated=false,
+  // o que impede o auto-save de disparar e sobrescrever o rascunho remoto por engano.
   useEffect(() => {
     let cancelled = false;
     async function load() {
-      // Sempre hidrata cache local primeiro pra não piscar tela vazia
-      const local = loadLocal(botId);
-      localLoadedAtRef.current = local.savedAt;
-      setContainers(local.containers);
-      setEdges(local.edges);
+      // Limpa qualquer resíduo do cache local antigo para nunca mais ser lido.
+      purgeLegacyLocalCache(botId);
 
       const supabase = getSupabase();
-      // Esperamos o currentWorkspace.id estar presente para garantir que o flow 
+      // Esperamos o currentWorkspace.id estar presente para garantir que o flow
       // seja criado/carregado com o workspace_id correto para permissões RLS.
       if (!supabase || !bot || !currentWorkspace?.id) {
         if (!currentWorkspace?.id && bot) {
-           console.log("[BotPage] Aguardando currentWorkspace.id para carregar flow real...");
-           return; // Não marca como hydrated ainda
+          console.log("[BotPage] Aguardando currentWorkspace.id para carregar flow real...");
+          return; // Não marca como hydrated ainda
         }
+        // Sem Supabase configurado: nada a hidratar.
         setHydrated(true);
         return;
       }
@@ -406,24 +398,25 @@ export default function BotPage() {
         const row = await ensureFlow(botId, bot.title || "Novo bot", currentWorkspace.id);
         if (cancelled) return;
         setFlow(row);
-        
-        // Carrega as variáveis se existirem no settings
+
         if (row.settings?.variables) {
           setBotVariables(row.settings.variables);
         }
 
-        // Se o servidor tem dados, só prefere o servidor quando ele é mais novo que o cache local.
-        // Isso evita o bug onde uma configuração recém-salva localmente volta para o default
-        // ao recarregar antes do banco responder com o último rascunho.
-        const hasServerData = row.draft_containers?.length || row.draft_edges?.length;
-        const serverUpdatedAt = row.draft_updated_at ? new Date(row.draft_updated_at).getTime() : 0;
-        const shouldUseServer = hasServerData && serverUpdatedAt >= localLoadedAtRef.current;
-        if (shouldUseServer) {
-          setContainers(row.draft_containers || []);
-          setEdges(row.draft_edges || []);
-        }
+        const serverContainers = row.draft_containers || [];
+        const serverEdges = row.draft_edges || [];
+        setContainers(serverContainers);
+        setEdges(serverEdges);
+        // Marca o "estado sincronizado" — o auto-save só grava se o usuário mudar algo depois disto.
+        lastSyncedRef.current = {
+          signature: JSON.stringify({ c: serverContainers, e: serverEdges }),
+        };
       } catch (err) {
-        console.error("Erro carregando flow:", err);
+        console.error("[BotPage] Erro carregando flow do servidor:", err);
+        toast.error("Não foi possível carregar o fluxo do servidor. Recarregue a página quando a conexão voltar — nada será sobrescrito enquanto isto não for resolvido.");
+        // Importante: NÃO marcamos hydrated=true no erro, para impedir que o auto-save
+        // dispare com o estado vazio e sobrescreva o rascunho remoto.
+        return;
       } finally {
         if (!cancelled) setHydrated(true);
       }
@@ -432,12 +425,13 @@ export default function BotPage() {
     return () => {
       cancelled = true;
     };
-  }, [botId, bot, currentWorkspace?.id]); // Adicionado currentWorkspace?.id como dependência
+  }, [botId, bot, currentWorkspace?.id]);
 
-  // Persiste cache local em toda alteração e gerencia histórico
+  // Gerencia histórico de undo/redo (sem mais gravar em localStorage)
   useEffect(() => {
     if (!hydrated) return;
-    saveLocal(botId, { containers, edges });
+
+
 
     if (isInternalChangeRef.current) {
       isInternalChangeRef.current = false;
@@ -572,11 +566,11 @@ export default function BotPage() {
 
   const handleSave = async () => {
     if (!flow) {
-      // sem Supabase — só salva local
-      saveLocal(botId, { containers, edges });
-      toast.success("Fluxo salvo localmente (aguardando conexão)");
+      toast.error("Sem conexão com o servidor — não é possível salvar. Verifique sua internet.");
       return;
     }
+
+
     
     setIsSaving(true);
     try {
@@ -678,16 +672,16 @@ export default function BotPage() {
   const slug = (params.slug as string | undefined) ?? profile?.slug;
 
   const handleBack = async () => {
-    // 1) Persiste rascunho pendente antes de sair.
+    // 1) Persiste rascunho pendente no servidor antes de sair (nada de localStorage).
     try {
-      saveLocal(botId, { containers, edges });
       if (flow) {
-        // Usamos await aqui para garantir que o save complete antes do reload/navegação
         await saveDraft(flow.id, containers, edges);
       }
     } catch (err) {
       console.warn("[BotPage] Save on back failed:", err);
     }
+
+
 
     // 2) Determina o destino (pasta pai ou workspace main).
     const parentId = bot?.parentId;
@@ -755,6 +749,8 @@ export default function BotPage() {
         handleAddNode={handleAddNode}
         setGetCenter={setGetCenter}
         hydrated={hydrated}
+        lastSyncedRef={lastSyncedRef}
+
       />
     </VariablesProvider>
   );
