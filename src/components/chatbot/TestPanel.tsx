@@ -1072,25 +1072,34 @@ export const TestPanel = ({
           const welcomeMessage = cfg.welcomeMessage || "";
 
           // Welcome behavior
-          if (!input && startMode === "automatic" && welcomeMessage && nextMessages.length === 0) {
-            console.log("[node:start] Agent Welcome", node.id);
-            const html = richHtmlFor(welcomeMessage, { variables });
-            nextMessages.push({
-              id: crypto.randomUUID(),
-              conversation_id: conversationId || "temp",
-              role: "assistant",
-              type: "bot",
-              content: html,
-              isHtml: true,
-              created_at: new Date().toISOString()
-            });
-            waitingFor = "input-text";
-            waitingForCfg = { placeholder: "Converse com o agente..." };
-            status = "waiting_input";
-            break;
+          const hasNoInput = !input || (input.message === undefined && input.button_id === undefined);
+          let autoGreeting = false;
+          if (hasNoInput && startMode === "automatic" && nextMessages.length === 0) {
+            if (welcomeMessage) {
+              console.log("[node:start] Agent Welcome (pre-defined)", node.id);
+              const html = richHtmlFor(welcomeMessage, { variables });
+              nextMessages.push({
+                id: crypto.randomUUID(),
+                conversation_id: conversationId || "temp",
+                role: "assistant",
+                type: "bot",
+                content: html,
+                isHtml: true,
+                created_at: new Date().toISOString()
+              });
+              waitingFor = "input-text";
+              waitingForCfg = { placeholder: "Converse com o agente..." };
+              status = "waiting_input";
+              break;
+            } else {
+              // Sem mensagem pré-definida: deixamos o próprio agente gerar a saudação
+              // com base no objetivo/instruções configurados.
+              console.log("[node:start] Agent Welcome (AI-generated)", node.id);
+              autoGreeting = true;
+            }
           }
 
-          if (!input || (input.message === undefined && input.button_id === undefined)) {
+          if (!autoGreeting && hasNoInput) {
             console.log("[node:waiting_input] Agent", node.id);
             waitingFor = "input-text";
             waitingForCfg = { placeholder: "Converse com o agente..." };
@@ -1098,9 +1107,9 @@ export const TestPanel = ({
             break;
           }
 
-          const userMsgContent = String(input.message || "").toLowerCase();
+          const userMsgContent = String(input?.message || "").toLowerCase();
           const exitPhrases = ["voltar menu", "sair", "parar", "cancelar", "exit", "stop"];
-          if (exitPhrases.some(p => userMsgContent.includes(p))) {
+          if (!autoGreeting && exitPhrases.some(p => userMsgContent.includes(p))) {
             console.log("[node:agent_exit]", node.id);
             mode = "flow";
             activeAgentNodeId = null;
@@ -1132,6 +1141,16 @@ export const TestPanel = ({
               kbLinksEnabled: cfg.kbLinksEnabled
             }
           });
+
+          // Auto-saudação: injetamos uma diretiva efêmera para o modelo gerar
+          // a primeira mensagem por conta própria, respeitando o objetivo e as
+          // instruções configuradas. Nenhuma "mensagem de usuário" real é criada.
+          if (autoGreeting && contextMessages.length === 0) {
+            contextMessages.push({
+              role: "user",
+              content: "[INÍCIO DA CONVERSA] Ainda não há mensagem do usuário. Inicie a conversa apresentando-se de forma natural e acolhedora conforme o seu objetivo e as instruções acima. Seja breve, não peça permissão para começar e não repita literalmente estas orientações."
+            });
+          }
 
           let aiReply: string | null = null;
           let skillCall: { skill_id: string; message?: string; arguments?: Record<string, any> } | null = null;
