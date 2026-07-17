@@ -1520,6 +1520,18 @@ export const TestPanel = ({
                   const agentQuery: Record<string, any> = (agentArgs.queryParams && typeof agentArgs.queryParams === "object") ? agentArgs.queryParams : {};
                   const agentBody = agentArgs.body;
                   const isMutatingDispatch = !!dispatch?.isMutating || ["POST", "PUT", "PATCH", "DELETE"].includes(method);
+                  const strictIds = typeof ep.strictIds === "boolean" ? ep.strictIds : isMutatingDispatch;
+                  // Auditoria de substituições/rejeições de IDs feitas nesta chamada.
+                  const idAuditTrail: Array<{
+                    location: "path" | "query" | "body";
+                    param: string;
+                    proposed: any;
+                    resolved: any;
+                    action: "kept" | "substituted" | "resolved_by_context" | "rejected_strict" | "unverified";
+                    reason?: string;
+                    source?: string;
+                    sourceEntityLabel?: string;
+                  }> = [];
                   // Busca recursiva por um valor no objeto de argumentos do agente
                   // (tolera formatos como { id: "..." }, { pathParams: { id } }, { arguments: {...} },
                   //  arrays [{ id, name }], nomes com case diferente, etc.).
