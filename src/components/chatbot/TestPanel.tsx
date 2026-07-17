@@ -1520,6 +1520,18 @@ export const TestPanel = ({
                   const agentQuery: Record<string, any> = (agentArgs.queryParams && typeof agentArgs.queryParams === "object") ? agentArgs.queryParams : {};
                   const agentBody = agentArgs.body;
                   const isMutatingDispatch = !!dispatch?.isMutating || ["POST", "PUT", "PATCH", "DELETE"].includes(method);
+                  const strictIds = typeof ep.strictIds === "boolean" ? ep.strictIds : isMutatingDispatch;
+                  // Auditoria de substituições/rejeições de IDs feitas nesta chamada.
+                  const idAuditTrail: Array<{
+                    location: "path" | "query" | "body";
+                    param: string;
+                    proposed: any;
+                    resolved: any;
+                    action: "kept" | "substituted" | "resolved_by_context" | "rejected_strict" | "unverified";
+                    reason?: string;
+                    source?: string;
+                    sourceEntityLabel?: string;
+                  }> = [];
                   // Busca recursiva por um valor no objeto de argumentos do agente
                   // (tolera formatos como { id: "..." }, { pathParams: { id } }, { arguments: {...} },
                   //  arrays [{ id, name }], nomes com case diferente, etc.).
@@ -1785,7 +1797,7 @@ export const TestPanel = ({
                     return score;
                   };
 
-                  const resolveKnownEntityId = (paramName: string, proposedValue: any) => {
+                  const resolveKnownEntityId = (paramName: string, proposedValue: any, location: "path" | "query" | "body" = "body") => {
                     if (!isIdLikeParam(paramName)) return { ok: true, value: proposedValue };
                     const hints = paramTypeHints(paramName);
                     const allEntities = getKnownEntities();
@@ -1797,6 +1809,10 @@ export const TestPanel = ({
                     const hasValue = rawValue !== undefined && rawValue !== null && String(rawValue).trim() !== "";
                     const rawText = hasValue ? String(rawValue).trim() : "";
 
+                    const audit = (entry: Omit<typeof idAuditTrail[number], "location" | "param" | "proposed">) => {
+                      idAuditTrail.push({ location, param: paramName, proposed: rawText || proposedValue, ...entry });
+                    };
+
                     if (hasValue && valueLooksLikeIdentifier(rawText)) {
                       const exact = candidates.find((entity) => String(entity.id) === rawText)
                         || (!hints.length ? allEntities.find((entity) => String(entity.id) === rawText) : undefined);
@@ -1806,16 +1822,39 @@ export const TestPanel = ({
                         const exactScore = scoreEntity(exact, terms);
                         const selectedScore = scoreEntity(verifiedSelection.entity, terms);
                         if (exactScore < 3 || exactScore <= selectedScore) {
+                          if (strictIds) {
+                            audit({ resolved: rawText, action: "rejected_strict", reason: "conflict_with_verified_selection", source: verifiedSelection.entity.source, sourceEntityLabel: verifiedSelection.entity.label });
+                            return {
+                              ok: false,
+                              error: "strict_unverified_id",
+                              message: `Modo estrito: ${paramName}=${rawText} conflita com o ID validado da sessão (${verifiedSelection.selection.id} — ${verifiedSelection.selection.label}).`,
+                              param: paramName,
+                              value: rawText,
+                            };
+                          }
                           console.warn(`[node:http-request][dynamic] ${paramName} tentou trocar ID validado (${verifiedSelection.selection.id}) por ${rawText}; mantendo seleção da sessão: ${verifiedSelection.selection.label}`);
+                          audit({ resolved: verifiedSelection.selection.id, action: "substituted", reason: "conflict_with_verified_selection", source: verifiedSelection.entity.source, sourceEntityLabel: verifiedSelection.entity.label });
                           return { ok: true, value: verifiedSelection.selection.id };
                         }
                       }
                       if (exact) {
                         rememberVerifiedEntitySelection(paramName, rawText);
+                        audit({ resolved: rawText, action: "kept", source: exact.source, sourceEntityLabel: exact.label });
                         return { ok: true, value: rawText };
                       }
                       if (verifiedSelection) {
+                        if (strictIds) {
+                          audit({ resolved: rawText, action: "rejected_strict", reason: "unverified_replacing_verified_selection", source: verifiedSelection.entity.source, sourceEntityLabel: verifiedSelection.entity.label });
+                          return {
+                            ok: false,
+                            error: "strict_unverified_id",
+                            message: `Modo estrito: ${paramName}=${rawText} não foi retornado por nenhuma consulta desta sessão (esperado ${verifiedSelection.selection.id} — ${verifiedSelection.selection.label}).`,
+                            param: paramName,
+                            value: rawText,
+                          };
+                        }
                         console.warn(`[node:http-request][dynamic] ${paramName} recebido com ID não verificado (${rawText}); usando seleção validada da sessão: ${verifiedSelection.selection.id} (${verifiedSelection.selection.label})`);
+                        audit({ resolved: verifiedSelection.selection.id, action: "substituted", reason: "unverified_replaced_by_verified_selection", source: verifiedSelection.entity.source, sourceEntityLabel: verifiedSelection.entity.label });
                         return { ok: true, value: verifiedSelection.selection.id };
                       }
                       // UUID/ID inventado pelo agente não é fonte de verdade. Em vez de abortar de cara,
@@ -1838,27 +1877,41 @@ export const TestPanel = ({
                     }
                     if (best && best.score >= 3) {
                       if (hasValue && valueLooksLikeIdentifier(rawText) && String(best.entity.id) !== rawText) {
+                        if (strictIds) {
+                          audit({ resolved: rawText, action: "rejected_strict", reason: "unverified_id_context_match_available", source: best.entity.source, sourceEntityLabel: best.entity.label });
+                          return {
+                            ok: false,
+                            error: "strict_unverified_id",
+                            message: `Modo estrito: ${paramName}=${rawText} não pertence à sessão (contexto sugere ${best.entity.id} — ${best.entity.label}).`,
+                            param: paramName,
+                            value: rawText,
+                          };
+                        }
                         console.warn(`[node:http-request][dynamic] ${paramName} recebeu ID não verificado (${rawText}); usando entidade validada da sessão: ${best.entity.id} (${best.entity.label})`);
+                        audit({ resolved: best.entity.id, action: "substituted", reason: "unverified_id_replaced_by_context_match", source: best.entity.source, sourceEntityLabel: best.entity.label });
                       } else {
                         console.log(`[node:http-request][dynamic] ${paramName} resolvido por entidade da sessão: ${best.entity.label}`);
+                        audit({ resolved: best.entity.id, action: "resolved_by_context", source: best.entity.source, sourceEntityLabel: best.entity.label });
                       }
                       rememberVerifiedEntitySelection(paramName, best.entity.id);
                       return { ok: true, value: best.entity.id };
                     }
                     if (hasValue && valueLooksLikeIdentifier(rawText) && isDispatched && !identifierExistsInSession(rawText)) {
+                      audit({ resolved: rawText, action: strictIds ? "rejected_strict" : "unverified", reason: "id_not_in_session" });
                       return {
                         ok: false,
-                        error: "unverified_entity_id",
-                        message: `O valor enviado para ${paramName} não foi retornado por nenhuma consulta desta sessão.`,
+                        error: strictIds ? "strict_unverified_id" : "unverified_entity_id",
+                        message: `${strictIds ? "Modo estrito: " : ""}O valor enviado para ${paramName} não foi retornado por nenhuma consulta desta sessão.`,
                         param: paramName,
                         value: rawText,
                       };
                     }
                     if (hasValue && candidates.length && isDispatched) {
+                      audit({ resolved: rawText, action: strictIds ? "rejected_strict" : "unverified", reason: "no_context_match" });
                       return {
                         ok: false,
-                        error: "unresolved_entity_id",
-                        message: `Não encontrei um ID real para ${paramName} usando os dados retornados nesta sessão.`,
+                        error: strictIds ? "strict_unverified_id" : "unresolved_entity_id",
+                        message: `${strictIds ? "Modo estrito: " : ""}Não encontrei um ID real para ${paramName} usando os dados retornados nesta sessão.`,
                         param: paramName,
                         value: rawText,
                       };
@@ -1866,11 +1919,11 @@ export const TestPanel = ({
                     return { ok: true, value: proposedValue };
                   };
 
-                  const sanitizeIdLikeValues = (value: any): { ok: boolean; value: any; error?: any } => {
+                  const sanitizeIdLikeValues = (value: any, location: "path" | "query" | "body" = "body"): { ok: boolean; value: any; error?: any } => {
                     if (Array.isArray(value)) {
                       const next: any[] = [];
                       for (const item of value) {
-                        const resolved = sanitizeIdLikeValues(item);
+                        const resolved = sanitizeIdLikeValues(item, location);
                         if (!resolved.ok) return resolved;
                         next.push(resolved.value);
                       }
@@ -1880,11 +1933,11 @@ export const TestPanel = ({
                       const next: Record<string, any> = {};
                       for (const [key, child] of Object.entries(value)) {
                         if (isIdLikeParam(key) && (typeof child !== "object" || child === null)) {
-                          const resolved = resolveKnownEntityId(key, child);
+                          const resolved = resolveKnownEntityId(key, child, location);
                           if (!resolved.ok) return { ok: false, value, error: resolved };
                           next[key] = resolved.value;
                         } else {
-                          const resolved = sanitizeIdLikeValues(child);
+                          const resolved = sanitizeIdLikeValues(child, location);
                           if (!resolved.ok) return resolved;
                           next[key] = resolved.value;
                         }
@@ -1995,13 +2048,14 @@ export const TestPanel = ({
                       : fromAgent !== undefined
                         ? fromAgent
                         : variables[p];
-                    const resolved = resolveKnownEntityId(p, rawValue);
+                    const resolved = resolveKnownEntityId(p, rawValue, "path");
                     if (!resolved.ok) {
                       lastOk = false;
-                      lastData = { ...resolved, ok: false };
+                      lastData = { ...resolved, ok: false, id_audit: idAuditTrail };
                       variables.httpResponse = lastData;
                       shouldSkipEndpoint = true;
                       console.warn(`[node:http-request][dynamic] ID inválido em path param "${p}" — chamada abortada`, resolved);
+                      console.table(idAuditTrail);
                       return;
                     }
                     const v = resolved.value;
@@ -2037,13 +2091,14 @@ export const TestPanel = ({
                     if (!p?.name) return;
                     const fromAgent = perms.queryParams === false ? undefined : agentQuery[p.name] ?? (p.name in agentArgs ? agentArgs[p.name] : undefined);
                     const candidate = fromAgent !== undefined ? fromAgent : replaceVars(String(p.value ?? ""));
-                    const resolved = resolveKnownEntityId(p.name, candidate);
+                    const resolved = resolveKnownEntityId(p.name, candidate, "query");
                     if (!resolved.ok) {
                       lastOk = false;
-                      lastData = { ...resolved, ok: false };
+                      lastData = { ...resolved, ok: false, id_audit: idAuditTrail };
                       variables.httpResponse = lastData;
                       shouldSkipEndpoint = true;
                       console.warn(`[node:http-request][dynamic] ID inválido em query param "${p.name}" — chamada abortada`, resolved);
+                      console.table(idAuditTrail);
                       return;
                     }
                     const val = resolved.value;
@@ -2055,13 +2110,14 @@ export const TestPanel = ({
                   if (perms.queryParams !== false) {
                     Object.entries(agentQuery).forEach(([k, v]) => {
                       if (usedQuery.has(k) || v === undefined || v === null) return;
-                      const resolved = resolveKnownEntityId(k, v);
+                      const resolved = resolveKnownEntityId(k, v, "query");
                       if (!resolved.ok) {
                         lastOk = false;
-                        lastData = { ...resolved, ok: false };
+                        lastData = { ...resolved, ok: false, id_audit: idAuditTrail };
                         variables.httpResponse = lastData;
                         shouldSkipEndpoint = true;
                         console.warn(`[node:http-request][dynamic] ID inválido em query param extra "${k}" — chamada abortada`, resolved);
+                        console.table(idAuditTrail);
                         return;
                       }
                       qp.push(`${encodeURIComponent(k)}=${encodeURIComponent(String(resolved.value))}`);
@@ -2091,12 +2147,13 @@ export const TestPanel = ({
                     const canAgentBody = perms.body !== false;
                     if (canAgentBody && agentBody !== undefined && agentBody !== null && agentBody !== "") {
                       const bodyValue = typeof agentBody === "string" ? extractJsonFromText(replaceVars(agentBody)) ?? replaceVars(agentBody) : agentBody;
-                      const sanitizedBody = sanitizeIdLikeValues(bodyValue);
+                      const sanitizedBody = sanitizeIdLikeValues(bodyValue, "body");
                       if (!sanitizedBody.ok) {
                         lastOk = false;
-                        lastData = { ...sanitizedBody.error, ok: false };
+                        lastData = { ...sanitizedBody.error, ok: false, id_audit: idAuditTrail };
                         variables.httpResponse = lastData;
                         console.warn(`[node:http-request][dynamic] ID inválido no body — chamada abortada`, sanitizedBody.error);
+                        console.table(idAuditTrail);
                         continue;
                       }
                       effectiveBody = typeof sanitizedBody.value === "string" ? sanitizedBody.value : normalizeBodyScalars(sanitizedBody.value);
@@ -2133,7 +2190,12 @@ export const TestPanel = ({
                     continue;
                   }
 
-                  console.log(`[node:http-request][dynamic] ${method} ${url}`, { dispatched: isDispatched, agentArgs, effectiveBody });
+                  if (idAuditTrail.length) {
+                    console.groupCollapsed(`[node:http-request][dynamic] auditoria de IDs (${ep.method} ${ep.url}) — strict=${strictIds}`);
+                    console.table(idAuditTrail);
+                    console.groupEnd();
+                  }
+                  console.log(`[node:http-request][dynamic] ${method} ${url}`, { dispatched: isDispatched, strictIds, agentArgs, effectiveBody, id_audit: idAuditTrail });
                   const res = await fetch(url, { method, headers, body });
                   const text = await res.text();
                   let data: any; try { data = JSON.parse(text); } catch { data = text; }

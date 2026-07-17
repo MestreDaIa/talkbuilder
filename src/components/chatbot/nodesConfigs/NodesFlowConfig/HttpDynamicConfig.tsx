@@ -51,6 +51,7 @@ export interface DynamicEndpoint {
   };
   responseMappings: { jsonPath: string; variableName: string; contextKey?: string }[];
   resultType: "context" | "live";
+  strictIds?: boolean;
   lastTestResponse?: any;
   argsSchema?: {
     pathParams?: { name: string; description: string; example?: string }[];
@@ -348,6 +349,21 @@ function EndpointCard({
               </SelectContent>
             </Select>
           </div>
+        </div>
+        <div className="flex items-start gap-2 rounded-md border p-2 bg-muted/30">
+          <input
+            id={`strict-${endpoint.id}`}
+            type="checkbox"
+            className="mt-0.5"
+            checked={endpoint.strictIds ?? ["POST", "PUT", "PATCH", "DELETE"].includes(String(endpoint.method || "").toUpperCase())}
+            onChange={(e) => onChange({ strictIds: e.target.checked })}
+          />
+          <label htmlFor={`strict-${endpoint.id}`} className="text-[11px] leading-tight">
+            <span className="font-semibold">Modo estrito de IDs</span>
+            <span className="block text-muted-foreground">
+              Rejeita a chamada quando algum <code>*_id</code> (path, query ou body) não foi retornado por uma consulta desta sessão. Sem esta opção, o runtime tenta substituir por um ID já validado.
+            </span>
+          </label>
         </div>
         <div>
           <Label className="text-[10px]">Descrição para o Agente IA</Label>
