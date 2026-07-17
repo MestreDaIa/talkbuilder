@@ -2144,7 +2144,7 @@ export const TestPanel = ({
                     const canAgentBody = perms.body !== false;
                     if (canAgentBody && agentBody !== undefined && agentBody !== null && agentBody !== "") {
                       const bodyValue = typeof agentBody === "string" ? extractJsonFromText(replaceVars(agentBody)) ?? replaceVars(agentBody) : agentBody;
-                      const sanitizedBody = sanitizeIdLikeValues(bodyValue);
+                      const sanitizedBody = sanitizeIdLikeValues(bodyValue, "body");
                       if (!sanitizedBody.ok) {
                         lastOk = false;
                         lastData = { ...sanitizedBody.error, ok: false };
