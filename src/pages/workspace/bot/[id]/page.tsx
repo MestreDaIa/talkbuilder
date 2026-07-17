@@ -681,8 +681,7 @@ export default function BotPage() {
       console.warn("[BotPage] Save on back failed:", err);
     }
 
-      console.warn("[BotPage] Save on back failed:", err);
-    }
+
 
     // 2) Determina o destino (pasta pai ou workspace main).
     const parentId = bot?.parentId;
