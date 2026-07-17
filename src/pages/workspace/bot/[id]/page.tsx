@@ -349,6 +349,10 @@ export default function BotPage() {
   const [getCenter, setGetCenter] = useState<(() => { x: number; y: number }) | null>(null);
   const [testContainer, setTestContainer] = useState<Container | null>(null);
   const localLoadedAtRef = useRef(0);
+  // Assinatura JSON do último estado sincronizado com o servidor.
+  // O auto-save só grava se `signature` mudar em relação ao servidor.
+  const lastSyncedRef = useRef<{ signature: string } | null>(null);
+
   
   // Undo/Redo history
   const [history, setHistory] = useState<{ containers: Container[]; edges: Edge[] }[]>([]);
