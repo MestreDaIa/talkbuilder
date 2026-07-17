@@ -160,10 +160,10 @@ function BotEditorInner({
   // Função de salvar manual (mantida para UX)
   const handleSaveWithVariables = async () => {
     if (!flow) {
-      saveLocal(botId, { containers, edges });
-      toast.success("Fluxo salvo localmente (aguardando conexão)");
+      toast.error("Sem conexão com o servidor — não é possível salvar. Verifique sua internet e tente novamente.");
       return;
     }
+
     
     setIsSaving(true);
     try {
