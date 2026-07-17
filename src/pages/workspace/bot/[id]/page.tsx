@@ -107,34 +107,32 @@ function BotEditorInner({
 }: any) {
   const { variables, setVariables } = useVariables();
 
-  // Auto-save logic: triggers saveDraft whenever containers or edges change after hydration
+  // Auto-save — só grava no Supabase se o estado atual difere do último snapshot sincronizado
+  // com o servidor. Isso impede o bug clássico: se o servidor demorou/falhou e o canvas ficou
+  // vazio na tela, o auto-save NÃO vai sobrescrever o rascunho real com [].
   useEffect(() => {
-    if (!hydrated || !flow?.id) return;
-    
-    // Evita loop se estivermos apenas reagindo ao carregamento inicial
-    if (historyIndex === -1) return;
+    if (!hydrated || !flow?.id || !lastSyncedRef?.current) return;
+
+    const currentSig = JSON.stringify({ c: containers, e: edges });
+    if (currentSig === lastSyncedRef.current.signature) return; // nada mudou desde o último save
 
     const timer = setTimeout(async () => {
       try {
-        // Log detalhado para depuração
-        const webhookNodes = containers
-          .flatMap((c: any) => c.nodes)
-          .filter((n: any) => n.type === 'webhook');
-        
         console.log("[BotPage] Auto-salvando rascunho...", {
           containersCount: containers.length,
           edgesCount: edges.length,
-          webhookNodesConfigs: webhookNodes.map((n: any) => ({ id: n.id, config: n.config }))
         });
-        
         await saveDraft(flow.id, containers, edges);
+        if (lastSyncedRef.current) lastSyncedRef.current.signature = currentSig;
       } catch (err) {
         console.error("[BotPage] Erro no auto-save:", err);
+        toast.error("Falha ao salvar rascunho no servidor. Verifique sua conexão — suas alterações ainda não foram salvas.");
       }
-    }, 1000); // Debounce de 1s para não sobrecarregar o banco
+    }, 1000);
 
     return () => clearTimeout(timer);
-  }, [containers, edges, flow?.id, hydrated, historyIndex]);
+  }, [containers, edges, flow?.id, hydrated, lastSyncedRef]);
+
 
   // Sync variables from initialVariables/Start node whenever containers change
   useEffect(() => {
