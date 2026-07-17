@@ -39,31 +39,20 @@ import { toast } from "sonner";
 
 const STORAGE_PREFIX = "bot_flow_";
 
-/** Cache local — fallback enquanto o flow não carrega ou o servidor ainda não recebeu o último save. */
-function loadLocal(botId: string): { containers: Container[]; edges: Edge[]; savedAt: number } {
-  if (typeof window === "undefined") return { containers: [], edges: [], savedAt: 0 };
-  try {
-    const raw = window.localStorage.getItem(`${STORAGE_PREFIX}${botId}`);
-    if (!raw) return { containers: [], edges: [], savedAt: 0 };
-    const parsed = JSON.parse(raw);
-    const containers = parsed.containers ?? [];
-    const edges = parsed.edges ?? [];
-    const hasFlowData = containers.length > 0 || edges.length > 0;
-    return {
-      containers,
-      edges,
-      // Caches antigos não tinham timestamp. Se tiverem dados, tratamos como recentes
-      // para não deixar o servidor sobrescrever uma edição recém-feita antes do auto-save.
-      savedAt: parsed.savedAt ?? (hasFlowData ? Date.now() : 0),
-    };
-  } catch {
-    return { containers: [], edges: [], savedAt: 0 };
-  }
-}
-
-function saveLocal(botId: string, data: { containers: Container[]; edges: Edge[] }) {
+/**
+ * Fonte da verdade = Supabase. NÃO usamos mais localStorage como cache autoritativo,
+ * porque um cache local vencendo contra um carregamento do servidor causou perda de
+ * dados no passado (limpar o storage → auto-save gravava [] por cima do rascunho real).
+ *
+ * Limpamos qualquer resíduo do cache antigo para evitar leituras acidentais.
+ */
+function purgeLegacyLocalCache(botId: string) {
   if (typeof window === "undefined") return;
-  window.localStorage.setItem(`${STORAGE_PREFIX}${botId}`, JSON.stringify({ ...data, savedAt: Date.now() }));
+  try {
+    window.localStorage.removeItem(`${STORAGE_PREFIX}${botId}`);
+  } catch {
+    /* noop */
+  }
 }
 
 function statusLabel(status: FlowStatus): { text: string; className: string } {
