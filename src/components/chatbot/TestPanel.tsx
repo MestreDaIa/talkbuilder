@@ -2108,7 +2108,7 @@ export const TestPanel = ({
                   if (perms.queryParams !== false) {
                     Object.entries(agentQuery).forEach(([k, v]) => {
                       if (usedQuery.has(k) || v === undefined || v === null) return;
-                      const resolved = resolveKnownEntityId(k, v);
+                      const resolved = resolveKnownEntityId(k, v, "query");
                       if (!resolved.ok) {
                         lastOk = false;
                         lastData = { ...resolved, ok: false };
