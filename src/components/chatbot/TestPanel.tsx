@@ -2090,7 +2090,7 @@ export const TestPanel = ({
                     if (!p?.name) return;
                     const fromAgent = perms.queryParams === false ? undefined : agentQuery[p.name] ?? (p.name in agentArgs ? agentArgs[p.name] : undefined);
                     const candidate = fromAgent !== undefined ? fromAgent : replaceVars(String(p.value ?? ""));
-                    const resolved = resolveKnownEntityId(p.name, candidate);
+                    const resolved = resolveKnownEntityId(p.name, candidate, "query");
                     if (!resolved.ok) {
                       lastOk = false;
                       lastData = { ...resolved, ok: false };
