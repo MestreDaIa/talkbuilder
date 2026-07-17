@@ -2048,7 +2048,7 @@ export const TestPanel = ({
                       : fromAgent !== undefined
                         ? fromAgent
                         : variables[p];
-                    const resolved = resolveKnownEntityId(p, rawValue);
+                    const resolved = resolveKnownEntityId(p, rawValue, "path");
                     if (!resolved.ok) {
                       lastOk = false;
                       lastData = { ...resolved, ok: false };
