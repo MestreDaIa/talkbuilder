@@ -2051,10 +2051,11 @@ export const TestPanel = ({
                     const resolved = resolveKnownEntityId(p, rawValue, "path");
                     if (!resolved.ok) {
                       lastOk = false;
-                      lastData = { ...resolved, ok: false };
+                      lastData = { ...resolved, ok: false, id_audit: idAuditTrail };
                       variables.httpResponse = lastData;
                       shouldSkipEndpoint = true;
                       console.warn(`[node:http-request][dynamic] ID inválido em path param "${p}" — chamada abortada`, resolved);
+                      console.table(idAuditTrail);
                       return;
                     }
                     const v = resolved.value;
