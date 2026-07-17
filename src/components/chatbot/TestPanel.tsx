@@ -2094,10 +2094,11 @@ export const TestPanel = ({
                     const resolved = resolveKnownEntityId(p.name, candidate, "query");
                     if (!resolved.ok) {
                       lastOk = false;
-                      lastData = { ...resolved, ok: false };
+                      lastData = { ...resolved, ok: false, id_audit: idAuditTrail };
                       variables.httpResponse = lastData;
                       shouldSkipEndpoint = true;
                       console.warn(`[node:http-request][dynamic] ID inválido em query param "${p.name}" — chamada abortada`, resolved);
+                      console.table(idAuditTrail);
                       return;
                     }
                     const val = resolved.value;
