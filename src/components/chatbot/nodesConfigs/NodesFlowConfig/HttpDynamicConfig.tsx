@@ -51,6 +51,7 @@ export interface DynamicEndpoint {
   };
   responseMappings: { jsonPath: string; variableName: string; contextKey?: string }[];
   resultType: "context" | "live";
+  strictIds?: boolean;
   lastTestResponse?: any;
   argsSchema?: {
     pathParams?: { name: string; description: string; example?: string }[];
