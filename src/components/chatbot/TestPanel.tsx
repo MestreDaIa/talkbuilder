@@ -1671,6 +1671,10 @@ export const TestPanel = ({
                     };
                     add(variables.last_message);
                     add((variables as any).last_user_message);
+                    const latestAssistantConfirmation = [...messageHistory]
+                      .reverse()
+                      .find((msg) => msg.role === "assistant" && /confirm/i.test(String(msg.content || "")) && !isSkillResultHistoryMessage(msg));
+                    add(latestAssistantConfirmation?.content);
                     const scanArgs = (obj: any, depth = 0) => {
                       if (obj == null || depth > 3) return;
                       if (typeof obj === "string" || typeof obj === "number") { add(obj); return; }
