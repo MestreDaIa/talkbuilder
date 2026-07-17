@@ -566,11 +566,11 @@ export default function BotPage() {
 
   const handleSave = async () => {
     if (!flow) {
-      // sem Supabase — só salva local
-      saveLocal(botId, { containers, edges });
-      toast.success("Fluxo salvo localmente (aguardando conexão)");
+      toast.error("Sem conexão com o servidor — não é possível salvar. Verifique sua internet.");
       return;
     }
+
+
     
     setIsSaving(true);
     try {
