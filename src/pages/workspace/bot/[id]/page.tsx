@@ -749,6 +749,8 @@ export default function BotPage() {
         handleAddNode={handleAddNode}
         setGetCenter={setGetCenter}
         hydrated={hydrated}
+        lastSyncedRef={lastSyncedRef}
+
       />
     </VariablesProvider>
   );
