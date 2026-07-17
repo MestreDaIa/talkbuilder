@@ -1142,6 +1142,16 @@ export const TestPanel = ({
             }
           });
 
+          // Auto-saudação: injetamos uma diretiva efêmera para o modelo gerar
+          // a primeira mensagem por conta própria, respeitando o objetivo e as
+          // instruções configuradas. Nenhuma "mensagem de usuário" real é criada.
+          if (autoGreeting && contextMessages.length === 0) {
+            contextMessages.push({
+              role: "user",
+              content: "[INÍCIO DA CONVERSA] Ainda não há mensagem do usuário. Inicie a conversa apresentando-se de forma natural e acolhedora conforme o seu objetivo e as instruções acima. Seja breve, não peça permissão para começar e não repita literalmente estas orientações."
+            });
+          }
+
           let aiReply: string | null = null;
           let skillCall: { skill_id: string; message?: string; arguments?: Record<string, any> } | null = null;
           if (activeKey) {
