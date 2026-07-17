@@ -820,15 +820,14 @@ export const TestPanel = ({
           Object.keys(nextArgs.body).forEach((key) => {
             const confirmed = resolveConfirmedValue(key);
             const normalizedKey = normalizeKeyName(key);
-            const currentValue = nextArgs.body[key];
             if (confirmed !== undefined) {
               nextArgs.body[key] = confirmed;
-              } else if (confirmedDate !== undefined && confirmedTime !== undefined && /(schedule|appointment|booking|start|end|slot).*(at|date|time)|^(datetime|date_time|starts_at|ends_at|scheduled_at)$/i.test(key)) {
+            } else if (confirmedDate !== undefined && confirmedTime !== undefined && /(schedule|appointment|booking|start|end|slot).*(at|date|time)|^(datetime|date_time|starts_at|ends_at|scheduled_at)$/i.test(key)) {
               const date = toIsoDate(confirmedDate);
               const time = toTime(confirmedTime);
               if (/time|hora|horario/i.test(key) && !/date|data|at/i.test(key)) nextArgs.body[key] = time;
               else if (/date|data/i.test(key) && !/time|hora|horario/i.test(key)) nextArgs.body[key] = date;
-                else nextArgs.body[key] = `${date} ${time}`;
+              else nextArgs.body[key] = `${date} ${time}`;
             } else if (confirmedDate !== undefined && (normalizedKey.includes("date") || normalizedKey.includes("data"))) {
               nextArgs.body[key] = toIsoDate(confirmedDate);
             } else if (confirmedTime !== undefined && (normalizedKey.includes("time") || normalizedKey.includes("hora") || normalizedKey.includes("horario"))) {
