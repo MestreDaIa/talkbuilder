@@ -2147,9 +2147,10 @@ export const TestPanel = ({
                       const sanitizedBody = sanitizeIdLikeValues(bodyValue, "body");
                       if (!sanitizedBody.ok) {
                         lastOk = false;
-                        lastData = { ...sanitizedBody.error, ok: false };
+                        lastData = { ...sanitizedBody.error, ok: false, id_audit: idAuditTrail };
                         variables.httpResponse = lastData;
                         console.warn(`[node:http-request][dynamic] ID inválido no body — chamada abortada`, sanitizedBody.error);
+                        console.table(idAuditTrail);
                         continue;
                       }
                       effectiveBody = typeof sanitizedBody.value === "string" ? sanitizedBody.value : normalizeBodyScalars(sanitizedBody.value);
