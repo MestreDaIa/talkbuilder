@@ -178,7 +178,7 @@ using (
     or (target_type = 'plan' and exists (
       select 1 from public.profiles p
       where p.id = auth.uid()
-        and coalesce(p.embed_plan_tier, p.plan) = notifications.target_value
+        and coalesce(p.embed_plan_tier, p.plan::text) = notifications.target_value
     ))
     or public.is_super_admin()
   )
@@ -236,7 +236,7 @@ select
   case
     when p.is_suspended then 'suspended'
     when p.embed_source = 'booking' then coalesce(p.embed_plan_tier, 'starter')
-    else coalesce(p.plan, 'starter')
+    else coalesce(p.plan::text, 'starter')
   end as effective_plan,
   (select count(*) from public.chatbot_flows f where f.workspace_id = w.id) as bots_count,
   (select count(*) from public.workspace_members m where m.workspace_id = w.id) as members_count
@@ -277,8 +277,8 @@ begin
         select
           case
             when is_suspended then 'suspended'
-            when embed_source = 'booking' then coalesce(embed_plan_tier, 'starter')
-            else coalesce(plan, 'starter')
+            when embed_source = 'booking' then coalesce(embed_plan_tier::text, 'starter')
+            else coalesce(plan::text, 'starter')
           end as pl,
           count(*) as c
         from public.profiles
