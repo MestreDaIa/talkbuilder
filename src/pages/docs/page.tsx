@@ -1286,7 +1286,7 @@ function NodeDocView({ node }: { node: NodeDoc }) {
             <div className="docs-panel__bar">
               <span className="text-xs text-muted-foreground font-mono">exemplo</span>
             </div>
-            <CodeBlock code={node.example} lang="json" />
+            <CodeBlock code={node.example} />
           </div>
         </div>
       </aside>
