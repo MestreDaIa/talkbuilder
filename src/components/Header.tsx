@@ -1,4 +1,4 @@
-import { LogOut, Settings } from "lucide-react";
+import { LogOut, Settings, ShieldCheck } from "lucide-react";
 import * as DropdownMenu from "@radix-ui/react-dropdown-menu";
 import { useNavigate } from "react-router-dom";
 import { useEmbed } from "../context/EmbedContext";
@@ -6,11 +6,14 @@ import { useAuth } from "../context/AuthContext";
 import { configsRoute, perfilRoute, workspaceRoot } from "../lib/workspaceRoutes";
 import logoMark from "../assets/logo-mark.svg";
 import logoWordmark from "../assets/logo-wordmark.svg";
+import NotificationBell from "./NotificationBell";
+import { useSuperAdmin } from "../hooks/useSuperAdmin";
 
 export default function Header() {
   const navigate = useNavigate();
-  const { flags } = useEmbed();
+  const { flags, mode } = useEmbed();
   const { user, profile, signOut, currentWorkspace } = useAuth();
+  const { isSuperAdmin } = useSuperAdmin();
   const slug = currentWorkspace?.slug || profile?.slug;
   const userRole = currentWorkspace?.role || 'owner';
   const showSettings = userRole === 'owner' || userRole === 'admin';
@@ -37,6 +40,16 @@ export default function Header() {
         </span>
       </h1>
       <div className="flex items-center shrink-0 gap-2">
+        {mode !== "embedded" && <NotificationBell />}
+        {isSuperAdmin && (
+          <button
+            onClick={() => navigate("/admin")}
+            title="Super Admin"
+            className="p-1 hover:bg-white/10 rounded-full transition"
+          >
+            <ShieldCheck className="w-6 h-6 text-amber-300" />
+          </button>
+        )}
         {showSettings && (
           <DropdownMenu.Root>
             <DropdownMenu.Trigger asChild>

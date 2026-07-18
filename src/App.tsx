@@ -14,6 +14,13 @@ import LandingPage from "./pages/landing/LandingPage";
 import PreviewPage from "./pages/preview/[id]/page";
 import PublicFlowPage from "./pages/public/flow/page";
 import InvitePage from "./pages/invite/[token]/page";
+import AdminLayout from "./pages/admin/AdminLayout";
+import AdminDashboard from "./pages/admin/Dashboard";
+import AdminWorkspaces from "./pages/admin/Workspaces";
+import AdminUsers from "./pages/admin/Users";
+import AdminPlans from "./pages/admin/Plans";
+import AdminNotifications from "./pages/admin/Notifications";
+import AdminAudit from "./pages/admin/Audit";
 
 
 import Layout from "./components/layout";
@@ -118,6 +125,16 @@ function App() {
 
       {/* Aceitar convite */}
       <Route path="/invite/:token" element={<InvitePage />} />
+
+      {/* Super Admin */}
+      <Route path="/admin" element={<AdminLayout />}>
+        <Route index element={<AdminDashboard />} />
+        <Route path="workspaces" element={<AdminWorkspaces />} />
+        <Route path="users" element={<AdminUsers />} />
+        <Route path="plans" element={<AdminPlans />} />
+        <Route path="notifications" element={<AdminNotifications />} />
+        <Route path="audit" element={<AdminAudit />} />
+      </Route>
 
       {/* Bot público publicado: /:slug/flow/:publicId */}
       <Route path="/:slug/flow/:publicId" element={<PublicFlowPage />} />
