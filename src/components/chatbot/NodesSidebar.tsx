@@ -112,7 +112,8 @@ export const NodesSidebar = ({ onAddNode }: NodesSidebarProps) => {
           {categories.map((category) => (
             <div key={category} className="flex flex-col gap-2 py-3 px-1 w-full justify-start border-b border-border/50 last:border-0">
               <h4
-                className={`${!collapsed ? "hidden" : "flex flex-col"} text-left text-[11px] font-semibold uppercase tracking-wider text-muted-foreground px-1`}
+                className={`${!collapsed ? "hidden" : "flex flex-col"} text-left text-[11px] font-semibold uppercase tracking-wider px-1`}
+                style={{ color: `var(--bot-${category})` }}
               >
                 {category}
               </h4>
