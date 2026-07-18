@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -1324,6 +1324,8 @@ export default function DocsPage() {
   const [jwt, setJwt] = useState("");
   const [showConfig, setShowConfig] = useState(false);
   const [search, setSearch] = useState("");
+  const topNavRef = useRef<HTMLElement>(null);
+
 
   useEffect(() => {
     const k = localStorage.getItem("zailom_docs_api_key");
@@ -1385,7 +1387,41 @@ export default function DocsPage() {
             </div>
           </a>
 
-          <nav className="docs-tabs docs-tabs--top">
+          <nav
+            ref={topNavRef}
+            className="docs-tabs docs-tabs--top"
+            onWheel={(e) => {
+              const el = e.currentTarget;
+              if (el.scrollWidth <= el.clientWidth) return;
+              if (Math.abs(e.deltaY) > Math.abs(e.deltaX)) {
+                el.scrollLeft += e.deltaY;
+              }
+            }}
+            onMouseDown={(e) => {
+              const el = e.currentTarget;
+              if (el.scrollWidth <= el.clientWidth) return;
+              const startX = e.pageX;
+              const startLeft = el.scrollLeft;
+              let moved = false;
+              el.style.cursor = "grabbing";
+              const onMove = (ev: MouseEvent) => {
+                const dx = ev.pageX - startX;
+                if (Math.abs(dx) > 3) moved = true;
+                el.scrollLeft = startLeft - dx;
+              };
+              const onUp = (ev: MouseEvent) => {
+                el.style.cursor = "";
+                window.removeEventListener("mousemove", onMove);
+                window.removeEventListener("mouseup", onUp);
+                if (moved) {
+                  ev.preventDefault();
+                  ev.stopPropagation();
+                }
+              };
+              window.addEventListener("mousemove", onMove);
+              window.addEventListener("mouseup", onUp);
+            }}
+          >
             {sections.map((s) => {
               const Icon = s.icon;
               const active = s.id === activeSectionId;
@@ -1396,6 +1432,7 @@ export default function DocsPage() {
               );
             })}
           </nav>
+
 
           <div className="docs-header__right">
             <div className="docs-search">
