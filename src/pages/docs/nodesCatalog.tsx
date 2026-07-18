@@ -72,7 +72,7 @@ export const nodeDocs: NodeDoc[] = [
     example: j({ id: "n2", type: "webhook", config: { variableName: "payload", secret: "shh" } }),
   },
   {
-    id: "http-request", title: "HTTP Request", category: "flow", icon: Globe,
+    id: "http-request", title: "HTTP Request", category: "logic", icon: Globe,
     summary: "Chamada HTTP síncrona a uma API externa.",
     description: "Executa GET/POST/PUT/PATCH/DELETE com headers, query e body dinâmicos (aceita interpolação {{variavel}}). A resposta é salva em variável e pode ter branches por status.",
     useCases: ["Consultar CRM", "Criar lead", "Buscar disponibilidade"],
