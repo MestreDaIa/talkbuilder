@@ -106,7 +106,10 @@ Deno.serve(async (req) => {
   try {
     // -------------------------- STATS ---------------------------------------
     if (path === "/stats" && method === "GET") {
-      const { data, error } = await admin.rpc("admin_get_stats");
+      // Precisa rodar com o JWT do usuário, porque admin_get_stats() valida
+      // public.is_super_admin() via auth.uid(). Usar service role aqui deixa
+      // auth.uid() nulo e a função retorna "forbidden" mesmo após a role estar correta.
+      const { data, error } = await userClient.rpc("admin_get_stats");
       if (error) throw error;
       return json(200, data);
     }
