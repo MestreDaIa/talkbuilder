@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
-import { supabase } from "@/integrations/supabase/client";
+import { getSupabase } from "@/lib/supabaseClient";
+const supabase = getSupabase();
 import { useAuth } from "@/context/AuthContext";
 
 export function useSuperAdmin() {
