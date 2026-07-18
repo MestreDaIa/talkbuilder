@@ -1388,7 +1388,7 @@ export default function DocsPage() {
               const Icon = s.icon;
               const active = s.id === activeSectionId;
               return (
-                <button key={s.id} onClick={() => setActiveSectionId(s.id)} className={`docs-tabs__btn ${active ? "docs-tabs__btn--active" : ""}`}>
+                <button key={s.id} onClick={() => goTo(s.id)} className={`docs-tabs__btn ${active ? "docs-tabs__btn--active" : ""}`}>
                   <Icon className="w-4 h-4" /> {s.label}
                 </button>
               );
