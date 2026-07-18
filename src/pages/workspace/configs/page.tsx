@@ -35,8 +35,9 @@ export default function ConfigurationWorkspace() {
 	const showBilling = flags.showBilling && !isBookingManaged;
 	const defaultTab = "workspace";
 	return (
-		<div className="relative flex h-full overflow-hidden bg-[#F8F9FA]">
-			<div className='px-6 py-8 flex w-full flex-col items-center justify-start gap-8 h-full overflow-auto max-w-5xl mx-auto'>
+		<div className="relative flex h-full overflow-y-auto bg-[#F8F9FA]">
+			<div className='px-6 py-8 flex w-full flex-col items-center justify-start gap-8 max-w-5xl mx-auto'>
+
 				<div className="w-full text-left space-y-1">
 					<h2 className="text-3xl font-extrabold text-[#1A1C1E] tracking-tight">Configurações</h2>
 					<p className="text-[#64748B] text-base">
