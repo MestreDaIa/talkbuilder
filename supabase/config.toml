@@ -7,6 +7,9 @@ verify_jwt = false
 [functions.chatbot-runtime]
 verify_jwt = false
 
+[functions.flow-api]
+verify_jwt = false
+
 [functions.embed-plan-status]
 verify_jwt = false
 
