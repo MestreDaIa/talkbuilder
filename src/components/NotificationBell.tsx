@@ -1,7 +1,8 @@
 import { useEffect, useMemo, useState } from "react";
 import { Bell } from "lucide-react";
 import * as Popover from "@radix-ui/react-popover";
-import { supabase } from "@/integrations/supabase/client";
+import { getSupabase } from "@/lib/supabaseClient";
+const supabase = getSupabase();
 import { useAuth } from "@/context/AuthContext";
 
 type N = {
