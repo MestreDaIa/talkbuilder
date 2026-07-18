@@ -1227,7 +1227,7 @@ print(r.status_code, r.json())`;
             <div className="docs-panel__bar">
               <span className="text-xs text-muted-foreground font-mono">200 · application/json</span>
             </div>
-            <CodeBlock code={endpoint.responseExample} lang="json" />
+            <CodeBlock code={endpoint.responseExample} />
           </div>
         </div>
       </aside>
