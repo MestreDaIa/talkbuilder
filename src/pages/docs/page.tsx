@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
+import { useNavigate, useParams } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -15,6 +16,7 @@ import {
   Copy,
   Globe,
   Key,
+  Layers,
   Loader2,
   Play,
   Plug,
@@ -29,6 +31,7 @@ import {
   Zap,
 } from "lucide-react";
 import { nodeCategories, nodeDocs, type NodeDoc } from "./nodesCatalog";
+import { systemGuides } from "./systemGuides";
 
 /* -------------------------------------------------------------------------- */
 /* Types                                                                       */
@@ -811,6 +814,21 @@ const sections: ApiSection[] = [
     overview: overviewDoc,
   },
   {
+    id: "sistema",
+    label: "Sistema",
+    icon: Layers,
+    baseUrl: API_PROXY_URL,
+    description: "Guias sobre a plataforma: arquitetura, integrações, operação e segurança.",
+    auth: { type: "none", description: "Documentação conceitual." },
+    sidebar: [
+      { label: "Começando", items: systemGuides.slice(0, 3).map((g) => ({ id: g.id, label: g.title })) },
+      { label: "Runtime & IA", items: systemGuides.slice(3, 8).map((g) => ({ id: g.id, label: g.title })) },
+      { label: "Operação", items: systemGuides.slice(8).map((g) => ({ id: g.id, label: g.title })) },
+    ],
+    endpoints: {},
+    reference: systemGuides,
+  },
+  {
     id: "booking",
     label: "Booking Integration",
     icon: Plug,
@@ -1294,8 +1312,12 @@ function ReferenceView({ doc }: { doc: ReferenceDoc }) {
 /* -------------------------------------------------------------------------- */
 
 export default function DocsPage() {
-  const [activeSectionId, setActiveSectionId] = useState<string>("overview");
-  const [activeItemId, setActiveItemId] = useState<string>("overview");
+  const navigate = useNavigate();
+  const { section: sectionParam, item: itemParam } = useParams();
+
+  const initialSection = sections.find((s) => s.id === sectionParam)?.id ?? "overview";
+  const [activeSectionId, setActiveSectionId] = useState<string>(initialSection);
+  const [activeItemId, setActiveItemId] = useState<string>(itemParam ?? "overview");
   const [apiKey, setApiKey] = useState("");
   const [jwt, setJwt] = useState("");
   const [showConfig, setShowConfig] = useState(false);
@@ -1310,14 +1332,30 @@ export default function DocsPage() {
   useEffect(() => { if (apiKey) localStorage.setItem("zailom_docs_api_key", apiKey); }, [apiKey]);
   useEffect(() => { if (jwt) localStorage.setItem("zailom_docs_jwt", jwt); }, [jwt]);
 
+  // URL → estado
+  useEffect(() => {
+    const s = sections.find((x) => x.id === sectionParam);
+    if (s) {
+      setActiveSectionId(s.id);
+      if (itemParam) setActiveItemId(itemParam);
+      else {
+        const first = s.sidebar[0]?.items[0]?.id;
+        if (first) setActiveItemId(first);
+      }
+    }
+  }, [sectionParam, itemParam]);
+
   const section = sections.find((s) => s.id === activeSectionId)!;
 
-  useEffect(() => {
-    const first = section.sidebar[0]?.items[0]?.id;
-    if (first) setActiveItemId(first);
-  }, [activeSectionId]); // eslint-disable-line
+  const goTo = (sectionId: string, itemId?: string) => {
+    const s = sections.find((x) => x.id === sectionId)!;
+    const it = itemId ?? s.sidebar[0]?.items[0]?.id ?? sectionId;
+    setActiveSectionId(sectionId);
+    setActiveItemId(it);
+    navigate(`/docs/${sectionId}/${it}`);
+  };
 
-  const isReference = section.id === "reference";
+  const isReference = section.id === "reference" || section.id === "sistema";
   const isOverview = section.id === "overview";
   const isBots = section.id === "bots";
   const endpoint = !isReference && !isOverview && !isBots ? section.endpoints[activeItemId] : undefined;
@@ -1350,7 +1388,7 @@ export default function DocsPage() {
               const Icon = s.icon;
               const active = s.id === activeSectionId;
               return (
-                <button key={s.id} onClick={() => setActiveSectionId(s.id)} className={`docs-tabs__btn ${active ? "docs-tabs__btn--active" : ""}`}>
+                <button key={s.id} onClick={() => goTo(s.id)} className={`docs-tabs__btn ${active ? "docs-tabs__btn--active" : ""}`}>
                   <Icon className="w-4 h-4" /> {s.label}
                 </button>
               );
@@ -1409,7 +1447,7 @@ export default function DocsPage() {
                   {group.items.map((it) => {
                     const active = it.id === activeItemId;
                     return (
-                      <button key={it.id} onClick={() => setActiveItemId(it.id)} className={`docs-sidebar__item ${active ? "docs-sidebar__item--active" : ""}`}>
+                      <button key={it.id} onClick={() => goTo(activeSectionId, it.id)} className={`docs-sidebar__item ${active ? "docs-sidebar__item--active" : ""}`}>
                         {it.method && <MethodBadge method={it.method} />}
                         <span className="flex-1 truncate">{it.label}</span>
                       </button>
