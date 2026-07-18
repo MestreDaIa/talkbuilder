@@ -1312,8 +1312,12 @@ function ReferenceView({ doc }: { doc: ReferenceDoc }) {
 /* -------------------------------------------------------------------------- */
 
 export default function DocsPage() {
-  const [activeSectionId, setActiveSectionId] = useState<string>("overview");
-  const [activeItemId, setActiveItemId] = useState<string>("overview");
+  const navigate = useNavigate();
+  const { section: sectionParam, item: itemParam } = useParams();
+
+  const initialSection = sections.find((s) => s.id === sectionParam)?.id ?? "overview";
+  const [activeSectionId, setActiveSectionId] = useState<string>(initialSection);
+  const [activeItemId, setActiveItemId] = useState<string>(itemParam ?? "overview");
   const [apiKey, setApiKey] = useState("");
   const [jwt, setJwt] = useState("");
   const [showConfig, setShowConfig] = useState(false);
@@ -1328,12 +1332,28 @@ export default function DocsPage() {
   useEffect(() => { if (apiKey) localStorage.setItem("zailom_docs_api_key", apiKey); }, [apiKey]);
   useEffect(() => { if (jwt) localStorage.setItem("zailom_docs_jwt", jwt); }, [jwt]);
 
+  // URL → estado
+  useEffect(() => {
+    const s = sections.find((x) => x.id === sectionParam);
+    if (s) {
+      setActiveSectionId(s.id);
+      if (itemParam) setActiveItemId(itemParam);
+      else {
+        const first = s.sidebar[0]?.items[0]?.id;
+        if (first) setActiveItemId(first);
+      }
+    }
+  }, [sectionParam, itemParam]);
+
   const section = sections.find((s) => s.id === activeSectionId)!;
 
-  useEffect(() => {
-    const first = section.sidebar[0]?.items[0]?.id;
-    if (first) setActiveItemId(first);
-  }, [activeSectionId]); // eslint-disable-line
+  const goTo = (sectionId: string, itemId?: string) => {
+    const s = sections.find((x) => x.id === sectionId)!;
+    const it = itemId ?? s.sidebar[0]?.items[0]?.id ?? sectionId;
+    setActiveSectionId(sectionId);
+    setActiveItemId(it);
+    navigate(`/docs/${sectionId}/${it}`);
+  };
 
   const isReference = section.id === "reference";
   const isOverview = section.id === "overview";
