@@ -127,6 +127,7 @@ function App() {
       <Route path="/invite/:token" element={<InvitePage />} />
 
       {/* Super Admin */}
+      <Route path="/admin/login" element={<AdminLogin />} />
       <Route path="/admin" element={<AdminLayout />}>
         <Route index element={<AdminDashboard />} />
         <Route path="workspaces" element={<AdminWorkspaces />} />
