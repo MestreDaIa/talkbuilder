@@ -1324,6 +1324,8 @@ export default function DocsPage() {
   const [jwt, setJwt] = useState("");
   const [showConfig, setShowConfig] = useState(false);
   const [search, setSearch] = useState("");
+  const topNavRef = useRef<HTMLElement>(null);
+
 
   useEffect(() => {
     const k = localStorage.getItem("zailom_docs_api_key");
