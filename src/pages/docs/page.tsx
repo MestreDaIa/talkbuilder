@@ -1355,7 +1355,7 @@ export default function DocsPage() {
     navigate(`/docs/${sectionId}/${it}`);
   };
 
-  const isReference = section.id === "reference";
+  const isReference = section.id === "reference" || section.id === "sistema";
   const isOverview = section.id === "overview";
   const isBots = section.id === "bots";
   const endpoint = !isReference && !isOverview && !isBots ? section.endpoints[activeItemId] : undefined;
