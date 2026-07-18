@@ -1442,9 +1442,12 @@ export default function DocsPage() {
           </div>
 
           <nav className="docs-sidebar__nav">
-            {filteredSidebar.map((group) => (
+            {filteredSidebar.map((group) => {
+              const catMatch = nodeCategories.find((c) => c.label === group.label);
+              const groupColor = catMatch ? `var(--bot-${catMatch.id})` : undefined;
+              return (
               <div key={group.label} className="mb-5">
-                <div className="docs-sidebar__group">{group.label}</div>
+                <div className="docs-sidebar__group" style={groupColor ? { color: groupColor } : undefined}>{group.label}</div>
                 <div className="space-y-0.5">
                   {group.items.map((it) => {
                     const active = it.id === activeItemId;
