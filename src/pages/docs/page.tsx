@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
+import { useNavigate, useParams } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -15,6 +16,7 @@ import {
   Copy,
   Globe,
   Key,
+  Layers,
   Loader2,
   Play,
   Plug,
@@ -29,6 +31,7 @@ import {
   Zap,
 } from "lucide-react";
 import { nodeCategories, nodeDocs, type NodeDoc } from "./nodesCatalog";
+import { systemGuides } from "./systemGuides";
 
 /* -------------------------------------------------------------------------- */
 /* Types                                                                       */
