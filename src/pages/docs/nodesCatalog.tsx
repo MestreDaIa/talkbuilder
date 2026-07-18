@@ -329,18 +329,6 @@ export const nodeDocs: NodeDoc[] = [
     fields: [{ name: "durationMs", type: "number", required: true, description: "Duração em ms." }],
     example: j({ id: "l4", type: "wait", config: { durationMs: 2000 } }),
   },
-  {
-    id: "await", title: "Await", category: "logic", icon: Hourglass,
-    summary: "Espera evento externo (callback) para continuar.",
-    description: "Pausa até receber POST em endpoint específico com session_id. Útil para integrações assíncronas.",
-    useCases: ["Aguardar pagamento", "Callback de N8N"],
-    fields: [
-      { name: "eventName", type: "string", required: true, description: "Nome do evento aguardado." },
-      { name: "timeoutMs", type: "number", description: "Cancela após N ms." },
-      { name: "saveResponseTo", type: "string", description: "Variável para payload recebido." },
-    ],
-    example: j({ id: "l5", type: "await", config: { eventName: "payment_confirmed", timeoutMs: 600000, saveResponseTo: "payment" } }),
-  },
 
   /* ------------------------- AI ------------------------- */
   {
