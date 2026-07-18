@@ -1460,7 +1460,8 @@ export default function DocsPage() {
                   })}
                 </div>
               </div>
-            ))}
+              );
+            })}
             {filteredSidebar.length === 0 && (
               <div className="text-xs text-muted-foreground px-2 py-4">Nenhum resultado.</div>
             )}
