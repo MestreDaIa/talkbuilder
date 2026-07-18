@@ -15,6 +15,7 @@ import PreviewPage from "./pages/preview/[id]/page";
 import PublicFlowPage from "./pages/public/flow/page";
 import InvitePage from "./pages/invite/[token]/page";
 import AdminLayout from "./pages/admin/AdminLayout";
+import AdminLogin from "./pages/admin/AdminLogin";
 import AdminDashboard from "./pages/admin/Dashboard";
 import AdminWorkspaces from "./pages/admin/Workspaces";
 import AdminUsers from "./pages/admin/Users";
