@@ -1250,7 +1250,7 @@ function NodeDocView({ node }: { node: NodeDoc }) {
             <span className={`docs-pill ${cat.color.replace("text-", "text-").replace("bg-", "bg-").replace("border-", "border-")}`}>
               <Icon className="w-3 h-3" /> {cat.label}
             </span>
-            <code className="docs-path">type: "{node.id}"</code>
+            <code className="docs-path">node: "{node.id}"</code>
           </div>
           <h1 className="text-3xl font-semibold tracking-tight text-foreground flex items-center gap-3">
             <span className="docs-node-icon"><Icon className="w-5 h-5" /></span>
