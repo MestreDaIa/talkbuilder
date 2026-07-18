@@ -814,6 +814,21 @@ const sections: ApiSection[] = [
     overview: overviewDoc,
   },
   {
+    id: "sistema",
+    label: "Sistema",
+    icon: Layers,
+    baseUrl: API_PROXY_URL,
+    description: "Guias sobre a plataforma: arquitetura, integrações, operação e segurança.",
+    auth: { type: "none", description: "Documentação conceitual." },
+    sidebar: [
+      { label: "Começando", items: systemGuides.slice(0, 3).map((g) => ({ id: g.id, label: g.title })) },
+      { label: "Runtime & IA", items: systemGuides.slice(3, 8).map((g) => ({ id: g.id, label: g.title })) },
+      { label: "Operação", items: systemGuides.slice(8).map((g) => ({ id: g.id, label: g.title })) },
+    ],
+    endpoints: {},
+    reference: systemGuides,
+  },
+  {
     id: "booking",
     label: "Booking Integration",
     icon: Plug,
