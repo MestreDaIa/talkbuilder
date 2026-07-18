@@ -1378,9 +1378,9 @@ export default function DocsPage() {
       <header className="docs-header">
         <div className="docs-header__inner">
           <a href="/" className="docs-brand">
-            <img src="/src/assets/logo-mark.svg" alt="" className="docs-brand__logo" />
+            <img src={logoMark} alt="" className="docs-brand__logo" />
             <div className="docs-brand__text">
-              <img src="/src/assets/logo-wordmark.svg" alt="Zailom" className="docs-brand__wordmark" />
+              <img src={logoWordmark} alt="Zailom" className="docs-brand__wordmark" />
               <div className="docs-brand__sub">Developer Docs</div>
             </div>
           </a>
