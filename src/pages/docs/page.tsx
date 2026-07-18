@@ -928,9 +928,9 @@ const sections: ApiSection[] = [
   },
   {
     id: "bots",
-    label: "Bots & Nodes",
+    label: "Catálogo de Nodes",
     icon: Blocks,
-    baseUrl: "editor://bots",
+    baseUrl: "Referência do editor",
     description: "Catálogo completo dos blocos disponíveis no editor de fluxos.",
     auth: { type: "none", description: "Referência conceitual — não faz chamada HTTP." },
     sidebar: nodeCategories.map((cat) => ({
