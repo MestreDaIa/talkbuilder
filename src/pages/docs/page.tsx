@@ -1447,7 +1447,7 @@ export default function DocsPage() {
                   {group.items.map((it) => {
                     const active = it.id === activeItemId;
                     return (
-                      <button key={it.id} onClick={() => setActiveItemId(it.id)} className={`docs-sidebar__item ${active ? "docs-sidebar__item--active" : ""}`}>
+                      <button key={it.id} onClick={() => goTo(activeSectionId, it.id)} className={`docs-sidebar__item ${active ? "docs-sidebar__item--active" : ""}`}>
                         {it.method && <MethodBadge method={it.method} />}
                         <span className="flex-1 truncate">{it.label}</span>
                       </button>
