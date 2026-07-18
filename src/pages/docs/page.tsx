@@ -32,6 +32,8 @@ import {
 } from "lucide-react";
 import { nodeCategories, nodeDocs, type NodeDoc } from "./nodesCatalog";
 import { systemGuides } from "./systemGuides";
+import logoMark from "@/assets/logo-mark.svg";
+import logoWordmark from "@/assets/logo-wordmark.svg";
 
 /* -------------------------------------------------------------------------- */
 /* Types                                                                       */
@@ -1227,7 +1229,7 @@ print(r.status_code, r.json())`;
             <div className="docs-panel__bar">
               <span className="text-xs text-muted-foreground font-mono">200 · application/json</span>
             </div>
-            <CodeBlock code={endpoint.responseExample} lang="json" />
+            <CodeBlock code={endpoint.responseExample} />
           </div>
         </div>
       </aside>
@@ -1250,7 +1252,7 @@ function NodeDocView({ node }: { node: NodeDoc }) {
             <span className={`docs-pill ${cat.color.replace("text-", "text-").replace("bg-", "bg-").replace("border-", "border-")}`}>
               <Icon className="w-3 h-3" /> {cat.label}
             </span>
-            <code className="docs-path">type: "{node.id}"</code>
+            <code className="docs-path">node: "{node.id}"</code>
           </div>
           <h1 className="text-3xl font-semibold tracking-tight text-foreground flex items-center gap-3">
             <span className="docs-node-icon"><Icon className="w-5 h-5" /></span>
@@ -1286,7 +1288,7 @@ function NodeDocView({ node }: { node: NodeDoc }) {
             <div className="docs-panel__bar">
               <span className="text-xs text-muted-foreground font-mono">exemplo</span>
             </div>
-            <CodeBlock code={node.example} lang="json" />
+            <CodeBlock code={node.example} />
           </div>
         </div>
       </aside>
@@ -1376,9 +1378,9 @@ export default function DocsPage() {
       <header className="docs-header">
         <div className="docs-header__inner">
           <a href="/" className="docs-brand">
-            <div className="docs-brand__mark"><Zap className="w-4 h-4" /></div>
+            <img src={logoMark} alt="" className="docs-brand__logo" />
             <div className="docs-brand__text">
-              <div className="docs-brand__title">Zailom</div>
+              <img src={logoWordmark} alt="Zailom" className="docs-brand__wordmark" />
               <div className="docs-brand__sub">Developer Docs</div>
             </div>
           </a>
