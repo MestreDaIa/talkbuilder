@@ -109,6 +109,8 @@ function App() {
 
       {/* Documentação pública da API */}
       <Route path="/docs" element={<DocsPage />} />
+      <Route path="/docs/:section" element={<DocsPage />} />
+      <Route path="/docs/:section/:item" element={<DocsPage />} />
 
       {/* Auth */}
       <Route path="/login" element={<AuthRoute><LoginPage /></AuthRoute>} />
