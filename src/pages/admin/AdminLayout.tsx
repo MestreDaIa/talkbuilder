@@ -25,7 +25,7 @@ export default function AdminLayout() {
       </div>
     );
   }
-  if (!user) return <Navigate to="/login" replace />;
+  if (!user) return <Navigate to="/admin/login" replace />;
   if (!isSuperAdmin) {
     return (
       <div className="min-h-svh flex items-center justify-center bg-[#0b0a12] text-white text-center px-6">
