@@ -1,7 +1,9 @@
-import { supabase } from "@/integrations/supabase/client";
+import { getSupabase } from "@/lib/supabaseClient";
+const supabase = getSupabase();
 
 const SUPABASE_URL =
-  import.meta.env.VITE_SUPABASE_URL || "https://fwoescubnnagdvwasbjl.supabase.co";
+  import.meta.env.VITE_EXTERNAL_SUPABASE_URL ||
+  "https://fwoescubnnagdvwasbjl.supabase.co";
 
 async function authHeader() {
   const { data } = await supabase.auth.getSession();
