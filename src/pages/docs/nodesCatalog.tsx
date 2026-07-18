@@ -61,7 +61,7 @@ export const nodeDocs: NodeDoc[] = [
     outputs: ["next"],
   },
   {
-    id: "webhook", title: "Webhook", category: "flow", icon: Webhook,
+    id: "webhook", title: "Webhook", category: "logic", icon: Webhook,
     summary: "Recebe payload externo e injeta no contexto.",
     description: "Cria um endpoint exclusivo do fluxo que aceita POST. O corpo é gravado na variável configurada e o fluxo continua a partir deste nó.",
     useCases: ["Iniciar fluxo por evento externo", "Sincronização com CRM"],
