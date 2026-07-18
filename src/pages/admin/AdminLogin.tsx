@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { useNavigate, Navigate } from "react-router-dom";
-import { supabase } from "@/integrations/supabase/client";
+import { getSupabase } from "@/lib/supabaseClient";
+const supabase = getSupabase();
 import { useAuth } from "@/context/AuthContext";
 import { useSuperAdmin } from "@/hooks/useSuperAdmin";
 import { ShieldCheck, Loader2 } from "lucide-react";
