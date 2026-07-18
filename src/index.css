@@ -867,7 +867,24 @@ a[href*="lovable.dev"][target="_blank"] {
 .prose-docs { color: var(--docs-text); font-size: 14.5px; line-height: 1.7; }
 .prose-docs h2 { color: #fff; font-size: 18px; font-weight: 600; margin-top: 28px; margin-bottom: 12px; }
 .prose-docs p { color: var(--docs-muted); margin-bottom: 12px; }
-.prose-docs code { background: rgba(255,255,255,0.06); padding: 2px 6px; border-radius: 4px; font-size: 12.5px; }
+.prose-docs :not(pre) > code { background: rgba(255,255,255,0.06); padding: 2px 6px; border-radius: 4px; font-size: 12.5px; color: var(--docs-text); display: inline; }
+
+/* Reset global code styles inside docs code blocks so <pre><code> renders as a real block */
+.docs-code__pre,
+.docs-code__pre code,
+.prose-docs pre,
+.prose-docs pre code {
+  display: block;
+  background: transparent;
+  padding: 0;
+  border-radius: 0;
+  color: #e2e2ea;
+  font-size: 12.5px;
+  line-height: 1.65;
+  white-space: pre;
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+}
+.docs-code__pre code { white-space: inherit; }
 .prose-docs a { color: var(--docs-accent); }
 .prose-docs ul { margin-left: 20px; margin-bottom: 12px; color: var(--docs-muted); }
 .prose-docs li { margin-bottom: 6px; }
