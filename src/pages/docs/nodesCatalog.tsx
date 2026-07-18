@@ -61,7 +61,7 @@ export const nodeDocs: NodeDoc[] = [
     outputs: ["next"],
   },
   {
-    id: "webhook", title: "Webhook", category: "flow", icon: Webhook,
+    id: "webhook", title: "Webhook", category: "logic", icon: Webhook,
     summary: "Recebe payload externo e injeta no contexto.",
     description: "Cria um endpoint exclusivo do fluxo que aceita POST. O corpo é gravado na variável configurada e o fluxo continua a partir deste nó.",
     useCases: ["Iniciar fluxo por evento externo", "Sincronização com CRM"],
@@ -72,7 +72,7 @@ export const nodeDocs: NodeDoc[] = [
     example: j({ id: "n2", type: "webhook", config: { variableName: "payload", secret: "shh" } }),
   },
   {
-    id: "http-request", title: "HTTP Request", category: "flow", icon: Globe,
+    id: "http-request", title: "HTTP Request", category: "logic", icon: Globe,
     summary: "Chamada HTTP síncrona a uma API externa.",
     description: "Executa GET/POST/PUT/PATCH/DELETE com headers, query e body dinâmicos (aceita interpolação {{variavel}}). A resposta é salva em variável e pode ter branches por status.",
     useCases: ["Consultar CRM", "Criar lead", "Buscar disponibilidade"],
@@ -328,18 +328,6 @@ export const nodeDocs: NodeDoc[] = [
     useCases: ["Espaçar mensagens", "Simular digitação"],
     fields: [{ name: "durationMs", type: "number", required: true, description: "Duração em ms." }],
     example: j({ id: "l4", type: "wait", config: { durationMs: 2000 } }),
-  },
-  {
-    id: "await", title: "Await", category: "logic", icon: Hourglass,
-    summary: "Espera evento externo (callback) para continuar.",
-    description: "Pausa até receber POST em endpoint específico com session_id. Útil para integrações assíncronas.",
-    useCases: ["Aguardar pagamento", "Callback de N8N"],
-    fields: [
-      { name: "eventName", type: "string", required: true, description: "Nome do evento aguardado." },
-      { name: "timeoutMs", type: "number", description: "Cancela após N ms." },
-      { name: "saveResponseTo", type: "string", description: "Variável para payload recebido." },
-    ],
-    example: j({ id: "l5", type: "await", config: { eventName: "payment_confirmed", timeoutMs: 600000, saveResponseTo: "payment" } }),
   },
 
   /* ------------------------- AI ------------------------- */
