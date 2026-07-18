@@ -32,6 +32,8 @@ import {
 } from "lucide-react";
 import { nodeCategories, nodeDocs, type NodeDoc } from "./nodesCatalog";
 import { systemGuides } from "./systemGuides";
+import logoMark from "@/assets/logo-mark.svg";
+import logoWordmark from "@/assets/logo-wordmark.svg";
 
 /* -------------------------------------------------------------------------- */
 /* Types                                                                       */
