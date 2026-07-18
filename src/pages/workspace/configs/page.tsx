@@ -14,6 +14,7 @@ import WorkspaceConfig from "./tabsListUI/WorkspaceConfig";
 import Preference from "./tabsListUI/Preference";
 import SecurityConfig from "./tabsListUI/Security";
 import KeysApi from "./tabsListUI/KeysApi";
+import FlowApiKeys from "./tabsListUI/FlowApiKeys";
 import IntegrationsSettings from "./tabsListUI/IntegrationsSettings";
 import PaymentPlan from "./tabsListUI/PaymentPlan";
 // WhatsAppConfig logic moved into IntegrationsSettings
@@ -126,7 +127,18 @@ export default function ConfigurationWorkspace() {
 							</TabsContent>
 							<TabsContent value="key">
 								<div className="animate-in fade-in slide-in-from-bottom-2 duration-300">
-									<KeysApi />
+									<Tabs defaultValue="flow" className="w-full">
+										<TabsList className="bg-[#EDF2F7] w-fit flex items-center justify-start p-1 rounded-xl mb-6 border border-[#E2E8F0]">
+											<TabsTrigger value="flow" className="px-4 py-2 rounded-lg data-[state=active]:bg-white data-[state=active]:text-primary data-[state=active]:shadow-sm">
+												Zailom Flow
+											</TabsTrigger>
+											<TabsTrigger value="booking" className="px-4 py-2 rounded-lg data-[state=active]:bg-white data-[state=active]:text-primary data-[state=active]:shadow-sm">
+												Zailom Booking
+											</TabsTrigger>
+										</TabsList>
+										<TabsContent value="flow"><FlowApiKeys /></TabsContent>
+										<TabsContent value="booking"><KeysApi /></TabsContent>
+									</Tabs>
 								</div>
 							</TabsContent>
 							<TabsContent value="integration">
