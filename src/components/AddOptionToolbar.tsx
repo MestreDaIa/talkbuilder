@@ -83,11 +83,37 @@ export default function AddOptionToolbar({ onAddFolder, onAddBot }: Props) {
 		setImportError(null)
 		try {
 			const text = await file.text()
-			const data = JSON.parse(text) as FlowExportData
-			if (!data.flow || !Array.isArray(data.flow.containers)) {
+			const raw = JSON.parse(text) as any
+
+			// Aceita dois formatos:
+			// 1) Export do construtor: { flow: { name, containers, edges, ... } }
+			// 2) Export do painel super admin: linha crua de chatbot_flows
+			//    { name, draft_containers, containers, draft_edges, edges, settings, ... }
+			let normalized: FlowExportData | null = null
+			if (raw?.flow && Array.isArray(raw.flow.containers)) {
+				normalized = raw as FlowExportData
+			} else if (raw && (raw.draft_containers || raw.containers)) {
+				const containers = raw.draft_containers ?? raw.containers ?? []
+				const edges = raw.draft_edges ?? raw.edges ?? []
+				if (!Array.isArray(containers)) {
+					throw new Error("Arquivo inválido: containers ausentes ou em formato incorreto.")
+				}
+				normalized = {
+					version: raw.version ?? "admin-export",
+					exportedAt: raw.exported_at ?? new Date().toISOString(),
+					flow: {
+						name: raw.name ?? "Bot importado",
+						description: raw.description ?? null,
+						emoji: raw.emoji ?? "🤖",
+						containers,
+						edges: Array.isArray(edges) ? edges : [],
+						settings: raw.settings ?? {},
+					},
+				}
+			} else {
 				throw new Error("Arquivo inválido: não contém um fluxo válido.")
 			}
-			setImportData(data)
+			setImportData(normalized)
 		} catch (err: any) {
 			setImportError(err?.message || "Erro ao ler arquivo")
 			setImportData(null)
