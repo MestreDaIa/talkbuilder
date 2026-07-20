@@ -284,7 +284,10 @@ Deno.serve(async (req) => {
     }
 
     if (path === "/notifications" && method === "POST") {
-      const { title, body: text, level, target_type, target_value, expires_at } = body ?? {};
+      const {
+        title, body: text, level, target_type, target_value, expires_at,
+        is_clickable, preview, image_url, video_url, link_url,
+      } = body ?? {};
       if (!title || !text || !target_type) return json(400, { error: "missing_fields" });
       if (!["global", "plan", "workspace", "user"].includes(target_type)) {
         return json(400, { error: "invalid_target_type" });
@@ -296,11 +299,16 @@ Deno.serve(async (req) => {
         target_type,
         target_value: target_value ?? null,
         expires_at: expires_at ?? null,
+        is_clickable: !!is_clickable,
+        preview: preview ?? null,
+        image_url: image_url ?? null,
+        video_url: video_url ?? null,
+        link_url:  link_url  ?? null,
         created_by: user.id,
       }).select().single();
       if (error) throw error;
       await audit("notification.create", "notification", data.id, {
-        target_type, target_value, level,
+        target_type, target_value, level, is_clickable,
       });
       return json(200, { notification: data });
     }
