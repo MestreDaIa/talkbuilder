@@ -117,6 +117,11 @@ export default function AdminUsers() {
                         className="p-1.5 rounded hover:bg-red-500/20">
                         {banned ? <CheckCircle2 className="w-4 h-4 text-emerald-300" /> : <Ban className="w-4 h-4 text-red-300" />}
                       </button>
+                      <button onClick={() => remove(u)} title="Excluir usuário"
+                        className="p-1.5 rounded hover:bg-red-500/20">
+                        <Trash2 className="w-4 h-4 text-red-300" />
+                      </button>
+
                     </div>
                   </td>
                 </tr>
