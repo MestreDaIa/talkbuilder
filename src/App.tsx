@@ -136,10 +136,24 @@ function App() {
         <Route index element={<AdminDashboard />} />
         <Route path="workspaces" element={<AdminWorkspaces />} />
         <Route path="users" element={<AdminUsers />} />
+        <Route path="bots" element={<AdminBots />} />
         <Route path="plans" element={<AdminPlans />} />
+        <Route path="billing" element={<AdminBilling />} />
         <Route path="notifications" element={<AdminNotifications />} />
         <Route path="audit" element={<AdminAudit />} />
       </Route>
+
+      {/* Página dedicada de notificação: /:slug/notification/:shortId */}
+      <Route
+        path="/:slug/notification/:shortId"
+        element={
+          <ProtectedRoute>
+            <SlugGuard>
+              <Layout><NotificationView /></Layout>
+            </SlugGuard>
+          </ProtectedRoute>
+        }
+      />
 
       {/* Bot público publicado: /:slug/flow/:publicId */}
       <Route path="/:slug/flow/:publicId" element={<PublicFlowPage />} />
