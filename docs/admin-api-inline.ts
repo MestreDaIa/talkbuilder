@@ -177,8 +177,10 @@ Deno.serve(async (req) => {
 
       await audit("workspace.create", "workspace", ws.id, { name, slug, owner_email: ownerEmail, plan });
       return json(200, { workspace: ws, owner_id: ownerId });
+    }
 
     const wsSuspend = path.match(/^\/workspaces\/([^/]+)\/(suspend|unsuspend)$/);
+
     if (wsSuspend && method === "POST") {
       const wsId = wsSuspend[1];
       const action = wsSuspend[2];
@@ -402,7 +404,7 @@ Deno.serve(async (req) => {
       const { data, error } = await admin.from("chatbot_flows").select("*").eq("id", bid).maybeSingle();
       if (error) throw error;
       if (!data) return json(404, { error: "bot_not_found" });
-      await audit("bot.export", "bot", bid, { title: data.title });
+      await audit("bot.export", "bot", bid, { name: data.name });
       return new Response(JSON.stringify(data, null, 2), {
         status: 200,
         headers: {
