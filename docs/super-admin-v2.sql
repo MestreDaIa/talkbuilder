@@ -107,7 +107,7 @@ create policy "super admin deletes flows"
 create or replace view public.v_admin_bots as
 select
   f.id,
-  f.title,
+  f.name as title,
   f.public_id,
   f.workspace_id,
   f.is_published,
