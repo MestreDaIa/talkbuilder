@@ -15,6 +15,7 @@ type FlowScope =
   | 'bots:read' | 'bots:run' | 'bots:write'
   | 'flows:read' | 'flows:write'
   | 'sessions:read' | 'sessions:write'
+  | 'workspace:read' | 'instances:read'
 
 const ALL_SCOPES: { id: FlowScope; label: string; desc: string }[] = [
   { id: 'bots:read',      label: 'bots:read',      desc: 'Listar e inspecionar bots' },
@@ -24,6 +25,8 @@ const ALL_SCOPES: { id: FlowScope; label: string; desc: string }[] = [
   { id: 'flows:write',    label: 'flows:write',    desc: 'Editar estrutura de fluxos' },
   { id: 'sessions:read',  label: 'sessions:read',  desc: 'Ler sessões de conversa' },
   { id: 'sessions:write', label: 'sessions:write', desc: 'Alterar / encerrar sessões' },
+  { id: 'workspace:read', label: 'workspace:read', desc: 'Integração Booking: ler dados do workspace' },
+  { id: 'instances:read', label: 'instances:read', desc: 'Integração Booking: listar instâncias WhatsApp' },
 ]
 
 interface FlowKeyRow {
