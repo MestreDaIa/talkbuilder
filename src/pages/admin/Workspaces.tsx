@@ -57,12 +57,23 @@ export default function AdminWorkspaces() {
     catch (e: any) { alert(e.message); }
   }
 
+  const [showCreate, setShowCreate] = useState(false);
+
   return (
     <div className="space-y-5">
-      <div>
-        <h1 className="text-2xl font-semibold">Workspaces</h1>
-        <p className="text-sm text-white/50">Gestão de todas as contas da plataforma</p>
+      <div className="flex items-center justify-between gap-3">
+        <div>
+          <h1 className="text-2xl font-semibold">Workspaces</h1>
+          <p className="text-sm text-white/50">Gestão de todas as contas da plataforma</p>
+        </div>
+        <button onClick={() => setShowCreate(true)}
+          className="inline-flex items-center gap-2 px-4 py-2 rounded-md bg-white text-black text-sm font-medium hover:bg-white/90">
+          <Plus className="w-4 h-4" /> Criar workspace
+        </button>
       </div>
+
+      {showCreate && <CreateWorkspaceModal onClose={() => setShowCreate(false)} onCreated={load} />}
+
 
       <div className="flex flex-wrap gap-2">
         <div className="relative flex-1 min-w-[220px]">
