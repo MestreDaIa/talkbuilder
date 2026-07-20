@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { Bell } from "lucide-react";
 import * as Popover from "@radix-ui/react-popover";
+import { useNavigate, useParams } from "react-router-dom";
 import { getSupabase } from "@/lib/supabaseClient";
 const supabase = getSupabase();
 import { useAuth } from "@/context/AuthContext";
@@ -9,6 +10,8 @@ type N = {
   id: string; title: string; body: string; level: string;
   target_type: string; target_value: string | null;
   created_at: string; expires_at: string | null;
+  is_clickable: boolean; preview: string | null; short_id: string;
+  image_url: string | null; video_url: string | null; link_url: string | null;
 };
 
 const levelDot: Record<string, string> = {
@@ -19,7 +22,11 @@ const levelDot: Record<string, string> = {
 };
 
 export default function NotificationBell() {
-  const { user } = useAuth();
+  const { user, currentWorkspace, profile } = useAuth();
+  const navigate = useNavigate();
+  const params = useParams();
+  const activeSlug = (params as any).slug || currentWorkspace?.slug || profile?.slug;
+
   const [items, setItems] = useState<N[]>([]);
   const [reads, setReads] = useState<Set<string>>(new Set());
   const [open, setOpen] = useState(false);
@@ -66,6 +73,14 @@ export default function NotificationBell() {
     await supabase.from("notification_reads" as any).insert(toInsert);
   }
 
+  function onClickItem(n: N) {
+    markRead(n.id);
+    if (n.is_clickable && n.short_id && activeSlug) {
+      setOpen(false);
+      navigate(`/${activeSlug}/notification/${n.short_id}`);
+    }
+  }
+
   if (!user) return null;
 
   return (
@@ -100,19 +115,30 @@ export default function NotificationBell() {
             )}
             {items.map((n) => {
               const isRead = reads.has(n.id);
+              // preview curto para notificações clicáveis, corpo completo para as demais
+              const teaser = n.is_clickable
+                ? (n.preview?.trim() || (n.body || "").slice(0, 120) + ((n.body || "").length > 120 ? "…" : ""))
+                : n.body;
               return (
                 <button
                   key={n.id}
-                  onClick={() => markRead(n.id)}
+                  onClick={() => onClickItem(n)}
                   className={`w-full text-left px-4 py-3 border-b border-white/5 hover:bg-white/[0.04] ${isRead ? "opacity-60" : ""}`}
                 >
                   <div className="flex items-start gap-2">
                     <span className={`mt-1.5 w-2 h-2 rounded-full shrink-0 ${levelDot[n.level] ?? levelDot.info}`} />
-                    <div className="min-w-0">
+                    <div className="min-w-0 flex-1">
                       <div className="text-sm font-medium">{n.title}</div>
-                      <div className="text-xs text-white/60 mt-0.5 whitespace-pre-line">{n.body}</div>
-                      <div className="text-[10px] text-white/40 mt-1">
-                        {new Date(n.created_at).toLocaleString("pt-BR")}
+                      <div className={`text-xs text-white/60 mt-0.5 whitespace-pre-line ${n.is_clickable ? "line-clamp-2" : ""}`}>
+                        {teaser}
+                      </div>
+                      <div className="flex items-center justify-between mt-1">
+                        <div className="text-[10px] text-white/40">
+                          {new Date(n.created_at).toLocaleString("pt-BR")}
+                        </div>
+                        {n.is_clickable && (
+                          <div className="text-[10px] text-primary">Ver mais →</div>
+                        )}
                       </div>
                     </div>
                   </div>

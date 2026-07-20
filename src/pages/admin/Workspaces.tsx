@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { adminApi } from "@/lib/adminApi";
-import { Search, ShieldAlert, ShieldCheck, Trash2, Link2, ExternalLink } from "lucide-react";
+import { Search, ShieldAlert, ShieldCheck, Trash2, Link2, ExternalLink, Plus, X } from "lucide-react";
 
 type Ws = {
   id: string; name: string; slug: string;
@@ -57,12 +57,23 @@ export default function AdminWorkspaces() {
     catch (e: any) { alert(e.message); }
   }
 
+  const [showCreate, setShowCreate] = useState(false);
+
   return (
     <div className="space-y-5">
-      <div>
-        <h1 className="text-2xl font-semibold">Workspaces</h1>
-        <p className="text-sm text-white/50">Gestão de todas as contas da plataforma</p>
+      <div className="flex items-center justify-between gap-3">
+        <div>
+          <h1 className="text-2xl font-semibold">Workspaces</h1>
+          <p className="text-sm text-white/50">Gestão de todas as contas da plataforma</p>
+        </div>
+        <button onClick={() => setShowCreate(true)}
+          className="inline-flex items-center gap-2 px-4 py-2 rounded-md bg-white text-black text-sm font-medium hover:bg-white/90">
+          <Plus className="w-4 h-4" /> Criar workspace
+        </button>
       </div>
+
+      {showCreate && <CreateWorkspaceModal onClose={() => setShowCreate(false)} onCreated={load} />}
+
 
       <div className="flex flex-wrap gap-2">
         <div className="relative flex-1 min-w-[220px]">
@@ -177,6 +188,99 @@ export default function AdminWorkspaces() {
           </tbody>
         </table>
       </div>
+    </div>
+  );
+}
+
+function CreateWorkspaceModal({ onClose, onCreated }: { onClose: () => void; onCreated: () => void }) {
+  const [name, setName] = useState("");
+  const [slug, setSlug] = useState("");
+  const [ownerEmail, setOwnerEmail] = useState("");
+  const [ownerName, setOwnerName] = useState("");
+  const [ownerPassword, setOwnerPassword] = useState("");
+  const [plan, setPlan] = useState<"starter" | "pro" | "business">("starter");
+  const [busy, setBusy] = useState(false);
+  const [err, setErr] = useState<string | null>(null);
+
+  async function submit(e: React.FormEvent) {
+    e.preventDefault();
+    setBusy(true); setErr(null);
+    try {
+      await adminApi.createWorkspace({
+        name, slug, owner_email: ownerEmail,
+        owner_name: ownerName || undefined,
+        owner_password: ownerPassword || undefined,
+        plan,
+      });
+      onClose(); onCreated();
+    } catch (e: any) { setErr(e.message); }
+    finally { setBusy(false); }
+  }
+
+  return (
+    <div className="fixed inset-0 z-[200] bg-black/70 flex items-center justify-center p-4" onClick={onClose}>
+      <form onClick={(e) => e.stopPropagation()} onSubmit={submit}
+        className="w-full max-w-lg rounded-xl border border-white/10 bg-[#12101a] text-white p-6 space-y-4">
+        <div className="flex items-start justify-between">
+          <div>
+            <h2 className="text-lg font-semibold">Criar workspace</h2>
+            <p className="text-xs text-white/50">Cria (ou vincula) o owner e o workspace correspondente.</p>
+          </div>
+          <button type="button" onClick={onClose} className="p-1 rounded hover:bg-white/10">
+            <X className="w-4 h-4" />
+          </button>
+        </div>
+
+        <div className="grid grid-cols-2 gap-3">
+          <div className="col-span-2">
+            <label className="text-xs text-white/60 mb-1 block">Nome do workspace</label>
+            <input required value={name} onChange={(e) => setName(e.target.value)}
+              className="w-full bg-white/5 border border-white/10 rounded-md px-3 py-2 text-sm" />
+          </div>
+          <div className="col-span-2">
+            <label className="text-xs text-white/60 mb-1 block">Slug (aparece na URL)</label>
+            <input required value={slug} onChange={(e) => setSlug(e.target.value)}
+              placeholder="minha-empresa"
+              className="w-full bg-white/5 border border-white/10 rounded-md px-3 py-2 text-sm font-mono" />
+          </div>
+          <div>
+            <label className="text-xs text-white/60 mb-1 block">Email do owner</label>
+            <input required type="email" value={ownerEmail} onChange={(e) => setOwnerEmail(e.target.value)}
+              className="w-full bg-white/5 border border-white/10 rounded-md px-3 py-2 text-sm" />
+          </div>
+          <div>
+            <label className="text-xs text-white/60 mb-1 block">Nome do owner</label>
+            <input value={ownerName} onChange={(e) => setOwnerName(e.target.value)}
+              className="w-full bg-white/5 border border-white/10 rounded-md px-3 py-2 text-sm" />
+          </div>
+          <div>
+            <label className="text-xs text-white/60 mb-1 block">Senha inicial (opcional)</label>
+            <input value={ownerPassword} onChange={(e) => setOwnerPassword(e.target.value)}
+              type="text" placeholder="Deixe em branco = aleatória"
+              className="w-full bg-white/5 border border-white/10 rounded-md px-3 py-2 text-sm" />
+          </div>
+          <div>
+            <label className="text-xs text-white/60 mb-1 block">Plano</label>
+            <select value={plan} onChange={(e) => setPlan(e.target.value as any)}
+              className="w-full bg-white/5 border border-white/10 rounded-md px-3 py-2 text-sm">
+              <option value="starter">Starter</option>
+              <option value="pro">Pro</option>
+              <option value="business">Business</option>
+            </select>
+          </div>
+        </div>
+
+        {err && <div className="text-sm text-red-300">{err}</div>}
+
+        <div className="flex justify-end gap-2 pt-2">
+          <button type="button" onClick={onClose}
+            className="px-4 py-2 rounded-md bg-white/10 hover:bg-white/20 text-sm">Cancelar</button>
+          <button disabled={busy}
+            className="px-4 py-2 rounded-md bg-white text-black text-sm font-medium hover:bg-white/90 disabled:opacity-50">
+            {busy ? "Criando…" : "Criar workspace"}
+          </button>
+        </div>
+      </form>
     </div>
   );
 }

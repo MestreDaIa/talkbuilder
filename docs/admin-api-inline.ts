@@ -131,6 +131,53 @@ Deno.serve(async (req) => {
       return json(200, { workspaces: data });
     }
 
+    // POST /workspaces  body: { name, slug, owner_email, owner_password?, owner_name?, plan? }
+    if (path === "/workspaces" && method === "POST") {
+      const name = String(body?.name ?? "").trim();
+      const slugRaw = String(body?.slug ?? "").trim().toLowerCase();
+      const slug = slugRaw.replace(/[^a-z0-9-]+/g, "-").replace(/(^-+|-+$)/g, "");
+      const ownerEmail = String(body?.owner_email ?? "").trim().toLowerCase();
+      const ownerName = body?.owner_name ? String(body.owner_name) : null;
+      const ownerPassword = body?.owner_password ? String(body.owner_password) : null;
+      const plan = ["starter", "pro", "business"].includes(body?.plan) ? body.plan : "starter";
+      if (!name || !slug || !ownerEmail) return json(400, { error: "missing_fields" });
+
+      // Find or create user
+      let ownerId: string | null = null;
+      const { data: existing } = await admin.auth.admin.listUsers({ page: 1, perPage: 200 });
+      const found = existing?.users?.find((u) => u.email?.toLowerCase() === ownerEmail);
+      if (found) {
+        ownerId = found.id;
+      } else {
+        const { data: created, error: cErr } = await admin.auth.admin.createUser({
+          email: ownerEmail,
+          password: ownerPassword ?? crypto.randomUUID(),
+          email_confirm: true,
+          user_metadata: { full_name: ownerName, slug },
+        });
+        if (cErr) return json(400, { error: "create_user_failed", detail: cErr.message });
+        ownerId = created.user?.id ?? null;
+      }
+      if (!ownerId) return json(500, { error: "owner_id_null" });
+
+      // Upsert profile
+      await admin.from("profiles").upsert({
+        id: ownerId, email: ownerEmail, full_name: ownerName, slug, plan,
+      }, { onConflict: "id" });
+
+      // Create workspace
+      const { data: ws, error: wsErr } = await admin.from("workspaces").insert({
+        name, slug, owner_id: ownerId,
+      }).select().single();
+      if (wsErr) return json(400, { error: "create_workspace_failed", detail: wsErr.message });
+
+      await admin.from("workspace_members").insert({
+        workspace_id: ws.id, user_id: ownerId, role: "owner",
+      });
+
+      await audit("workspace.create", "workspace", ws.id, { name, slug, owner_email: ownerEmail, plan });
+      return json(200, { workspace: ws, owner_id: ownerId });
+
     const wsSuspend = path.match(/^\/workspaces\/([^/]+)\/(suspend|unsuspend)$/);
     if (wsSuspend && method === "POST") {
       const wsId = wsSuspend[1];
@@ -284,7 +331,10 @@ Deno.serve(async (req) => {
     }
 
     if (path === "/notifications" && method === "POST") {
-      const { title, body: text, level, target_type, target_value, expires_at } = body ?? {};
+      const {
+        title, body: text, level, target_type, target_value, expires_at,
+        is_clickable, preview, image_url, video_url, link_url,
+      } = body ?? {};
       if (!title || !text || !target_type) return json(400, { error: "missing_fields" });
       if (!["global", "plan", "workspace", "user"].includes(target_type)) {
         return json(400, { error: "invalid_target_type" });
@@ -296,11 +346,16 @@ Deno.serve(async (req) => {
         target_type,
         target_value: target_value ?? null,
         expires_at: expires_at ?? null,
+        is_clickable: !!is_clickable,
+        preview: preview ?? null,
+        image_url: image_url ?? null,
+        video_url: video_url ?? null,
+        link_url:  link_url  ?? null,
         created_by: user.id,
       }).select().single();
       if (error) throw error;
       await audit("notification.create", "notification", data.id, {
-        target_type, target_value, level,
+        target_type, target_value, level, is_clickable,
       });
       return json(200, { notification: data });
     }
@@ -324,6 +379,87 @@ Deno.serve(async (req) => {
         .limit(limit);
       if (error) throw error;
       return json(200, { entries: data });
+    }
+
+    // -------------------------- BOTS ----------------------------------------
+    if (path === "/bots" && method === "GET") {
+      const search = url.searchParams.get("search")?.trim() ?? "";
+      const status = url.searchParams.get("status") ?? ""; // published|unpublished|blocked|banned
+      let q = admin.from("v_admin_bots").select("*").order("created_at", { ascending: false }).limit(500);
+      if (search) q = q.or(`title.ilike.%${search}%,workspace_name.ilike.%${search}%,owner_email.ilike.%${search}%`);
+      if (status === "published") q = q.eq("is_published", true);
+      if (status === "unpublished") q = q.eq("is_published", false);
+      if (status === "blocked") q = q.eq("is_blocked", true);
+      if (status === "banned") q = q.eq("is_banned", true);
+      const { data, error } = await q;
+      if (error) throw error;
+      return json(200, { bots: data });
+    }
+
+    const botExport = path.match(/^\/bots\/([^/]+)\/export$/);
+    if (botExport && method === "GET") {
+      const bid = botExport[1];
+      const { data, error } = await admin.from("chatbot_flows").select("*").eq("id", bid).maybeSingle();
+      if (error) throw error;
+      if (!data) return json(404, { error: "bot_not_found" });
+      await audit("bot.export", "bot", bid, { title: data.title });
+      return new Response(JSON.stringify(data, null, 2), {
+        status: 200,
+        headers: {
+          ...corsHeaders,
+          "Content-Type": "application/json",
+          "Content-Disposition": `attachment; filename="bot-${data.public_id ?? bid}.json"`,
+        },
+      });
+    }
+
+    const botAction = path.match(/^\/bots\/([^/]+)\/(publish|unpublish|block|unblock|ban|unban)$/);
+    if (botAction && method === "POST") {
+      const bid = botAction[1];
+      const act = botAction[2];
+      const reason = body?.reason ?? null;
+      const now = new Date().toISOString();
+      const patch: Record<string, unknown> =
+        act === "publish"   ? { is_published: true } :
+        act === "unpublish" ? { is_published: false } :
+        act === "block"     ? { is_blocked: true,  blocked_at: now, blocked_reason: reason } :
+        act === "unblock"   ? { is_blocked: false, blocked_at: null, blocked_reason: null } :
+        act === "ban"       ? { is_banned: true,   banned_at: now,  banned_reason: reason, is_published: false } :
+                              { is_banned: false,  banned_at: null, banned_reason: null };
+      const { error } = await admin.from("chatbot_flows").update(patch).eq("id", bid);
+      if (error) throw error;
+      await audit(`bot.${act}`, "bot", bid, patch);
+      return json(200, { ok: true });
+    }
+
+    const botDelete = path.match(/^\/bots\/([^/]+)$/);
+    if (botDelete && method === "DELETE") {
+      const bid = botDelete[1];
+      const { error } = await admin.from("chatbot_flows").delete().eq("id", bid);
+      if (error) throw error;
+      await audit("bot.delete", "bot", bid, null);
+      return json(200, { ok: true });
+    }
+
+    // -------------------------- BILLING -------------------------------------
+    if (path === "/billing" && method === "GET") {
+      const { data: rows, error } = await admin.from("v_admin_billing").select("*");
+      if (error) throw error;
+      const { data: prices } = await admin.from("plan_prices").select("*").order("plan");
+      const mrr = (rows ?? []).reduce((s: number, r: any) => s + Number(r.mrr_brl || 0), 0);
+      return json(200, { rows, prices, mrr_brl_total: mrr });
+    }
+
+    if (path === "/billing/prices" && method === "POST") {
+      const plan = String(body?.plan ?? "");
+      const price = Number(body?.price_brl ?? 0);
+      if (!plan) return json(400, { error: "missing_plan" });
+      const { error } = await admin.from("plan_prices").upsert({
+        plan, price_brl: price, updated_at: new Date().toISOString(),
+      });
+      if (error) throw error;
+      await audit("billing.price_update", "plan", plan, { price_brl: price });
+      return json(200, { ok: true });
     }
 
     return json(404, { error: "route_not_found", path, method });
