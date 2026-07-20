@@ -302,6 +302,28 @@ Deno.serve(async (req) => {
       return json(200, { ok: true });
     }
 
+    const userDelete = path.match(/^\/users\/([^/]+)$/);
+    if (userDelete && method === "DELETE") {
+      const uid = userDelete[1];
+      // Remove workspaces onde é único owner, e memberships
+      const { data: memberships } = await admin
+        .from("workspace_members")
+        .select("workspace_id, role")
+        .eq("user_id", uid);
+      const ownedWs = (memberships ?? []).filter((m: any) => m.role === "owner").map((m: any) => m.workspace_id);
+      if (ownedWs.length) {
+        await admin.from("workspaces").delete().in("id", ownedWs);
+      }
+      await admin.from("workspace_members").delete().eq("user_id", uid);
+      await admin.from("profiles").delete().eq("id", uid);
+      const { error } = await admin.auth.admin.deleteUser(uid);
+      if (error) throw error;
+      await audit("user.delete", "user", uid, {});
+      return json(200, { ok: true });
+    }
+
+
+
     // -------------------------- PLANS ---------------------------------------
     // POST /plans/:workspace_id   body: { plan, custom_bots_limit?, custom_messages_limit?, custom_integrations_limit?, reason? }
     const planUpdate = path.match(/^\/plans\/([^/]+)$/);
