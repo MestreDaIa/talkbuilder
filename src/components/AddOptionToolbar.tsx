@@ -121,13 +121,23 @@ export default function AddOptionToolbar({ onAddFolder, onAddBot }: Props) {
 	}
 
 	async function handleConfirmImport() {
-		if (!importData || !user) return
+		if (!importData) {
+			setImportError("Selecione um arquivo JSON válido antes de importar.")
+			return
+		}
+		if (!user) {
+			setImportError("Sessão expirada. Faça login novamente para importar o bot.")
+			toast.error("Sessão expirada")
+			return
+		}
 		const supabase = getSupabase()
 		if (!supabase) {
-			toast.error("Supabase não configurado")
+			setImportError("Banco de dados não configurado.")
+			toast.error("Banco de dados não configurado")
 			return
 		}
 		if (!currentWorkspace?.id) {
+			setImportError("Workspace ativo não encontrado. Recarregue a página e tente novamente.")
 			toast.error("Workspace ativo não encontrado")
 			return
 		}
@@ -138,6 +148,7 @@ export default function AddOptionToolbar({ onAddFolder, onAddBot }: Props) {
 			const emoji = importData.flow.emoji || "🤖"
 			const name = importData.flow.name || "Bot importado"
 			const description = importData.flow.description || ""
+			const indexItem = nextIndexFor(items, currentFolderId)
 
 			// 1) cria o workspace_item (bot) — precisa de workspace_id, senão
 			// o item some ao recarregar (WorkspaceContext filtra por workspace_id).
@@ -150,7 +161,7 @@ export default function AddOptionToolbar({ onAddFolder, onAddBot }: Props) {
 				description,
 				emoji,
 				parent_id: currentFolderId,
-				index_item: 0,
+				index_item: indexItem,
 			})
 			if (wsErr) throw wsErr
 
@@ -178,7 +189,8 @@ export default function AddOptionToolbar({ onAddFolder, onAddBot }: Props) {
 					description,
 					emoji,
 					parentId: currentFolderId,
-					indexItem: 0,
+					indexItem,
+					persisted: true,
 				},
 			])
 
