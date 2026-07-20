@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { adminApi } from "@/lib/adminApi";
-import { Search, ShieldAlert, ShieldCheck, Trash2, Link2, ExternalLink } from "lucide-react";
+import { Search, ShieldAlert, ShieldCheck, Trash2, Link2, ExternalLink, Plus, X } from "lucide-react";
 
 type Ws = {
   id: string; name: string; slug: string;
