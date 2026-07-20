@@ -269,7 +269,7 @@ begin
     'total_users', (select count(*) from auth.users),
     'active_sessions_24h', (
       select count(*) from public.conversation_sessions
-      where last_activity_at > now() - interval '24 hours'
+      where last_interaction_at > now() - interval '24 hours'
     ),
     'plan_distribution', (
       select jsonb_object_agg(coalesce(pl, 'unknown'), c)
