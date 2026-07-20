@@ -34,6 +34,9 @@ ALTER TABLE public.flow_api_keys
 
 -- 2) Atualiza validação dentro da função create_flow_api_key
 --    (substitui a lista de escopos aceitos)
+-- Precisa DROP antes pois o RETURNS TABLE pode ter mudado entre versões.
+DROP FUNCTION IF EXISTS public.create_flow_api_key(UUID, TEXT, TEXT[], TIMESTAMPTZ);
+
 CREATE OR REPLACE FUNCTION public.create_flow_api_key(
   _workspace_id UUID,
   _name         TEXT,
