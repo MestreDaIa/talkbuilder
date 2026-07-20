@@ -66,6 +66,12 @@ export const adminApi = {
     },
   ) => call(`/plans/${workspaceId}`, { method: "POST", body: JSON.stringify(payload) }),
 
+  createWorkspace: (payload: {
+    name: string; slug: string; owner_email: string;
+    owner_name?: string; owner_password?: string;
+    plan?: "starter" | "pro" | "business";
+  }) => call("/workspaces", { method: "POST", body: JSON.stringify(payload) }),
+
   listNotifications: () => call("/notifications"),
   createNotification: (payload: {
     title: string;
@@ -74,8 +80,37 @@ export const adminApi = {
     target_type: "global" | "plan" | "workspace" | "user";
     target_value?: string | null;
     expires_at?: string | null;
+    is_clickable?: boolean;
+    preview?: string | null;
+    image_url?: string | null;
+    video_url?: string | null;
+    link_url?: string | null;
   }) => call("/notifications", { method: "POST", body: JSON.stringify(payload) }),
   deleteNotification: (id: string) => call(`/notifications/${id}`, { method: "DELETE" }),
+
+  // Bots
+  listBots: (params: { search?: string; status?: string } = {}) => {
+    const q = new URLSearchParams();
+    if (params.search) q.set("search", params.search);
+    if (params.status) q.set("status", params.status);
+    const qs = q.toString();
+    return call(`/bots${qs ? `?${qs}` : ""}`);
+  },
+  botAction: (id: string, action: "publish" | "unpublish" | "block" | "unblock" | "ban" | "unban", reason?: string) =>
+    call(`/bots/${id}/${action}`, { method: "POST", body: JSON.stringify({ reason }) }),
+  deleteBot: (id: string) => call(`/bots/${id}`, { method: "DELETE" }),
+  exportBotUrl: (id: string) => `${SUPABASE_URL}/functions/v1/admin-api/bots/${id}/export`,
+  exportBot: async (id: string) => {
+    const headers = await authHeader();
+    const res = await fetch(`${SUPABASE_URL}/functions/v1/admin-api/bots/${id}/export`, { headers });
+    if (!res.ok) throw new Error(`Falha ao exportar: HTTP ${res.status}`);
+    return res.blob();
+  },
+
+  // Billing
+  billing: () => call("/billing"),
+  updatePrice: (plan: string, price_brl: number) =>
+    call("/billing/prices", { method: "POST", body: JSON.stringify({ plan, price_brl }) }),
 
   audit: (limit = 200) => call(`/audit?limit=${limit}`),
 };
