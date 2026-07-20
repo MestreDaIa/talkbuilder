@@ -5,16 +5,67 @@
 // Nome da function: flow-api
 // Verify JWT: DESATIVADO (autenticação é feita via Flow API Key)
 //
-// Basta:
+// Deploy:
 //   1. Criar function chamada `flow-api` no dashboard.
 //   2. Colar ESTE arquivo inteiro em index.ts.
 //   3. Salvar / Deploy.
+//   4. Rodar `docs/flow-api-v2-scopes.sql` no SQL Editor (uma vez)
+//      para habilitar os escopos `workspace:read` e `instances:read`.
 //
-// Endpoints (mesma spec da versão modular):
-//   GET  /flow-api/v1/bots
-//   GET  /flow-api/v1/bots/:botId
-//   POST /flow-api/v1/bots/:botId/run
-//   GET  /flow-api/v1/sessions?bot_id=&contact_id=
+// ------------------------------------------------------------
+// AUTENTICAÇÃO
+// ------------------------------------------------------------
+// Toda rota exige uma Flow API Key válida do workspace, enviada
+// em UM dos formatos abaixo:
+//   Authorization: Bearer zf_live_<64-hex>
+//   x-flow-api-key: zf_live_<64-hex>
+//
+// A chave define o workspace. É PROIBIDO informar workspace_id no
+// body / query — o servidor sempre resolve pelo dono da chave e
+// nunca permite acesso cruzado entre workspaces.
+//
+// ------------------------------------------------------------
+// ENDPOINTS
+// ------------------------------------------------------------
+//
+// [Integração Zailom Booking → Flow] (scopes novos)
+//   GET  /flow-api/v1/health             (qualquer scope válido)
+//        Valida rapidamente se a chave, o workspace e a API
+//        estão OK. Usado logo após "Conectar" no Booking.
+//        200 → { ok:true, workspace_id, key_id, scopes, server_time }
+//
+//   GET  /flow-api/v1/workspace          (scope: workspace:read)
+//        Retorna dados básicos do workspace autenticado.
+//        200 → { data: { id, name, slug, plan, status, embed:{...}, created_at } }
+//
+//   GET  /flow-api/v1/instances          (scope: instances:read)
+//        Lista todas as instâncias WhatsApp do workspace.
+//        200 → { data: [ { id, name, instance_name, status,
+//                          phone_number, last_connected_at,
+//                          connection_state, created_at, updated_at } ] }
+//
+//   GET  /flow-api/v1/instances/:id      (scope: instances:read)
+//        Detalhe de uma instância. 404 se não pertencer ao workspace.
+//
+// [Bots — já existentes]
+//   GET  /flow-api/v1/bots               (scope: bots:read)
+//        Lista bots (por padrão apenas publicados; use ?all=1 para todos).
+//   GET  /flow-api/v1/bots/:botId        (scope: bots:read)
+//   POST /flow-api/v1/bots/:botId/run    (scope: bots:run)
+//
+// [Sessões — já existente]
+//   GET  /flow-api/v1/sessions?bot_id=&contact_id=   (scope: sessions:read)
+//
+// ------------------------------------------------------------
+// CÓDIGOS HTTP
+// ------------------------------------------------------------
+//   200  OK
+//   400  parâmetro inválido
+//   401  chave ausente / inválida / revogada / expirada
+//   403  chave sem o scope necessário
+//   404  recurso não encontrado no workspace
+//   500  erro interno / falha de banco
+//   502  falha ao invocar chatbot-runtime
 // ============================================================
 // @ts-nocheck
 import { createClient } from "npm:@supabase/supabase-js@2";
@@ -66,6 +117,9 @@ function clientIp(req) {
 }
 
 // ---------- Autenticação via Flow API Key ----------
+// opts.requireScope pode ser:
+//   string  → exige exatamente esse scope
+//   null    → apenas exige que a chave seja válida (usado no /health)
 async function authenticateFlowRequest(req, opts) {
   const supabase = getServiceClient();
   const ip = clientIp(req);
@@ -116,7 +170,7 @@ async function authenticateFlowRequest(req, opts) {
   }
 
   const scopes = row.scopes || [];
-  if (!scopes.includes(opts.requireScope)) {
+  if (opts.requireScope && !scopes.includes(opts.requireScope)) {
     await supabase.from("flow_api_key_audit").insert({
       key_id: row.key_id,
       workspace_id: row.workspace_id,
@@ -147,7 +201,7 @@ async function authenticateFlowRequest(req, opts) {
       key_id: row.key_id,
       workspace_id: row.workspace_id,
       event: "used",
-      scope_used: opts.requireScope,
+      scope_used: opts.requireScope || "health",
       ip,
       user_agent: userAgent,
       route,
@@ -166,6 +220,50 @@ async function authenticateFlowRequest(req, opts) {
   };
 }
 
+// ---------- Helpers de mapeamento ----------
+function mapInstance(row) {
+  const settings = row.settings || {};
+  return {
+    id: row.id,
+    name: row.name ?? row.instance_name ?? null,
+    instance_name: row.instance_name ?? null,
+    status: row.status ?? null,
+    connection_state: settings.connection_state ?? settings.state ?? row.status ?? null,
+    phone_number:
+      settings.phone_number ??
+      settings.number ??
+      settings.wa_number ??
+      settings.owner ??
+      null,
+    last_connected_at:
+      settings.last_connected_at ??
+      settings.connected_at ??
+      settings.lastConnectedAt ??
+      null,
+    created_at: row.created_at,
+    updated_at: row.updated_at,
+  };
+}
+
+function mapWorkspace(profile) {
+  return {
+    id: profile.id,
+    name: profile.full_name ?? profile.email ?? null,
+    slug: profile.slug ?? null,
+    email: profile.email ?? null,
+    plan: profile.plan ?? "starter",
+    status: profile.is_suspended ? "suspended" : "active",
+    embed: {
+      source: profile.embed_source ?? null,
+      company_id: profile.embed_company_id ?? null,
+      plan_tier: profile.embed_plan_tier ?? null,
+      plan_synced_at: profile.embed_plan_synced_at ?? null,
+      is_embed: !!profile.embed_source,
+    },
+    created_at: profile.created_at,
+  };
+}
+
 // ============================================================
 // HANDLER
 // ============================================================
@@ -180,7 +278,98 @@ Deno.serve(async (req) => {
   const route = vIdx >= 0 ? parts.slice(vIdx + 1) : parts;
 
   try {
-    // ---- GET /v1/bots ----
+    // ================================================================
+    // [Integração Booking] GET /v1/health
+    // ================================================================
+    if (req.method === "GET" && route.length === 1 && route[0] === "health") {
+      const auth = await authenticateFlowRequest(req, {
+        requireScope: null,
+        route: "/v1/health",
+      });
+      if ("error" in auth) return jsonResponse(auth.error.body, auth.error.status);
+      const { workspaceId, keyId, scopes } = auth.ctx;
+      return jsonResponse({
+        ok: true,
+        workspace_id: workspaceId,
+        key_id: keyId,
+        scopes,
+        server_time: new Date().toISOString(),
+      });
+    }
+
+    // ================================================================
+    // [Integração Booking] GET /v1/workspace
+    // ================================================================
+    if (req.method === "GET" && route.length === 1 && route[0] === "workspace") {
+      const auth = await authenticateFlowRequest(req, {
+        requireScope: "workspace:read",
+        route: "/v1/workspace",
+      });
+      if ("error" in auth) return jsonResponse(auth.error.body, auth.error.status);
+      const { supabase, workspaceId } = auth.ctx;
+
+      const { data, error } = await supabase
+        .from("profiles")
+        .select(
+          "id, full_name, email, slug, plan, is_suspended, embed_source, embed_company_id, embed_plan_tier, embed_plan_synced_at, created_at"
+        )
+        .eq("id", workspaceId)
+        .maybeSingle();
+
+      if (error) return jsonResponse({ error: error.message }, 500);
+      if (!data) return jsonResponse({ error: "Workspace não encontrado" }, 404);
+      return jsonResponse({ data: mapWorkspace(data) });
+    }
+
+    // ================================================================
+    // [Integração Booking] GET /v1/instances
+    // ================================================================
+    if (req.method === "GET" && route.length === 1 && route[0] === "instances") {
+      const auth = await authenticateFlowRequest(req, {
+        requireScope: "instances:read",
+        route: "/v1/instances",
+      });
+      if ("error" in auth) return jsonResponse(auth.error.body, auth.error.status);
+      const { supabase, workspaceId } = auth.ctx;
+
+      const { data, error } = await supabase
+        .from("whatsapp_connections")
+        .select("id, instance_name, name, status, settings, created_at, updated_at")
+        .eq("workspace_id", workspaceId)
+        .order("updated_at", { ascending: false })
+        .limit(200);
+
+      if (error) return jsonResponse({ error: error.message }, 500);
+      return jsonResponse({ data: (data ?? []).map(mapInstance) });
+    }
+
+    // ================================================================
+    // [Integração Booking] GET /v1/instances/:id
+    // ================================================================
+    if (req.method === "GET" && route.length === 2 && route[0] === "instances") {
+      const instanceId = route[1];
+      const auth = await authenticateFlowRequest(req, {
+        requireScope: "instances:read",
+        route: `/v1/instances/${instanceId}`,
+      });
+      if ("error" in auth) return jsonResponse(auth.error.body, auth.error.status);
+      const { supabase, workspaceId } = auth.ctx;
+
+      const { data, error } = await supabase
+        .from("whatsapp_connections")
+        .select("id, instance_name, name, status, settings, created_at, updated_at")
+        .eq("workspace_id", workspaceId)
+        .eq("id", instanceId)
+        .maybeSingle();
+
+      if (error) return jsonResponse({ error: error.message }, 500);
+      if (!data) return jsonResponse({ error: "Instância não encontrada" }, 404);
+      return jsonResponse({ data: mapInstance(data) });
+    }
+
+    // ================================================================
+    // GET /v1/bots  (por padrão apenas publicados; ?all=1 retorna todos)
+    // ================================================================
     if (req.method === "GET" && route.length === 1 && route[0] === "bots") {
       const auth = await authenticateFlowRequest(req, {
         requireScope: "bots:read",
@@ -189,15 +378,28 @@ Deno.serve(async (req) => {
       if ("error" in auth) return jsonResponse(auth.error.body, auth.error.status);
 
       const { supabase, workspaceId } = auth.ctx;
-      const { data, error } = await supabase
+      const includeAll = url.searchParams.get("all") === "1";
+      let q = supabase
         .from("chatbot_flows")
-        .select("id, name, description, is_published, updated_at, created_at")
+        .select("id, name, description, is_published, updated_at, created_at, public_id")
         .eq("workspace_id", workspaceId)
         .order("updated_at", { ascending: false })
         .limit(200);
+      if (!includeAll) q = q.eq("is_published", true);
 
+      const { data, error } = await q;
       if (error) return jsonResponse({ error: error.message }, 500);
-      return jsonResponse({ data });
+      const mapped = (data ?? []).map((b) => ({
+        id: b.id,
+        public_id: b.public_id ?? null,
+        name: b.name,
+        description: b.description ?? null,
+        is_published: !!b.is_published,
+        status: b.is_published ? "published" : "draft",
+        created_at: b.created_at,
+        updated_at: b.updated_at,
+      }));
+      return jsonResponse({ data: mapped });
     }
 
     // ---- GET /v1/bots/:id ----
@@ -219,7 +421,12 @@ Deno.serve(async (req) => {
 
       if (error) return jsonResponse({ error: error.message }, 500);
       if (!data) return jsonResponse({ error: "Bot não encontrado" }, 404);
-      return jsonResponse({ data });
+      return jsonResponse({
+        data: {
+          ...data,
+          status: data.is_published ? "published" : "draft",
+        },
+      });
     }
 
     // ---- POST /v1/bots/:id/run ----
