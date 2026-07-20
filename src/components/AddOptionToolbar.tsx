@@ -127,6 +127,10 @@ export default function AddOptionToolbar({ onAddFolder, onAddBot }: Props) {
 			toast.error("Supabase não configurado")
 			return
 		}
+		if (!currentWorkspace?.id) {
+			toast.error("Workspace ativo não encontrado")
+			return
+		}
 		setImporting(true)
 		try {
 			const newBotId = crypto.randomUUID()
@@ -135,9 +139,11 @@ export default function AddOptionToolbar({ onAddFolder, onAddBot }: Props) {
 			const name = importData.flow.name || "Bot importado"
 			const description = importData.flow.description || ""
 
-			// 1) cria o workspace_item (bot)
+			// 1) cria o workspace_item (bot) — precisa de workspace_id, senão
+			// o item some ao recarregar (WorkspaceContext filtra por workspace_id).
 			const { error: wsErr } = await supabase.from("workspace_items").insert({
 				id: newBotId,
+				workspace_id: currentWorkspace.id,
 				user_id: user.id,
 				type: "bot",
 				title: name,
@@ -148,8 +154,10 @@ export default function AddOptionToolbar({ onAddFolder, onAddBot }: Props) {
 			})
 			if (wsErr) throw wsErr
 
-			// 2) cria o chatbot_flows com os dados importados
+			// 2) cria o chatbot_flows com os dados importados — também precisa de
+			// workspace_id para RLS e para o ensureFlow encontrar a linha depois.
 			const { error: flowErr } = await supabase.from("chatbot_flows").insert({
+				workspace_id: currentWorkspace.id,
 				user_id: user.id,
 				workspace_item_id: newBotId,
 				name,
