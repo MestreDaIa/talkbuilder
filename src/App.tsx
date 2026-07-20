@@ -22,6 +22,9 @@ import AdminUsers from "./pages/admin/Users";
 import AdminPlans from "./pages/admin/Plans";
 import AdminNotifications from "./pages/admin/Notifications";
 import AdminAudit from "./pages/admin/Audit";
+import AdminBots from "./pages/admin/Bots";
+import AdminBilling from "./pages/admin/Billing";
+import NotificationView from "./pages/workspace/notification/[id]/page";
 
 
 import Layout from "./components/layout";
