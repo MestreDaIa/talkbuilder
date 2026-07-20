@@ -19,6 +19,8 @@ type typeItem = {
 	parentId: string | null;
 	type: "folder" | "bot";
 	indexItem?: number;
+	/** Item já persistido no banco; usado para sincronizar UI sem novo insert. */
+	persisted?: boolean;
 };
 
 type WorkspaceContextType = {
@@ -126,7 +128,7 @@ export function WorkspaceProvider({
 		const nextById = new Map(next.map((i) => [i.id, i]));
 
 		// INSERTs
-		const inserts = next.filter((i) => !prevById.has(i.id));
+		const inserts = next.filter((i) => !prevById.has(i.id) && !i.persisted);
 		if (inserts.length) {
 			console.log("[Workspace] inserting items:", inserts);
 			supabase
