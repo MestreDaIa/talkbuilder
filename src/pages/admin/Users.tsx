@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { adminApi } from "@/lib/adminApi";
-import { KeyRound, Ban, CheckCircle2, Link2 } from "lucide-react";
+import { KeyRound, Ban, CheckCircle2, Link2, Trash2 } from "lucide-react";
+
 
 type U = {
   id: string; email: string | null; created_at: string;
