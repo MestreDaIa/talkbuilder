@@ -45,6 +45,13 @@ export default function AdminUsers() {
       try { await adminApi.banUser(u.id); await load(); } catch (e: any) { alert(e.message); }
     }
   }
+  async function remove(u: U) {
+    const label = u.email || u.id;
+    if (!confirm(`Excluir permanentemente ${label}?\n\nIsto remove o usuário do Auth, o profile e workspaces em que ele é o único owner. Esta ação não pode ser desfeita.`)) return;
+    if (!confirm(`Confirmar exclusão de ${label}? Última chance.`)) return;
+    try { await adminApi.deleteUser(u.id); await load(); } catch (e: any) { alert(e.message); }
+  }
+
 
   return (
     <div className="space-y-5">
