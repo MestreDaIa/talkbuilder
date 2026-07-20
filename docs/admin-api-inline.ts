@@ -381,6 +381,87 @@ Deno.serve(async (req) => {
       return json(200, { entries: data });
     }
 
+    // -------------------------- BOTS ----------------------------------------
+    if (path === "/bots" && method === "GET") {
+      const search = url.searchParams.get("search")?.trim() ?? "";
+      const status = url.searchParams.get("status") ?? ""; // published|unpublished|blocked|banned
+      let q = admin.from("v_admin_bots").select("*").order("created_at", { ascending: false }).limit(500);
+      if (search) q = q.or(`title.ilike.%${search}%,workspace_name.ilike.%${search}%,owner_email.ilike.%${search}%`);
+      if (status === "published") q = q.eq("is_published", true);
+      if (status === "unpublished") q = q.eq("is_published", false);
+      if (status === "blocked") q = q.eq("is_blocked", true);
+      if (status === "banned") q = q.eq("is_banned", true);
+      const { data, error } = await q;
+      if (error) throw error;
+      return json(200, { bots: data });
+    }
+
+    const botExport = path.match(/^\/bots\/([^/]+)\/export$/);
+    if (botExport && method === "GET") {
+      const bid = botExport[1];
+      const { data, error } = await admin.from("chatbot_flows").select("*").eq("id", bid).maybeSingle();
+      if (error) throw error;
+      if (!data) return json(404, { error: "bot_not_found" });
+      await audit("bot.export", "bot", bid, { title: data.title });
+      return new Response(JSON.stringify(data, null, 2), {
+        status: 200,
+        headers: {
+          ...corsHeaders,
+          "Content-Type": "application/json",
+          "Content-Disposition": `attachment; filename="bot-${data.public_id ?? bid}.json"`,
+        },
+      });
+    }
+
+    const botAction = path.match(/^\/bots\/([^/]+)\/(publish|unpublish|block|unblock|ban|unban)$/);
+    if (botAction && method === "POST") {
+      const bid = botAction[1];
+      const act = botAction[2];
+      const reason = body?.reason ?? null;
+      const now = new Date().toISOString();
+      const patch: Record<string, unknown> =
+        act === "publish"   ? { is_published: true } :
+        act === "unpublish" ? { is_published: false } :
+        act === "block"     ? { is_blocked: true,  blocked_at: now, blocked_reason: reason } :
+        act === "unblock"   ? { is_blocked: false, blocked_at: null, blocked_reason: null } :
+        act === "ban"       ? { is_banned: true,   banned_at: now,  banned_reason: reason, is_published: false } :
+                              { is_banned: false,  banned_at: null, banned_reason: null };
+      const { error } = await admin.from("chatbot_flows").update(patch).eq("id", bid);
+      if (error) throw error;
+      await audit(`bot.${act}`, "bot", bid, patch);
+      return json(200, { ok: true });
+    }
+
+    const botDelete = path.match(/^\/bots\/([^/]+)$/);
+    if (botDelete && method === "DELETE") {
+      const bid = botDelete[1];
+      const { error } = await admin.from("chatbot_flows").delete().eq("id", bid);
+      if (error) throw error;
+      await audit("bot.delete", "bot", bid, null);
+      return json(200, { ok: true });
+    }
+
+    // -------------------------- BILLING -------------------------------------
+    if (path === "/billing" && method === "GET") {
+      const { data: rows, error } = await admin.from("v_admin_billing").select("*");
+      if (error) throw error;
+      const { data: prices } = await admin.from("plan_prices").select("*").order("plan");
+      const mrr = (rows ?? []).reduce((s: number, r: any) => s + Number(r.mrr_brl || 0), 0);
+      return json(200, { rows, prices, mrr_brl_total: mrr });
+    }
+
+    if (path === "/billing/prices" && method === "POST") {
+      const plan = String(body?.plan ?? "");
+      const price = Number(body?.price_brl ?? 0);
+      if (!plan) return json(400, { error: "missing_plan" });
+      const { error } = await admin.from("plan_prices").upsert({
+        plan, price_brl: price, updated_at: new Date().toISOString(),
+      });
+      if (error) throw error;
+      await audit("billing.price_update", "plan", plan, { price_brl: price });
+      return json(200, { ok: true });
+    }
+
     return json(404, { error: "route_not_found", path, method });
   } catch (err: any) {
     console.error("[admin-api] error:", err);
