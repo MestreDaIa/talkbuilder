@@ -34,8 +34,7 @@ export default function AdminLayout() {
         <div className="max-w-md space-y-3">
           <h1 className="text-2xl font-semibold">Acesso negado</h1>
           <p className="text-sm text-white/60">
-            Esta área é restrita a Super Administradores. Se você é o operador da plataforma,
-            promova seu usuário na tabela <code className="text-white/80">user_roles</code>.
+            Você não tem permissão para acessar esta área.
           </p>
           <NavLink to="/" className="inline-block text-sm text-primary underline underline-offset-4">
             Voltar
@@ -44,6 +43,7 @@ export default function AdminLayout() {
       </div>
     );
   }
+
 
   return (
     <div className="min-h-svh flex bg-[#0b0a12] text-white">
