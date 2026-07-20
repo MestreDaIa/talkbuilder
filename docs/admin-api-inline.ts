@@ -131,6 +131,53 @@ Deno.serve(async (req) => {
       return json(200, { workspaces: data });
     }
 
+    // POST /workspaces  body: { name, slug, owner_email, owner_password?, owner_name?, plan? }
+    if (path === "/workspaces" && method === "POST") {
+      const name = String(body?.name ?? "").trim();
+      const slugRaw = String(body?.slug ?? "").trim().toLowerCase();
+      const slug = slugRaw.replace(/[^a-z0-9-]+/g, "-").replace(/(^-+|-+$)/g, "");
+      const ownerEmail = String(body?.owner_email ?? "").trim().toLowerCase();
+      const ownerName = body?.owner_name ? String(body.owner_name) : null;
+      const ownerPassword = body?.owner_password ? String(body.owner_password) : null;
+      const plan = ["starter", "pro", "business"].includes(body?.plan) ? body.plan : "starter";
+      if (!name || !slug || !ownerEmail) return json(400, { error: "missing_fields" });
+
+      // Find or create user
+      let ownerId: string | null = null;
+      const { data: existing } = await admin.auth.admin.listUsers({ page: 1, perPage: 200 });
+      const found = existing?.users?.find((u) => u.email?.toLowerCase() === ownerEmail);
+      if (found) {
+        ownerId = found.id;
+      } else {
+        const { data: created, error: cErr } = await admin.auth.admin.createUser({
+          email: ownerEmail,
+          password: ownerPassword ?? crypto.randomUUID(),
+          email_confirm: true,
+          user_metadata: { full_name: ownerName, slug },
+        });
+        if (cErr) return json(400, { error: "create_user_failed", detail: cErr.message });
+        ownerId = created.user?.id ?? null;
+      }
+      if (!ownerId) return json(500, { error: "owner_id_null" });
+
+      // Upsert profile
+      await admin.from("profiles").upsert({
+        id: ownerId, email: ownerEmail, full_name: ownerName, slug, plan,
+      }, { onConflict: "id" });
+
+      // Create workspace
+      const { data: ws, error: wsErr } = await admin.from("workspaces").insert({
+        name, slug, owner_id: ownerId,
+      }).select().single();
+      if (wsErr) return json(400, { error: "create_workspace_failed", detail: wsErr.message });
+
+      await admin.from("workspace_members").insert({
+        workspace_id: ws.id, user_id: ownerId, role: "owner",
+      });
+
+      await audit("workspace.create", "workspace", ws.id, { name, slug, owner_email: ownerEmail, plan });
+      return json(200, { workspace: ws, owner_id: ownerId });
+
     const wsSuspend = path.match(/^\/workspaces\/([^/]+)\/(suspend|unsuspend)$/);
     if (wsSuspend && method === "POST") {
       const wsId = wsSuspend[1];
