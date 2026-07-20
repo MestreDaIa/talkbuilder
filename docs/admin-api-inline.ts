@@ -177,8 +177,10 @@ Deno.serve(async (req) => {
 
       await audit("workspace.create", "workspace", ws.id, { name, slug, owner_email: ownerEmail, plan });
       return json(200, { workspace: ws, owner_id: ownerId });
+    }
 
     const wsSuspend = path.match(/^\/workspaces\/([^/]+)\/(suspend|unsuspend)$/);
+
     if (wsSuspend && method === "POST") {
       const wsId = wsSuspend[1];
       const action = wsSuspend[2];
