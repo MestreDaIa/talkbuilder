@@ -142,13 +142,40 @@ Deno.serve(async (req) => {
       const plan = ["starter", "pro", "business"].includes(body?.plan) ? body.plan : "starter";
       if (!name || !slug || !ownerEmail) return json(400, { error: "missing_fields" });
 
-      // Find or create user
+      // --- 1) Pré-validação: procurar user existente por email ---
       let ownerId: string | null = null;
       const { data: existing } = await admin.auth.admin.listUsers({ page: 1, perPage: 200 });
       const found = existing?.users?.find((u) => u.email?.toLowerCase() === ownerEmail);
-      if (found) {
-        ownerId = found.id;
-      } else {
+      if (found) ownerId = found.id;
+
+      // --- 2) Pré-validação de slug (profiles e workspaces) ---
+      //     Se o slug já é do MESMO owner (mesmo email), tudo bem — reaproveita.
+      const { data: profileBySlug } = await admin
+        .from("profiles").select("id, email").eq("slug", slug).maybeSingle();
+      if (profileBySlug && profileBySlug.id !== ownerId) {
+        return json(409, {
+          error: "slug_taken",
+          detail: `Slug "${slug}" já está em uso por outra conta (${profileBySlug.email ?? "—"}).`,
+        });
+      }
+      const { data: wsBySlug } = await admin
+        .from("workspaces").select("id, owner_id").eq("slug", slug).maybeSingle();
+      if (wsBySlug && wsBySlug.owner_id !== ownerId) {
+        return json(409, {
+          error: "slug_taken",
+          detail: `Slug "${slug}" já está em uso por outro workspace.`,
+        });
+      }
+      if (wsBySlug && wsBySlug.owner_id === ownerId) {
+        return json(409, {
+          error: "workspace_exists",
+          detail: `Esse owner já possui um workspace com o slug "${slug}".`,
+        });
+      }
+
+      // --- 3) Criar user apenas depois das validações ---
+      let createdNewUser = false;
+      if (!ownerId) {
         const { data: created, error: cErr } = await admin.auth.admin.createUser({
           email: ownerEmail,
           password: ownerPassword ?? crypto.randomUUID(),
@@ -157,26 +184,41 @@ Deno.serve(async (req) => {
         });
         if (cErr) return json(400, { error: "create_user_failed", detail: cErr.message });
         ownerId = created.user?.id ?? null;
+        createdNewUser = true;
       }
       if (!ownerId) return json(500, { error: "owner_id_null" });
 
-      // Upsert profile
-      await admin.from("profiles").upsert({
-        id: ownerId, email: ownerEmail, full_name: ownerName, slug, plan,
-      }, { onConflict: "id" });
+      // --- 4) Upsert profile (sem sobrescrever slug de user existente que já tenha um) ---
+      const { data: existingProfile } = await admin
+        .from("profiles").select("id, slug").eq("id", ownerId).maybeSingle();
+      const profilePatch: Record<string, unknown> = {
+        id: ownerId, email: ownerEmail, full_name: ownerName, plan,
+      };
+      if (!existingProfile?.slug) profilePatch.slug = slug;
+      const { error: pErr } = await admin.from("profiles").upsert(profilePatch, { onConflict: "id" });
+      if (pErr) {
+        // rollback do user recém-criado para não deixar órfão
+        if (createdNewUser) await admin.auth.admin.deleteUser(ownerId).catch(() => {});
+        return json(400, { error: "profile_upsert_failed", detail: pErr.message });
+      }
 
-      // Create workspace
+      // --- 5) Criar workspace ---
       const { data: ws, error: wsErr } = await admin.from("workspaces").insert({
         name, slug, owner_id: ownerId,
       }).select().single();
-      if (wsErr) return json(400, { error: "create_workspace_failed", detail: wsErr.message });
+      if (wsErr) {
+        if (createdNewUser) await admin.auth.admin.deleteUser(ownerId).catch(() => {});
+        return json(400, { error: "create_workspace_failed", detail: wsErr.message });
+      }
 
       await admin.from("workspace_members").insert({
         workspace_id: ws.id, user_id: ownerId, role: "owner",
       });
 
-      await audit("workspace.create", "workspace", ws.id, { name, slug, owner_email: ownerEmail, plan });
-      return json(200, { workspace: ws, owner_id: ownerId });
+      await audit("workspace.create", "workspace", ws.id, {
+        name, slug, owner_email: ownerEmail, plan, reused_user: !createdNewUser,
+      });
+      return json(200, { workspace: ws, owner_id: ownerId, reused_user: !createdNewUser });
     }
 
     const wsSuspend = path.match(/^\/workspaces\/([^/]+)\/(suspend|unsuspend)$/);
