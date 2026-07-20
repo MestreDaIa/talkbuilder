@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { adminApi } from "@/lib/adminApi";
-import { KeyRound, Ban, CheckCircle2, Link2 } from "lucide-react";
+import { KeyRound, Ban, CheckCircle2, Link2, Trash2 } from "lucide-react";
+
 
 type U = {
   id: string; email: string | null; created_at: string;
@@ -44,6 +45,13 @@ export default function AdminUsers() {
       try { await adminApi.banUser(u.id); await load(); } catch (e: any) { alert(e.message); }
     }
   }
+  async function remove(u: U) {
+    const label = u.email || u.id;
+    if (!confirm(`Excluir permanentemente ${label}?\n\nIsto remove o usuário do Auth, o profile e workspaces em que ele é o único owner. Esta ação não pode ser desfeita.`)) return;
+    if (!confirm(`Confirmar exclusão de ${label}? Última chance.`)) return;
+    try { await adminApi.deleteUser(u.id); await load(); } catch (e: any) { alert(e.message); }
+  }
+
 
   return (
     <div className="space-y-5">
@@ -109,6 +117,11 @@ export default function AdminUsers() {
                         className="p-1.5 rounded hover:bg-red-500/20">
                         {banned ? <CheckCircle2 className="w-4 h-4 text-emerald-300" /> : <Ban className="w-4 h-4 text-red-300" />}
                       </button>
+                      <button onClick={() => remove(u)} title="Excluir usuário"
+                        className="p-1.5 rounded hover:bg-red-500/20">
+                        <Trash2 className="w-4 h-4 text-red-300" />
+                      </button>
+
                     </div>
                   </td>
                 </tr>

@@ -54,6 +54,8 @@ export const adminApi = {
     call(`/users/${uid}/ban`, { method: "POST", body: JSON.stringify({ duration }) }),
   unbanUser: (uid: string) =>
     call(`/users/${uid}/unban`, { method: "POST", body: "{}" }),
+  deleteUser: (uid: string) => call(`/users/${uid}`, { method: "DELETE" }),
+
 
   updatePlan: (
     workspaceId: string,
