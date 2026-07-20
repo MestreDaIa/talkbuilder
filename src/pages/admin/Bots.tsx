@@ -30,10 +30,11 @@ export default function AdminBots() {
 
   async function act(b: BotRow, action: "publish" | "unpublish" | "block" | "unblock" | "ban" | "unban") {
     let reason: string | undefined;
-    if (action === "block" || action === "ban") {
-      reason = window.prompt(`Motivo (${action}):`) ?? undefined;
-    } else if (action === "ban") {
+    if (action === "ban") {
       if (!confirm(`Banir "${b.title}"? Isso impede o bot de ser publicado novamente.`)) return;
+      reason = window.prompt("Motivo (ban):") ?? undefined;
+    } else if (action === "block") {
+      reason = window.prompt("Motivo (block):") ?? undefined;
     }
     try { await adminApi.botAction(b.id, action, reason); await load(); }
     catch (e: any) { alert(e.message); }
