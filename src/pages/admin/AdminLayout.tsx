@@ -1,6 +1,6 @@
 import { NavLink, Outlet, Navigate } from "react-router-dom";
 import {
-  LayoutDashboard, Building2, Users, CreditCard, Bell, FileClock, ArrowLeft,
+  LayoutDashboard, Building2, Users, Bot, CreditCard, DollarSign, Bell, FileClock, ArrowLeft,
 } from "lucide-react";
 import { useSuperAdmin } from "@/hooks/useSuperAdmin";
 import { useAuth } from "@/context/AuthContext";
@@ -9,7 +9,9 @@ const NAV = [
   { to: "/admin", end: true, label: "Dashboard", icon: LayoutDashboard },
   { to: "/admin/workspaces", label: "Workspaces", icon: Building2 },
   { to: "/admin/users", label: "Usuários", icon: Users },
+  { to: "/admin/bots", label: "Bots", icon: Bot },
   { to: "/admin/plans", label: "Planos", icon: CreditCard },
+  { to: "/admin/billing", label: "Faturamento", icon: DollarSign },
   { to: "/admin/notifications", label: "Notificações", icon: Bell },
   { to: "/admin/audit", label: "Auditoria", icon: FileClock },
 ];
