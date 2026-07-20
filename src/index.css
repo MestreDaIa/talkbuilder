@@ -919,3 +919,15 @@ a[href*="lovable.dev"][target="_blank"] {
 @media (max-width: 1280px) {
   .docs-scope .docs-search { display: none; }
 }
+
+/* Native <select> options — force readable colors in dark admin panel */
+select option,
+select optgroup {
+  background-color: #0f172a;
+  color: #e2e8f0;
+}
+select option:checked,
+select option:hover {
+  background-color: #1e293b;
+  color: #ffffff;
+}
