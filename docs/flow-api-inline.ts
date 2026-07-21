@@ -245,22 +245,25 @@ function mapInstance(row) {
   };
 }
 
-function mapWorkspace(profile) {
+function mapWorkspace(ws, ownerProfile) {
+  const p = ownerProfile || {};
   return {
-    id: profile.id,
-    name: profile.full_name ?? profile.email ?? null,
-    slug: profile.slug ?? null,
-    email: profile.email ?? null,
-    plan: profile.plan ?? "starter",
-    status: profile.is_suspended ? "suspended" : "active",
+    id: ws.id,
+    name: ws.name ?? p.full_name ?? p.email ?? null,
+    slug: ws.slug ?? p.slug ?? null,
+    email: p.email ?? null,
+    plan: p.plan ?? "starter",
+    status: p.is_suspended ? "suspended" : "active",
+    owner_id: ws.owner_id ?? null,
     embed: {
-      source: profile.embed_source ?? null,
-      company_id: profile.embed_company_id ?? null,
-      plan_tier: profile.embed_plan_tier ?? null,
-      plan_synced_at: profile.embed_plan_synced_at ?? null,
-      is_embed: !!profile.embed_source,
+      source: p.embed_source ?? null,
+      company_id: p.embed_company_id ?? null,
+      plan_tier: p.embed_plan_tier ?? null,
+      plan_synced_at: p.embed_plan_synced_at ?? null,
+      is_embed: !!p.embed_source,
     },
-    created_at: profile.created_at,
+    created_at: ws.created_at,
+    updated_at: ws.updated_at,
   };
 }
 
@@ -308,17 +311,29 @@ Deno.serve(async (req) => {
       if ("error" in auth) return jsonResponse(auth.error.body, auth.error.status);
       const { supabase, workspaceId } = auth.ctx;
 
-      const { data, error } = await supabase
-        .from("profiles")
-        .select(
-          "id, full_name, email, slug, plan, is_suspended, embed_source, embed_company_id, embed_plan_tier, embed_plan_synced_at, created_at"
-        )
+      // workspace_id refere-se a public.workspaces(id).
+      const { data: ws, error: wsErr } = await supabase
+        .from("workspaces")
+        .select("id, name, slug, owner_id, created_at, updated_at")
         .eq("id", workspaceId)
         .maybeSingle();
+      if (wsErr) return jsonResponse({ error: wsErr.message }, 500);
+      if (!ws) return jsonResponse({ error: "Workspace não encontrado" }, 404);
 
-      if (error) return jsonResponse({ error: error.message }, 500);
-      if (!data) return jsonResponse({ error: "Workspace não encontrado" }, 404);
-      return jsonResponse({ data: mapWorkspace(data) });
+      // Metadados de plano/embed vivem em profiles do owner (opcional).
+      let ownerProfile = null;
+      if (ws.owner_id) {
+        const { data: prof } = await supabase
+          .from("profiles")
+          .select(
+            "id, full_name, email, slug, plan, is_suspended, embed_source, embed_company_id, embed_plan_tier, embed_plan_synced_at"
+          )
+          .eq("id", ws.owner_id)
+          .maybeSingle();
+        ownerProfile = prof || null;
+      }
+
+      return jsonResponse({ data: mapWorkspace(ws, ownerProfile) });
     }
 
     // ================================================================
