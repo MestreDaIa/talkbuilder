@@ -288,14 +288,65 @@ app.get("/health", (req: Request, res: Response) => {
   res.json({ status: "ok" });
 });
 
+// =====================================================================
+// Proxy para Edge Functions do Supabase
+// Encaminha /functions/v1/* -> ${SUPABASE_URL}/functions/v1/*
+// Permite que o domínio público (ex: api-flowbuilder.zailom.com) sirva
+// a API pública sem expor o domínio *.supabase.co ao cliente.
+// =====================================================================
+app.use("/functions/v1", async (req: Request, res: Response) => {
+  const target = process.env.SUPABASE_URL;
+  if (!target) {
+    return res.status(500).json({ error: "SUPABASE_URL not configured on server" });
+  }
+  try {
+    const upstreamUrl = `${target.replace(/\/$/, "")}/functions/v1${req.url}`;
+
+    // Copia headers relevantes; remove hop-by-hop e host
+    const headers: Record<string, string> = {};
+    for (const [k, v] of Object.entries(req.headers)) {
+      if (!v) continue;
+      const key = k.toLowerCase();
+      if (["host", "connection", "content-length", "accept-encoding"].includes(key)) continue;
+      headers[k] = Array.isArray(v) ? v.join(", ") : String(v);
+    }
+    // Garante apikey (algumas edge functions exigem) usando anon do próprio servidor
+    if (!headers["apikey"] && process.env.SUPABASE_ANON_KEY) {
+      headers["apikey"] = process.env.SUPABASE_ANON_KEY;
+    }
+
+    const method = req.method.toUpperCase();
+    const hasBody = !["GET", "HEAD", "OPTIONS"].includes(method);
+    let body: string | undefined;
+    if (hasBody) {
+      body = typeof req.body === "string" ? req.body : JSON.stringify(req.body ?? {});
+      if (!headers["content-type"]) headers["content-type"] = "application/json";
+    }
+
+    const upstream = await fetch(upstreamUrl, { method, headers, body });
+    const buf = Buffer.from(await upstream.arrayBuffer());
+
+    upstream.headers.forEach((value, key) => {
+      const lk = key.toLowerCase();
+      if (["content-encoding", "transfer-encoding", "connection", "content-length"].includes(lk)) return;
+      res.setHeader(key, value);
+    });
+    res.status(upstream.status).send(buf);
+  } catch (err: any) {
+    console.error("[functions-proxy] error:", err?.message || err);
+    res.status(502).json({ error: "Bad Gateway", message: err?.message || "proxy_failed" });
+  }
+});
+
 // Rota de captura para 404 (garante que retorne JSON e não HTML)
 app.use((req: Request, res: Response) => {
   console.warn(`404 Not Found: ${req.method} ${req.url}`);
-  res.status(404).json({ 
-    error: "Not Found", 
-    message: `A rota ${req.method} ${req.url} não existe neste servidor.` 
+  res.status(404).json({
+    error: "Not Found",
+    message: `A rota ${req.method} ${req.url} não existe neste servidor.`
   });
 });
+
 
 app.listen(Number(port), "0.0.0.0", () => {
   console.log(`[${new Date().toISOString()}] Servidor inicializado com sucesso!`);
