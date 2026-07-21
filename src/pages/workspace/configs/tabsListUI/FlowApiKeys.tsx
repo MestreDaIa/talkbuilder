@@ -94,13 +94,14 @@ export default function FlowApiKeys() {
     }
 
     const row = Array.isArray(data) ? data[0] : data
-    if (!row?.plaintext_key) {
+    const plaintext = row?.plaintext ?? row?.plaintext_key
+    if (!plaintext) {
       toast.error('A chave foi criada, mas o valor não foi retornado. Revogue e crie outra.')
       loadKeys(); setIsDialogOpen(false)
       return
     }
 
-    setRevealed({ id: row.id, plaintext: row.plaintext_key })
+    setRevealed({ id: row.id, plaintext })
     setIsDialogOpen(false)
     setNewKeyName('Minha Chave do Flow')
     setSelectedScopes(new Set(['bots:read', 'bots:run']))
