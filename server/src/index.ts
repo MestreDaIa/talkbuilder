@@ -35,7 +35,11 @@ app.use((req: Request, res: Response, next: NextFunction) => {
 });
 
 app.use(morgan("dev"));
-app.use(express.json({ limit: "50mb" }));
+// Captura body cru para verificação de HMAC do webhook do wa-service.
+app.use(express.json({
+  limit: "50mb",
+  verify: (req: any, _res, buf) => { req.rawBody = buf; },
+}));
 app.use(express.urlencoded({ limit: "50mb", extended: true }));
 
 // Middleware de Autenticação via API Key
