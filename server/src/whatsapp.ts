@@ -1,31 +1,52 @@
 import { supabase } from "./supabase.js";
 import { processRuntime } from "./runtime.js";
-import { evolutionApi, EVO_BASE_URL, EVO_GLOBAL_KEY } from "./evolution.js";
+import { evolutionApi, EVO_BASE_URL } from "./evolution.js";
+import { verifyWebhookSignature, findWorkspaceByInstance } from "./waService.js";
 
-export async function handleWhatsAppWebhook(payload: any, query?: any, requestMeta?: any) {
-  // console.log("Recebendo webhook WhatsApp:", JSON.stringify(payload, null, 2));
-  
-  // Suporte a ambos formatos: com ou sem o wrapper de evento da Evolution API
+export async function handleWhatsAppWebhook(
+  payload: any,
+  query?: any,
+  requestMeta?: any,
+  rawBody?: Buffer | string,
+  signature?: string
+) {
+  // 0. HMAC — rejeita payloads sem assinatura válida do wa-service.
+  if (!verifyWebhookSignature(rawBody ?? JSON.stringify(payload ?? {}), signature)) {
+    console.warn("[webhook] assinatura HMAC ausente/ inválida — rejeitando payload");
+    return { error: "invalid_signature" };
+  }
+
+  // 1. Normaliza formato:
+  //    - wa-service: { event, tenant:{id,product,product_tenant_id}, instance, message:{...} }
+  //    - legado Evolution (não deve mais chegar): { event, data:{key,message,...} }
   const eventName: string = payload.event || payload.eventType || "";
-  const isUpsert = eventName === "MESSAGES_UPSERT" || eventName === "messages.upsert" || (!eventName && payload.data?.key);
-  
+  const isUpsert =
+    eventName === "MESSAGES_UPSERT" ||
+    eventName === "messages.upsert" ||
+    eventName === "message.received" ||
+    (!eventName && (payload.data?.key || payload.message));
+
   if (!isUpsert && eventName) {
     console.log("Evento ignorado:", eventName);
     return { status: "ignored_event", event: eventName };
   }
 
-  // Se byEvents estiver false, a Evolution manda o objeto direto no payload.
-  // Se estiver true, manda dentro de payload.data.
-  const messageData = payload.data || (payload.key ? payload : null);
-  if (!messageData?.key) {
-    console.error("Payload inválido: faltando messageData.key");
+  // Suporta ambas as formas
+  const messageData =
+    payload.message || payload.data || (payload.key ? payload : null);
+  if (!messageData?.key && !messageData?.id && !messageData?.text && !messageData?.message) {
+    console.error("Payload inválido: sem message/data reconhecível");
     return { error: "invalid_payload" };
   }
 
-  const instanceName: string = payload.instance;
-  const remoteJid: string = messageData.key.remoteJid;
-  const fromMe: boolean = !!messageData.key.fromMe;
-  const currentApiKey = payload.apikey || payload.apiKey || payload.data?.apikey || EVO_GLOBAL_KEY;
+  const instanceName: string = payload.instance?.name || payload.instance || payload.data?.instance || "";
+  const remoteJid: string =
+    messageData.key?.remoteJid || messageData.from || messageData.remoteJid || "";
+  const fromMe: boolean = !!(messageData.key?.fromMe ?? messageData.fromMe);
+
+  // Resolve a zwa_live_ do workspace dono da instância (webhook é anônimo).
+  const creds = instanceName ? await findWorkspaceByInstance(instanceName) : null;
+  const currentApiKey = creds?.apiKey || "";
 
   console.log(`Mensagem de ${remoteJid} na instância ${instanceName}. FromMe: ${fromMe}. Query: ${JSON.stringify(query)}`);
 
