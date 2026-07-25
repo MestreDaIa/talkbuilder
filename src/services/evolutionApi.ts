@@ -19,22 +19,15 @@ async function currentWorkspaceContext(): Promise<{ token: string; workspaceId: 
   const userId = session?.user?.id;
   if (!token || !userId) throw new Error("Sessão expirada. Faça login novamente.");
 
-  // Resolve workspace pelo profile ou pelo ownership.
+  // Resolve workspace pelo profile. Fallback: usa o próprio userId como
+  // workspaceId (1 usuário = 1 workspace lógico) para compatibilidade.
   const { data: prof } = await supabase
     .from("profiles")
     .select("workspace_id, id")
     .eq("id", userId)
     .maybeSingle();
 
-  let workspaceId = (prof as any)?.workspace_id as string | undefined;
-  if (!workspaceId) {
-    const { data: ws } = await supabase
-      .from("workspaces")
-      .select("id")
-      .eq("owner_id", userId)
-      .maybeSingle();
-    workspaceId = ws?.id;
-  }
+  const workspaceId = ((prof as any)?.workspace_id as string | undefined) || userId;
   if (!workspaceId) throw new Error("Workspace não encontrado para o usuário atual.");
   return { token, workspaceId };
 }
