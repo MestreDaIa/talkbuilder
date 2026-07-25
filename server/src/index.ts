@@ -5,6 +5,8 @@ import dotenv from "dotenv";
 import { supabase } from "./supabase.js";
 import { handleWhatsAppWebhook } from "./whatsapp.js";
 import { processRuntime } from "./runtime.js";
+import { getWorkspaceCredentials, waApi } from "./waService.js";
+import { createClient } from "@supabase/supabase-js";
 
 dotenv.config();
 
@@ -35,7 +37,11 @@ app.use((req: Request, res: Response, next: NextFunction) => {
 });
 
 app.use(morgan("dev"));
-app.use(express.json({ limit: "50mb" }));
+// Captura body cru para verificação de HMAC do webhook do wa-service.
+app.use(express.json({
+  limit: "50mb",
+  verify: (req: any, _res, buf) => { req.rawBody = buf; },
+}));
 app.use(express.urlencoded({ limit: "50mb", extended: true }));
 
 // Middleware de Autenticação via API Key
@@ -141,12 +147,17 @@ app.post("/webhook/whatsapp*", async (req: Request, res: Response) => {
       console.warn("[WEBHOOK] Falha ao capturar payload:", e);
     }
 
-    const result = await handleWhatsAppWebhook(req.body, req.query, {
-      receivedAt: new Date().toISOString(),
-      method: req.method,
-      headers: req.headers,
-      params: req.params,
-    });
+    const signature = (req.headers["x-zailom-signature"] || req.headers["x-hub-signature-256"]) as string | undefined;
+    const rawBody: Buffer | undefined = (req as any).rawBody;
+
+    const result = await handleWhatsAppWebhook(
+      req.body,
+      req.query,
+      { receivedAt: new Date().toISOString(), method: req.method, headers: req.headers, params: req.params },
+      rawBody,
+      signature
+    );
+    if ((result as any)?.error === "invalid_signature") return res.status(401).json(result);
     res.json(result);
   } catch (error: any) {
     console.error("Erro no webhook WhatsApp:", error);
@@ -289,10 +300,105 @@ app.get("/health", (req: Request, res: Response) => {
 });
 
 // =====================================================================
+// /api/wa/* — Proxy autenticado do frontend do Flow -> wa-service
+// Substitui completamente as chamadas diretas à Evolution API que existiam
+// no antigo src/services/evolutionApi.ts.
+//
+// Autenticação: Authorization: Bearer <supabase access token do usuário>
+// Header extra:  x-workspace-id: <workspace UUID>
+// O server valida o JWT, confere se o usuário tem acesso ao workspace,
+// resolve/provisiona a zwa_live_ do workspace e chama wa.zailom.com.
+// =====================================================================
+const authSupabase = createClient(
+  process.env.SUPABASE_URL || "",
+  process.env.SUPABASE_ANON_KEY || "",
+  { auth: { persistSession: false } }
+);
+
+async function requireWorkspace(req: Request, res: Response): Promise<{ workspaceId: string; userId: string } | null> {
+  const auth = req.headers.authorization;
+  const workspaceId = (req.headers["x-workspace-id"] as string) || "";
+  if (!auth?.startsWith("Bearer ")) { res.status(401).json({ error: "missing_auth" }); return null; }
+  if (!workspaceId) { res.status(400).json({ error: "missing_workspace" }); return null; }
+
+  const token = auth.slice(7);
+  const { data: userData, error: userErr } = await authSupabase.auth.getUser(token);
+  if (userErr || !userData?.user) { res.status(401).json({ error: "invalid_token" }); return null; }
+  const userId = userData.user.id;
+
+  // Autoriza: workspaceId == userId (modelo 1-para-1), owner do workspace,
+  // ou profile.workspace_id.
+  let allowed = workspaceId === userId;
+  if (!allowed) {
+    const { data: ws } = await supabase
+      .from("workspaces")
+      .select("id, owner_id")
+      .eq("id", workspaceId)
+      .maybeSingle();
+    if (ws?.owner_id === userId) allowed = true;
+  }
+  if (!allowed) {
+    const { data: prof } = await supabase
+      .from("profiles")
+      .select("id, workspace_id")
+      .eq("id", userId)
+      .maybeSingle();
+    if ((prof as any)?.workspace_id === workspaceId) allowed = true;
+  }
+  if (!allowed) { res.status(403).json({ error: "forbidden" }); return null; }
+  return { workspaceId, userId };
+}
+
+function waRoute(handler: (req: Request, res: Response, api: ReturnType<typeof waApi>) => Promise<void>) {
+  return async (req: Request, res: Response) => {
+    const ctx = await requireWorkspace(req, res);
+    if (!ctx) return;
+    try {
+      const creds = await getWorkspaceCredentials(ctx.workspaceId);
+      const api = waApi(creds.apiKey);
+      await handler(req, res, api);
+    } catch (err: any) {
+      console.error("[/api/wa] erro:", err?.message || err);
+      res.status(err?.status || 500).json({ error: err?.message || "wa_service_error", details: err?.body });
+    }
+  };
+}
+
+// Instâncias
+app.get("/api/wa/instances", waRoute(async (_req, res, api) => { res.json(await api.listInstances()); }));
+app.post("/api/wa/instances", waRoute(async (req, res, api) => {
+  const name = String(req.body?.name || "").trim();
+  if (!name) return res.status(400).json({ error: "missing_name" });
+  res.json(await api.createInstance(name));
+}));
+app.get("/api/wa/instances/:name", waRoute(async (req, res, api) => { res.json(await api.getInstance(req.params.name)); }));
+app.delete("/api/wa/instances/:name", waRoute(async (req, res, api) => { res.json(await api.deleteInstance(req.params.name)); }));
+app.post("/api/wa/instances/:name/logout", waRoute(async (req, res, api) => { res.json(await api.logoutInstance(req.params.name)); }));
+app.get("/api/wa/instances/:name/qr", waRoute(async (req, res, api) => { res.json(await api.getQrCode(req.params.name)); }));
+app.get("/api/wa/instances/:name/status", waRoute(async (req, res, api) => { res.json(await api.getStatus(req.params.name)); }));
+
+// Webhook / settings / bot
+app.get("/api/wa/instances/:name/webhook", waRoute(async (req, res, api) => { res.json(await api.getWebhook(req.params.name)); }));
+app.post("/api/wa/instances/:name/webhook", waRoute(async (req, res, api) => { res.json(await api.setWebhook(req.params.name, req.body)); }));
+app.get("/api/wa/instances/:name/settings", waRoute(async (req, res, api) => { res.json(await api.getSettings(req.params.name)); }));
+app.post("/api/wa/instances/:name/settings", waRoute(async (req, res, api) => { res.json(await api.setSettings(req.params.name, req.body)); }));
+app.get("/api/wa/instances/:name/bot", waRoute(async (req, res, api) => { res.json(await api.getBot(req.params.name)); }));
+app.post("/api/wa/instances/:name/bot", waRoute(async (req, res, api) => { res.json(await api.setBot(req.params.name, req.body)); }));
+app.delete("/api/wa/instances/:name/bot", waRoute(async (req, res, api) => { res.json(await api.deleteBot(req.params.name)); }));
+
+// Envio (raramente usado direto do frontend, mas útil pra testes)
+app.post("/api/wa/messages/text", waRoute(async (req, res, api) => {
+  const { instance, to, text } = req.body || {};
+  res.json(await api.sendText(instance, to, text));
+}));
+app.post("/api/wa/messages/buttons", waRoute(async (req, res, api) => {
+  const { instance, to, text, buttons } = req.body || {};
+  res.json(await api.sendButtons(instance, to, text, buttons || []));
+}));
+
+// =====================================================================
 // Proxy para Edge Functions do Supabase
 // Encaminha /functions/v1/* -> ${SUPABASE_URL}/functions/v1/*
-// Permite que o domínio público (ex: api-flowbuilder.zailom.com) sirva
-// a API pública sem expor o domínio *.supabase.co ao cliente.
 // =====================================================================
 app.use("/functions/v1", async (req: Request, res: Response) => {
   const target = process.env.SUPABASE_URL;

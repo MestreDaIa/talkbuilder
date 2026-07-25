@@ -1,354 +1,144 @@
 /**
- * Evolution API Service
- * Responsável pela comunicação com a VPS do cliente
+ * WhatsApp API — proxy do Zailom Flow para o zailom-wa-service.
+ *
+ * IMPORTANTE: o frontend NÃO fala mais com a Evolution direto.
+ * Todas as chamadas vão para `${VITE_BACKEND_URL}/api/wa/*`, que autentica
+ * o usuário pela sessão do Supabase e usa a `zwa_live_` do workspace.
+ *
+ * O nome `evoApi` foi mantido por compatibilidade com os call sites
+ * existentes (WhatsAppInstanceSettings, IntegrationsSettings, EmbedSnippets,
+ * BotSettingsDialog, whatsappRuntimeService).
  */
+import { supabase } from "@/integrations/supabase/client";
 
-const EVO_BASE_URL = 'https://evo.zailom.com';
-const EVO_GLOBAL_KEY = 'e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855';
+const BACKEND_URL = (import.meta.env.VITE_BACKEND_URL as string) || "https://api-flowbuilder.zailom.com";
+
+async function currentWorkspaceContext(): Promise<{ token: string; workspaceId: string }> {
+  const { data: { session } } = await supabase.auth.getSession();
+  const token = session?.access_token;
+  const userId = session?.user?.id;
+  if (!token || !userId) throw new Error("Sessão expirada. Faça login novamente.");
+
+  // 1 usuário = 1 workspace lógico. O backend usa esse workspaceId
+  // para resolver/provisionar a zwa_live_ do tenant no wa-service.
+  const workspaceId = userId;
+  return { token, workspaceId };
+}
+
+async function waRequest<T = any>(
+  path: string,
+  init: { method?: string; body?: any } = {}
+): Promise<T> {
+  const { token, workspaceId } = await currentWorkspaceContext();
+  const res = await fetch(`${BACKEND_URL}${path}`, {
+    method: init.method || "GET",
+    headers: {
+      "Content-Type": "application/json",
+      Authorization: `Bearer ${token}`,
+      "x-workspace-id": workspaceId,
+    },
+    body: init.body ? JSON.stringify(init.body) : undefined,
+  });
+  const text = await res.text();
+  let data: any = null;
+  try { data = text ? JSON.parse(text) : null; } catch { data = { raw: text }; }
+  if (!res.ok) {
+    const msg = data?.error || data?.message || `wa-service ${res.status}`;
+    throw new Error(typeof msg === "string" ? msg : JSON.stringify(msg));
+  }
+  return data as T;
+}
+
+const enc = encodeURIComponent;
 
 export const evoApi = {
-  /**
-   * Lista todas as instâncias existentes na Evolution API
-   */
+  // --- Instâncias -----------------------------------------------------------
   async fetchInstances() {
-    const response = await fetch(`${EVO_BASE_URL}/instance/fetchInstances`, {
-      method: 'GET',
-      headers: { 'apikey': EVO_GLOBAL_KEY },
-    });
-    if (!response.ok) return [];
-    return response.json();
+    try { return await waRequest<any[]>("/api/wa/instances"); } catch { return []; }
   },
-
-  /**
-   * Configura webhook da instância
-   */
-  async setWebhook(instanceName: string, webhookData: {
-    enabled: boolean;
-    url: string;
-    byEvents: boolean;
-    base64: boolean;
-    events: string[];
-  }) {
-    const response = await fetch(`${EVO_BASE_URL}/webhook/set/${instanceName}`, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'apikey': EVO_GLOBAL_KEY,
-      },
-      body: JSON.stringify({
-        webhook: webhookData
-      }),
-    });
-    if (!response.ok) {
-      const data = await response.json().catch(() => ({}));
-      throw new Error(data.message || data.error || 'Erro ao configurar webhook');
-    }
-    return response.json();
-  },
-
-  /**
-   * Atualiza as configurações da instância
-   */
-  async setSettings(instanceName: string, settings: {
-    reject_call?: boolean;
-    msg_call?: string;
-    groups_ignore?: boolean;
-    always_online?: boolean;
-    read_messages?: boolean;
-    sync_full_history?: boolean;
-    read_status?: boolean;
-  }) {
-    const response = await fetch(`${EVO_BASE_URL}/settings/set/${instanceName}`, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'apikey': EVO_GLOBAL_KEY,
-      },
-      body: JSON.stringify({
-        rejectCall: !!settings.reject_call,
-        msgCall: settings.msg_call || "",
-        groupsIgnore: !!settings.groups_ignore,
-        alwaysOnline: !!settings.always_online,
-        readMessages: !!settings.read_messages,
-        readStatus: !!settings.read_status,
-        syncFullHistory: !!settings.sync_full_history,
-      }),
-    });
-    if (!response.ok) {
-      const data = await response.json().catch(() => ({}));
-      throw new Error(data.message || data.error || 'Erro ao atualizar configurações');
-    }
-    return response.json();
-  },
-
-  /**
-   * Busca as configurações específicas de uma instância
-   */
-  async fetchSettings(instanceName: string) {
-    const response = await fetch(`${EVO_BASE_URL}/settings/find/${instanceName}`, {
-      method: 'GET',
-      headers: { 'apikey': EVO_GLOBAL_KEY },
-    });
-    if (!response.ok) return null;
-    return response.json();
-  },
-
-  /**
-   * Busca as configurações de webhook de uma instância
-   */
-  async fetchWebhook(instanceName: string) {
-    const response = await fetch(`${EVO_BASE_URL}/webhook/find/${instanceName}`, {
-      method: 'GET',
-      headers: { 'apikey': EVO_GLOBAL_KEY },
-    });
-    if (!response.ok) return null;
-    return response.json();
-  },
-
-  /**
-   * Busca as configurações atuais da instância
-   */
   async fetchInstance(instanceName: string) {
-    const response = await fetch(`${EVO_BASE_URL}/instance/fetchInstances?instanceName=${instanceName}`, {
-      method: 'GET',
-      headers: { 'apikey': EVO_GLOBAL_KEY },
-    });
-    if (!response.ok) return null;
-    const instances = await response.json();
-    return Array.isArray(instances) ? instances.find((i: any) => i.instanceName === instanceName) : instances;
+    try { return await waRequest<any>(`/api/wa/instances/${enc(instanceName)}`); } catch { return null; }
   },
-  /**
-   * Cria uma nova instância na Evolution API
-   */
   async createInstance(instanceName: string) {
     try {
-      // Primeiro tenta verificar se já existe
-      const checkResponse = await fetch(`${EVO_BASE_URL}/instance/connectionState/${instanceName}`, {
-        method: 'GET',
-        headers: { 'apikey': EVO_GLOBAL_KEY }
-      });
-
-      if (checkResponse.ok) {
-        const checkData = await checkResponse.json();
-        // Se a instância já existe, retornamos os dados dela
-        return {
-          instance: {
-            instanceName,
-            status: checkData.instance?.state || 'disconnected',
-            apikey: EVO_GLOBAL_KEY
-          },
-          alreadyExists: true
-        };
+      return await waRequest<any>("/api/wa/instances", { method: "POST", body: { name: instanceName } });
+    } catch (err: any) {
+      const msg = String(err?.message || "");
+      if (/exist|already/i.test(msg)) {
+        return { instance: { instanceName }, alreadyExists: true };
       }
-
-      const response = await fetch(`${EVO_BASE_URL}/instance/create`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'apikey': EVO_GLOBAL_KEY
-        },
-        body: JSON.stringify({
-          instanceName,
-          token: '', 
-          qrcode: true,
-          integration: 'WHATSAPP-BAILEYS'
-        })
-      });
-      
-      const data = await response.json();
-      
-      if (!response.ok) {
-        console.error('Erro Evolution API (Create):', data);
-        // Se retornar que já existe por erro 403/400, tentamos retornar sucesso simulado
-        if (response.status === 403 || response.status === 400 || data.message?.includes('exists')) {
-           return {
-            instance: { instanceName, apikey: EVO_GLOBAL_KEY },
-            alreadyExists: true
-           };
-        }
-        throw new Error(data.message || data.error || 'Erro ao criar instância');
-      }
-      
-      return data;
-    } catch (error) {
-      console.error('Erro na requisição createInstance:', error);
-      throw error;
+      throw err;
     }
   },
-
-  /**
-   * Obtém o QR Code de uma instância
-   */
-  async getQrCode(instanceName: string) {
-    const response = await fetch(`${EVO_BASE_URL}/instance/connect/${instanceName}`, {
-      method: 'GET',
-      headers: {
-        'apikey': EVO_GLOBAL_KEY
-      }
-    });
-    
-    if (!response.ok) return null;
-    return response.json();
-  },
-
-  /**
-   * Verifica o status da instância
-   */
-  async getInstanceStatus(instanceName: string) {
-    const response = await fetch(`${EVO_BASE_URL}/instance/connectionState/${instanceName}`, {
-      method: 'GET',
-      headers: {
-        'apikey': EVO_GLOBAL_KEY
-      }
-    });
-    
-    if (!response.ok) return null;
-    return response.json();
-  },
-
-  /**
-   * Remove uma instância
-   */
-  async logoutInstance(instanceName: string) {
-    const response = await fetch(`${EVO_BASE_URL}/instance/logout/${instanceName}`, {
-      method: 'DELETE',
-      headers: {
-        'apikey': EVO_GLOBAL_KEY
-      }
-    });
-    
-    return response.ok;
-  },
-
   async deleteInstance(instanceName: string) {
-    const response = await fetch(`${EVO_BASE_URL}/instance/delete/${instanceName}`, {
-      method: 'DELETE',
-      headers: {
-        'apikey': EVO_GLOBAL_KEY
-      }
-    });
-    
-    return response.ok;
+    try { await waRequest(`/api/wa/instances/${enc(instanceName)}`, { method: "DELETE" }); return true; }
+    catch { return false; }
+  },
+  async logoutInstance(instanceName: string) {
+    try { await waRequest(`/api/wa/instances/${enc(instanceName)}/logout`, { method: "POST" }); return true; }
+    catch { return false; }
+  },
+  async getQrCode(instanceName: string) {
+    try { return await waRequest<any>(`/api/wa/instances/${enc(instanceName)}/qr`); } catch { return null; }
+  },
+  async getInstanceStatus(instanceName: string) {
+    try { return await waRequest<any>(`/api/wa/instances/${enc(instanceName)}/status`); } catch { return null; }
   },
 
-  /**
-   * Envia mensagem de texto
-   */
-  async sendText(instanceName: string, number: string, text: string) {
-    const response = await fetch(`${EVO_BASE_URL}/message/sendText/${instanceName}`, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'apikey': EVO_GLOBAL_KEY
-      },
-      body: JSON.stringify({
-        number,
-        text,
-        linkPreview: false
-      })
+  // --- Webhook / Settings ---------------------------------------------------
+  async fetchWebhook(instanceName: string) {
+    try { return await waRequest<any>(`/api/wa/instances/${enc(instanceName)}/webhook`); } catch { return null; }
+  },
+  async setWebhook(
+    instanceName: string,
+    webhookData: { enabled: boolean; url: string; byEvents?: boolean; base64?: boolean; events?: string[] }
+  ) {
+    return waRequest<any>(`/api/wa/instances/${enc(instanceName)}/webhook`, {
+      method: "POST",
+      body: webhookData,
     });
-    return response.json();
+  },
+  async fetchSettings(instanceName: string) {
+    try { return await waRequest<any>(`/api/wa/instances/${enc(instanceName)}/settings`); } catch { return null; }
+  },
+  async setSettings(instanceName: string, settings: Record<string, any>) {
+    return waRequest<any>(`/api/wa/instances/${enc(instanceName)}/settings`, {
+      method: "POST",
+      body: settings,
+    });
   },
 
-  /**
-   * Envia mensagem com botões
-   */
-  async sendButtons(instanceName: string, number: string, text: string, buttons: any[]) {
-    const response = await fetch(`${EVO_BASE_URL}/message/sendButtons/${instanceName}`, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'apikey': EVO_GLOBAL_KEY
-      },
-      body: JSON.stringify({
-        number,
-        title: "Opções",
-        description: text,
-        footer: "Bot",
-        buttons: buttons.map(b => ({
-          buttonId: b.id,
-          buttonText: { displayText: b.label },
-          type: 1
-        }))
-      })
-    });
-    return response.json();
-  },
-
-  /**
-   * Evolution Bot Settings
-   */
+  // --- Bot (pass-through) ---------------------------------------------------
   async fetchEvolutionBot(instanceName: string) {
-    const response = await fetch(`${EVO_BASE_URL}/evolutionBot/find/${instanceName}`, {
-      method: 'GET',
-      headers: { 'apikey': EVO_GLOBAL_KEY },
-    });
-    if (!response.ok) return null;
-    return response.json();
+    try { return await waRequest<any>(`/api/wa/instances/${enc(instanceName)}/bot`); } catch { return null; }
   },
-
   async setEvolutionBot(instanceName: string, data: any) {
-    // Normalize ignoreJids to array (Evolution API expects array)
-    const ignoreJidsArr = Array.isArray(data.ignoreJids)
-      ? data.ignoreJids
-      : typeof data.ignoreJids === 'string' && data.ignoreJids.trim()
-        ? data.ignoreJids.split(',').map((s: string) => s.trim()).filter(Boolean)
-        : [];
-
-    const payload: any = {
-      enabled: !!data.enabled,
-      description: data.description || 'Evolution Bot',
-      apiUrl: data.apiUrl || '',
-      apiKey: data.apiKey || '',
-      triggerType: data.triggerType || 'keyword',
-      triggerOperator: data.triggerOperator || 'contains',
-      triggerValue: data.triggerValue ?? data.triggerKeyword ?? '',
-      expire: Number(data.expire) || 0,
-      keywordFinish: data.keywordFinish || '',
-      delayMessage: Number(data.delayMessage) || 0,
-      unknownMessage: data.unknownMessage || '',
-      listeningFromMe: !!data.listeningFromMe,
-      stopBotFromMe: !!data.stopBotFromMe,
-      keepOpen: !!data.keepOpen,
-      debounceTime: Number(data.debounceTime) || 0,
-      splitMessages: !!data.splitMessages,
-      timePerChar: Number(data.timePerChar) || 0,
-      ignoreJids: ignoreJidsArr,
-    };
-
-    // Evolution API expects lowercase enum values for triggerType/triggerOperator
-    payload.triggerType = String(payload.triggerType).toLowerCase();
-    payload.triggerOperator = String(payload.triggerOperator).toLowerCase();
-
-    // Required: when triggerType is 'all', triggerOperator/triggerValue shouldn't be required
-    if (payload.triggerType === 'all' || payload.triggerType === 'none') {
-      delete payload.triggerOperator;
-      delete payload.triggerValue;
-    }
-
-    const response = await fetch(`${EVO_BASE_URL}/evolutionBot/create/${instanceName}`, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'apikey': EVO_GLOBAL_KEY,
-      },
-      body: JSON.stringify(payload),
+    return waRequest<any>(`/api/wa/instances/${enc(instanceName)}/bot`, {
+      method: "POST",
+      body: data,
     });
-    if (!response.ok) {
-      const errorData = await response.json().catch(() => ({}));
-      console.error('Evolution Bot error:', errorData);
-      const msg = errorData?.response?.message || errorData?.message || errorData?.error;
-      const msgStr = Array.isArray(msg) ? msg.join(', ') : (typeof msg === 'string' ? msg : JSON.stringify(errorData));
-      throw new Error(msgStr || 'Erro ao salvar Evolution Bot');
-    }
-    return response.json();
+  },
+  async deleteEvolutionBot(instanceName: string) {
+    try { await waRequest(`/api/wa/instances/${enc(instanceName)}/bot`, { method: "DELETE" }); return true; }
+    catch { return false; }
   },
 
-  async deleteEvolutionBot(instanceName: string) {
-    const response = await fetch(`${EVO_BASE_URL}/evolutionBot/delete/${instanceName}`, {
-      method: 'DELETE',
-      headers: { 'apikey': EVO_GLOBAL_KEY },
+  // --- Envio ----------------------------------------------------------------
+  async sendText(instanceName: string, number: string, text: string) {
+    return waRequest<any>("/api/wa/messages/text", {
+      method: "POST",
+      body: { instance: instanceName, to: number, text },
     });
-    return response.ok;
-  }
+  },
+  async sendButtons(instanceName: string, number: string, text: string, buttons: any[]) {
+    return waRequest<any>("/api/wa/messages/buttons", {
+      method: "POST",
+      body: {
+        instance: instanceName,
+        to: number,
+        text,
+        buttons: (buttons || []).map((b) => ({ id: b.id, label: b.label })),
+      },
+    });
+  },
 };
