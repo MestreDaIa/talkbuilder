@@ -145,12 +145,17 @@ app.post("/webhook/whatsapp*", async (req: Request, res: Response) => {
       console.warn("[WEBHOOK] Falha ao capturar payload:", e);
     }
 
-    const result = await handleWhatsAppWebhook(req.body, req.query, {
-      receivedAt: new Date().toISOString(),
-      method: req.method,
-      headers: req.headers,
-      params: req.params,
-    });
+    const signature = (req.headers["x-zailom-signature"] || req.headers["x-hub-signature-256"]) as string | undefined;
+    const rawBody: Buffer | undefined = (req as any).rawBody;
+
+    const result = await handleWhatsAppWebhook(
+      req.body,
+      req.query,
+      { receivedAt: new Date().toISOString(), method: req.method, headers: req.headers, params: req.params },
+      rawBody,
+      signature
+    );
+    if ((result as any)?.error === "invalid_signature") return res.status(401).json(result);
     res.json(result);
   } catch (error: any) {
     console.error("Erro no webhook WhatsApp:", error);
