@@ -55,36 +55,45 @@ export async function handleWhatsAppWebhook(
     return { status: "ignored" };
   }
 
-  // Detectar tipo de mensagem e conteúdo
-  const messageType = messageData.messageType || (messageData.message ? Object.keys(messageData.message)[0] : "unknown");
-  
-  const text: string = messageData.message?.conversation || 
-                       messageData.message?.extendedTextMessage?.text || 
-                       messageData.message?.buttonsResponseMessage?.selectedButtonId ||
-                       messageData.message?.templateButtonReplyMessage?.selectedId ||
-                       "";
+  // Detectar tipo de mensagem e conteúdo (aceita shape wa-service E legado Evolution)
+  const rawMsg = messageData.message || {};
+  const messageType =
+    messageData.type ||
+    messageData.messageType ||
+    (typeof rawMsg === "object" && rawMsg && Object.keys(rawMsg)[0]) ||
+    "unknown";
 
-  const caption: string = messageData.message?.imageMessage?.caption || 
-                          messageData.message?.videoMessage?.caption || 
-                          messageData.message?.documentMessage?.caption || 
-                          "";
+  const text: string =
+    messageData.text ||
+    messageData.body ||
+    rawMsg.conversation ||
+    rawMsg.extendedTextMessage?.text ||
+    messageData.buttonId ||
+    rawMsg.buttonsResponseMessage?.selectedButtonId ||
+    rawMsg.templateButtonReplyMessage?.selectedId ||
+    "";
 
-  // Se for mídia, pegamos os dados extras
-  const mediaData = messageData.message?.imageMessage || 
-                    messageData.message?.audioMessage || 
-                    messageData.message?.videoMessage || 
-                    messageData.message?.stickerMessage || 
-                    messageData.message?.documentMessage;
+  const caption: string =
+    messageData.caption ||
+    rawMsg.imageMessage?.caption ||
+    rawMsg.videoMessage?.caption ||
+    rawMsg.documentMessage?.caption ||
+    "";
 
-  const mimetype = mediaData?.mimetype || "";
-  const mediaUrl = mediaData?.url || ""; // Nota: Isso costuma ser a URL interna da Evolution
-  
-  // A Evolution costuma enviar o base64 se configurado no webhook
-  // mas aqui estamos pegando o que veio no payload
-  const base64 = payload.base64 || ""; 
+  const media =
+    messageData.media ||
+    rawMsg.imageMessage ||
+    rawMsg.audioMessage ||
+    rawMsg.videoMessage ||
+    rawMsg.stickerMessage ||
+    rawMsg.documentMessage;
 
-  // Não bloqueamos mais se o texto estiver vazio, pois pode ser uma imagem/áudio sem legenda
-  if (!text && !caption && !messageData.message?.buttonsResponseMessage && !mediaData) {
+  const mimetype = media?.mimetype || "";
+  const mediaUrl = media?.url || "";
+  const base64 = messageData.base64 || media?.base64 || payload.base64 || "";
+
+  // Não bloqueamos se texto vazio (pode ser mídia sem legenda)
+  if (!text && !caption && !messageData.buttonId && !rawMsg.buttonsResponseMessage && !media) {
     console.log("Mensagem sem conteúdo reconhecido ignorada.");
     return { status: "no_content" };
   }
