@@ -326,21 +326,24 @@ async function requireWorkspace(req: Request, res: Response): Promise<{ workspac
   if (userErr || !userData?.user) { res.status(401).json({ error: "invalid_token" }); return null; }
   const userId = userData.user.id;
 
-  // Autoriza: owner do workspace OU profile.workspace_id
-  const { data: ws } = await supabase
-    .from("workspaces")
-    .select("id, owner_id")
-    .eq("id", workspaceId)
-    .maybeSingle();
-  const isOwner = ws?.owner_id === userId;
-  let allowed = isOwner;
+  // Autoriza: workspaceId == userId (modelo 1-para-1), owner do workspace,
+  // ou profile.workspace_id.
+  let allowed = workspaceId === userId;
+  if (!allowed) {
+    const { data: ws } = await supabase
+      .from("workspaces")
+      .select("id, owner_id")
+      .eq("id", workspaceId)
+      .maybeSingle();
+    if (ws?.owner_id === userId) allowed = true;
+  }
   if (!allowed) {
     const { data: prof } = await supabase
       .from("profiles")
       .select("id, workspace_id")
       .eq("id", userId)
       .maybeSingle();
-    allowed = (prof as any)?.workspace_id === workspaceId;
+    if ((prof as any)?.workspace_id === workspaceId) allowed = true;
   }
   if (!allowed) { res.status(403).json({ error: "forbidden" }); return null; }
   return { workspaceId, userId };
