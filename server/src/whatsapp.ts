@@ -155,21 +155,21 @@ export async function handleWhatsAppWebhook(
     channel: "whatsapp",
     payload: {
       message: text || caption || "",
-      button_id: messageData.message?.buttonsResponseMessage?.selectedButtonId || messageData.message?.templateButtonReplyMessage?.selectedId,
+      button_id: messageData.buttonId || rawMsg.buttonsResponseMessage?.selectedButtonId || rawMsg.templateButtonReplyMessage?.selectedId,
       body: payload,
       headers: requestMeta?.headers || {},
       query: query || {},
       params: requestMeta?.params || {},
       method: requestMeta?.method || "POST",
       receivedAt: requestMeta?.receivedAt || new Date().toISOString(),
-      // Special Evolution Bot variables
-      messageId: messageData.key.id,
+      // Contexto do canal (agora fornecido pelo wa-service, não pela Evolution).
+      messageId: messageData.id || messageData.key?.id,
       remoteJid,
       pushName: messageData.pushName || "",
       instanceName,
       serverUrl: EVO_BASE_URL,
-      apiKey: payload.apikey || payload.apiKey || payload.data?.apikey || EVO_GLOBAL_KEY,
-      apikey: payload.apikey || payload.apiKey || payload.data?.apikey || EVO_GLOBAL_KEY,
+      apiKey: currentApiKey,
+      apikey: currentApiKey,
       // Novos campos para suporte a mídia e condições
       messageType,
       caption,
@@ -194,12 +194,12 @@ export async function handleWhatsAppWebhook(
           contact_id: remoteJid,
           channel: "whatsapp",
           payload: {
-            messageId: messageData.key.id,
+            messageId: messageData.id || messageData.key?.id,
             remoteJid,
             pushName: messageData.pushName || "",
             instanceName,
             serverUrl: EVO_BASE_URL,
-            apiKey: EVO_GLOBAL_KEY
+            apiKey: currentApiKey,
           }
         });
         
