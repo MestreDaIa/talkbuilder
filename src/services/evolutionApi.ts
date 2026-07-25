@@ -19,16 +19,9 @@ async function currentWorkspaceContext(): Promise<{ token: string; workspaceId: 
   const userId = session?.user?.id;
   if (!token || !userId) throw new Error("Sessão expirada. Faça login novamente.");
 
-  // Resolve workspace pelo profile. Fallback: usa o próprio userId como
-  // workspaceId (1 usuário = 1 workspace lógico) para compatibilidade.
-  const { data: prof } = await supabase
-    .from("profiles")
-    .select("workspace_id, id")
-    .eq("id", userId)
-    .maybeSingle();
-
-  const workspaceId = ((prof as any)?.workspace_id as string | undefined) || userId;
-  if (!workspaceId) throw new Error("Workspace não encontrado para o usuário atual.");
+  // 1 usuário = 1 workspace lógico. O backend usa esse workspaceId
+  // para resolver/provisionar a zwa_live_ do tenant no wa-service.
+  const workspaceId = userId;
   return { token, workspaceId };
 }
 
