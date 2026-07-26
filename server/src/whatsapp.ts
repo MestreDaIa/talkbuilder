@@ -2,6 +2,8 @@ import { supabase } from "./supabase.js";
 import { processRuntime } from "./runtime.js";
 import { evolutionApi, EVO_BASE_URL } from "./evolution.js";
 import { verifyWebhookSignature, findWorkspaceByInstance } from "./waService.js";
+import { shouldFlowHandle } from "./channelRoute.js";
+
 
 export async function handleWhatsAppWebhook(
   payload: any,
