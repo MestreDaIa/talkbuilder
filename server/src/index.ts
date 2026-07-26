@@ -335,7 +335,10 @@ if (!SUPABASE_URL_ENV || !SUPABASE_ANON) {
 const authSupabase = createClient(
   SUPABASE_URL_ENV || "https://placeholder.supabase.co",
   SUPABASE_ANON || process.env.SUPABASE_SERVICE_ROLE_KEY || "placeholder-key",
-  { auth: { persistSession: false } }
+  {
+    auth: { persistSession: false },
+    realtime: { transport: ws as any },
+  }
 );
 
 
