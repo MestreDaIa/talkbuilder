@@ -57,6 +57,18 @@ export async function handleWhatsAppWebhook(
     return { status: "ignored" };
   }
 
+  // 1.5 Rota do canal: só processa se esta instância estiver atribuída ao Flow.
+  //     Fonte da verdade: wa-service (se expuser rota) → Booking API → fallback.
+  if (instanceName) {
+    const { handle, route, source } = await shouldFlowHandle(instanceName);
+    if (!handle) {
+      console.log(`[channel-route] instância ${instanceName} roteada para "${route}" (${source}) — Flow ignora.`);
+      return { status: "ignored_channel_route", route, source, instance: instanceName };
+    }
+    console.log(`[channel-route] instância ${instanceName} => "${route}" (${source}) — Flow processa.`);
+  }
+
+
   // Detectar tipo de mensagem e conteúdo (aceita shape wa-service E legado Evolution)
   const rawMsg = messageData.message || {};
   const messageType =
