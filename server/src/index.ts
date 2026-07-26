@@ -368,7 +368,7 @@ function waRoute(handler: (req: Request, res: Response, api: ReturnType<typeof w
 app.get("/api/wa/instances", waRoute(async (_req, res, api) => { res.json(await api.listInstances()); }));
 app.post("/api/wa/instances", waRoute(async (req, res, api) => {
   const name = String(req.body?.name || "").trim();
-  if (!name) return res.status(400).json({ error: "missing_name" });
+  if (!name) { res.status(400).json({ error: "missing_name" }); return; }
   res.json(await api.createInstance(name));
 }));
 app.get("/api/wa/instances/:name", waRoute(async (req, res, api) => { res.json(await api.getInstance(req.params.name)); }));
