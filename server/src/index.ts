@@ -7,11 +7,12 @@ import { handleWhatsAppWebhook } from "./whatsapp.js";
 import { processRuntime } from "./runtime.js";
 import { getWorkspaceCredentials, waApi } from "./waService.js";
 import { createClient } from "@supabase/supabase-js";
+import ws from "ws";
 
 dotenv.config();
 
 const app = express();
-const port = process.env.PORT || 80;
+const port = process.env.PORT || 3000;
 
 // Configuração de CORS robusta
 const corsOptions = {
@@ -335,7 +336,10 @@ if (!SUPABASE_URL_ENV || !SUPABASE_ANON) {
 const authSupabase = createClient(
   SUPABASE_URL_ENV || "https://placeholder.supabase.co",
   SUPABASE_ANON || process.env.SUPABASE_SERVICE_ROLE_KEY || "placeholder-key",
-  { auth: { persistSession: false } }
+  {
+    auth: { persistSession: false },
+    realtime: { transport: ws as any },
+  }
 );
 
 
