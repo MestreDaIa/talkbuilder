@@ -6,6 +6,8 @@ import { supabase } from "./supabase.js";
 import { handleWhatsAppWebhook } from "./whatsapp.js";
 import { processRuntime } from "./runtime.js";
 import { getWorkspaceCredentials, waApi } from "./waService.js";
+import { resolveChannelRoute, invalidateChannelRoute } from "./channelRoute.js";
+
 import { createClient } from "@supabase/supabase-js";
 import ws from "ws";
 
@@ -407,7 +409,17 @@ app.get("/api/wa/instances/:name/status", waRoute(async (req, res, api) => { res
 
 // Webhook / settings / bot
 app.get("/api/wa/instances/:name/webhook", waRoute(async (req, res, api) => { res.json(await api.getWebhook(req.params.name)); }));
-app.post("/api/wa/instances/:name/webhook", waRoute(async (req, res, api) => { res.json(await api.setWebhook(req.params.name, req.body)); }));
+app.post("/api/wa/instances/:name/webhook", waRoute(async (req, res, api) => {
+  const out = await api.setWebhook(req.params.name, req.body);
+  invalidateChannelRoute(req.params.name);
+  res.json(out);
+}));
+// Diagnóstico: qual produto é dono do canal desta instância (flow | direct | none | unknown)
+app.get("/api/wa/instances/:name/route", waRoute(async (req, res) => {
+  const info = await resolveChannelRoute(req.params.name);
+  res.json({ instance: req.params.name, ...info });
+}));
+
 app.get("/api/wa/instances/:name/settings", waRoute(async (req, res, api) => { res.json(await api.getSettings(req.params.name)); }));
 app.post("/api/wa/instances/:name/settings", waRoute(async (req, res, api) => { res.json(await api.setSettings(req.params.name, req.body)); }));
 app.get("/api/wa/instances/:name/bot", waRoute(async (req, res, api) => { res.json(await api.getBot(req.params.name)); }));
