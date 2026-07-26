@@ -47,6 +47,16 @@
 //   GET  /flow-api/v1/instances/:id      (scope: instances:read)
 //        Detalhe de uma instância. 404 se não pertencer ao workspace.
 //
+//   POST /flow-api/v1/messages/send      (scope: messages:send)
+//        Body: { to, text, instance? }
+//        Envia texto pelo WhatsApp via zailom-wa-service usando a key
+//        do workspace. É a rota que o Booking chama quando o canal da
+//        instância está com channel_preference = "flow".
+//        200 → { data: { sent:true, instance, to, result } }
+//        409 → wa_not_provisioned | no_connected_instance
+//        Requer env WA_SERVICE_URL na function (default https://wa.zailom.com).
+
+//
 // [Bots — já existentes]
 //   GET  /flow-api/v1/bots               (scope: bots:read)
 //        Lista bots (por padrão apenas publicados; use ?all=1 para todos).
