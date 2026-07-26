@@ -309,11 +309,35 @@ app.get("/health", (req: Request, res: Response) => {
 // O server valida o JWT, confere se o usuário tem acesso ao workspace,
 // resolve/provisiona a zwa_live_ do workspace e chama wa.zailom.com.
 // =====================================================================
+// Chave anon usada para validar JWT de usuário e para o proxy das edge functions.
+// Aceita variações de nome para não quebrar quando o .env é substituído por
+// variáveis de ambiente no Portainer.
+export const SUPABASE_ANON =
+  process.env.SUPABASE_ANON_KEY ||
+  process.env.SUPABASE_PUBLISHABLE_KEY ||
+  process.env.VITE_SUPABASE_ANON_KEY ||
+  process.env.VITE_EXTERNAL_SUPABASE_ANON_KEY ||
+  "";
+
+const SUPABASE_URL_ENV =
+  process.env.SUPABASE_URL ||
+  process.env.VITE_EXTERNAL_SUPABASE_URL ||
+  process.env.VITE_SUPABASE_URL ||
+  "";
+
+if (!SUPABASE_URL_ENV || !SUPABASE_ANON) {
+  console.error(
+    "[boot] AVISO: SUPABASE_URL e/ou SUPABASE_ANON_KEY ausentes. " +
+      "Rotas autenticadas (/api/wa/*) e o proxy /functions/v1 vão falhar até configurar."
+  );
+}
+
 const authSupabase = createClient(
-  process.env.SUPABASE_URL || "",
-  process.env.SUPABASE_ANON_KEY || "",
+  SUPABASE_URL_ENV || "https://placeholder.supabase.co",
+  SUPABASE_ANON || process.env.SUPABASE_SERVICE_ROLE_KEY || "placeholder-key",
   { auth: { persistSession: false } }
 );
+
 
 async function requireWorkspace(req: Request, res: Response): Promise<{ workspaceId: string; userId: string } | null> {
   const auth = req.headers.authorization;
@@ -401,7 +425,7 @@ app.post("/api/wa/messages/buttons", waRoute(async (req, res, api) => {
 // Encaminha /functions/v1/* -> ${SUPABASE_URL}/functions/v1/*
 // =====================================================================
 app.use("/functions/v1", async (req: Request, res: Response) => {
-  const target = process.env.SUPABASE_URL;
+  const target = SUPABASE_URL_ENV;
   if (!target) {
     return res.status(500).json({ error: "SUPABASE_URL not configured on server" });
   }
@@ -417,9 +441,10 @@ app.use("/functions/v1", async (req: Request, res: Response) => {
       headers[k] = Array.isArray(v) ? v.join(", ") : String(v);
     }
     // Garante apikey (algumas edge functions exigem) usando anon do próprio servidor
-    if (!headers["apikey"] && process.env.SUPABASE_ANON_KEY) {
-      headers["apikey"] = process.env.SUPABASE_ANON_KEY;
+    if (!headers["apikey"] && SUPABASE_ANON) {
+      headers["apikey"] = SUPABASE_ANON;
     }
+
 
     const method = req.method.toUpperCase();
     const hasBody = !["GET", "HEAD", "OPTIONS"].includes(method);
