@@ -383,6 +383,90 @@ Deno.serve(async (req) => {
     }
 
     // ================================================================
+    // [Integração Booking] POST /v1/messages/send   (scope: messages:send)
+    // Body: { to: string, text: string, instance?: string }
+    // Envia uma mensagem de texto pelo WhatsApp usando a chave do
+    // zailom-wa-service do workspace (rota "flow" do Booking).
+    // ================================================================
+    if (
+      req.method === "POST" &&
+      route.length === 2 &&
+      route[0] === "messages" &&
+      route[1] === "send"
+    ) {
+      const auth = await authenticateFlowRequest(req, {
+        requireScope: "messages:send",
+        route: "/v1/messages/send",
+      });
+      if ("error" in auth) return jsonResponse(auth.error.body, auth.error.status);
+      const { supabase, workspaceId } = auth.ctx;
+
+      let body: any = {};
+      try {
+        body = await req.json();
+      } catch {
+        return jsonResponse({ error: "Body inválido (JSON esperado)" }, 400);
+      }
+
+      const to = typeof body.to === "string" ? body.to.trim() : "";
+      const text = typeof body.text === "string" ? body.text : "";
+      let instance = typeof body.instance === "string" ? body.instance.trim() : "";
+
+      if (!to || to.length > 64) return jsonResponse({ error: "to obrigatório (1..64 chars)" }, 400);
+      if (!text || text.length > 4096) return jsonResponse({ error: "text obrigatório (1..4096 chars)" }, 400);
+
+      // Chave do wa-service do workspace (provisionada pelo backend do Flow).
+      const { data: ws, error: wsErr } = await supabase
+        .from("workspaces")
+        .select("id, wa_service_api_key")
+        .eq("id", workspaceId)
+        .maybeSingle();
+      if (wsErr) return jsonResponse({ error: wsErr.message }, 500);
+      if (!ws?.wa_service_api_key) {
+        return jsonResponse(
+          { error: "Workspace ainda não provisionado no wa-service", code: "wa_not_provisioned" },
+          409
+        );
+      }
+
+      // Instância: usa a informada ou a única/mais recente conectada do workspace.
+      if (!instance) {
+        const { data: conns } = await supabase
+          .from("whatsapp_connections")
+          .select("instance_name, status, updated_at")
+          .eq("workspace_id", workspaceId)
+          .order("updated_at", { ascending: false })
+          .limit(20);
+        const connected = (conns ?? []).find((c: any) =>
+          ["open", "connected", "CONNECTED"].includes(String(c.status))
+        );
+        instance = (connected || (conns ?? [])[0])?.instance_name || "";
+      }
+      if (!instance) {
+        return jsonResponse({ error: "Nenhuma instância disponível", code: "no_connected_instance" }, 409);
+      }
+
+      const waUrl = (Deno.env.get("WA_SERVICE_URL") || "https://wa.zailom.com").replace(/\/$/, "");
+      const waRes = await fetch(`${waUrl}/v1/messages/text`, {
+        method: "POST",
+        headers: {
+          Authorization: `Bearer ${ws.wa_service_api_key}`,
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({ instance, to, text, linkPreview: false }),
+      });
+      const waBody = await waRes.json().catch(() => null);
+      if (!waRes.ok) {
+        return jsonResponse(
+          { error: waBody?.error || "Falha ao enviar mensagem", details: waBody },
+          waRes.status === 404 ? 404 : 502
+        );
+      }
+      return jsonResponse({ data: { sent: true, instance, to, result: waBody } });
+    }
+
+
+    // ================================================================
     // GET /v1/bots  (por padrão apenas publicados; ?all=1 retorna todos)
     // ================================================================
     if (req.method === "GET" && route.length === 1 && route[0] === "bots") {
