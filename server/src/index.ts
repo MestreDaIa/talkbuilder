@@ -425,7 +425,7 @@ app.post("/api/wa/messages/buttons", waRoute(async (req, res, api) => {
 // Encaminha /functions/v1/* -> ${SUPABASE_URL}/functions/v1/*
 // =====================================================================
 app.use("/functions/v1", async (req: Request, res: Response) => {
-  const target = process.env.SUPABASE_URL;
+  const target = SUPABASE_URL_ENV;
   if (!target) {
     return res.status(500).json({ error: "SUPABASE_URL not configured on server" });
   }
@@ -441,9 +441,10 @@ app.use("/functions/v1", async (req: Request, res: Response) => {
       headers[k] = Array.isArray(v) ? v.join(", ") : String(v);
     }
     // Garante apikey (algumas edge functions exigem) usando anon do próprio servidor
-    if (!headers["apikey"] && process.env.SUPABASE_ANON_KEY) {
-      headers["apikey"] = process.env.SUPABASE_ANON_KEY;
+    if (!headers["apikey"] && SUPABASE_ANON) {
+      headers["apikey"] = SUPABASE_ANON;
     }
+
 
     const method = req.method.toUpperCase();
     const hasBody = !["GET", "HEAD", "OPTIONS"].includes(method);
