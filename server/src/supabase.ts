@@ -4,12 +4,18 @@ import ws from "ws";
 
 dotenv.config();
 
-const supabaseUrl: string = process.env.SUPABASE_URL || "";
-const supabaseServiceRoleKey: string = process.env.SUPABASE_SERVICE_ROLE_KEY || "";
+const supabaseUrl: string =
+  process.env.SUPABASE_URL ||
+  process.env.VITE_EXTERNAL_SUPABASE_URL ||
+  process.env.VITE_SUPABASE_URL ||
+  "";
+const supabaseServiceRoleKey: string =
+  process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.SUPABASE_SECRET_KEY || "";
 
 if (!supabaseUrl || !supabaseServiceRoleKey) {
   console.error("ERRO: SUPABASE_URL ou SUPABASE_SERVICE_ROLE_KEY não configurados.");
 }
+
 
 export const supabase: SupabaseClient = createClient(supabaseUrl, supabaseServiceRoleKey, {
   auth: {
