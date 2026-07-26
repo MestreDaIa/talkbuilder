@@ -17,7 +17,10 @@ if (!supabaseUrl || !supabaseServiceRoleKey) {
 }
 
 
-export const supabase: SupabaseClient = createClient(supabaseUrl, supabaseServiceRoleKey, {
+export const supabase: SupabaseClient = createClient(
+  supabaseUrl || "https://placeholder.supabase.co",
+  supabaseServiceRoleKey || "placeholder-key",
+  {
   auth: {
     persistSession: false,
   },
