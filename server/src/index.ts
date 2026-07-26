@@ -309,11 +309,35 @@ app.get("/health", (req: Request, res: Response) => {
 // O server valida o JWT, confere se o usuário tem acesso ao workspace,
 // resolve/provisiona a zwa_live_ do workspace e chama wa.zailom.com.
 // =====================================================================
+// Chave anon usada para validar JWT de usuário e para o proxy das edge functions.
+// Aceita variações de nome para não quebrar quando o .env é substituído por
+// variáveis de ambiente no Portainer.
+export const SUPABASE_ANON =
+  process.env.SUPABASE_ANON_KEY ||
+  process.env.SUPABASE_PUBLISHABLE_KEY ||
+  process.env.VITE_SUPABASE_ANON_KEY ||
+  process.env.VITE_EXTERNAL_SUPABASE_ANON_KEY ||
+  "";
+
+const SUPABASE_URL_ENV =
+  process.env.SUPABASE_URL ||
+  process.env.VITE_EXTERNAL_SUPABASE_URL ||
+  process.env.VITE_SUPABASE_URL ||
+  "";
+
+if (!SUPABASE_URL_ENV || !SUPABASE_ANON) {
+  console.error(
+    "[boot] AVISO: SUPABASE_URL e/ou SUPABASE_ANON_KEY ausentes. " +
+      "Rotas autenticadas (/api/wa/*) e o proxy /functions/v1 vão falhar até configurar."
+  );
+}
+
 const authSupabase = createClient(
-  process.env.SUPABASE_URL || "",
-  process.env.SUPABASE_ANON_KEY || "",
+  SUPABASE_URL_ENV || "https://placeholder.supabase.co",
+  SUPABASE_ANON || process.env.SUPABASE_SERVICE_ROLE_KEY || "placeholder-key",
   { auth: { persistSession: false } }
 );
+
 
 async function requireWorkspace(req: Request, res: Response): Promise<{ workspaceId: string; userId: string } | null> {
   const auth = req.headers.authorization;
