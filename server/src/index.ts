@@ -6,6 +6,8 @@ import { supabase } from "./supabase.js";
 import { handleWhatsAppWebhook } from "./whatsapp.js";
 import { processRuntime } from "./runtime.js";
 import { getWorkspaceCredentials, waApi } from "./waService.js";
+import { resolveChannelRoute, invalidateChannelRoute } from "./channelRoute.js";
+
 import { createClient } from "@supabase/supabase-js";
 import ws from "ws";
 
