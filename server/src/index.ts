@@ -7,11 +7,12 @@ import { handleWhatsAppWebhook } from "./whatsapp.js";
 import { processRuntime } from "./runtime.js";
 import { getWorkspaceCredentials, waApi } from "./waService.js";
 import { createClient } from "@supabase/supabase-js";
+import ws from "ws";
 
 dotenv.config();
 
 const app = express();
-const port = process.env.PORT || 80;
+const port = process.env.PORT || 3000;
 
 // Configuração de CORS robusta
 const corsOptions = {
