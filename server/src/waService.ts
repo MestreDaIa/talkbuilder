@@ -285,23 +285,91 @@ export async function findWorkspaceByInstance(instanceName: string): Promise<Wor
 function readInstanceName(item: any): string | null {
   const value =
     item?.name ||
+    item?.label ||
+    item?.display_name ||
+    item?.evoName ||
+    item?.evo_name ||
+    item?.evolutionName ||
+    item?.evolution_name ||
     item?.instanceName ||
     item?.instance_name ||
+    item?.instance?.name ||
+    item?.instance?.label ||
+    item?.instance?.display_name ||
+    item?.instance?.evoName ||
+    item?.instance?.evo_name ||
+    item?.instance?.evolutionName ||
+    item?.instance?.evolution_name ||
     item?.instance?.instanceName ||
-    item?.instance?.instance_name ||
-    item?.instance?.name;
+    item?.instance?.instance_name;
   return value ? String(value) : null;
 }
 
 function readInstanceId(item: any): string | null {
   const value =
     item?.id ||
+    item?._id ||
+    item?.uuid ||
+    item?.instanceUuid ||
+    item?.instance_uuid ||
+    item?.wa_instance_id ||
+    item?.waInstanceId ||
     item?.instanceId ||
     item?.instance_id ||
     item?.instance?.id ||
+    item?.instance?._id ||
+    item?.instance?.uuid ||
+    item?.instance?.instanceUuid ||
+    item?.instance?.instance_uuid ||
+    item?.instance?.wa_instance_id ||
+    item?.instance?.waInstanceId ||
     item?.instance?.instanceId ||
     item?.instance?.instance_id;
   return value ? String(value) : null;
+}
+
+function instanceListFrom(payload: any): any[] {
+  if (Array.isArray(payload)) return payload;
+  const candidates = [payload?.data, payload?.instances, payload?.items, payload?.results, payload?.records];
+  for (const candidate of candidates) {
+    if (Array.isArray(candidate)) return candidate;
+  }
+  return [];
+}
+
+function safeDecode(value: string): string {
+  try { return decodeURIComponent(value); } catch { return value; }
+}
+
+function sameIdentifier(a: string | null | undefined, b: string): boolean {
+  if (!a) return false;
+  const left = safeDecode(String(a)).trim();
+  const right = safeDecode(String(b)).trim();
+  return left === right || left.toLowerCase() === right.toLowerCase();
+}
+
+function uniqueNonEmpty(values: Array<string | null | undefined>): string[] {
+  const seen = new Set<string>();
+  const out: string[] = [];
+  for (const value of values) {
+    const normalized = value ? String(value).trim() : "";
+    if (!normalized || seen.has(normalized)) continue;
+    seen.add(normalized);
+    out.push(normalized);
+  }
+  return out;
+}
+
+function deleteCandidatesFrom(item: any, fallback: string): string[] {
+  return uniqueNonEmpty([
+    readInstanceId(item),
+    item?.local_id,
+    item?.localId,
+    item?.instance?.local_id,
+    item?.instance?.localId,
+    readInstanceName(item),
+    fallback,
+  ]);
 }
 
 // ----------------------------------------------------------------------------
@@ -312,16 +380,20 @@ export function waApi(apiKey: string) {
   const call = <T = any>(path: string, init: { method?: string; body?: any; query?: Record<string, any> } = {}) =>
     waFetch<T>(path, { ...init, apiKey });
 
-  const resolveInstanceDeleteTarget = async (name: string): Promise<string> => {
+  const resolveInstanceDeleteCandidates = async (name: string): Promise<string[]> => {
     try {
       const list: any = await call<any>("/v1/instances/all-instances");
-      const arr: any[] = Array.isArray(list) ? list : list?.data || list?.instances || [];
-      const found = arr.find((item) => readInstanceName(item) === name || readInstanceId(item) === name);
-      const id = readInstanceId(found);
-      return id || name;
+      const arr = instanceListFrom(list);
+      const found = arr.find((item) =>
+        sameIdentifier(readInstanceName(item), name) ||
+        sameIdentifier(readInstanceId(item), name) ||
+        deleteCandidatesFrom(item, name).some((candidate) => sameIdentifier(candidate, name))
+      );
+      if (!found) return [name];
+      return deleteCandidatesFrom(found, name);
     } catch (err: any) {
       console.warn("[wa-service] não foi possível resolver id da instância para delete:", err?.message || err);
-      return name;
+      return [name];
     }
   };
 
@@ -332,8 +404,23 @@ export function waApi(apiKey: string) {
     createInstance: (name: string) =>
       call<any>("/v1/instances/create", { method: "POST", body: { name } }),
     deleteInstance: async (name: string) => {
-      const target = await resolveInstanceDeleteTarget(name);
-      return call<any>(`/v1/instances/${encodeURIComponent(target)}/delete`, { method: "DELETE" });
+      const candidates = await resolveInstanceDeleteCandidates(name);
+      const failures: Array<{ target: string; status?: number; message: string; body?: any }> = [];
+      for (const target of candidates) {
+        try {
+          const result = await call<any>(`/v1/instances/${encodeURIComponent(target)}/delete`, { method: "DELETE" });
+          console.log(`[wa-service] instância ${name} excluída via target ${target}`);
+          return result;
+        } catch (err: any) {
+          failures.push({ target, status: err?.status, message: err?.message || String(err), body: err?.body });
+          console.warn(`[wa-service] falha ao excluir ${name} via target ${target}:`, err?.message || err);
+        }
+      }
+      const last = failures[failures.length - 1];
+      const error: any = new Error(last?.message || "Falha ao excluir instância no wa-service");
+      error.status = last?.status || 500;
+      error.body = { attempts: failures };
+      throw error;
     },
     logoutInstance: (name: string) =>
       call<any>(`/v1/instances/${encodeURIComponent(name)}/logout`, { method: "POST" }),

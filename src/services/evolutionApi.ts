@@ -86,8 +86,8 @@ export const evoApi = {
     }
   },
   async deleteInstance(instanceName: string) {
-    try { await waRequest(`/api/wa/instances/${enc(instanceName)}`, { method: "DELETE" }); return true; }
-    catch { return false; }
+    await waRequest(`/api/wa/instances/${enc(instanceName)}`, { method: "DELETE" });
+    return true;
   },
   async logoutInstance(instanceName: string) {
     try { await waRequest(`/api/wa/instances/${enc(instanceName)}/logout`, { method: "POST" }); return true; }

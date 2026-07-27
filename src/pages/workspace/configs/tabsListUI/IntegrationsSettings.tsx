@@ -320,13 +320,18 @@ export default function IntegrationsSettings() {
   const handleDeleteWhatsapp = async (id: string, name: string) => {
     if (!confirm("Tem certeza que deseja remover esta conexão?")) return;
     try {
-      await evoApi.deleteInstance(name);
+      const removed = await evoApi.deleteInstance(name);
+      if (!removed) throw new Error("A instância não foi removida no serviço WhatsApp.");
       const { error } = await supabase.from("whatsapp_connections").delete().eq("id", id);
       if (error) throw error;
       toast({ title: "Conexão removida" });
       loadWhatsappConnections();
-    } catch (err) {
-      toast({ title: "Erro ao remover", variant: "destructive" });
+    } catch (err: any) {
+      toast({
+        title: "Erro ao remover",
+        description: err?.message || "Não foi possível excluir a instância.",
+        variant: "destructive",
+      });
     }
   };
 
