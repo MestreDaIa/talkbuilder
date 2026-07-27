@@ -9,11 +9,12 @@
  * existentes (WhatsAppInstanceSettings, IntegrationsSettings, EmbedSnippets,
  * BotSettingsDialog, whatsappRuntimeService).
  */
-import { supabase } from "@/integrations/supabase/client";
+import { getSupabase } from "@/lib/supabaseClient";
 
 const BACKEND_URL = (import.meta.env.VITE_BACKEND_URL as string) || "https://api-flowbuilder.zailom.com";
 
 async function currentWorkspaceContext(): Promise<{ token: string; workspaceId: string }> {
+  const supabase = getSupabase();
   const { data: { session } } = await supabase.auth.getSession();
   const token = session?.access_token;
   const userId = session?.user?.id;

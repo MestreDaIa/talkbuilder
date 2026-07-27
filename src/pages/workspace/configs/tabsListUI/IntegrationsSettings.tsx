@@ -5,7 +5,7 @@ import { Input } from '../../../../components/ui/input'
 import { Label } from '../../../../components/ui/label'
 import { CalendarCheck2, Database, Ellipsis, CheckCircle2, XCircle, RefreshCw, Trash2, Loader2, QrCode, Settings } from 'lucide-react'
 import { useEmbed } from '../../../../context/EmbedContext'
-import { useState, useEffect } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import {
   getSupabaseConfig,
   saveSupabaseConfig,
@@ -28,7 +28,7 @@ import WhatsAppInstanceSettings from './WhatsAppInstanceSettings'
 export default function IntegrationsSettings() {
   const { flags } = useEmbed();
   const { toast } = useToast();
-  const { currentWorkspace } = useAuth();
+  const { currentWorkspace, profile } = useAuth();
   
   // Supabase Config State
   const [url, setUrl] = useState('');
@@ -40,12 +40,16 @@ export default function IntegrationsSettings() {
   const [loadingWhatsapp, setLoadingWhatsapp] = useState(true);
   const [creating, setCreating] = useState(false);
   const [syncing, setSyncing] = useState(false);
+  const [refreshing, setRefreshing] = useState(false);
+  const [refreshMinutes, setRefreshMinutes] = useState(2);
 
   const [qrCodeData, setQrCodeData] = useState<string | null>(null);
   const [instanceName, setInstanceName] = useState("");
   const [showQrModal, setShowQrModal] = useState(false);
   const [pollInterval, setPollInterval] = useState<NodeJS.Timeout | null>(null);
   const [selectedInstanceForConfig, setSelectedInstanceForConfig] = useState<string | null>(null);
+  const autoSyncAttemptedRef = useRef<string | null>(null);
+  const isBookingWorkspace = Boolean(profile?.embed_company_id || profile?.embed_source === "booking");
 
   useEffect(() => {
     const cfg = getSupabaseConfig();
@@ -54,15 +58,27 @@ export default function IntegrationsSettings() {
       setAnonKey(cfg.anonKey);
       setConnected(true);
     }
+  }, []);
 
-    if (currentWorkspace?.id) {
-      loadWhatsappConnections();
-    }
-
+  useEffect(() => {
     return () => {
       if (pollInterval) clearInterval(pollInterval);
     };
-  }, [currentWorkspace?.id]);
+  }, [pollInterval]);
+
+  useEffect(() => {
+    if (!currentWorkspace?.id) return;
+    void loadWhatsappConnections({ syncRemote: true, allowAutoProvision: true });
+  }, [currentWorkspace?.id, profile?.embed_company_id, profile?.embed_source]);
+
+  useEffect(() => {
+    if (!currentWorkspace?.id) return;
+    const minutes = Number.isFinite(refreshMinutes) && refreshMinutes > 0 ? refreshMinutes : 2;
+    const interval = window.setInterval(() => {
+      void loadWhatsappConnections({ syncRemote: true, silent: true });
+    }, minutes * 60 * 1000);
+    return () => window.clearInterval(interval);
+  }, [currentWorkspace?.id, refreshMinutes]);
 
   // --- Supabase Actions ---
   function handleSaveSupabase() {
@@ -98,7 +114,7 @@ export default function IntegrationsSettings() {
       // Refaz o vínculo com o wa-service (tenant compartilhado com o Zailom Booking)
       await evoApi.reprovision();
       const remote = await evoApi.listInstancesStrict();
-      await loadWhatsappConnections(true);
+      await loadWhatsappConnections({ syncRemote: true, forceRemotePersist: true });
       if (!remote.length) {
         const diag = await evoApi.diagnose().catch(() => null);
         console.warn("[wa-service] diagnóstico:", diag);
@@ -120,22 +136,46 @@ export default function IntegrationsSettings() {
   };
 
 
-  const loadWhatsappConnections = async (syncRemote = true) => {
+  const loadWhatsappConnections = async (options: {
+    syncRemote?: boolean;
+    allowAutoProvision?: boolean;
+    forceRemotePersist?: boolean;
+    silent?: boolean;
+  } = {}) => {
+    const {
+      syncRemote = true,
+      allowAutoProvision = false,
+      forceRemotePersist = false,
+      silent = false,
+    } = options;
+
+    if (!currentWorkspace?.id) return;
+    if (!silent) setLoadingWhatsapp(true);
 
     try {
       const { data, error } = await supabase
         .from("whatsapp_connections")
         .select("*")
-        .eq("workspace_id", currentWorkspace?.id)
+        .eq("workspace_id", currentWorkspace.id)
         .order("created_at", { ascending: false });
 
       if (error) throw error;
       let list = data || [];
 
-      if (syncRemote && currentWorkspace?.id) {
+      if (syncRemote) {
+        if (allowAutoProvision && isBookingWorkspace && list.length === 0 && autoSyncAttemptedRef.current !== currentWorkspace.id) {
+          autoSyncAttemptedRef.current = currentWorkspace.id;
+          await evoApi.reprovision().catch((err) => {
+            console.warn("[wa-service] auto reprovision falhou:", err);
+          });
+        }
+
         // Instâncias vivem no wa-service (compartilhado com o Zailom Booking).
         // Trazemos as que ainda não existem localmente.
-        const remote = await evoApi.fetchInstances().catch(() => []);
+        const remote = await evoApi.fetchInstances().catch((err) => {
+          console.warn("[wa-service] fetch instances falhou:", err);
+          return [];
+        });
         const known = new Set(list.map((c: any) => c.instance_name));
         const missing = (remote || [])
           .map((r: any) => ({
@@ -145,20 +185,21 @@ export default function IntegrationsSettings() {
           }))
           .filter((r: any) => r.instance_name && !known.has(r.instance_name));
 
-        if (missing.length) {
-          await supabase.from("whatsapp_connections").insert(
-            missing.map((m: any) => ({
-              workspace_id: currentWorkspace?.id,
-              instance_name: m.instance_name,
-              name: m.instance_name,
-              status: m.status,
-              settings: m.settings,
-            }))
-          );
+        if (missing.length || forceRemotePersist) {
+          const rows = missing.map((m: any) => ({
+            workspace_id: currentWorkspace.id,
+            instance_name: m.instance_name,
+            name: m.instance_name,
+            status: m.status,
+            settings: m.settings,
+          }));
+          if (rows.length) {
+            await supabase.from("whatsapp_connections").insert(rows);
+          }
           const { data: refreshed } = await supabase
             .from("whatsapp_connections")
             .select("*")
-            .eq("workspace_id", currentWorkspace?.id)
+            .eq("workspace_id", currentWorkspace.id)
             .order("created_at", { ascending: false });
           list = refreshed || list;
         }
@@ -167,8 +208,21 @@ export default function IntegrationsSettings() {
       setConnections(list);
     } catch (err) {
       console.error("Erro ao carregar conexões WhatsApp:", err);
+      if (!silent) {
+        toast({ title: "Erro ao carregar instâncias", description: err instanceof Error ? err.message : undefined, variant: "destructive" });
+      }
     } finally {
-      setLoadingWhatsapp(false);
+      if (!silent) setLoadingWhatsapp(false);
+    }
+  };
+
+  const refreshInstances = async () => {
+    setRefreshing(true);
+    try {
+      await loadWhatsappConnections({ syncRemote: true, forceRemotePersist: true });
+      toast({ title: "Lista de instâncias atualizada" });
+    } finally {
+      setRefreshing(false);
     }
   };
 
@@ -303,10 +357,30 @@ export default function IntegrationsSettings() {
                 <CardDescription>Conecte seu WhatsApp via Evolution API para enviar e receber mensagens.</CardDescription>
               </div>
           </div>
-          <Button variant="outline" size="sm" onClick={syncInstances} disabled={syncing}>
-            {syncing ? <Loader2 className="w-4 h-4 animate-spin mr-2" /> : null}
-            Sincronizar instâncias
-          </Button>
+          <div className="flex flex-wrap items-center justify-end gap-2">
+            <div className="flex items-center gap-2 text-xs text-muted-foreground">
+              <span>Auto</span>
+              <select
+                value={refreshMinutes}
+                onChange={(event) => setRefreshMinutes(Number(event.target.value))}
+                className="h-8 rounded-md border border-input bg-background px-2 text-xs text-foreground"
+                aria-label="Intervalo de atualização automática"
+              >
+                <option value={1}>1 min</option>
+                <option value={2}>2 min</option>
+                <option value={5}>5 min</option>
+                <option value={10}>10 min</option>
+              </select>
+            </div>
+            <Button variant="outline" size="sm" onClick={refreshInstances} disabled={refreshing || syncing}>
+              {refreshing ? <Loader2 className="w-4 h-4 animate-spin mr-2" /> : <RefreshCw className="w-4 h-4 mr-2" />}
+              Atualizar
+            </Button>
+            <Button variant="outline" size="sm" onClick={syncInstances} disabled={syncing || refreshing}>
+              {syncing ? <Loader2 className="w-4 h-4 animate-spin mr-2" /> : null}
+              Sincronizar instâncias
+            </Button>
+          </div>
 
         </CardHeader>
         <CardContent className="space-y-6">
