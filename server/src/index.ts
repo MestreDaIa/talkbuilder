@@ -447,7 +447,13 @@ app.get("/api/wa/instances/:name", waRoute(async (req, res, api) => { res.json(a
 app.delete("/api/wa/instances/:name", waRoute(async (req, res, api) => { res.json(await api.deleteInstance(req.params.name)); }));
 app.post("/api/wa/instances/:name/logout", waRoute(async (req, res, api) => { res.json(await api.logoutInstance(req.params.name)); }));
 app.get("/api/wa/instances/:name/qr", waRoute(async (req, res, api) => { res.json(await api.getQrCode(req.params.name)); }));
-app.get("/api/wa/instances/:name/status", waRoute(async (req, res, api) => { res.json(await api.getStatus(req.params.name)); }));
+app.get("/api/wa/instances/:name/status", waRoute(async (req, res, api) => {
+  const status = await api.getStatus(req.params.name);
+  res.json(status);
+}));
+app.post("/api/wa/instances/:name/refresh-status", waRoute(async (req, res, api) => {
+  res.json(await api.refreshStatus(req.params.name));
+}));
 
 // Webhook / settings / bot
 app.get("/api/wa/instances/:name/webhook", waRoute(async (req, res, api) => { res.json(await api.getWebhook(req.params.name)); }));
