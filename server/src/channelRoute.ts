@@ -21,16 +21,25 @@ import { findWorkspaceByInstance, waApi } from "./waService.js";
 export type ChannelRoute = "flow" | "direct" | "none" | "unknown";
 
 /**
- * Fallback opcional. O Booking NÃO tem uma env var de API key: suas chaves de
- * public-api são geradas por empresa (tabela `public_api_keys`) e enviadas no
- * header `x-api-key`. Só preencha estas variáveis se você gerar uma chave lá e
- * colar aqui. Vazio = fallback desativado.
+ * Fallback opcional (b). Estas variáveis são DO FLOW (server/), não existem e
+ * não precisam existir no Booking.
+ *
+ * - BOOKING_API_URL: já vem com o default público `https://api-booking.zailom.com`,
+ *   então não precisa configurar nada.
+ * - BOOKING_API_KEY: o Booking NÃO tem master key. Cada empresa gera a sua em
+ *   `public_api_keys` (prefixo `zlm_...`, header `x-api-key`). Vazio = fallback
+ *   (b) desativado; o Flow usa apenas o metadado de rota do wa-service.
+ * - BOOKING_ROUTE_PATH / CHANNEL_ROUTE_TTL_MS / STRICT_CHANNEL_ROUTE: puramente
+ *   do Flow (path, cache e modo estrito). Têm default, ignore-as se quiser.
  */
-const BOOKING_API_URL = (process.env.BOOKING_API_URL || "").replace(/\/$/, "");
+const BOOKING_API_URL = (
+  process.env.BOOKING_API_URL || "https://api-booking.zailom.com"
+).replace(/\/$/, "");
 const BOOKING_API_KEY = process.env.BOOKING_API_KEY || "";
 /** Path do endpoint de rota na public-api do Booking. `{instance}` é substituído. */
 const BOOKING_ROUTE_PATH =
   process.env.BOOKING_ROUTE_PATH || "/v1/whatsapp/instances/{instance}/route";
+
 
 const TTL_MS = Number(process.env.CHANNEL_ROUTE_TTL_MS || 60_000);
 const cache = new Map<string, { value: ChannelRoute; source: string; at: number }>();
