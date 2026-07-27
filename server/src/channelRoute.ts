@@ -20,9 +20,15 @@ import { findWorkspaceByInstance, waApi } from "./waService.js";
 
 export type ChannelRoute = "flow" | "direct" | "none" | "unknown";
 
+/**
+ * Fallback opcional. O Booking NÃO tem uma env var de API key: suas chaves de
+ * public-api são geradas por empresa (tabela `public_api_keys`) e enviadas no
+ * header `x-api-key`. Só preencha estas variáveis se você gerar uma chave lá e
+ * colar aqui. Vazio = fallback desativado.
+ */
 const BOOKING_API_URL = (process.env.BOOKING_API_URL || "").replace(/\/$/, "");
 const BOOKING_API_KEY = process.env.BOOKING_API_KEY || "";
-/** Path do endpoint de rota no Booking. `{instance}` é substituído. */
+/** Path do endpoint de rota na public-api do Booking. `{instance}` é substituído. */
 const BOOKING_ROUTE_PATH =
   process.env.BOOKING_ROUTE_PATH || "/v1/whatsapp/instances/{instance}/route";
 
