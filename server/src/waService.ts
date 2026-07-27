@@ -197,6 +197,22 @@ export async function getWorkspaceCredentials(workspaceId: string): Promise<Work
   return creds;
 }
 
+/**
+ * Esquece a key/tenant atual do workspace e força novo provisionamento na
+ * próxima chamada. Usado para migrar um workspace que já tinha tenant próprio
+ * `flow/<workspace_id>` para o tenant compartilhado do Booking.
+ */
+export async function reprovisionWorkspace(workspaceId: string): Promise<WorkspaceCreds> {
+  credsCache.delete(workspaceId);
+  await supabase
+    .from("workspaces")
+    .update({ wa_service_tenant_id: null, wa_service_api_key: null })
+    .eq("id", workspaceId);
+  return getWorkspaceCredentials(workspaceId);
+}
+
+
+
 /** Cache reverso instance_name -> workspace_id (para o webhook resolver a key). */
 export async function findWorkspaceByInstance(instanceName: string): Promise<WorkspaceCreds | null> {
   const { data: binding } = await supabase
