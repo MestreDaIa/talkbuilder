@@ -101,6 +101,16 @@ const credsCache = new Map<string, WorkspaceCreds>();
  */
 async function findBookingCompanyId(workspaceId: string): Promise<string | null> {
   if (String(process.env.WA_SHARED_TENANT || "true").toLowerCase() === "false") return null;
+
+  // 1) workspaceId pode ser o próprio user_id (1 usuário = 1 workspace lógico)
+  const { data: self } = await supabase
+    .from("profiles")
+    .select("embed_company_id")
+    .eq("id", workspaceId)
+    .maybeSingle();
+  if ((self as any)?.embed_company_id) return String((self as any).embed_company_id);
+
+  // 2) workspace real com membros
   const { data: members } = await supabase
     .from("workspace_members")
     .select("user_id")
@@ -114,6 +124,7 @@ async function findBookingCompanyId(workspaceId: string): Promise<string | null>
   const hit = (profs || []).find((p: any) => p?.embed_company_id);
   return hit?.embed_company_id ? String(hit.embed_company_id) : null;
 }
+
 
 /** Cria (ou recupera) o tenant no wa-service — idempotente. */
 async function ensureTenant(product: string, productTenantId: string, name: string): Promise<string> {
