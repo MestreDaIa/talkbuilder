@@ -90,7 +90,7 @@ export default function IntegrationsSettings() {
   }
 
   // --- WhatsApp Actions ---
-  const loadWhatsappConnections = async () => {
+  const loadWhatsappConnections = async (syncRemote = true) => {
     try {
       const { data, error } = await supabase
         .from("whatsapp_connections")
@@ -99,13 +99,48 @@ export default function IntegrationsSettings() {
         .order("created_at", { ascending: false });
 
       if (error) throw error;
-      setConnections(data || []);
+      let list = data || [];
+
+      if (syncRemote && currentWorkspace?.id) {
+        // Instâncias vivem no wa-service (compartilhado com o Zailom Booking).
+        // Trazemos as que ainda não existem localmente.
+        const remote = await evoApi.fetchInstances().catch(() => []);
+        const known = new Set(list.map((c: any) => c.instance_name));
+        const missing = (remote || [])
+          .map((r: any) => ({
+            instance_name: r?.name || r?.instanceName || r?.instance?.instanceName,
+            status: r?.status || r?.connectionStatus || r?.state || "disconnected",
+            settings: r,
+          }))
+          .filter((r: any) => r.instance_name && !known.has(r.instance_name));
+
+        if (missing.length) {
+          await supabase.from("whatsapp_connections").insert(
+            missing.map((m: any) => ({
+              workspace_id: currentWorkspace?.id,
+              instance_name: m.instance_name,
+              name: m.instance_name,
+              status: m.status,
+              settings: m.settings,
+            }))
+          );
+          const { data: refreshed } = await supabase
+            .from("whatsapp_connections")
+            .select("*")
+            .eq("workspace_id", currentWorkspace?.id)
+            .order("created_at", { ascending: false });
+          list = refreshed || list;
+        }
+      }
+
+      setConnections(list);
     } catch (err) {
       console.error("Erro ao carregar conexões WhatsApp:", err);
     } finally {
       setLoadingWhatsapp(false);
     }
   };
+
 
   const createWhatsappInstance = async () => {
     if (!instanceName.trim()) {
