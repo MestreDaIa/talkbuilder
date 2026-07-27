@@ -60,9 +60,6 @@ export const evoApi = {
   async fetchInstances() {
     try { return await waRequest<any[]>("/api/wa/instances"); } catch { return []; }
   },
-
-    try { return await waRequest<any[]>("/api/wa/instances"); } catch { return []; }
-  },
   async fetchInstance(instanceName: string) {
     try { return await waRequest<any>(`/api/wa/instances/${enc(instanceName)}`); } catch { return null; }
   },
