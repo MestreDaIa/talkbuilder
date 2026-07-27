@@ -403,6 +403,15 @@ export default function IntegrationsSettings() {
     if (!confirm("Tem certeza que deseja remover esta conexão?")) return;
     try {
       const current = connections.find((conn) => conn.id === id);
+      const remoteBeforeDelete = await evoApi.fetchInstances().catch(() => []);
+      const matchingRemote = remoteBeforeDelete.find((remote: any) =>
+        hasIdentifierOverlap(current, remote) || hasIdentifierOverlap({ instance_name: name }, remote)
+      );
+      const hiddenIdentifiers = Array.from(new Set([
+        ...collectInstanceIdentifiers(current),
+        ...collectInstanceIdentifiers({ instance_name: name }),
+        ...collectInstanceIdentifiers(matchingRemote),
+      ]));
       let remoteDeleteError: Error | null = null;
 
       try {
@@ -422,6 +431,7 @@ export default function IntegrationsSettings() {
             settings: {
               ...settingsObject(current?.settings),
               flow_hidden: true,
+              flow_hidden_identifiers: hiddenIdentifiers,
               flow_deleted_at: new Date().toISOString(),
               flow_delete_error: remoteDeleteError.message,
             },
@@ -441,6 +451,7 @@ export default function IntegrationsSettings() {
             settings: {
               ...settingsObject(current?.settings),
               flow_hidden: true,
+              flow_hidden_identifiers: hiddenIdentifiers,
               flow_deleted_at: new Date().toISOString(),
               flow_delete_remote_ok: true,
             },
