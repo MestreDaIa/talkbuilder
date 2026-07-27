@@ -10,6 +10,8 @@ import ConfigPage from "./pages/workspace/configs/page";
 import PerfilPage from "./pages/workspace/perfil/page";
 import LoginPage from "./pages/auth/LoginPage";
 import SignupPage from "./pages/auth/SignupPage";
+import ForgotPasswordPage from "./pages/auth/ForgotPasswordPage";
+import ResetPasswordPage from "./pages/auth/ResetPasswordPage";
 import LandingPage from "./pages/landing/LandingPage";
 import PreviewPage from "./pages/preview/[id]/page";
 import PublicFlowPage from "./pages/public/flow/page";
@@ -126,6 +128,8 @@ function App() {
       {/* Auth */}
       <Route path="/login" element={<AuthRoute><LoginPage /></AuthRoute>} />
       <Route path="/signup" element={<AuthRoute><SignupPage /></AuthRoute>} />
+      <Route path="/forgot-password" element={<ForgotPasswordPage />} />
+      <Route path="/reset-password" element={<ResetPasswordPage />} />
 
       {/* Aceitar convite */}
       <Route path="/invite/:token" element={<InvitePage />} />
