@@ -25,8 +25,8 @@ import {
 
 import WhatsAppInstanceSettings from './WhatsAppInstanceSettings'
 
-function settingsObject(value: unknown): Record<string, unknown> {
-  return value && typeof value === "object" && !Array.isArray(value) ? value as Record<string, unknown> : {};
+function settingsObject(value: unknown): Record<string, any> {
+  return value && typeof value === "object" && !Array.isArray(value) ? value as Record<string, any> : {};
 }
 
 function isLocallyRemovedConnection(conn: any) {
