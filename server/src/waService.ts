@@ -91,6 +91,54 @@ interface WorkspaceCreds {
 
 const credsCache = new Map<string, WorkspaceCreds>();
 
+/**
+ * Descobre o company_id do Booking associado a este workspace (contas embedadas).
+ * Se existir, o Flow COMPARTILHA o tenant do Booking no wa-service — é assim que
+ * as instâncias criadas em qualquer um dos dois produtos aparecem nos dois.
+ */
+async function findBookingCompanyId(workspaceId: string): Promise<string | null> {
+  if (String(process.env.WA_SHARED_TENANT || "true").toLowerCase() === "false") return null;
+  const { data: members } = await supabase
+    .from("workspace_members")
+    .select("user_id")
+    .eq("workspace_id", workspaceId);
+  const ids = (members || []).map((m: any) => m.user_id).filter(Boolean);
+  if (!ids.length) return null;
+  const { data: profs } = await supabase
+    .from("profiles")
+    .select("embed_company_id")
+    .in("id", ids);
+  const hit = (profs || []).find((p: any) => p?.embed_company_id);
+  return hit?.embed_company_id ? String(hit.embed_company_id) : null;
+}
+
+/** Cria (ou recupera) o tenant no wa-service — idempotente. */
+async function ensureTenant(product: string, productTenantId: string, name: string): Promise<string> {
+  try {
+    const tenant = await waFetch<any>("/v1/admin/tenants", {
+      admin: true,
+      method: "POST",
+      body: { product, product_tenant_id: productTenantId, name },
+    });
+    const id = tenant?.id || tenant?.tenant_id || tenant?.tenant?.id;
+    if (id) return String(id);
+  } catch (err: any) {
+    if (err?.status !== 409 && err?.status !== 400) throw err;
+  }
+  // Já existe → procura na listagem
+  const list = await waFetch<any>("/v1/admin/tenants", {
+    admin: true,
+    query: { product, product_tenant_id: productTenantId },
+  });
+  const arr: any[] = Array.isArray(list) ? list : list?.data || list?.tenants || [];
+  const found = arr.find(
+    (t) => String(t?.product_tenant_id ?? "") === String(productTenantId) && (!t?.product || t.product === product)
+  );
+  const id = found?.id || found?.tenant_id;
+  if (!id) throw new Error(`wa-service: tenant ${product}/${productTenantId} não encontrado nem criado`);
+  return String(id);
+}
+
 export async function getWorkspaceCredentials(workspaceId: string): Promise<WorkspaceCreds> {
   const cached = credsCache.get(workspaceId);
   if (cached) return cached;
@@ -109,19 +157,16 @@ export async function getWorkspaceCredentials(workspaceId: string): Promise<Work
     return creds;
   }
 
-  // Lazy provisioning
-  console.log(`[wa-service] provisionando tenant para workspace ${workspaceId}`);
-  const tenant = await waFetch<any>("/v1/admin/tenants", {
-    admin: true,
-    method: "POST",
-    body: {
-      product: WA_PRODUCT,
-      product_tenant_id: workspaceId,
-      name: ws.name || ws.slug || workspaceId,
-    },
-  });
-  const tenantId: string = tenant.id || tenant.tenant_id || tenant.tenant?.id;
-  if (!tenantId) throw new Error("wa-service não retornou tenant_id");
+  // Lazy provisioning — tenant compartilhado com o Booking quando a conta é embedada
+  const companyId = await findBookingCompanyId(workspaceId);
+  const product = companyId ? WA_SHARED_PRODUCT : WA_PRODUCT;
+  const productTenantId = companyId || workspaceId;
+  console.log(
+    `[wa-service] provisionando tenant ${product}/${productTenantId} para workspace ${workspaceId}` +
+      (companyId ? " (compartilhado com o Booking)" : "")
+  );
+  const tenantId = await ensureTenant(product, productTenantId, ws.name || ws.slug || workspaceId);
+
 
   const keyResp = await waFetch<any>("/v1/admin/api-keys", {
     admin: true,
