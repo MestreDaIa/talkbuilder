@@ -271,6 +271,11 @@ export default function IntegrationsSettings() {
                 <CardDescription>Conecte seu WhatsApp via Evolution API para enviar e receber mensagens.</CardDescription>
               </div>
           </div>
+          <Button variant="outline" size="sm" onClick={syncInstances} disabled={syncing}>
+            {syncing ? <Loader2 className="w-4 h-4 animate-spin mr-2" /> : null}
+            Sincronizar instâncias
+          </Button>
+
         </CardHeader>
         <CardContent className="space-y-6">
           <div className="flex flex-col gap-4 p-4 border-2 border-dashed rounded-xl bg-gray-50/50">
