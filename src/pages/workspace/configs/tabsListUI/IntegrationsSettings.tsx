@@ -245,21 +245,27 @@ export default function IntegrationsSettings() {
         }
 
         // Instâncias vivem no wa-service (compartilhado com o Zailom Booking).
-        // Trazemos as que ainda não existem localmente.
+        // Trazemos apenas as que ainda não existem localmente e que não foram
+        // removidas/ocultadas antes neste workspace, mesmo quando o wa-service
+        // retorna outro identificador para a mesma instância.
         const remote = await evoApi.fetchInstances().catch((err) => {
           console.warn("[wa-service] fetch instances falhou:", err);
           return [];
         });
-        // Inclui também linhas marcadas como removidas localmente. Assim uma
-        // instância órfã que ainda vem do wa-service não reaparece a cada sync.
-        const known = new Set(list.map((c: any) => c.instance_name));
+        const known = list.filter((conn: any) => !isLocallyRemovedConnection(conn));
+        const tombstones = list.filter(isLocallyRemovedConnection);
         const missing = (remote || [])
           .map((r: any) => ({
-            instance_name: r?.name || r?.instanceName || r?.instance?.instanceName,
+            instance_name: remoteInstanceName(r),
             status: r?.status || r?.connectionStatus || r?.state || "disconnected",
             settings: r,
           }))
-          .filter((r: any) => r.instance_name && !known.has(r.instance_name));
+          .filter((r: any) => {
+            if (!r.instance_name) return false;
+            if (known.some((conn: any) => hasIdentifierOverlap(conn, r))) return false;
+            if (tombstones.some((conn: any) => hasIdentifierOverlap(conn, r))) return false;
+            return true;
+          });
 
         if (missing.length || forceRemotePersist) {
           const rows = missing.map((m: any) => ({
