@@ -292,26 +292,28 @@ export function waApi(apiKey: string) {
 
   return {
     // Instâncias
-    listInstances: () => call<any[]>("/v1/instances"),
+    listInstances: () => call<any[]>("/v1/instances/all-instances"),
     getInstance: (name: string) => call<any>(`/v1/instances/${encodeURIComponent(name)}`),
     createInstance: (name: string) =>
-      call<any>("/v1/instances", { method: "POST", body: { name } }),
+      call<any>("/v1/instances/create", { method: "POST", body: { name } }),
     deleteInstance: (name: string) =>
-      call<any>(`/v1/instances/${encodeURIComponent(name)}`, { method: "DELETE" }),
+      call<any>(`/v1/instances/${encodeURIComponent(name)}/delete`, { method: "DELETE" }),
     logoutInstance: (name: string) =>
       call<any>(`/v1/instances/${encodeURIComponent(name)}/logout`, { method: "POST" }),
     getQrCode: (name: string) =>
-      call<any>(`/v1/instances/${encodeURIComponent(name)}/qr`),
+      call<any>(`/v1/instances/${encodeURIComponent(name)}/connect`, { method: "POST" }),
     getStatus: (name: string) =>
-      call<any>(`/v1/instances/${encodeURIComponent(name)}/status`),
+      call<any>(`/v1/instances/${encodeURIComponent(name)}/connectionState`),
+    refreshStatus: (name: string) =>
+      call<any>(`/v1/instances/${encodeURIComponent(name)}/refresh-status`, { method: "POST" }),
 
     // Config
     setWebhook: (name: string, data: { url: string; events?: string[]; base64?: boolean; byEvents?: boolean; enabled?: boolean }) =>
-      call<any>(`/v1/instances/${encodeURIComponent(name)}/webhook`, { method: "POST", body: data }),
+      call<any>(`/v1/instances/${encodeURIComponent(name)}/webhook/set`, { method: "POST", body: data }),
     getWebhook: (name: string) =>
-      call<any>(`/v1/instances/${encodeURIComponent(name)}/webhook`),
+      call<any>(`/v1/instances/${encodeURIComponent(name)}/webhook/find`),
     setSettings: (name: string, settings: Record<string, any>) =>
-      call<any>(`/v1/instances/${encodeURIComponent(name)}/settings`, { method: "POST", body: settings }),
+      call<any>(`/v1/instances/${encodeURIComponent(name)}/settings/set`, { method: "POST", body: settings }),
     getSettings: (name: string) =>
       call<any>(`/v1/instances/${encodeURIComponent(name)}/settings`),
 
@@ -325,11 +327,14 @@ export function waApi(apiKey: string) {
 
     // Mensagens
     sendText: (instance: string, to: string, text: string) =>
-      call<any>("/v1/messages/text", { method: "POST", body: { instance, to, text, linkPreview: false } }),
-    sendButtons: (instance: string, to: string, text: string, buttons: Array<{ id: string; label: string }>) =>
-      call<any>("/v1/messages/buttons", {
+      call<any>(`/v1/instances/${encodeURIComponent(instance)}/message/sendText`, {
         method: "POST",
-        body: { instance, to, text, footer: "Bot", buttons },
+        body: { number: to, to, text, linkPreview: false },
+      }),
+    sendButtons: (instance: string, to: string, text: string, buttons: Array<{ id: string; label: string }>) =>
+      call<any>(`/v1/instances/${encodeURIComponent(instance)}/message/sendButtons`, {
+        method: "POST",
+        body: { number: to, to, text, footer: "Bot", buttons },
       }),
   };
 }
