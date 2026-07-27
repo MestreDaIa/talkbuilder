@@ -17,10 +17,23 @@ const app = express();
 const port = process.env.PORT || 3000;
 
 // Configuração de CORS robusta
+const ALLOWED_HEADERS = [
+  "Origin",
+  "X-Requested-With",
+  "Content-Type",
+  "Accept",
+  "Authorization",
+  "apikey",
+  "x-workspace-id",
+  "x-user-id",
+  "x-api-key",
+  "x-client-info",
+];
+
 const corsOptions = {
   origin: "*",
-  methods: ["GET", "POST", "PUT", "DELETE", "OPTIONS"],
-  allowedHeaders: ["Origin", "X-Requested-With", "Content-Type", "Accept", "Authorization"],
+  methods: ["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
+  allowedHeaders: ALLOWED_HEADERS,
   credentials: false,
   optionsSuccessStatus: 204,
 };
@@ -29,15 +42,18 @@ app.use(cors(corsOptions));
 
 // Middleware manual para garantir que OPTIONS nunca trave e logue preflights
 app.use((req: Request, res: Response, next: NextFunction) => {
+  const requested = req.header("Access-Control-Request-Headers");
+  res.header("Access-Control-Allow-Origin", "*");
+  res.header("Access-Control-Allow-Methods", "GET, POST, PUT, PATCH, DELETE, OPTIONS");
+  res.header("Access-Control-Allow-Headers", requested || ALLOWED_HEADERS.join(", "));
+  res.header("Access-Control-Max-Age", "86400");
   if (req.method === 'OPTIONS') {
-    console.log(`[CORS-PREFLIGHT] ${req.url}`);
-    res.header('Access-Control-Allow-Origin', '*');
-    res.header('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, OPTIONS');
-    res.header('Access-Control-Allow-Headers', 'Origin, X-Requested-With, Content-Type, Accept, Authorization');
+    console.log(`[CORS-PREFLIGHT] ${req.url} headers=${requested || "-"}`);
     return res.sendStatus(204);
   }
   next();
 });
+
 
 app.use(morgan("dev"));
 // Captura body cru para verificação de HMAC do webhook do wa-service.
