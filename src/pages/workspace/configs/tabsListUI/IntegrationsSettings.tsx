@@ -25,6 +25,15 @@ import {
 
 import WhatsAppInstanceSettings from './WhatsAppInstanceSettings'
 
+function settingsObject(value: unknown): Record<string, any> {
+  return value && typeof value === "object" && !Array.isArray(value) ? value as Record<string, any> : {};
+}
+
+function isLocallyRemovedConnection(conn: any) {
+  const settings = settingsObject(conn?.settings);
+  return conn?.status === "deleted" || settings.flow_hidden === true || Boolean(settings.flow_deleted_at);
+}
+
 export default function IntegrationsSettings() {
   const { flags } = useEmbed();
   const { toast } = useToast();
@@ -176,6 +185,8 @@ export default function IntegrationsSettings() {
           console.warn("[wa-service] fetch instances falhou:", err);
           return [];
         });
+        // Inclui também linhas marcadas como removidas localmente. Assim uma
+        // instância órfã que ainda vem do wa-service não reaparece a cada sync.
         const known = new Set(list.map((c: any) => c.instance_name));
         const missing = (remote || [])
           .map((r: any) => ({
@@ -205,7 +216,7 @@ export default function IntegrationsSettings() {
         }
       }
 
-      setConnections(list);
+      setConnections(list.filter((conn: any) => !isLocallyRemovedConnection(conn)));
     } catch (err) {
       console.error("Erro ao carregar conexões WhatsApp:", err);
       if (!silent) {
@@ -320,12 +331,56 @@ export default function IntegrationsSettings() {
   const handleDeleteWhatsapp = async (id: string, name: string) => {
     if (!confirm("Tem certeza que deseja remover esta conexão?")) return;
     try {
-      const removed = await evoApi.deleteInstance(name);
-      if (!removed) throw new Error("A instância não foi removida no serviço WhatsApp.");
-      const { error } = await supabase.from("whatsapp_connections").delete().eq("id", id);
-      if (error) throw error;
-      toast({ title: "Conexão removida" });
-      loadWhatsappConnections();
+      const current = connections.find((conn) => conn.id === id);
+      let remoteDeleteError: Error | null = null;
+
+      try {
+        const removed = await evoApi.deleteInstance(name);
+        if (!removed) throw new Error("A instância não foi removida no serviço WhatsApp.");
+      } catch (err: any) {
+        remoteDeleteError = err instanceof Error ? err : new Error(String(err?.message || err));
+      }
+
+      await supabase.from("whatsapp_bindings").delete().eq("instance_name", name);
+
+      if (remoteDeleteError) {
+        const { error } = await supabase
+          .from("whatsapp_connections")
+          .update({
+            status: "deleted",
+            settings: {
+              ...settingsObject(current?.settings),
+              flow_hidden: true,
+              flow_deleted_at: new Date().toISOString(),
+              flow_delete_error: remoteDeleteError.message,
+            },
+          })
+          .eq("id", id);
+        if (error) throw error;
+        setConnections((prev) => prev.filter((conn) => conn.id !== id));
+        toast({
+          title: "Conexão removida do Flow",
+          description: "O serviço WhatsApp retornou erro ao apagar na origem; esta instância não será sincronizada novamente neste workspace.",
+        });
+      } else {
+        const { error } = await supabase
+          .from("whatsapp_connections")
+          .update({
+            status: "deleted",
+            settings: {
+              ...settingsObject(current?.settings),
+              flow_hidden: true,
+              flow_deleted_at: new Date().toISOString(),
+              flow_delete_remote_ok: true,
+            },
+          })
+          .eq("id", id);
+        if (error) throw error;
+        setConnections((prev) => prev.filter((conn) => conn.id !== id));
+        toast({ title: "Conexão removida" });
+      }
+
+      void loadWhatsappConnections({ syncRemote: true, silent: true });
     } catch (err: any) {
       toast({
         title: "Erro ao remover",
