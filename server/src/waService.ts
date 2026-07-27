@@ -157,15 +157,25 @@ export async function getWorkspaceCredentials(workspaceId: string): Promise<Work
   const cached = credsCache.get(workspaceId);
   if (cached) return cached;
 
-  const { data: ws, error } = await supabase
+  const { data: ws } = await supabase
     .from("workspaces")
     .select("id, name, slug, wa_service_tenant_id, wa_service_api_key")
     .eq("id", workspaceId)
     .maybeSingle();
 
-  if (error || !ws) throw new Error(`workspace ${workspaceId} não encontrado`);
+  // Fallback: contas onde 1 usuário = 1 workspace lógico (não existe linha em `workspaces`)
+  let profile: any = null;
+  if (!ws) {
+    const { data: prof } = await supabase
+      .from("profiles")
+      .select("id, full_name, slug, email")
+      .eq("id", workspaceId)
+      .maybeSingle();
+    profile = prof;
+    if (!prof) throw new Error(`workspace ${workspaceId} não encontrado`);
+  }
 
-  if (ws.wa_service_tenant_id && ws.wa_service_api_key) {
+  if (ws?.wa_service_tenant_id && ws?.wa_service_api_key) {
     const creds = { tenantId: ws.wa_service_tenant_id, apiKey: ws.wa_service_api_key, workspaceId };
     credsCache.set(workspaceId, creds);
     return creds;
@@ -175,11 +185,13 @@ export async function getWorkspaceCredentials(workspaceId: string): Promise<Work
   const companyId = await findBookingCompanyId(workspaceId);
   const product = companyId ? WA_SHARED_PRODUCT : WA_PRODUCT;
   const productTenantId = companyId || workspaceId;
+  const displayName =
+    (ws as any)?.name || (ws as any)?.slug || profile?.full_name || profile?.slug || profile?.email || workspaceId;
   console.log(
     `[wa-service] provisionando tenant ${product}/${productTenantId} para workspace ${workspaceId}` +
       (companyId ? " (compartilhado com o Booking)" : "")
   );
-  const tenantId = await ensureTenant(product, productTenantId, ws.name || ws.slug || workspaceId);
+  const tenantId = await ensureTenant(product, productTenantId, displayName);
 
 
   const keyResp = await waFetch<any>("/v1/admin/api-keys", {
@@ -194,19 +206,22 @@ export async function getWorkspaceCredentials(workspaceId: string): Promise<Work
   const plaintext: string = keyResp.plaintext || keyResp.key || keyResp.api_key;
   if (!plaintext) throw new Error("wa-service não retornou plaintext da api-key");
 
-  await supabase
-    .from("workspaces")
-    .update({
-      wa_service_tenant_id: tenantId,
-      wa_service_api_key: plaintext,
-      wa_service_provisioned_at: new Date().toISOString(),
-    })
-    .eq("id", workspaceId);
+  if (ws) {
+    await supabase
+      .from("workspaces")
+      .update({
+        wa_service_tenant_id: tenantId,
+        wa_service_api_key: plaintext,
+        wa_service_provisioned_at: new Date().toISOString(),
+      })
+      .eq("id", workspaceId);
+  }
 
   const creds = { tenantId, apiKey: plaintext, workspaceId };
   credsCache.set(workspaceId, creds);
   return creds;
 }
+
 
 /**
  * Esquece a key/tenant atual do workspace e força novo provisionamento na
