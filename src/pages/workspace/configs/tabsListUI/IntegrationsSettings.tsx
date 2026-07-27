@@ -363,7 +363,18 @@ export default function IntegrationsSettings() {
           description: "O serviço WhatsApp retornou erro ao apagar na origem; esta instância não será sincronizada novamente neste workspace.",
         });
       } else {
-        const { error } = await supabase.from("whatsapp_connections").delete().eq("id", id);
+        const { error } = await supabase
+          .from("whatsapp_connections")
+          .update({
+            status: "deleted",
+            settings: {
+              ...settingsObject(current?.settings),
+              flow_hidden: true,
+              flow_deleted_at: new Date().toISOString(),
+              flow_delete_remote_ok: true,
+            },
+          })
+          .eq("id", id);
         if (error) throw error;
         setConnections((prev) => prev.filter((conn) => conn.id !== id));
         toast({ title: "Conexão removida" });
