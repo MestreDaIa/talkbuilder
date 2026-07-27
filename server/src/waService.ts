@@ -101,6 +101,16 @@ const credsCache = new Map<string, WorkspaceCreds>();
  */
 async function findBookingCompanyId(workspaceId: string): Promise<string | null> {
   if (String(process.env.WA_SHARED_TENANT || "true").toLowerCase() === "false") return null;
+
+  // 1) workspaceId pode ser o próprio user_id (1 usuário = 1 workspace lógico)
+  const { data: self } = await supabase
+    .from("profiles")
+    .select("embed_company_id")
+    .eq("id", workspaceId)
+    .maybeSingle();
+  if ((self as any)?.embed_company_id) return String((self as any).embed_company_id);
+
+  // 2) workspace real com membros
   const { data: members } = await supabase
     .from("workspace_members")
     .select("user_id")
@@ -114,6 +124,7 @@ async function findBookingCompanyId(workspaceId: string): Promise<string | null>
   const hit = (profs || []).find((p: any) => p?.embed_company_id);
   return hit?.embed_company_id ? String(hit.embed_company_id) : null;
 }
+
 
 /** Cria (ou recupera) o tenant no wa-service — idempotente. */
 async function ensureTenant(product: string, productTenantId: string, name: string): Promise<string> {
@@ -146,15 +157,25 @@ export async function getWorkspaceCredentials(workspaceId: string): Promise<Work
   const cached = credsCache.get(workspaceId);
   if (cached) return cached;
 
-  const { data: ws, error } = await supabase
+  const { data: ws } = await supabase
     .from("workspaces")
     .select("id, name, slug, wa_service_tenant_id, wa_service_api_key")
     .eq("id", workspaceId)
     .maybeSingle();
 
-  if (error || !ws) throw new Error(`workspace ${workspaceId} não encontrado`);
+  // Fallback: contas onde 1 usuário = 1 workspace lógico (não existe linha em `workspaces`)
+  let profile: any = null;
+  if (!ws) {
+    const { data: prof } = await supabase
+      .from("profiles")
+      .select("id, full_name, slug, email")
+      .eq("id", workspaceId)
+      .maybeSingle();
+    profile = prof;
+    if (!prof) throw new Error(`workspace ${workspaceId} não encontrado`);
+  }
 
-  if (ws.wa_service_tenant_id && ws.wa_service_api_key) {
+  if (ws?.wa_service_tenant_id && ws?.wa_service_api_key) {
     const creds = { tenantId: ws.wa_service_tenant_id, apiKey: ws.wa_service_api_key, workspaceId };
     credsCache.set(workspaceId, creds);
     return creds;
@@ -164,11 +185,13 @@ export async function getWorkspaceCredentials(workspaceId: string): Promise<Work
   const companyId = await findBookingCompanyId(workspaceId);
   const product = companyId ? WA_SHARED_PRODUCT : WA_PRODUCT;
   const productTenantId = companyId || workspaceId;
+  const displayName =
+    (ws as any)?.name || (ws as any)?.slug || profile?.full_name || profile?.slug || profile?.email || workspaceId;
   console.log(
     `[wa-service] provisionando tenant ${product}/${productTenantId} para workspace ${workspaceId}` +
       (companyId ? " (compartilhado com o Booking)" : "")
   );
-  const tenantId = await ensureTenant(product, productTenantId, ws.name || ws.slug || workspaceId);
+  const tenantId = await ensureTenant(product, productTenantId, displayName);
 
 
   const keyResp = await waFetch<any>("/v1/admin/api-keys", {
@@ -183,19 +206,22 @@ export async function getWorkspaceCredentials(workspaceId: string): Promise<Work
   const plaintext: string = keyResp.plaintext || keyResp.key || keyResp.api_key;
   if (!plaintext) throw new Error("wa-service não retornou plaintext da api-key");
 
-  await supabase
-    .from("workspaces")
-    .update({
-      wa_service_tenant_id: tenantId,
-      wa_service_api_key: plaintext,
-      wa_service_provisioned_at: new Date().toISOString(),
-    })
-    .eq("id", workspaceId);
+  if (ws) {
+    await supabase
+      .from("workspaces")
+      .update({
+        wa_service_tenant_id: tenantId,
+        wa_service_api_key: plaintext,
+        wa_service_provisioned_at: new Date().toISOString(),
+      })
+      .eq("id", workspaceId);
+  }
 
   const creds = { tenantId, apiKey: plaintext, workspaceId };
   credsCache.set(workspaceId, creds);
   return creds;
 }
+
 
 /**
  * Esquece a key/tenant atual do workspace e força novo provisionamento na
@@ -210,6 +236,28 @@ export async function reprovisionWorkspace(workspaceId: string): Promise<Workspa
     .eq("id", workspaceId);
   return getWorkspaceCredentials(workspaceId);
 }
+
+/** Diagnóstico: mostra como este workspace está mapeado no wa-service. */
+export async function diagnoseWorkspace(workspaceId: string): Promise<any> {
+  const out: any = { workspace_id: workspaceId, wa_service_url: WA_SERVICE_URL };
+  try {
+    out.booking_company_id = await findBookingCompanyId(workspaceId);
+    out.product = out.booking_company_id ? WA_SHARED_PRODUCT : WA_PRODUCT;
+    out.product_tenant_id = out.booking_company_id || workspaceId;
+    const creds = await getWorkspaceCredentials(workspaceId);
+    out.tenant_id = creds.tenantId;
+    out.api_key_prefix = String(creds.apiKey || "").slice(0, 12);
+    const list = await waApi(creds.apiKey).listInstances();
+    const arr: any[] = Array.isArray(list) ? list : (list as any)?.data || (list as any)?.instances || [];
+    out.instances_count = arr.length;
+    out.instances = arr.map((i: any) => i?.name || i?.instanceName || i?.instance?.instanceName).filter(Boolean);
+  } catch (err: any) {
+    out.error = err?.message || String(err);
+    out.details = err?.body;
+  }
+  return out;
+}
+
 
 
 

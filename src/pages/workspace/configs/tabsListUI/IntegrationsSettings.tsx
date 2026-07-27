@@ -96,15 +96,29 @@ export default function IntegrationsSettings() {
     setSyncing(true);
     try {
       // Refaz o vínculo com o wa-service (tenant compartilhado com o Zailom Booking)
-      await evoApi.reprovision().catch(() => null);
+      await evoApi.reprovision();
+      const remote = await evoApi.listInstancesStrict();
       await loadWhatsappConnections(true);
-      toast({ title: "Instâncias sincronizadas" });
+      if (!remote.length) {
+        const diag = await evoApi.diagnose().catch(() => null);
+        console.warn("[wa-service] diagnóstico:", diag);
+        toast({
+          title: "Nenhuma instância encontrada no wa-service",
+          description: diag
+            ? `tenant ${diag.product}/${diag.product_tenant_id}${diag.error ? ` — ${diag.error}` : ""}`
+            : "Verifique se a conta está vinculada ao Zailom Booking.",
+          variant: "destructive",
+        });
+      } else {
+        toast({ title: `${remote.length} instância(s) sincronizada(s)` });
+      }
     } catch (err: any) {
       toast({ title: "Falha ao sincronizar", description: err?.message, variant: "destructive" });
     } finally {
       setSyncing(false);
     }
   };
+
 
   const loadWhatsappConnections = async (syncRemote = true) => {
 
