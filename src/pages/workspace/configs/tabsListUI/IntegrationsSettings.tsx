@@ -34,6 +34,71 @@ function isLocallyRemovedConnection(conn: any) {
   return conn?.status === "deleted" || settings.flow_hidden === true || Boolean(settings.flow_deleted_at);
 }
 
+function normalizeInstanceIdentifier(value: unknown): string | null {
+  if (value == null) return null;
+  let text = String(value).trim();
+  if (!text) return null;
+  try { text = decodeURIComponent(text); } catch { /* mantém valor original */ }
+  return text.trim().toLowerCase() || null;
+}
+
+function collectInstanceIdentifiers(source: any): string[] {
+  const ids = new Set<string>();
+  const add = (value: unknown) => {
+    const normalized = normalizeInstanceIdentifier(value);
+    if (normalized) ids.add(normalized);
+  };
+
+  const walk = (value: any, depth = 0) => {
+    if (!value || depth > 3) return;
+    if (typeof value !== "object") return;
+    const record = value as Record<string, any>;
+
+    [
+      "id", "_id", "uuid", "name", "label", "display_name",
+      "instanceName", "instance_name", "instanceId", "instance_id",
+      "instanceUuid", "instance_uuid", "waInstanceId", "wa_instance_id",
+      "evoName", "evo_name", "evolutionName", "evolution_name",
+      "local_id", "localId",
+    ].forEach((key) => add(record[key]));
+
+    walk(record.instance, depth + 1);
+    walk(record.connection, depth + 1);
+    walk(record.data, depth + 1);
+  };
+
+  add(source?.instance_name);
+  add(source?.name);
+  add(source?.id);
+  walk(source?.settings ?? source);
+
+  const hidden = settingsObject(source?.settings).flow_hidden_identifiers;
+  if (Array.isArray(hidden)) hidden.forEach(add);
+
+  return [...ids];
+}
+
+function hasIdentifierOverlap(left: any, right: any) {
+  const rightIds = new Set(collectInstanceIdentifiers(right));
+  if (!rightIds.size) return false;
+  return collectInstanceIdentifiers(left).some((id) => rightIds.has(id));
+}
+
+function remoteInstanceName(remote: any): string | null {
+  const value =
+    remote?.name ||
+    remote?.instanceName ||
+    remote?.instance_name ||
+    remote?.label ||
+    remote?.display_name ||
+    remote?.instance?.name ||
+    remote?.instance?.instanceName ||
+    remote?.instance?.instance_name ||
+    remote?.instance?.label ||
+    remote?.instance?.display_name;
+  return value ? String(value) : null;
+}
+
 export default function IntegrationsSettings() {
   const { flags } = useEmbed();
   const { toast } = useToast();
@@ -180,21 +245,27 @@ export default function IntegrationsSettings() {
         }
 
         // Instâncias vivem no wa-service (compartilhado com o Zailom Booking).
-        // Trazemos as que ainda não existem localmente.
+        // Trazemos apenas as que ainda não existem localmente e que não foram
+        // removidas/ocultadas antes neste workspace, mesmo quando o wa-service
+        // retorna outro identificador para a mesma instância.
         const remote = await evoApi.fetchInstances().catch((err) => {
           console.warn("[wa-service] fetch instances falhou:", err);
           return [];
         });
-        // Inclui também linhas marcadas como removidas localmente. Assim uma
-        // instância órfã que ainda vem do wa-service não reaparece a cada sync.
-        const known = new Set(list.map((c: any) => c.instance_name));
+        const known = list.filter((conn: any) => !isLocallyRemovedConnection(conn));
+        const tombstones = list.filter(isLocallyRemovedConnection);
         const missing = (remote || [])
           .map((r: any) => ({
-            instance_name: r?.name || r?.instanceName || r?.instance?.instanceName,
+            instance_name: remoteInstanceName(r),
             status: r?.status || r?.connectionStatus || r?.state || "disconnected",
             settings: r,
           }))
-          .filter((r: any) => r.instance_name && !known.has(r.instance_name));
+          .filter((r: any) => {
+            if (!r.instance_name) return false;
+            if (known.some((conn: any) => hasIdentifierOverlap(conn, r))) return false;
+            if (tombstones.some((conn: any) => hasIdentifierOverlap(conn, r))) return false;
+            return true;
+          });
 
         if (missing.length || forceRemotePersist) {
           const rows = missing.map((m: any) => ({
@@ -216,7 +287,12 @@ export default function IntegrationsSettings() {
         }
       }
 
-      setConnections(list.filter((conn: any) => !isLocallyRemovedConnection(conn)));
+      const tombstones = list.filter(isLocallyRemovedConnection);
+      const visible = list.filter((conn: any) => {
+        if (isLocallyRemovedConnection(conn)) return false;
+        return !tombstones.some((removed: any) => hasIdentifierOverlap(removed, conn));
+      });
+      setConnections(visible);
     } catch (err) {
       console.error("Erro ao carregar conexões WhatsApp:", err);
       if (!silent) {
@@ -332,6 +408,26 @@ export default function IntegrationsSettings() {
     if (!confirm("Tem certeza que deseja remover esta conexão?")) return;
     try {
       const current = connections.find((conn) => conn.id === id);
+      const remoteBeforeDelete = await evoApi.fetchInstances().catch(() => []);
+      const matchingRemote = remoteBeforeDelete.find((remote: any) =>
+        hasIdentifierOverlap(current, remote) || hasIdentifierOverlap({ instance_name: name }, remote)
+      );
+      const hiddenIdentifiers = Array.from(new Set([
+        ...collectInstanceIdentifiers(current),
+        ...collectInstanceIdentifiers({ instance_name: name }),
+        ...collectInstanceIdentifiers(matchingRemote),
+      ]));
+      const { data: localRows } = await supabase
+        .from("whatsapp_connections")
+        .select("*")
+        .eq("workspace_id", currentWorkspace?.id);
+      const targetIds = (localRows || [])
+        .filter((conn: any) =>
+          conn.id === id || collectInstanceIdentifiers(conn).some((identifier) => hiddenIdentifiers.includes(identifier))
+        )
+        .map((conn: any) => conn.id)
+        .filter(Boolean);
+      if (!targetIds.includes(id)) targetIds.push(id);
       let remoteDeleteError: Error | null = null;
 
       try {
@@ -351,13 +447,14 @@ export default function IntegrationsSettings() {
             settings: {
               ...settingsObject(current?.settings),
               flow_hidden: true,
+              flow_hidden_identifiers: hiddenIdentifiers,
               flow_deleted_at: new Date().toISOString(),
               flow_delete_error: remoteDeleteError.message,
             },
           })
-          .eq("id", id);
+          .in("id", targetIds);
         if (error) throw error;
-        setConnections((prev) => prev.filter((conn) => conn.id !== id));
+        setConnections((prev) => prev.filter((conn) => !targetIds.includes(conn.id)));
         toast({
           title: "Conexão removida do Flow",
           description: "O serviço WhatsApp retornou erro ao apagar na origem; esta instância não será sincronizada novamente neste workspace.",
@@ -370,13 +467,14 @@ export default function IntegrationsSettings() {
             settings: {
               ...settingsObject(current?.settings),
               flow_hidden: true,
+              flow_hidden_identifiers: hiddenIdentifiers,
               flow_deleted_at: new Date().toISOString(),
               flow_delete_remote_ok: true,
             },
           })
-          .eq("id", id);
+          .in("id", targetIds);
         if (error) throw error;
-        setConnections((prev) => prev.filter((conn) => conn.id !== id));
+        setConnections((prev) => prev.filter((conn) => !targetIds.includes(conn.id)));
         toast({ title: "Conexão removida" });
       }
 
