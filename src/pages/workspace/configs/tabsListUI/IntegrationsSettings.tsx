@@ -92,7 +92,22 @@ export default function IntegrationsSettings() {
   }
 
   // --- WhatsApp Actions ---
+  const syncInstances = async () => {
+    setSyncing(true);
+    try {
+      // Refaz o vínculo com o wa-service (tenant compartilhado com o Zailom Booking)
+      await evoApi.reprovision().catch(() => null);
+      await loadWhatsappConnections(true);
+      toast({ title: "Instâncias sincronizadas" });
+    } catch (err: any) {
+      toast({ title: "Falha ao sincronizar", description: err?.message, variant: "destructive" });
+    } finally {
+      setSyncing(false);
+    }
+  };
+
   const loadWhatsappConnections = async (syncRemote = true) => {
+
     try {
       const { data, error } = await supabase
         .from("whatsapp_connections")
