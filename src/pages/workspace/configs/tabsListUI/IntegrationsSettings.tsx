@@ -34,6 +34,71 @@ function isLocallyRemovedConnection(conn: any) {
   return conn?.status === "deleted" || settings.flow_hidden === true || Boolean(settings.flow_deleted_at);
 }
 
+function normalizeInstanceIdentifier(value: unknown): string | null {
+  if (value == null) return null;
+  let text = String(value).trim();
+  if (!text) return null;
+  try { text = decodeURIComponent(text); } catch { /* mantém valor original */ }
+  return text.trim().toLowerCase() || null;
+}
+
+function collectInstanceIdentifiers(source: any): string[] {
+  const ids = new Set<string>();
+  const add = (value: unknown) => {
+    const normalized = normalizeInstanceIdentifier(value);
+    if (normalized) ids.add(normalized);
+  };
+
+  const walk = (value: any, depth = 0) => {
+    if (!value || depth > 3) return;
+    if (typeof value !== "object") return;
+    const record = value as Record<string, any>;
+
+    [
+      "id", "_id", "uuid", "name", "label", "display_name",
+      "instanceName", "instance_name", "instanceId", "instance_id",
+      "instanceUuid", "instance_uuid", "waInstanceId", "wa_instance_id",
+      "evoName", "evo_name", "evolutionName", "evolution_name",
+      "local_id", "localId",
+    ].forEach((key) => add(record[key]));
+
+    walk(record.instance, depth + 1);
+    walk(record.connection, depth + 1);
+    walk(record.data, depth + 1);
+  };
+
+  add(source?.instance_name);
+  add(source?.name);
+  add(source?.id);
+  walk(source?.settings ?? source);
+
+  const hidden = settingsObject(source?.settings).flow_hidden_identifiers;
+  if (Array.isArray(hidden)) hidden.forEach(add);
+
+  return [...ids];
+}
+
+function hasIdentifierOverlap(left: any, right: any) {
+  const rightIds = new Set(collectInstanceIdentifiers(right));
+  if (!rightIds.size) return false;
+  return collectInstanceIdentifiers(left).some((id) => rightIds.has(id));
+}
+
+function remoteInstanceName(remote: any): string | null {
+  const value =
+    remote?.name ||
+    remote?.instanceName ||
+    remote?.instance_name ||
+    remote?.label ||
+    remote?.display_name ||
+    remote?.instance?.name ||
+    remote?.instance?.instanceName ||
+    remote?.instance?.instance_name ||
+    remote?.instance?.label ||
+    remote?.instance?.display_name;
+  return value ? String(value) : null;
+}
+
 export default function IntegrationsSettings() {
   const { flags } = useEmbed();
   const { toast } = useToast();
