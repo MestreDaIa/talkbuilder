@@ -39,6 +39,8 @@ export default function IntegrationsSettings() {
   const [connections, setConnections] = useState<any[]>([]);
   const [loadingWhatsapp, setLoadingWhatsapp] = useState(true);
   const [creating, setCreating] = useState(false);
+  const [syncing, setSyncing] = useState(false);
+
   const [qrCodeData, setQrCodeData] = useState<string | null>(null);
   const [instanceName, setInstanceName] = useState("");
   const [showQrModal, setShowQrModal] = useState(false);
