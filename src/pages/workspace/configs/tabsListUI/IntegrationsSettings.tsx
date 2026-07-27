@@ -357,10 +357,30 @@ export default function IntegrationsSettings() {
                 <CardDescription>Conecte seu WhatsApp via Evolution API para enviar e receber mensagens.</CardDescription>
               </div>
           </div>
-          <Button variant="outline" size="sm" onClick={syncInstances} disabled={syncing}>
-            {syncing ? <Loader2 className="w-4 h-4 animate-spin mr-2" /> : null}
-            Sincronizar instâncias
-          </Button>
+          <div className="flex flex-wrap items-center justify-end gap-2">
+            <div className="flex items-center gap-2 text-xs text-muted-foreground">
+              <span>Auto</span>
+              <select
+                value={refreshMinutes}
+                onChange={(event) => setRefreshMinutes(Number(event.target.value))}
+                className="h-8 rounded-md border border-input bg-background px-2 text-xs text-foreground"
+                aria-label="Intervalo de atualização automática"
+              >
+                <option value={1}>1 min</option>
+                <option value={2}>2 min</option>
+                <option value={5}>5 min</option>
+                <option value={10}>10 min</option>
+              </select>
+            </div>
+            <Button variant="outline" size="sm" onClick={refreshInstances} disabled={refreshing || syncing}>
+              {refreshing ? <Loader2 className="w-4 h-4 animate-spin mr-2" /> : <RefreshCw className="w-4 h-4 mr-2" />}
+              Atualizar
+            </Button>
+            <Button variant="outline" size="sm" onClick={syncInstances} disabled={syncing || refreshing}>
+              {syncing ? <Loader2 className="w-4 h-4 animate-spin mr-2" /> : null}
+              Sincronizar instâncias
+            </Button>
+          </div>
 
         </CardHeader>
         <CardContent className="space-y-6">
