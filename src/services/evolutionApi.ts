@@ -56,10 +56,20 @@ export const evoApi = {
   async reprovision() {
     return waRequest<any>("/api/wa/reprovision", { method: "POST" });
   },
-  // --- Instâncias -----------------------------------------------------------
-  async fetchInstances() {
-    try { return await waRequest<any[]>("/api/wa/instances"); } catch { return []; }
+  /** Diagnóstico do vínculo (tenant, produto, instâncias vistas). */
+  async diagnose() {
+    return waRequest<any>("/api/wa/diagnose");
   },
+  // --- Instâncias -----------------------------------------------------------
+  /** Lista instâncias — lança erro (usado na sincronização manual). */
+  async listInstancesStrict(): Promise<any[]> {
+    const data = await waRequest<any>("/api/wa/instances");
+    return Array.isArray(data) ? data : data?.data || data?.instances || [];
+  },
+  async fetchInstances() {
+    try { return await evoApi.listInstancesStrict(); } catch { return []; }
+  },
+
   async fetchInstance(instanceName: string) {
     try { return await waRequest<any>(`/api/wa/instances/${enc(instanceName)}`); } catch { return null; }
   },
