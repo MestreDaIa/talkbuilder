@@ -261,7 +261,8 @@ export default function IntegrationsSettings() {
     <div className="flex flex-col gap-6 w-full">
       {/* WhatsApp Section */}
       <Card>
-        <CardHeader>
+        <CardHeader className="flex flex-row items-center justify-between gap-4">
+
           <div className="flex items-center gap-3">
              <div className='p-2.5 h-fit w-fit rounded-xl bg-green-50'>
                 <SiWhatsapp className='w-5 h-5 text-green-600'/>
