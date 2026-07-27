@@ -237,6 +237,28 @@ export async function reprovisionWorkspace(workspaceId: string): Promise<Workspa
   return getWorkspaceCredentials(workspaceId);
 }
 
+/** Diagnóstico: mostra como este workspace está mapeado no wa-service. */
+export async function diagnoseWorkspace(workspaceId: string): Promise<any> {
+  const out: any = { workspace_id: workspaceId, wa_service_url: WA_SERVICE_URL };
+  try {
+    out.booking_company_id = await findBookingCompanyId(workspaceId);
+    out.product = out.booking_company_id ? WA_SHARED_PRODUCT : WA_PRODUCT;
+    out.product_tenant_id = out.booking_company_id || workspaceId;
+    const creds = await getWorkspaceCredentials(workspaceId);
+    out.tenant_id = creds.tenantId;
+    out.api_key_prefix = String(creds.apiKey || "").slice(0, 12);
+    const list = await waApi(creds.apiKey).listInstances();
+    const arr: any[] = Array.isArray(list) ? list : (list as any)?.data || (list as any)?.instances || [];
+    out.instances_count = arr.length;
+    out.instances = arr.map((i: any) => i?.name || i?.instanceName || i?.instance?.instanceName).filter(Boolean);
+  } catch (err: any) {
+    out.error = err?.message || String(err);
+    out.details = err?.body;
+  }
+  return out;
+}
+
+
 
 
 /** Cache reverso instance_name -> workspace_id (para o webhook resolver a key). */
