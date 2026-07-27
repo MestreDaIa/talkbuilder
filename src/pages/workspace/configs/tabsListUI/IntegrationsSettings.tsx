@@ -412,6 +412,17 @@ export default function IntegrationsSettings() {
         ...collectInstanceIdentifiers({ instance_name: name }),
         ...collectInstanceIdentifiers(matchingRemote),
       ]));
+      const { data: localRows } = await supabase
+        .from("whatsapp_connections")
+        .select("*")
+        .eq("workspace_id", currentWorkspace?.id);
+      const targetIds = (localRows || [])
+        .filter((conn: any) =>
+          conn.id === id || collectInstanceIdentifiers(conn).some((identifier) => hiddenIdentifiers.includes(identifier))
+        )
+        .map((conn: any) => conn.id)
+        .filter(Boolean);
+      if (!targetIds.includes(id)) targetIds.push(id);
       let remoteDeleteError: Error | null = null;
 
       try {
@@ -436,9 +447,9 @@ export default function IntegrationsSettings() {
               flow_delete_error: remoteDeleteError.message,
             },
           })
-          .eq("id", id);
+          .in("id", targetIds);
         if (error) throw error;
-        setConnections((prev) => prev.filter((conn) => conn.id !== id));
+        setConnections((prev) => prev.filter((conn) => !targetIds.includes(conn.id)));
         toast({
           title: "Conexão removida do Flow",
           description: "O serviço WhatsApp retornou erro ao apagar na origem; esta instância não será sincronizada novamente neste workspace.",
@@ -456,9 +467,9 @@ export default function IntegrationsSettings() {
               flow_delete_remote_ok: true,
             },
           })
-          .eq("id", id);
+          .in("id", targetIds);
         if (error) throw error;
-        setConnections((prev) => prev.filter((conn) => conn.id !== id));
+        setConnections((prev) => prev.filter((conn) => !targetIds.includes(conn.id)));
         toast({ title: "Conexão removida" });
       }
 
