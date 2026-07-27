@@ -282,6 +282,28 @@ export async function findWorkspaceByInstance(instanceName: string): Promise<Wor
   return getWorkspaceCredentials(wsId).catch(() => null);
 }
 
+function readInstanceName(item: any): string | null {
+  const value =
+    item?.name ||
+    item?.instanceName ||
+    item?.instance_name ||
+    item?.instance?.instanceName ||
+    item?.instance?.instance_name ||
+    item?.instance?.name;
+  return value ? String(value) : null;
+}
+
+function readInstanceId(item: any): string | null {
+  const value =
+    item?.id ||
+    item?.instanceId ||
+    item?.instance_id ||
+    item?.instance?.id ||
+    item?.instance?.instanceId ||
+    item?.instance?.instance_id;
+  return value ? String(value) : null;
+}
+
 // ----------------------------------------------------------------------------
 // High-level API (por workspace)
 // ----------------------------------------------------------------------------
@@ -290,14 +312,29 @@ export function waApi(apiKey: string) {
   const call = <T = any>(path: string, init: { method?: string; body?: any; query?: Record<string, any> } = {}) =>
     waFetch<T>(path, { ...init, apiKey });
 
+  const resolveInstanceDeleteTarget = async (name: string): Promise<string> => {
+    try {
+      const list: any = await call<any>("/v1/instances/all-instances");
+      const arr: any[] = Array.isArray(list) ? list : list?.data || list?.instances || [];
+      const found = arr.find((item) => readInstanceName(item) === name || readInstanceId(item) === name);
+      const id = readInstanceId(found);
+      return id || name;
+    } catch (err: any) {
+      console.warn("[wa-service] não foi possível resolver id da instância para delete:", err?.message || err);
+      return name;
+    }
+  };
+
   return {
     // Instâncias
     listInstances: () => call<any[]>("/v1/instances/all-instances"),
     getInstance: (name: string) => call<any>(`/v1/instances/${encodeURIComponent(name)}`),
     createInstance: (name: string) =>
       call<any>("/v1/instances/create", { method: "POST", body: { name } }),
-    deleteInstance: (name: string) =>
-      call<any>(`/v1/instances/${encodeURIComponent(name)}/delete`, { method: "DELETE" }),
+    deleteInstance: async (name: string) => {
+      const target = await resolveInstanceDeleteTarget(name);
+      return call<any>(`/v1/instances/${encodeURIComponent(target)}/delete`, { method: "DELETE" });
+    },
     logoutInstance: (name: string) =>
       call<any>(`/v1/instances/${encodeURIComponent(name)}/logout`, { method: "POST" }),
     getQrCode: (name: string) =>
