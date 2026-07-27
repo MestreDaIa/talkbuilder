@@ -17,6 +17,9 @@ export const WA_SERVICE_URL: string =
 const WA_ADMIN_TOKEN: string = process.env.WA_SERVICE_ADMIN_TOKEN || "";
 const WA_WEBHOOK_SECRET: string = process.env.WA_WEBHOOK_SIGNING_SECRET || "";
 const WA_PRODUCT = "flow";
+/** Produto usado pelo Zailom Booking no wa-service (tenant compartilhado). */
+const WA_SHARED_PRODUCT = process.env.WA_SHARED_TENANT_PRODUCT || "booking";
+
 
 // ----------------------------------------------------------------------------
 // HMAC
