@@ -39,6 +39,8 @@ export default function IntegrationsSettings() {
   const [connections, setConnections] = useState<any[]>([]);
   const [loadingWhatsapp, setLoadingWhatsapp] = useState(true);
   const [creating, setCreating] = useState(false);
+  const [syncing, setSyncing] = useState(false);
+
   const [qrCodeData, setQrCodeData] = useState<string | null>(null);
   const [instanceName, setInstanceName] = useState("");
   const [showQrModal, setShowQrModal] = useState(false);
@@ -90,7 +92,22 @@ export default function IntegrationsSettings() {
   }
 
   // --- WhatsApp Actions ---
-  const loadWhatsappConnections = async () => {
+  const syncInstances = async () => {
+    setSyncing(true);
+    try {
+      // Refaz o vínculo com o wa-service (tenant compartilhado com o Zailom Booking)
+      await evoApi.reprovision().catch(() => null);
+      await loadWhatsappConnections(true);
+      toast({ title: "Instâncias sincronizadas" });
+    } catch (err: any) {
+      toast({ title: "Falha ao sincronizar", description: err?.message, variant: "destructive" });
+    } finally {
+      setSyncing(false);
+    }
+  };
+
+  const loadWhatsappConnections = async (syncRemote = true) => {
+
     try {
       const { data, error } = await supabase
         .from("whatsapp_connections")
@@ -99,13 +116,48 @@ export default function IntegrationsSettings() {
         .order("created_at", { ascending: false });
 
       if (error) throw error;
-      setConnections(data || []);
+      let list = data || [];
+
+      if (syncRemote && currentWorkspace?.id) {
+        // Instâncias vivem no wa-service (compartilhado com o Zailom Booking).
+        // Trazemos as que ainda não existem localmente.
+        const remote = await evoApi.fetchInstances().catch(() => []);
+        const known = new Set(list.map((c: any) => c.instance_name));
+        const missing = (remote || [])
+          .map((r: any) => ({
+            instance_name: r?.name || r?.instanceName || r?.instance?.instanceName,
+            status: r?.status || r?.connectionStatus || r?.state || "disconnected",
+            settings: r,
+          }))
+          .filter((r: any) => r.instance_name && !known.has(r.instance_name));
+
+        if (missing.length) {
+          await supabase.from("whatsapp_connections").insert(
+            missing.map((m: any) => ({
+              workspace_id: currentWorkspace?.id,
+              instance_name: m.instance_name,
+              name: m.instance_name,
+              status: m.status,
+              settings: m.settings,
+            }))
+          );
+          const { data: refreshed } = await supabase
+            .from("whatsapp_connections")
+            .select("*")
+            .eq("workspace_id", currentWorkspace?.id)
+            .order("created_at", { ascending: false });
+          list = refreshed || list;
+        }
+      }
+
+      setConnections(list);
     } catch (err) {
       console.error("Erro ao carregar conexões WhatsApp:", err);
     } finally {
       setLoadingWhatsapp(false);
     }
   };
+
 
   const createWhatsappInstance = async () => {
     if (!instanceName.trim()) {
@@ -226,7 +278,8 @@ export default function IntegrationsSettings() {
     <div className="flex flex-col gap-6 w-full">
       {/* WhatsApp Section */}
       <Card>
-        <CardHeader>
+        <CardHeader className="flex flex-row items-center justify-between gap-4">
+
           <div className="flex items-center gap-3">
              <div className='p-2.5 h-fit w-fit rounded-xl bg-green-50'>
                 <SiWhatsapp className='w-5 h-5 text-green-600'/>
@@ -236,6 +289,11 @@ export default function IntegrationsSettings() {
                 <CardDescription>Conecte seu WhatsApp via Evolution API para enviar e receber mensagens.</CardDescription>
               </div>
           </div>
+          <Button variant="outline" size="sm" onClick={syncInstances} disabled={syncing}>
+            {syncing ? <Loader2 className="w-4 h-4 animate-spin mr-2" /> : null}
+            Sincronizar instâncias
+          </Button>
+
         </CardHeader>
         <CardContent className="space-y-6">
           <div className="flex flex-col gap-4 p-4 border-2 border-dashed rounded-xl bg-gray-50/50">

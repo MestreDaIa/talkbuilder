@@ -5,7 +5,7 @@ import dotenv from "dotenv";
 import { supabase } from "./supabase.js";
 import { handleWhatsAppWebhook } from "./whatsapp.js";
 import { processRuntime } from "./runtime.js";
-import { getWorkspaceCredentials, waApi } from "./waService.js";
+import { getWorkspaceCredentials, reprovisionWorkspace, waApi } from "./waService.js";
 import { resolveChannelRoute, invalidateChannelRoute } from "./channelRoute.js";
 
 import { createClient } from "@supabase/supabase-js";
@@ -394,8 +394,23 @@ function waRoute(handler: (req: Request, res: Response, api: ReturnType<typeof w
   };
 }
 
+// Re-provisiona o vínculo com o wa-service (migra para o tenant compartilhado do Booking)
+app.post("/api/wa/reprovision", async (req: Request, res: Response) => {
+  const ctx = await requireWorkspace(req, res);
+  if (!ctx) return;
+  try {
+    const creds = await reprovisionWorkspace(ctx.workspaceId);
+    invalidateChannelRoute();
+    res.json({ ok: true, tenant_id: creds.tenantId });
+  } catch (err: any) {
+    console.error("[/api/wa/reprovision] erro:", err?.message || err);
+    res.status(err?.status || 500).json({ error: err?.message || "reprovision_failed" });
+  }
+});
+
 // Instâncias
 app.get("/api/wa/instances", waRoute(async (_req, res, api) => { res.json(await api.listInstances()); }));
+
 app.post("/api/wa/instances", waRoute(async (req, res, api) => {
   const name = String(req.body?.name || "").trim();
   if (!name) { res.status(400).json({ error: "missing_name" }); return; }

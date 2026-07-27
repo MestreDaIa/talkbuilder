@@ -52,6 +52,10 @@ async function waRequest<T = any>(
 const enc = encodeURIComponent;
 
 export const evoApi = {
+  /** Refaz o vínculo do workspace com o wa-service (tenant compartilhado). */
+  async reprovision() {
+    return waRequest<any>("/api/wa/reprovision", { method: "POST" });
+  },
   // --- Instâncias -----------------------------------------------------------
   async fetchInstances() {
     try { return await waRequest<any[]>("/api/wa/instances"); } catch { return []; }
