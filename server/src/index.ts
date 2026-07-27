@@ -409,7 +409,18 @@ app.post("/api/wa/reprovision", async (req: Request, res: Response) => {
 });
 
 // Instâncias
-app.get("/api/wa/instances", waRoute(async (_req, res, api) => { res.json(await api.listInstances()); }));
+// Diagnóstico do vínculo com o wa-service
+app.get("/api/wa/diagnose", async (req: Request, res: Response) => {
+  const ctx = await requireWorkspace(req, res);
+  if (!ctx) return;
+  res.json(await diagnoseWorkspace(ctx.workspaceId));
+});
+
+app.get("/api/wa/instances", waRoute(async (_req, res, api) => {
+  const list: any = await api.listInstances();
+  const arr: any[] = Array.isArray(list) ? list : list?.data || list?.instances || [];
+  res.json(arr);
+}));
 
 app.post("/api/wa/instances", waRoute(async (req, res, api) => {
   const name = String(req.body?.name || "").trim();
