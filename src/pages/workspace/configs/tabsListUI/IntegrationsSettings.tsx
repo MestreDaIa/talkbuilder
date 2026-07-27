@@ -287,7 +287,12 @@ export default function IntegrationsSettings() {
         }
       }
 
-      setConnections(list.filter((conn: any) => !isLocallyRemovedConnection(conn)));
+      const tombstones = list.filter(isLocallyRemovedConnection);
+      const visible = list.filter((conn: any) => {
+        if (isLocallyRemovedConnection(conn)) return false;
+        return !tombstones.some((removed: any) => hasIdentifierOverlap(removed, conn));
+      });
+      setConnections(visible);
     } catch (err) {
       console.error("Erro ao carregar conexões WhatsApp:", err);
       if (!silent) {
