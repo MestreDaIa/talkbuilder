@@ -84,6 +84,97 @@ function decodeText(text: string) {
     .trim();
 }
 
+type AIErrorInfo = {
+  level: "error" | "warning";
+  category: string;
+  errorCode: string;
+  title: string;
+  message: string;
+  suggestion: string;
+};
+
+function classifyAIError(provider: string, status?: number, rawBody?: string, caughtError?: unknown): AIErrorInfo {
+  const body = String(rawBody || "").toLowerCase();
+  const errorText = caughtError instanceof Error ? caughtError.message.toLowerCase() : String(caughtError || "").toLowerCase();
+  const p = provider === "gemini" ? "google" : provider;
+  const statusCode = Number(status) || 0;
+
+  if (!statusCode && (errorText.includes("timeout") || errorText.includes("timed out") || errorText.includes("network") || errorText.includes("fetch failed"))) {
+    return {
+      level: "error",
+      category: "connection",
+      errorCode: "NETWORK_ERROR",
+      title: "Falha de conexão com a IA",
+      message: "Não foi possível conectar ao provedor de IA.",
+      suggestion: "Verifique a conexão e tente novamente. Se persistir, verifique o status do provedor.",
+    };
+  }
+
+  if (statusCode === 401 || statusCode === 403 || body.includes("invalid_api_key") || body.includes("api key not valid") || body.includes("authentication")) {
+    return {
+      level: "error",
+      category: "credentials",
+      errorCode: "INVALID_CREDENTIALS",
+      title: "Credencial da IA inválida",
+      message: "A credencial configurada para o provedor não foi aceita.",
+      suggestion: "Verifique a API Key nas configurações do workspace e gere uma nova chave se necessário.",
+    };
+  }
+
+  if (statusCode === 402 || body.includes("billing") || body.includes("payment required") || body.includes("insufficient balance")) {
+    return {
+      level: "error",
+      category: "billing",
+      errorCode: "BILLING_REQUIRED",
+      title: "Pagamento ou faturamento da IA",
+      message: "O provedor recusou a chamada por uma questão de faturamento.",
+      suggestion: "Verifique o faturamento da conta do provedor e regularize o pagamento.",
+    };
+  }
+
+  if (statusCode === 429 || body.includes("quota") || body.includes("rate limit") || body.includes("resource exhausted") || body.includes("too many requests")) {
+    return {
+      level: "error",
+      category: "quota",
+      errorCode: "QUOTA_EXCEEDED",
+      title: "Quota ou limite da IA excedido",
+      message: "O limite disponível para o provedor de IA foi atingido.",
+      suggestion: "Recarregue os créditos da IA, aumente o limite da conta ou altere o modelo/provedor.",
+    };
+  }
+
+  if (statusCode === 404 || body.includes("model not found") || body.includes("not_found") || body.includes("does not exist")) {
+    return {
+      level: "error",
+      category: "model",
+      errorCode: "MODEL_NOT_FOUND",
+      title: "Modelo de IA não encontrado",
+      message: "O modelo configurado não está disponível para esta conta ou provedor.",
+      suggestion: "Confira o nome do modelo e escolha um modelo disponível para sua conta.",
+    };
+  }
+
+  if ([408, 500, 502, 503, 504].includes(statusCode)) {
+    return {
+      level: "error",
+      category: "provider",
+      errorCode: "PROVIDER_UNAVAILABLE",
+      title: "Provedor de IA indisponível",
+      message: "O provedor não conseguiu processar a solicitação neste momento.",
+      suggestion: "Tente novamente em instantes. Se continuar, verifique o status do provedor ou altere o modelo.",
+    };
+  }
+
+  return {
+    level: "error",
+    category: "provider",
+    errorCode: statusCode ? `AI_HTTP_${statusCode}` : "AI_PROVIDER_ERROR",
+    title: `Erro no provedor de IA${p ? ` (${p})` : ""}`,
+    message: "A chamada ao provedor de IA não foi concluída.",
+    suggestion: "Verifique as configurações da IA e tente novamente. Se persistir, consulte os logs do workspace.",
+  };
+}
+
 /**
  * Main Flow Execution Engine
  */
@@ -103,6 +194,8 @@ class FlowEngine {
   private activeAgentNodeId: string | null;
   private mode: string;
   private isWaitingTime: boolean;
+  private executionId: string | null;
+
 
   constructor(supabase: any, flow: any, execution: any) {
     this.supabase = supabase;
@@ -130,6 +223,7 @@ class FlowEngine {
       contact_id: execution.contact_id || execution.variables?.contact_id
     };
 
+    this.executionId = execution.id ? String(execution.id) : null;
     this.currentNodeId = execution.current_node_id;
     this.activeAgentNodeId = execution.active_agent_node_id || null;
     this.mode = execution.runtime_mode || "flow";
@@ -583,6 +677,35 @@ class FlowEngine {
     }
   }
 
+  private async recordRuntimeError(node: any, info: AIErrorInfo, provider: string, httpStatus?: number, executionId?: string | null) {
+    try {
+      const { error } = await this.supabase.from("flow_runtime_logs").insert({
+        workspace_id: this.flow.workspace_id,
+        flow_id: this.flow.id,
+        execution_id: executionId ?? this.executionId,
+        node_id: node?.id ? String(node.id) : null,
+        level: info.level,
+        category: info.category,
+        provider: provider || null,
+        error_code: info.errorCode,
+        http_status: httpStatus ?? null,
+        title: info.title,
+        message: info.message,
+        suggestion: info.suggestion,
+        metadata: {
+          channel: this.variables.channel || "webchat",
+          public: true,
+        },
+      });
+
+      if (error) {
+        console.warn("[FlowEngine:AI] não foi possível persistir o log:", error);
+      }
+    } catch (logError) {
+      console.warn("[FlowEngine:AI] falha ao registrar log:", logError);
+    }
+  }
+
   private async executeAINode(node: any, container: any) {
     const cfg = node.config || {};
     const userMessage = String(this.variables["last_message"] || "").trim();
@@ -595,7 +718,13 @@ class FlowEngine {
     const activeKey = (this.flow?.settings?.aiKeys || {})[`${provider}Key`] || cfg.apiKey;
 
     if (!activeKey) {
-      this.messages.push({ id: crypto.randomUUID(), type: "bot", content: "⚠️ AI Key não configurada." });
+      const info = classifyAIError(provider, 401, "missing api key");
+      await this.recordRuntimeError(node, info, provider, 401);
+      this.messages.push({
+        id: crypto.randomUUID(),
+        type: "bot",
+        content: "Não foi possível processar sua solicitação no momento. Tente novamente mais tarde.",
+      });
       this.currentNodeId = this.nextFromNode(node.id, container);
       return;
     }
@@ -606,20 +735,13 @@ class FlowEngine {
 
       if (provider === "openai") {
         const messages: any[] = [{ role: "system", content: systemPrompt }];
-        
         if (cfg.visionEnabled) {
-          // Detect image URLs or base64 in userMessage or variables
           const content: any[] = [{ type: "text", text: userMessage }];
-          
-          // Check if userMessage itself is a URL or base64
           if (userMessage.startsWith("http") || userMessage.startsWith("data:image")) {
-             content.push({ type: "image_url", image_url: { url: userMessage } });
+            content.push({ type: "image_url", image_url: { url: userMessage } });
           } else {
-            // Check all variables for potential images if vision is enabled
-            // Or look for specific common media variables
             const mediaUrl = this.variables["mediaUrl"] || this.variables["media_url"] || this.variables["url"];
             const base64 = this.variables["base64"] || this.variables["image_base64"];
-            
             if (base64) {
               const b64 = String(base64).startsWith("data:") ? base64 : `data:image/jpeg;base64,${base64}`;
               content.push({ type: "image_url", image_url: { url: b64 } });
@@ -636,33 +758,43 @@ class FlowEngine {
           method: "POST",
           headers: { "Authorization": `Bearer ${activeKey}`, "Content-Type": "application/json" },
           body: JSON.stringify({
-            model: cfg.model || (cfg.visionEnabled ? "gpt-4o-mini" : "gpt-4o-mini"),
-            messages: messages,
+            model: cfg.model || "gpt-4o-mini",
+            messages,
             temperature: cfg.temperature ?? 0.7,
             max_tokens: cfg.maxTokens ?? 1000,
           }),
         });
-        if (res.ok) {
-          const data = await res.json();
-          aiReply = data.choices?.[0]?.message?.content || "";
+
+        const body = await res.text();
+        if (!res.ok) {
+          const info = classifyAIError(provider, res.status, body);
+          await this.recordRuntimeError(node, info, provider, res.status);
+          this.messages.push({
+            id: crypto.randomUUID(),
+            type: "bot",
+            content: "Não foi possível processar sua solicitação no momento. Tente novamente mais tarde.",
+          });
+        } else {
+          try {
+            const data = JSON.parse(body);
+            aiReply = data.choices?.[0]?.message?.content || "";
+          } catch (parseError) {
+            const info = classifyAIError(provider, 200, body, parseError);
+            await this.recordRuntimeError(node, info, provider, 200);
+          }
         }
       } else if (provider === "google" || provider === "gemini") {
         const model = cfg.model || "gemini-2.0-flash";
-        
         const contents: any[] = [];
         const userParts: any[] = [{ text: userMessage }];
 
         if (cfg.visionEnabled) {
           const mediaUrl = this.variables["mediaUrl"] || this.variables["media_url"] || this.variables["url"];
           const base64 = this.variables["base64"] || this.variables["image_base64"];
-
           if (base64) {
             const b64Data = String(base64).replace(/^data:image\/[a-z]+;base64,/, "");
             userParts.push({ inline_data: { mime_type: "image/jpeg", data: b64Data } });
           } else if (mediaUrl && String(mediaUrl).startsWith("http")) {
-            // Gemini doesn't support direct URLs in the same way as OpenAI for simple fetch
-            // usually you need to upload to Google Cloud Storage or send as base64
-            // For simplicity, let's try to fetch it if it's a URL and convert to base64
             try {
               const imgRes = await fetch(mediaUrl);
               if (imgRes.ok) {
@@ -670,29 +802,43 @@ class FlowEngine {
                 const b64 = btoa(String.fromCharCode(...new Uint8Array(arrayBuffer)));
                 userParts.push({ inline_data: { mime_type: imgRes.headers.get("content-type") || "image/jpeg", data: b64 } });
               }
-            } catch (e) {
-              console.error("[Gemini:Vision] failed to fetch image", e);
+            } catch (visionError) {
+              console.warn("[Gemini:Vision] falha ao buscar imagem:", visionError);
             }
           }
         }
 
         contents.push({ role: "user", parts: userParts });
-
         const res = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${activeKey}`, {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({
             system_instruction: { parts: [{ text: systemPrompt }] },
-            contents: contents,
+            contents,
             generationConfig: {
               temperature: cfg.temperature ?? 0.7,
               maxOutputTokens: cfg.maxTokens ?? 1000,
-            }
+            },
           }),
         });
-        if (res.ok) {
-          const data = await res.json();
-          aiReply = data.candidates?.[0]?.content?.parts?.[0]?.text || "";
+
+        const body = await res.text();
+        if (!res.ok) {
+          const info = classifyAIError(provider, res.status, body);
+          await this.recordRuntimeError(node, info, provider, res.status);
+          this.messages.push({
+            id: crypto.randomUUID(),
+            type: "bot",
+            content: "Não foi possível processar sua solicitação no momento. Tente novamente mais tarde.",
+          });
+        } else {
+          try {
+            const data = JSON.parse(body);
+            aiReply = data.candidates?.[0]?.content?.parts?.[0]?.text || "";
+          } catch (parseError) {
+            const info = classifyAIError(provider, 200, body, parseError);
+            await this.recordRuntimeError(node, info, provider, 200);
+          }
         }
       }
 
@@ -702,7 +848,14 @@ class FlowEngine {
         if (saveVar) this.variables[saveVar] = aiReply;
       }
     } catch (e) {
+      const info = classifyAIError(provider, undefined, "", e);
+      await this.recordRuntimeError(node, info, provider);
       console.error("[FlowEngine:AI] error", e);
+      this.messages.push({
+        id: crypto.randomUUID(),
+        type: "bot",
+        content: "Não foi possível processar sua solicitação no momento. Tente novamente mais tarde.",
+      });
     }
 
     this.currentNodeId = this.nextFromNode(node.id, container);
