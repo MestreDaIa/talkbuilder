@@ -50,7 +50,7 @@ export default function WorkspaceOverviewPage() {
       console.error("[WorkspaceOverview] erro ao carregar execuções:", error);
       setExecutionCount(null);
     }
-  }, [flows.map((flow) => flow.id).join(",")]);
+  }, [flows.map((flow) => flow.id).join(","), currentWorkspace?.id]);
 
   useEffect(() => {
     if (loading) return;
