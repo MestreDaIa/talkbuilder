@@ -27,7 +27,7 @@ export default function WorkspaceOverviewPage() {
       const { count, error } = await supabase
         .from("flow_executions")
         .select("id", { count: "exact", head: true })
-        .in("bot_id", flows.map((flow) => flow.id));
+        .in("flow_id", flows.map((flow) => flow.id));
 
       if (error) throw error;
       setExecutionCount(count ?? 0);
