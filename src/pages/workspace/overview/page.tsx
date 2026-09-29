@@ -96,37 +96,42 @@ export default function WorkspaceOverviewPage() {
 
   useEffect(() => {
     if (loading) return;
+
     void loadExecutionCount();
-    if (currentWorkspace?.id) {
-      const supabase = getSupabase();
-      const since = new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString();
-      const loadProblemCount = async () => {
-        const { count, error } = await supabase
-          .from("flow_runtime_logs")
-          .select("id", { count: "exact", head: true })
-          .eq("workspace_id", currentWorkspace.id)
-          .is("resolved_at", null)
-          .gte("created_at", since);
-        if (!error) setProblemCount(count ?? 0);
-      };
-      void loadProblemCount();
-
-      const channel = supabase
-        .channel(`workspace-overview-logs-${currentWorkspace.id}`)
-        .on("postgres_changes", {
-          event: "INSERT",
-          schema: "public",
-          table: "flow_runtime_logs",
-          filter: `workspace_id=eq.${currentWorkspace.id}`,
-        }, () => setProblemCount((value) => value + 1))
-        .subscribe();
-
-      return () => { void supabase.removeChannel(channel); };
-    }
-    return undefined;
     const interval = window.setInterval(() => void loadExecutionCount(), 5000);
-    return () => window.clearInterval(interval);
-  }, [loading, loadExecutionCount]);
+
+    if (!currentWorkspace?.id) {
+      return () => window.clearInterval(interval);
+    }
+
+    const supabase = getSupabase();
+    const since = new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString();
+    const loadProblemCount = async () => {
+      const { count, error } = await supabase
+        .from("flow_runtime_logs")
+        .select("id", { count: "exact", head: true })
+        .eq("workspace_id", currentWorkspace.id)
+        .is("resolved_at", null)
+        .gte("created_at", since);
+      if (!error) setProblemCount(count ?? 0);
+    };
+    void loadProblemCount();
+
+    const channel = supabase
+      .channel(`workspace-overview-logs-${currentWorkspace.id}`)
+      .on("postgres_changes", {
+        event: "INSERT",
+        schema: "public",
+        table: "flow_runtime_logs",
+        filter: `workspace_id=eq.${currentWorkspace.id}`,
+      }, () => setProblemCount((value) => value + 1))
+      .subscribe();
+
+    return () => {
+      window.clearInterval(interval);
+      void supabase.removeChannel(channel);
+    };
+  }, [loading, loadExecutionCount, currentWorkspace?.id]);
 
   const stats = [
     { label: "Fluxos", value: loading ? "…" : String(flows.length), icon: Boxes },
