@@ -25,7 +25,19 @@ export default function WorkspaceOverviewPage() {
     flow_name: string;
   }>>([]);
 
-  const relativeTime = (value: string) => {\n    const diff = Math.max(0, Date.now() - new Date(value).getTime());\n    const minutes = Math.floor(diff / 60000);\n    if (minutes < 1) return "agora";\n    if (minutes < 60) return `há ${minutes} min`;\n    const hours = Math.floor(minutes / 60);\n    if (hours < 24) return `há ${hours}h`;\n    const days = Math.floor(hours / 24);\n    if (days < 30) return `há ${days}d`;\n    return new Date(value).toLocaleDateString("pt-BR");\n  };\n\n  const loadExecutionCount = useCallback(async () => {
+  const relativeTime = (value: string) => {
+    const diff = Math.max(0, Date.now() - new Date(value).getTime());
+    const minutes = Math.floor(diff / 60000);
+    if (minutes < 1) return "agora";
+    if (minutes < 60) return `há ${minutes} min`;
+    const hours = Math.floor(minutes / 60);
+    if (hours < 24) return `há ${hours}h`;
+    const days = Math.floor(hours / 24);
+    if (days < 30) return `há ${days}d`;
+    return new Date(value).toLocaleDateString("pt-BR");
+  };
+
+  const loadExecutionCount = useCallback(async () => {
     if (!flows.length) {
       setExecutionCount(0);
       return;
