@@ -27,6 +27,9 @@ import AdminAudit from "./pages/admin/Audit";
 import AdminBots from "./pages/admin/Bots";
 import AdminBilling from "./pages/admin/Billing";
 import NotificationView from "./pages/workspace/notification/[id]/page";
+import WorkspaceOverviewPage from "./pages/workspace/overview/page";
+import WorkspaceExecutionsPage from "./pages/workspace/executions/page";
+import WorkspaceIntegrationsPage from "./pages/workspace/integrations/page";
 
 
 import Layout from "./components/layout";
@@ -169,6 +172,38 @@ function App() {
           <ProtectedRoute>
             <SlugGuard>
               <Layout><WorkspaceMain /></Layout>
+            </SlugGuard>
+          </ProtectedRoute>
+        }
+      />
+
+      {/* Workspace Command Center */}
+      <Route
+        path="/:slug/workspace/overview"
+        element={
+          <ProtectedRoute>
+            <SlugGuard>
+              <Layout><WorkspaceOverviewPage /></Layout>
+            </SlugGuard>
+          </ProtectedRoute>
+        }
+      />
+      <Route
+        path="/:slug/workspace/executions"
+        element={
+          <ProtectedRoute>
+            <SlugGuard>
+              <Layout><WorkspaceExecutionsPage /></Layout>
+            </SlugGuard>
+          </ProtectedRoute>
+        }
+      />
+      <Route
+        path="/:slug/workspace/integrations"
+        element={
+          <ProtectedRoute>
+            <SlugGuard>
+              <Layout><WorkspaceIntegrationsPage /></Layout>
             </SlugGuard>
           </ProtectedRoute>
         }
