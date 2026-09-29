@@ -79,6 +79,7 @@ export default function WorkspaceLogsPage() {
 
       const flowIds = [...new Set((data ?? []).map((log) => log.flow_id))];
       let flowNames = new Map<string, string>();
+      let flowWorkspaceItems = new Map<string, string | null>();
 
       if (flowIds.length) {
         const { data: flows, error: flowError } = await supabase
@@ -87,12 +88,13 @@ export default function WorkspaceLogsPage() {
           .in("id", flowIds);
         if (flowError) throw flowError;
         flowNames = new Map((flows ?? []).map((flow) => [flow.id, flow.name]));
+        flowWorkspaceItems = new Map((flows ?? []).map((flow) => [flow.id, flow.workspace_item_id ?? null]));
       }
 
       setLogs((data ?? []).map((log) => ({
         ...log,
         flow_name: flowNames.get(log.flow_id) ?? "Fluxo",
-        workspace_item_id: (flows ?? []).find((flow) => flow.id === log.flow_id)?.workspace_item_id ?? null,
+        workspace_item_id: flowWorkspaceItems.get(log.flow_id) ?? null,
       })));
       setError(null);
     } catch (loadError) {
