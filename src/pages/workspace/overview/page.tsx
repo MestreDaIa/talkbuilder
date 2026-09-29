@@ -2,9 +2,11 @@
 
 import { Activity, ArrowRight, Boxes, Plug, CheckCircle2 } from "lucide-react";
 import { useNavigate } from "react-router-dom";
+import { useCallback, useEffect, useState } from "react";
 import { useAuth } from "../../../context/AuthContext";
 import { useWorkspace } from "../../../context/WorkspaceContext";
 import { botRoute, workspaceRoot } from "../../../lib/workspaceRoutes";
+import { getSupabase } from "../../../lib/supabaseClient";
 
 export default function WorkspaceOverviewPage() {
   const { profile, currentWorkspace } = useAuth();
@@ -12,10 +14,39 @@ export default function WorkspaceOverviewPage() {
   const navigate = useNavigate();
   const slug = currentWorkspace?.slug ?? profile?.slug;
   const flows = items.filter((item) => item.type === "bot");
+  const [executionCount, setExecutionCount] = useState<number | null>(null);
+
+  const loadExecutionCount = useCallback(async () => {
+    if (!flows.length) {
+      setExecutionCount(0);
+      return;
+    }
+
+    try {
+      const supabase = getSupabase();
+      const { count, error } = await supabase
+        .from("conversations")
+        .select("id", { count: "exact", head: true })
+        .in("bot_id", flows.map((flow) => flow.id));
+
+      if (error) throw error;
+      setExecutionCount(count ?? 0);
+    } catch (error) {
+      console.error("[WorkspaceOverview] erro ao carregar execuções:", error);
+      setExecutionCount(null);
+    }
+  }, [flows.map((flow) => flow.id).join(",")]);
+
+  useEffect(() => {
+    if (loading) return;
+    void loadExecutionCount();
+    const interval = window.setInterval(() => void loadExecutionCount(), 5000);
+    return () => window.clearInterval(interval);
+  }, [loading, loadExecutionCount]);
 
   const stats = [
     { label: "Fluxos", value: loading ? "…" : String(flows.length), icon: Boxes },
-    { label: "Execuções", value: "—", icon: Activity },
+    { label: "Execuções", value: executionCount === null ? "—" : String(executionCount), icon: Activity },
     { label: "Sucesso", value: "—", icon: CheckCircle2 },
     { label: "Integrações", value: "—", icon: Plug },
   ];
