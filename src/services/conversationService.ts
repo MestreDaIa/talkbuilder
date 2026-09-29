@@ -11,6 +11,7 @@ export const conversationService = {
       .select("*")
       .eq("visitor_id", visitorId)
       .eq("bot_id", botId)
+      .eq("workspace_id", workspaceId)
       .order("updated_at", { ascending: false })
       .limit(1)
       .maybeSingle();
