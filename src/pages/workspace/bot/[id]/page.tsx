@@ -77,6 +77,7 @@ function BotEditorInner({
   setEdges,
   status,
   profile,
+  currentWorkspace,
   isSaving,
   setIsSaving,
   handleBack,
@@ -723,6 +724,7 @@ export default function BotPage() {
         setEdges={setEdges}
         status={status}
         profile={profile}
+        currentWorkspace={currentWorkspace}
         isSaving={isSaving}
         setIsSaving={setIsSaving}
         handleBack={handleBack}
