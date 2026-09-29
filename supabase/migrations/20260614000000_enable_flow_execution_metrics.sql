@@ -34,26 +34,3 @@ USING (
   )
 );
 
-DROP POLICY IF EXISTS "Workspace members can update execution records" ON public.flow_executions;
-CREATE POLICY "Workspace members can update execution records"
-ON public.flow_executions
-FOR UPDATE
-TO anon, authenticated
-USING (
-  EXISTS (
-    SELECT 1
-    FROM public.chatbot_flows f
-    WHERE f.id = flow_executions.flow_id
-      AND f.is_published = true
-      AND f.is_active = true
-  )
-)
-WITH CHECK (
-  EXISTS (
-    SELECT 1
-    FROM public.chatbot_flows f
-    WHERE f.id = flow_executions.flow_id
-      AND f.is_published = true
-      AND f.is_active = true
-  )
-);
