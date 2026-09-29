@@ -262,6 +262,12 @@ export const TestPanel = ({
   const [isLoading, setIsLoading] = useState(false);
   const [attachMenuOpen, setAttachMenuOpen] = useState<boolean>(false);
   const scrollRef = useRef<HTMLDivElement>(null);
+  const [isNearBottom, setIsNearBottom] = useState(true);
+  const [showNewMessages, setShowNewMessages] = useState(false);
+  const [typingMessageId, setTypingMessageId] = useState<string | null>(null);
+  const [typedBotContent, setTypedBotContent] = useState("");
+  const typingTimerRef = useRef<number | null>(null);
+  const lastTypedMessageIdRef = useRef<string | null>(null);
   const runtimeStateRef = useRef<RuntimeState | null>(null);
   const hasStartedRef = useRef(false);
   const startedFlowRef = useRef<string | null>(null);
@@ -2612,11 +2618,102 @@ export const TestPanel = ({
     return () => clearWaitTimer();
   }, []);
 
+  const getScrollViewport = () =>
+    scrollRef.current?.querySelector<HTMLElement>("[data-radix-scroll-area-viewport]") ?? null;
+
+  const scrollToBottom = (behavior: ScrollBehavior = "smooth") => {
+    const viewport = getScrollViewport();
+    if (!viewport) return;
+    viewport.scrollTo({ top: viewport.scrollHeight, behavior });
+    setIsNearBottom(true);
+    setShowNewMessages(false);
+  };
+
   useEffect(() => {
-    if (scrollRef.current) {
-      scrollRef.current.scrollTop = scrollRef.current.scrollHeight;
+    const viewport = getScrollViewport();
+    if (!viewport) return;
+
+    const handleScroll = () => {
+      const distance = viewport.scrollHeight - viewport.scrollTop - viewport.clientHeight;
+      const near = distance <= 72;
+      setIsNearBottom(near);
+      if (near) setShowNewMessages(false);
+    };
+
+    handleScroll();
+    viewport.addEventListener("scroll", handleScroll, { passive: true });
+    return () => viewport.removeEventListener("scroll", handleScroll);
+  }, [isOpen]);
+
+  useEffect(() => {
+    const latestBot = [...messages].reverse().find(
+      (message) =>
+        message.type === "bot" &&
+        !message.isHtml &&
+        !message.isImage &&
+        !message.isVideo &&
+        !message.isAudio &&
+        !message.isFile &&
+        typeof message.content === "string" &&
+        message.content.length > 0,
+    );
+
+    if (!latestBot || latestBot.id === lastTypedMessageIdRef.current) return;
+
+    if (typingTimerRef.current !== null) {
+      window.clearInterval(typingTimerRef.current);
+      typingTimerRef.current = null;
     }
+
+    lastTypedMessageIdRef.current = latestBot.id;
+    setTypingMessageId(latestBot.id);
+    setTypedBotContent("");
+
+    let index = 0;
+    const text = latestBot.content;
+    typingTimerRef.current = window.setInterval(() => {
+      index += 1;
+      setTypedBotContent(text.slice(0, index));
+
+      if (index >= text.length) {
+        if (typingTimerRef.current !== null) {
+          window.clearInterval(typingTimerRef.current);
+          typingTimerRef.current = null;
+        }
+      }
+    }, 18);
+
+    return () => {
+      if (typingTimerRef.current !== null) {
+        window.clearInterval(typingTimerRef.current);
+        typingTimerRef.current = null;
+      }
+    };
   }, [messages]);
+
+  useEffect(() => {
+    if (!isNearBottom) {
+      if (messages.length > 0) setShowNewMessages(true);
+      return;
+    }
+    const frame = window.requestAnimationFrame(() => scrollToBottom("auto"));
+    return () => window.cancelAnimationFrame(frame);
+  }, [messages, isNearBottom]);
+
+  useEffect(() => {
+    if (!isNearBottom) {
+      setShowNewMessages(true);
+      return;
+    }
+    const frame = window.requestAnimationFrame(() => scrollToBottom("auto"));
+    return () => window.cancelAnimationFrame(frame);
+  }, [typedBotContent, isNearBottom]);
+
+  useEffect(() => {
+    return () => {
+      if (typingTimerRef.current !== null) window.clearInterval(typingTimerRef.current);
+    };
+  }, []);
 
   const clearWaitTimer = () => {
     if (waitTimerRef.current !== null) {
@@ -2924,9 +3021,11 @@ export const TestPanel = ({
             {!hideClose && <Button variant="ghost" size="icon" onClick={onClose} style={{ color: theme?.headerTextColor }}><X className="h-5 w-5" /></Button>}
           </div>
         </div>
-        <ScrollArea className="flex-1 p-3" ref={scrollRef}>
+        <div className="relative flex-1 min-h-0">
+        <ScrollArea className="h-full p-3" ref={scrollRef}>
           <div className="space-y-3">
             {messages.map((message) => (
+
               <div key={message.id} className={`flex ${message.type === "bot" ? "justify-start" : "justify-end"}`}>
                 <div className={`max-w-[85%] px-3 py-2 rounded-2xl text-sm shadow-md text-left ${message.type === "bot" ? "rounded-bl-sm" : "rounded-br-sm"}`}
                   style={message.type === "user" 
@@ -2945,7 +3044,7 @@ export const TestPanel = ({
                               strong: ({node, ...props}) => <strong className="font-bold text-inherit" {...props} />,
                            }}
                          >
-                            {normalizeMarkdown(message.content)}
+                            {normalizeMarkdown(message.id === typingMessageId ? typedBotContent : message.content)}
                          </ReactMarkdown>
                        </div>
                      )
@@ -2956,6 +3055,16 @@ export const TestPanel = ({
             {isLoading && <div className="flex justify-start"><div className="bg-muted px-4 py-2 rounded-2xl rounded-bl-sm"><Loader2 className="w-4 h-4 animate-spin text-muted-foreground" /></div></div>}
           </div>
         </ScrollArea>
+        {showNewMessages && (
+          <button
+            type="button"
+            onClick={() => scrollToBottom("smooth")}
+            className="absolute bottom-4 left-1/2 z-20 flex -translate-x-1/2 items-center gap-2 rounded-full border border-border bg-background/95 px-3 py-1.5 text-xs font-medium shadow-lg"
+          >
+            ↓ Novas mensagens
+          </button>
+        )}
+        </div>
         {waitingForButton && activeButtons.length > 0 && (
           <div className="p-3 border-t border-border space-y-2 bg-card">
             <div className="flex flex-wrap gap-2">
