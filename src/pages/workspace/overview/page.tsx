@@ -24,14 +24,28 @@ export default function WorkspaceOverviewPage() {
 
     try {
       const supabase = getSupabase();
-      const { count, error } = await supabase
-        .from("conversations")
+      const { count: eventCount, error: eventError } = await supabase
+        .from("flow_execution_events")
         .select("id", { count: "exact", head: true })
-        .in("bot_id", flows.map((flow) => flow.id))
+        .in("flow_id", flows.map((flow) => flow.id))
         .eq("workspace_id", currentWorkspace?.id);
 
-      if (error) throw error;
-      setExecutionCount(count ?? 0);
+      if (eventError) throw eventError;
+
+      // O TestPanel executa o fluxo localmente e mantém a sessão em flow_executions.
+      // Enquanto não houver evento do runtime público, usamos essa sessão como fallback
+      // para que testes feitos pelo botão "Testar" também apareçam no Command Center.
+      if ((eventCount ?? 0) === 0) {
+        const { count: sessionCount, error: sessionError } = await supabase
+          .from("flow_executions")
+          .select("flow_id", { count: "exact", head: true })
+          .in("flow_id", flows.map((flow) => flow.id));
+
+        if (sessionError) throw sessionError;
+        setExecutionCount(sessionCount ?? 0);
+      } else {
+        setExecutionCount(eventCount ?? 0);
+      }
     } catch (error) {
       console.error("[WorkspaceOverview] erro ao carregar execuções:", error);
       setExecutionCount(null);
