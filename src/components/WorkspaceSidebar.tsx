@@ -96,7 +96,7 @@ export default function WorkspaceSidebar() {
             type="button"
             onClick={() => navigate(path)}
             title={collapsed ? label : undefined}
-            className={`w-full flex items-center rounded-lg py-2.5 text-sm transition-colors ${collapsed ? "justify-center px-0" : "gap-3 px-3 text-left"} ${
+            className={`relative w-full flex items-center rounded-lg py-2.5 text-sm transition-colors ${collapsed ? "justify-center px-0" : "gap-3 px-3 text-left"} ${
               isActive(path, label)
                 ? "bg-white/10 text-white"
                 : "text-white/60 hover:bg-white/5 hover:text-white"
