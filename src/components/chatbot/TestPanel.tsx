@@ -2551,10 +2551,35 @@ export const TestPanel = ({
     return scheduleRuntimeContinue(data.wait_ms);
   };
 
+  const persistFlowExecution = async (runtimeData: any) => {
+    if (!flowId) return;
+
+    try {
+      const supabase = getSupabase();
+      const runtimeState = runtimeData?.runtime_state ?? runtimeStateRef.current;
+      await supabase.from("flow_executions").upsert(
+        {
+          flow_id: flowId,
+          contact_id: contactIdRef.current,
+          channel_id: "webchat",
+          current_node_id: runtimeState?.current_node_id ?? null,
+          variables: runtimeState?.variables ?? {},
+          waiting_for_input: Boolean(runtimeState?.waiting_for_input),
+          updated_at: new Date().toISOString(),
+        },
+        { onConflict: "flow_id,contact_id,channel_id" }
+      );
+    } catch (error) {
+      // Métrica não pode interromper a execução do bot.
+      console.warn("[TestPanel] não foi possível registrar a execução:", error);
+    }
+  };
+
   const startRuntimeSession = async () => {
     setIsLoading(true);
     setMessages([]);
     const data = await runLocalFlow(null);
+    await persistFlowExecution(data);
     applyRuntimeData(data, true);
     if (!waitTimerRef.current) setIsLoading(false);
   };
@@ -2562,6 +2587,7 @@ export const TestPanel = ({
   const continueRuntime = async () => {
     setIsLoading(true);
     const data = await runLocalFlow(runtimeStateRef.current);
+    await persistFlowExecution(data);
     applyRuntimeData(data);
     if (!waitTimerRef.current) setIsLoading(false);
   };
@@ -2667,7 +2693,7 @@ export const TestPanel = ({
     }
 
     const data = await runLocalFlow(currentState, inputPayload);
-    
+    await persistFlowExecution(data);
     applyRuntimeData(data);
     setIsLoading(false);
   };
