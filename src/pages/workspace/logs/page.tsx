@@ -83,7 +83,7 @@ export default function WorkspaceLogsPage() {
       if (flowIds.length) {
         const { data: flows, error: flowError } = await supabase
           .from("chatbot_flows")
-          .select("id,name")
+          .select("id,name,workspace_item_id")
           .in("id", flowIds);
         if (flowError) throw flowError;
         flowNames = new Map((flows ?? []).map((flow) => [flow.id, flow.name]));
@@ -92,6 +92,7 @@ export default function WorkspaceLogsPage() {
       setLogs((data ?? []).map((log) => ({
         ...log,
         flow_name: flowNames.get(log.flow_id) ?? "Fluxo",
+        workspace_item_id: (flows ?? []).find((flow) => flow.id === log.flow_id)?.workspace_item_id ?? null,
       })));
       setError(null);
     } catch (loadError) {
@@ -125,12 +126,12 @@ export default function WorkspaceLogsPage() {
           const incoming = payload.new as RuntimeLog;
           const { data: flow } = await supabase
             .from("chatbot_flows")
-            .select("name")
+            .select("name,workspace_item_id")
             .eq("id", incoming.flow_id)
             .maybeSingle();
 
           setLogs((current) => [
-            { ...incoming, flow_name: flow?.name ?? "Fluxo" },
+            { ...incoming, flow_name: flow?.name ?? "Fluxo", workspace_item_id: flow?.workspace_item_id ?? null },
             ...current.filter((item) => item.id !== incoming.id),
           ].slice(0, 100));
         },
