@@ -1,6 +1,6 @@
 "use client";
 
-import { Activity, ArrowRight, Boxes, Plug, CheckCircle2 } from "lucide-react";
+import { Activity, AlertTriangle, ArrowRight, Boxes, Plug, CheckCircle2 } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import { useCallback, useEffect, useState } from "react";
 import { useAuth } from "../../../context/AuthContext";
@@ -15,6 +15,7 @@ export default function WorkspaceOverviewPage() {
   const slug = currentWorkspace?.slug ?? profile?.slug;
   const flows = items.filter((item) => item.type === "bot");
   const [executionCount, setExecutionCount] = useState<number | null>(null);
+  const [problemCount, setProblemCount] = useState(0);
   const [recentExecutions, setRecentExecutions] = useState<Array<{
     id: string;
     flow_id: string;
@@ -96,6 +97,33 @@ export default function WorkspaceOverviewPage() {
   useEffect(() => {
     if (loading) return;
     void loadExecutionCount();
+    if (currentWorkspace?.id) {
+      const supabase = getSupabase();
+      const since = new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString();
+      const loadProblemCount = async () => {
+        const { count, error } = await supabase
+          .from("flow_runtime_logs")
+          .select("id", { count: "exact", head: true })
+          .eq("workspace_id", currentWorkspace.id)
+          .is("resolved_at", null)
+          .gte("created_at", since);
+        if (!error) setProblemCount(count ?? 0);
+      };
+      void loadProblemCount();
+
+      const channel = supabase
+        .channel(`workspace-overview-logs-${currentWorkspace.id}`)
+        .on("postgres_changes", {
+          event: "INSERT",
+          schema: "public",
+          table: "flow_runtime_logs",
+          filter: `workspace_id=eq.${currentWorkspace.id}`,
+        }, () => setProblemCount((value) => value + 1))
+        .subscribe();
+
+      return () => { void supabase.removeChannel(channel); };
+    }
+    return undefined;
     const interval = window.setInterval(() => void loadExecutionCount(), 5000);
     return () => window.clearInterval(interval);
   }, [loading, loadExecutionCount]);
@@ -105,6 +133,7 @@ export default function WorkspaceOverviewPage() {
     { label: "Execuções", value: executionCount === null ? "—" : String(executionCount), icon: Activity },
     { label: "Sucesso", value: "—", icon: CheckCircle2 },
     { label: "Integrações", value: "—", icon: Plug },
+    { label: "Problemas (24h)", value: String(problemCount), icon: AlertTriangle },
   ];
 
   return (
@@ -118,15 +147,39 @@ export default function WorkspaceOverviewPage() {
           </p>
         </header>
 
-        <section className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
+        <section className="grid gap-4 sm:grid-cols-2 xl:grid-cols-5">
           {stats.map(({ label, value, icon: Icon }) => (
-            <div key={label} className="rounded-xl border bg-background p-5">
-              <Icon className="h-5 w-5 text-muted-foreground" />
+            <div
+              key={label}
+              className={`rounded-xl border bg-background p-5 ${label.startsWith("Problemas") && problemCount > 0 ? "border-destructive/40 bg-destructive/5" : ""}`}
+            >
+              <Icon className={`h-5 w-5 ${label.startsWith("Problemas") && problemCount > 0 ? "text-destructive" : "text-muted-foreground"}`} />
               <div className="mt-4 text-2xl font-bold">{value}</div>
               <div className="text-sm text-muted-foreground">{label}</div>
             </div>
           ))}
         </section>
+
+        {problemCount > 0 && (
+          <section className="flex flex-col gap-3 rounded-xl border border-destructive/30 bg-destructive/5 p-5 md:flex-row md:items-center md:justify-between">
+            <div>
+              <div className="flex items-center gap-2 font-semibold text-destructive">
+                <AlertTriangle className="h-4 w-4" />
+                Problemas recentes precisam de atenção
+              </div>
+              <p className="mt-1 text-sm text-muted-foreground">
+                Há {problemCount} erro{problemCount === 1 ? "" : "s"} de execução registrados nas últimas 24 horas.
+              </p>
+            </div>
+            <button
+              type="button"
+              onClick={() => navigate(`/${slug}/workspace/logs`)}
+              className="inline-flex items-center justify-center gap-2 rounded-lg border border-destructive/30 bg-background px-4 py-2 text-sm font-medium hover:bg-muted"
+            >
+              Ver logs <ArrowRight className="h-4 w-4" />
+            </button>
+          </section>
+        )}
 
         <section className="grid gap-6 lg:grid-cols-[1.4fr_.8fr]">
           <div className="rounded-xl border bg-background">
