@@ -32,20 +32,9 @@ export default function WorkspaceOverviewPage() {
 
       if (eventError) throw eventError;
 
-      // O TestPanel executa o fluxo localmente e mantém a sessão em flow_executions.
-      // Enquanto não houver evento do runtime público, usamos essa sessão como fallback
-      // para que testes feitos pelo botão "Testar" também apareçam no Command Center.
-      if ((eventCount ?? 0) === 0) {
-        const { count: sessionCount, error: sessionError } = await supabase
-          .from("flow_executions")
-          .select("flow_id", { count: "exact", head: true })
-          .in("flow_id", flows.map((flow) => flow.id));
-
-        if (sessionError) throw sessionError;
-        setExecutionCount(sessionCount ?? 0);
-      } else {
-        setExecutionCount(eventCount ?? 0);
-      }
+      // A métrica considera somente chamadas reais do runtime público.
+      // O TestPanel/local flow_executions não entra nesta contagem.
+      setExecutionCount(eventCount ?? 0);
     } catch (error) {
       console.error("[WorkspaceOverview] erro ao carregar execuções:", error);
       setExecutionCount(null);
