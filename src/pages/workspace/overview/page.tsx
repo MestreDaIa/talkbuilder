@@ -3,6 +3,8 @@
 import { Activity, ArrowRight, Boxes, Plug, CheckCircle2 } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import { useCallback, useEffect, useState } from "react";
+import { formatDistanceToNow } from "date-fns";
+import { ptBR } from "date-fns/locale";
 import { useAuth } from "../../../context/AuthContext";
 import { useWorkspace } from "../../../context/WorkspaceContext";
 import { botRoute, workspaceRoot } from "../../../lib/workspaceRoutes";
@@ -15,6 +17,15 @@ export default function WorkspaceOverviewPage() {
   const slug = currentWorkspace?.slug ?? profile?.slug;
   const flows = items.filter((item) => item.type === "bot");
   const [executionCount, setExecutionCount] = useState<number | null>(null);
+  const [recentExecutions, setRecentExecutions] = useState<Array<{
+    id: string;
+    flow_id: string;
+    contact_id: string;
+    channel_id: string;
+    action: string;
+    created_at: string;
+    flow_name: string;
+  }>>([]);
 
   const loadExecutionCount = useCallback(async () => {
     if (!flows.length) {
@@ -36,12 +47,39 @@ export default function WorkspaceOverviewPage() {
 
       if (eventError) throw eventError;
 
-      // A métrica considera somente chamadas reais do runtime público.
-      // O TestPanel/local flow_executions não entra nesta contagem.
+      const { data: events, error: recentError } = await supabase
+        .from("flow_execution_events")
+        .select("id,flow_id,contact_id,channel_id,action,created_at")
+        .eq("workspace_id", currentWorkspace.id)
+        .order("created_at", { ascending: false })
+        .limit(6);
+
+      if (recentError) throw recentError;
+
+      const flowIds = [...new Set((events ?? []).map((event) => event.flow_id))];
+      let flowNames = new Map<string, string>();
+
+      if (flowIds.length) {
+        const { data: flowRows, error: flowsError } = await supabase
+          .from("chatbot_flows")
+          .select("id,name")
+          .in("id", flowIds);
+
+        if (flowsError) throw flowsError;
+        flowNames = new Map((flowRows ?? []).map((flow) => [flow.id, flow.name]));
+      }
+
       setExecutionCount(eventCount ?? 0);
+      setRecentExecutions(
+        (events ?? []).map((event) => ({
+          ...event,
+          flow_name: flowNames.get(event.flow_id) ?? "Fluxo",
+        })),
+      );
     } catch (error) {
       console.error("[WorkspaceOverview] erro ao carregar execuções:", error);
       setExecutionCount(null);
+      setRecentExecutions([]);
     }
   }, [flows.map((flow) => flow.id).join(","), currentWorkspace?.id]);
 
@@ -120,11 +158,32 @@ export default function WorkspaceOverviewPage() {
             </div>
           </div>
 
-          <div className="rounded-xl border bg-background p-5">
-            <h2 className="font-semibold">Atividade recente</h2>
-            <p className="mt-1 text-sm text-muted-foreground">Execuções e eventos aparecerão aqui quando o histórico estiver disponível.</p>
-            <div className="mt-6 rounded-lg border border-dashed p-6 text-center text-sm text-muted-foreground">
-              Nenhuma execução registrada ainda.
+          <div className="rounded-xl border bg-background">
+            <div className="border-b p-5">
+              <h2 className="font-semibold">Atividade recente</h2>
+              <p className="mt-1 text-sm text-muted-foreground">Últimas execuções reais dos seus fluxos.</p>
+            </div>
+
+            <div className="divide-y">
+              {recentExecutions.map((execution) => (
+                <div key={execution.id} className="flex items-center gap-3 p-4">
+                  <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-muted">
+                    <Activity className="h-4 w-4 text-muted-foreground" />
+                  </div>
+                  <div className="min-w-0 flex-1">
+                    <p className="truncate text-sm font-medium">{execution.flow_name}</p>
+                    <p className="truncate text-xs text-muted-foreground">
+                      {execution.channel_id} · {formatDistanceToNow(new Date(execution.created_at), { addSuffix: true, locale: ptBR })}
+                    </p>
+                  </div>
+                </div>
+              ))}
+
+              {!recentExecutions.length && (
+                <div className="p-6 text-center text-sm text-muted-foreground">
+                  Nenhuma execução registrada ainda.
+                </div>
+              )}
             </div>
           </div>
         </section>
