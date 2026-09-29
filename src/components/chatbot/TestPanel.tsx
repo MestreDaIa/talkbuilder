@@ -721,6 +721,8 @@ export const TestPanel = ({
         base64?: string;
         fileName?: string;
         mimetype?: string;
+        __fromSkill?: boolean;
+        __internalAgentTurn?: boolean;
       },
       containersIn?: Container[],
       edgesIn?: Edge[],
@@ -946,16 +948,19 @@ export const TestPanel = ({
         const userValue = input.message ?? input.button_id;
         variables["last_message"] = userValue;
 
-        // Save to history
-        const userMsg: RuntimeMessage = {
-          id: crypto.randomUUID(),
-          conversation_id: conversationId || "temp",
-          role: "user",
-          content: String(userValue),
-          created_at: new Date().toISOString()
-        };
-        messageHistory.push(userMsg);
-        if (conversationId) conversationService.saveMessage(userMsg);
+        // Save user input to history. Internal Agent turns are execution control
+        // messages and must never appear as if they came from the visitor.
+        if (!(input as any).__internalAgentTurn) {
+          const userMsg: RuntimeMessage = {
+            id: crypto.randomUUID(),
+            conversation_id: conversationId || "temp",
+            role: "user",
+            content: String(userValue),
+            created_at: new Date().toISOString()
+          };
+          messageHistory.push(userMsg);
+          if (conversationId) conversationService.saveMessage(userMsg);
+        }
 
         if (mode === "agent" && activeAgentNodeId) {
           currentNodeId = activeAgentNodeId;
@@ -1356,6 +1361,46 @@ export const TestPanel = ({
           }
 
           skillCall = skillCall || parseSkillFromText(aiReply);
+
+          // If the model produced a progress message without actually emitting a tool call,
+          // give the Agent one bounded internal turn to decide whether a skill is still
+          // required. This avoids forcing the visitor to send "estou esperando" just to
+          // resume an unfinished task. It is deliberately not based on matching phrases.
+          const internalAgentTurn = Boolean((input as any)?.__internalAgentTurn);
+          const shouldCheckForPendingSkill = Boolean(
+            aiReply &&
+            !skillCall &&
+            skills.length > 0 &&
+            !internalAgentTurn &&
+            !(input as any)?.__fromSkill
+          );
+
+          if (shouldCheckForPendingSkill) {
+            const internalPrompt: RuntimeMessage = {
+              id: crypto.randomUUID(),
+              conversation_id: conversationId || "temp",
+              role: "user",
+              content: "[CONTINUAÇÃO INTERNA DO AGENTE] A mensagem anterior foi apenas uma etapa da tarefa. Antes de encerrar este turno, verifique se ainda existe alguma skill disponível que precise ser executada para concluir o pedido do usuário. Se existir, chame use_skill agora com os argumentos atuais. Se nenhuma skill for necessária, não produza outra resposta ao usuário.",
+              metadata: { kind: "agent_internal_control" },
+              created_at: new Date().toISOString()
+            };
+
+            // Keep the progress message in the conversation/UI, then let the next
+            // bounded Agent turn decide whether a tool call is required.
+            const progressMsg: RuntimeMessage = {
+              id: crypto.randomUUID(),
+              conversation_id: conversationId || "temp",
+              role: "assistant",
+              content: aiReply!,
+              created_at: new Date().toISOString()
+            };
+            messageHistory.push(progressMsg);
+            nextMessages.push({ ...progressMsg, type: "bot", content: aiReply!, isHtml: false } as Message);
+            messageHistory.push(internalPrompt);
+            currentNodeId = activeAgentNodeId;
+            input = { message: internalPrompt.content, __fromSkill: true, __internalAgentTurn: true } as any;
+            continue;
+          }
 
           const matchedSkill = skillCall?.skill_id ? skills.find((s) => s.id === skillCall!.skill_id) : null;
           if (skillCall?.skill_id && matchedSkill) {
