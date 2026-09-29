@@ -197,6 +197,7 @@ interface TestPanelProps {
   fullScreen?: boolean;
   theme?: TestPanelTheme;
   flowId?: string;
+  workspaceId?: string;
   settings?: Record<string, any>;
 }
 
@@ -212,6 +213,7 @@ export const TestPanel = ({
   fullScreen = false,
   theme,
   flowId,
+  workspaceId,
   settings,
 }: TestPanelProps) => {
   const [messages, setMessages] = useState<Message[]>([]);
@@ -853,7 +855,7 @@ export const TestPanel = ({
 
       let conversationId = state?.conversation_id || null;
       if (!conversationId && flowId) {
-        const conv = await conversationService.getOrCreateConversation(visitorId, flowId, "default-workspace");
+        const conv = await conversationService.getOrCreateConversation(visitorId, flowId, workspaceId || "");
         conversationId = conv.id;
       }
 
