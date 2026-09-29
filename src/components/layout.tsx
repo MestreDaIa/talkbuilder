@@ -16,6 +16,7 @@ import { useEmbed } from "../context/EmbedContext";
 import DnDProvider from "../context/DnDProvider";
 import { useLocation } from "react-router-dom";
 import FoldersSidebarNavigation from "./FoldersSidebarNavigation";
+import WorkspaceSidebar from "./WorkspaceSidebar";
 import AddOptionToolbar from "./AddOptionToolbar";
 import Breadcrumb from "./Breadcrumb";
 import Header from "./Header";
@@ -48,6 +49,8 @@ function WorkspaceLayoutContent({ children }: { children: React.ReactNode }) {
 			const isBotEditor = /\/workspace\/bot\//.test(pathname);
 
 			const isWorkspaceRoot = /^\/[^/]+\/workspace\/?$/.test(pathname) || pathname === "/";
+			const isWorkspaceRoute = /\/workspace(?:\/|$)/.test(pathname);
+			const showWorkspaceNavigation = mode !== "embedded" && !isBotEditor && isWorkspaceRoute;
 			const isFolderRoute = /\/workspace\/folder\//.test(pathname);
 
 			// No modo embedded, escondemos a navegação institucional (breadcrumb com seletor
@@ -127,6 +130,7 @@ function WorkspaceLayoutContent({ children }: { children: React.ReactNode }) {
 				{!isBotEditor && flags.showHeader && <Header />}
 					{showBreadcrumb && <Breadcrumb />}
 					<div className="flex-1 flex relative overflow-hidden">
+						{showWorkspaceNavigation && <WorkspaceSidebar />}
 						{showBreadcrumb && (
 							<div className="flex ">
 								<FoldersSidebarNavigation />
