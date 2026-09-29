@@ -2690,7 +2690,7 @@ export const TestPanel = ({
     return () => viewport.removeEventListener("scroll", handleScroll);
   }, [isOpen]);
 
-  useEffect(() => {
+  useLayoutEffect(() => {
     const latestBot = [...messages].reverse().find(
       (message) =>
         message.type === "bot" &&
