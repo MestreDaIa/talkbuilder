@@ -1,10 +1,11 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useParams } from "react-router-dom";
 import { Loader2, RefreshCw } from "lucide-react";
 import { TestPanel } from "@/components/chatbot/TestPanel";
 import { VariablesProvider } from "@/context/VariablesContext";
 import { Button } from "@/components/ui/button";
 import { getPublicFlow, type PublicFlowResult } from "@/lib/flowsApi";
+import { getSupabase } from "@/lib/supabaseClient";
 import type { Container, Edge } from "@/types/chatbot";
 
 /**
@@ -20,6 +21,27 @@ export default function PublicFlowPage() {
   const [data, setData] = useState<PublicFlowResult | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const executionRecordedRef = useRef(false);
+
+  useEffect(() => {
+    if (!data?.id || executionRecordedRef.current) return;
+
+    executionRecordedRef.current = true;
+    const supabase = getSupabase();
+    const contactId = `public-${crypto.randomUUID()}`;
+
+    void supabase
+      .rpc("record_public_flow_execution", {
+        p_flow_id: data.id,
+        p_contact_id: contactId,
+        p_channel_id: "webchat",
+      })
+      .then(({ error: metricError }) => {
+        if (metricError) {
+          console.error("[PublicFlowPage] erro registrando execução pública:", metricError);
+        }
+      });
+  }, [data?.id]);
 
   useEffect(() => {
     document.documentElement.classList.add("dark");
