@@ -253,6 +253,7 @@ export const TestPanel = ({
   settings,
 }: TestPanelProps) => {
   const [messages, setMessages] = useState<Message[]>([]);
+  const messagesRef = useRef<Message[]>([]);
   const [currentInput, setCurrentInput] = useState("");
   const [waitingForInput, setWaitingForInput] = useState(false);
   const [waitingForType, setWaitingForType] = useState<string | null>(null);
@@ -2693,6 +2694,45 @@ export const TestPanel = ({
     return () => viewport.removeEventListener("scroll", handleScroll);
   }, [isOpen]);
 
+  messagesRef.current = messages;
+
+  const startNextBotTyping = () => {
+    if (currentTypingMessageIdRef.current || typingTimerRef.current !== null) return;
+
+    while (typingQueueRef.current.length > 0) {
+      const nextId = typingQueueRef.current.shift();
+      if (!nextId) return;
+
+      const nextMessage = messagesRef.current.find((message) => message.id === nextId);
+      if (!nextMessage || typedMessageIdsRef.current.has(nextMessage.id)) continue;
+
+      currentTypingMessageIdRef.current = nextMessage.id;
+      setTypingMessageId(nextMessage.id);
+      setTypedBotContent("");
+
+      let index = 0;
+      const text = nextMessage.content;
+      typingTimerRef.current = window.setInterval(() => {
+        index += 1;
+        setTypedBotContent(text.slice(0, index));
+
+        if (index >= text.length) {
+          if (typingTimerRef.current !== null) window.clearInterval(typingTimerRef.current);
+          typingTimerRef.current = null;
+          typedMessageIdsRef.current.add(nextMessage.id);
+          setTypedBotContents((prev) => ({ ...prev, [nextMessage.id]: text }));
+          currentTypingMessageIdRef.current = null;
+          setTypingMessageId(null);
+          setTypedBotContent("");
+
+          // A próxima mensagem só começa depois que esta terminou completamente.
+          startNextBotTyping();
+        }
+      }, 18);
+      return;
+    }
+  };
+
   useEffect(() => {
     const botMessages = messages.filter((message) =>
       message.type === "bot" &&
@@ -2700,38 +2740,15 @@ export const TestPanel = ({
       !message.isAudio && !message.isFile &&
       typeof message.content === "string" && message.content.length > 0
     );
+
     for (const message of botMessages) {
       if (currentTypingMessageIdRef.current === message.id) continue;
       if (typingQueueRef.current.includes(message.id)) continue;
       if (typedMessageIdsRef.current.has(message.id)) continue;
       typingQueueRef.current.push(message.id);
     }
-    if (currentTypingMessageIdRef.current || typingTimerRef.current !== null) return;
-    const nextId = typingQueueRef.current.shift();
-    if (!nextId) return;
-    const nextMessage = botMessages.find((message) => message.id === nextId);
-    if (!nextMessage) return;
-    currentTypingMessageIdRef.current = nextMessage.id;
-    setTypingMessageId(nextMessage.id);
-    setTypedBotContent("");
-    let index = 0;
-    const text = nextMessage.content;
-    typingTimerRef.current = window.setInterval(() => {
-      index += 1;
-      setTypedBotContent(text.slice(0, index));
-      if (index >= text.length) {
-        if (typingTimerRef.current !== null) window.clearInterval(typingTimerRef.current);
-        typingTimerRef.current = null;
-        typedMessageIdsRef.current.add(nextMessage.id);
-        setTypedBotContents((prev) => ({ ...prev, [nextMessage.id]: text }));
-        currentTypingMessageIdRef.current = null;
-        setTypingMessageId(null);
-        setTypedBotContent("");
-      }
-    }, 18);
-    return () => {
-      if (typingTimerRef.current !== null) window.clearInterval(typingTimerRef.current);
-    };
+
+    startNextBotTyping();
   }, [messages]);
 
   useEffect(() => {
@@ -2833,6 +2850,9 @@ export const TestPanel = ({
 
 
   const sendMessage = async (message?: string, buttonId?: string, fileData?: { type: 'image' | 'video' | 'audio' | 'file', url: string, file?: File }) => {
+    // O usuário só pode interagir depois que TODAS as mensagens bot da fila terminarem.
+    if (currentTypingMessageIdRef.current || typingQueueRef.current.length > 0) return;
+
     const msgToSend = message || currentInput || fileData?.url;
     if (!msgToSend && !buttonId && !fileData) return;
 
@@ -2969,6 +2989,8 @@ export const TestPanel = ({
 
   if (theme?.textColor) themeStyle.color = theme.textColor;
   if (theme?.fontFamily) themeStyle.fontFamily = theme.fontFamily;
+
+  const botIsTyping = typingMessageId !== null || typingQueueRef.current.length > 0;
 
   const containerClass = fullScreen
     ? "absolute inset-0 h-full w-full bg-card flex flex-col z-50"
@@ -3117,7 +3139,7 @@ export const TestPanel = ({
           <div className="p-3 border-t border-border space-y-2 bg-card">
             <div className="flex flex-wrap gap-2">
               {activeButtons.map((btn) => (
-                <Button key={btn.id} variant="outline" size="sm" onClick={() => handleButtonClick(btn)} disabled={isLoading}>
+                <Button key={btn.id} variant="outline" size="sm" onClick={() => handleButtonClick(btn)} disabled={isLoading || botIsTyping}>
                   {btn.label}
                 </Button>
               ))}
@@ -3137,7 +3159,7 @@ export const TestPanel = ({
                           variant="ghost" 
                           size="icon" 
                           className="rounded-full shrink-0 hover:bg-muted"
-                          disabled={isLoading}
+                          disabled={isLoading || botIsTyping}
                           onClick={(e) => {
                             e.preventDefault();
                             e.stopPropagation();
@@ -3276,13 +3298,13 @@ export const TestPanel = ({
                         rows={1}
                         className="flex-1 min-w-0 resize-none min-h-[40px] max-h-[160px] rounded-2xl bg-muted/50 border-none focus-visible:ring-1"
                         style={{ color: theme?.inputTextColor || "inherit" }}
-                        disabled={isLoading}
+                        disabled={isLoading || botIsTyping}
                       />
                       
                       <Button 
                         size="icon" 
                         onClick={handleSendMessage} 
-                        disabled={isLoading || !currentInput.trim()}
+                        disabled={isLoading || botIsTyping || !currentInput.trim()}
                         className="rounded-full shrink-0"
                         style={{ background: theme?.primaryColor, color: "#ffffff" }}
                       >
@@ -3314,7 +3336,7 @@ export const TestPanel = ({
                       variant="outline" 
                       className="flex-1 gap-2 rounded-full" 
                       onClick={() => document.getElementById('file-upload')?.click()}
-                      disabled={isLoading}
+                      disabled={isLoading || botIsTyping}
                     >
                       <Upload className="h-4 w-4" />
                       {waitingForType === "input-image" ? "Enviar Foto" : 
@@ -3329,7 +3351,7 @@ export const TestPanel = ({
                           const type = waitingForType.replace('input-', '') as any;
                           startCapture(type);
                         }}
-                        disabled={isLoading}
+                        disabled={isLoading || botIsTyping}
                       >
                         {waitingForType === "input-image" ? <Camera className="h-4 w-4" /> : 
                          waitingForType === "input-video" ? <Video className="h-4 w-4" /> : <Mic className="h-4 w-4" />}
@@ -3354,7 +3376,7 @@ export const TestPanel = ({
                           step={waitingForType === "input-number" ? waitingForConfig?.step : undefined}
                           className={`flex-1 min-w-0 rounded-2xl ${waitingForType === "input-phone" ? "pl-9" : ""}`}
                           style={{ background: theme?.inputBackgroundColor ? "rgba(255,255,255,0.1)" : undefined, color: theme?.inputTextColor || "inherit", borderColor: theme?.inputTextColor ? `${theme.inputTextColor}40` : undefined }}
-                          disabled={isLoading}
+                          disabled={isLoading || botIsTyping}
                         />
                       </div>
                     ) : (
@@ -3371,13 +3393,13 @@ export const TestPanel = ({
                         rows={1}
                         className="flex-1 min-w-0 resize-none min-h-[40px] max-h-[160px] rounded-2xl"
                         style={{ background: theme?.inputBackgroundColor ? "rgba(255,255,255,0.1)" : undefined, color: theme?.inputTextColor || "inherit", borderColor: theme?.inputTextColor ? `${theme.inputTextColor}40` : undefined }}
-                        disabled={isLoading}
+                        disabled={isLoading || botIsTyping}
                       />
                     )}
                     <Button 
                       size="icon" 
                       onClick={handleSendMessage} 
-                      disabled={isLoading || !currentInput.trim()}
+                      disabled={isLoading || botIsTyping || !currentInput.trim()}
                       className="rounded-full"
                       style={{ background: theme?.primaryColor, color: "#ffffff" }}
                     >
