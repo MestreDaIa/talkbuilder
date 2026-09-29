@@ -24,11 +24,15 @@ export default function WorkspaceOverviewPage() {
 
     try {
       const supabase = getSupabase();
+      if (!currentWorkspace?.id) {
+        setExecutionCount(0);
+        return;
+      }
+
       const { count: eventCount, error: eventError } = await supabase
         .from("flow_execution_events")
         .select("id", { count: "exact", head: true })
-        .in("flow_id", flows.map((flow) => flow.id))
-        .eq("workspace_id", currentWorkspace?.id);
+        .eq("workspace_id", currentWorkspace.id);
 
       if (eventError) throw eventError;
 
