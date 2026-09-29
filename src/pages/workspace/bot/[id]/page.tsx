@@ -290,6 +290,7 @@ function BotEditorInner({
             allContainers={containers}
             edges={edges}
             flowId={flow?.id}
+            workspaceId={currentWorkspace?.id}
             settings={flow?.settings}
           />
         </div>
