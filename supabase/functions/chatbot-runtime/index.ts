@@ -966,15 +966,17 @@ Deno.serve(async (req: Request) => {
 
     // Analytics: cada chamada real do runtime representa uma execução.
     // O TestPanel local não passa por esta função, portanto não entra na métrica.
-    try {
-      await supabase.from("flow_execution_events").insert({
-        workspace_id: flow.workspace_id ?? flow.user_id,
+    const { error: analyticsError } = await supabase
+      .from("flow_execution_events")
+      .insert({
+        workspace_id: flow.workspace_id,
         flow_id: flow.id,
         contact_id,
         channel_id: channel,
         action,
       });
-    } catch (analyticsError) {
+
+    if (analyticsError) {
       console.warn("[runtime] não foi possível registrar métrica:", analyticsError);
     }
 
