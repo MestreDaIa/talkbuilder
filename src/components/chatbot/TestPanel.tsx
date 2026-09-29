@@ -2553,26 +2553,6 @@ export const TestPanel = ({
     return scheduleRuntimeContinue(data.wait_ms);
   };
 
-  const persistExecutionEvent = async () => {
-    if (!flowId || !workspaceId) return;
-
-    try {
-      const supabase = getSupabase();
-      const { error } = await supabase.from("flow_execution_events").insert({
-        workspace_id: workspaceId,
-        flow_id: flowId,
-        contact_id: contactIdRef.current,
-        channel_id: "webchat",
-        action: "start",
-      });
-
-      if (error) throw error;
-    } catch (error) {
-      // A métrica não pode interromper o teste do fluxo.
-      console.warn("[TestPanel] não foi possível registrar evento de execução:", error);
-    }
-  };
-
   const persistFlowExecution = async (runtimeData: any) => {
     if (!flowId) return;
 
@@ -2600,7 +2580,6 @@ export const TestPanel = ({
   const startRuntimeSession = async () => {
     setIsLoading(true);
     setMessages([]);
-    await persistExecutionEvent();
     const data = await runLocalFlow(null);
     await persistFlowExecution(data);
     applyRuntimeData(data, true);
