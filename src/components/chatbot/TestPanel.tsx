@@ -74,6 +74,42 @@ function evaluateSetVariableValue(cfg: any, variables: Record<string, any>, repl
   }
 }
 
+type ClientAIErrorInfo = {
+  level: "error" | "warning";
+  category: string;
+  errorCode: string;
+  title: string;
+  message: string;
+  suggestion: string;
+};
+
+function classifyClientAIError(provider: string, status?: number, rawBody?: string, caughtError?: unknown): ClientAIErrorInfo {
+  const body = String(rawBody || "").toLowerCase();
+  const errorText = caughtError instanceof Error ? caughtError.message.toLowerCase() : String(caughtError || "").toLowerCase();
+  const p = provider === "gemini" ? "google" : provider;
+  const code = Number(status) || 0;
+
+  if (!code && (errorText.includes("timeout") || errorText.includes("timed out") || errorText.includes("network") || errorText.includes("fetch failed"))) {
+    return { level: "error", category: "connection", errorCode: "NETWORK_ERROR", title: "Falha de conexão com a IA", message: "Não foi possível conectar ao provedor de IA.", suggestion: "Verifique a conexão e tente novamente. Se persistir, verifique o status do provedor." };
+  }
+  if (code === 401 || code === 403 || body.includes("invalid_api_key") || body.includes("api key not valid") || body.includes("authentication")) {
+    return { level: "error", category: "credentials", errorCode: "INVALID_CREDENTIALS", title: "Credencial da IA inválida", message: "A credencial configurada para o provedor não foi aceita.", suggestion: "Verifique a API Key nas configurações do workspace e gere uma nova chave se necessário." };
+  }
+  if (code === 402 || body.includes("billing") || body.includes("payment required") || body.includes("insufficient balance")) {
+    return { level: "error", category: "billing", errorCode: "BILLING_REQUIRED", title: "Pagamento ou faturamento da IA", message: "O provedor recusou a chamada por uma questão de faturamento.", suggestion: "Verifique o faturamento da conta do provedor e regularize o pagamento." };
+  }
+  if (code === 429 || body.includes("quota") || body.includes("rate limit") || body.includes("resource exhausted") || body.includes("too many requests")) {
+    return { level: "error", category: "quota", errorCode: "QUOTA_EXCEEDED", title: "Quota ou limite da IA excedido", message: "O limite disponível para o provedor de IA foi atingido.", suggestion: "Recarregue os créditos da IA, aumente o limite da conta ou altere o modelo/provedor." };
+  }
+  if (code === 404 || body.includes("model not found") || body.includes("not_found") || body.includes("does not exist")) {
+    return { level: "error", category: "model", errorCode: "MODEL_NOT_FOUND", title: "Modelo de IA não encontrado", message: "O modelo configurado não está disponível para esta conta ou provedor.", suggestion: "Confira o nome do modelo e escolha um modelo disponível para sua conta." };
+  }
+  if ([408, 500, 502, 503, 504].includes(code)) {
+    return { level: "error", category: "provider", errorCode: "PROVIDER_UNAVAILABLE", title: "Provedor de IA indisponível", message: "O provedor não conseguiu processar a solicitação neste momento.", suggestion: "Tente novamente em instantes. Se continuar, verifique o status do provedor ou altere o modelo." };
+  }
+  return { level: "error", category: "provider", errorCode: code ? `AI_HTTP_${code}` : "AI_PROVIDER_ERROR", title: `Erro no provedor de IA${p ? ` (${p})` : ""}`, message: "A chamada ao provedor de IA não foi concluída.", suggestion: "Verifique as configurações da IA e tente novamente. Se persistir, consulte os logs do workspace." };
+}
+
 interface Message extends RuntimeMessage {
   // UI Specific extension
   id: string;
@@ -356,6 +392,45 @@ export const TestPanel = ({
   };
 
   const contactIdRef = useRef<string>(`test-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`);
+
+  const reportAIError = async (nodeId: string, provider: string, info: ClientAIErrorInfo, httpStatus?: number) => {
+    if (!flowId) return;
+    try {
+      const supabase = getSupabase();
+      if (!supabase) return;
+      const { error } = await supabase.rpc("record_flow_runtime_log", {
+        p_flow_id: flowId,
+        p_node_id: nodeId,
+        p_level: info.level,
+        p_category: info.category,
+        p_provider: provider,
+        p_error_code: info.errorCode,
+        p_http_status: httpStatus ?? null,
+        p_title: info.title,
+        p_message: info.message,
+        p_suggestion: info.suggestion,
+        p_execution_id: contactIdRef.current,
+        p_metadata: { public: fullScreen, source: "flow-ui" },
+      });
+      if (error) console.warn("[AI] não foi possível registrar log:", error);
+    } catch (error) {
+      console.warn("[AI] falha ao registrar log:", error);
+    }
+  };
+
+  const pushFriendlyAIError = (messagesTarget: Message[], nodeId: string, provider: string, info: ClientAIErrorInfo, httpStatus?: number) => {
+    void reportAIError(nodeId, provider, info, httpStatus);
+    messagesTarget.push({
+      id: crypto.randomUUID(),
+      conversation_id: "temp",
+      role: "assistant",
+      type: "bot",
+      content: "Não foi possível processar sua solicitação no momento. Tente novamente mais tarde.",
+      isHtml: false,
+    } as Message);
+  };
+
+
 
   const firstNodeOfContainer = (containerId: string) => {
     const container = allContainers.find((c) => c.id === containerId);
@@ -990,6 +1065,10 @@ export const TestPanel = ({
           const nodeProvider = (cfg.provider || "openai").toLowerCase();
           const globalKeys = settings?.aiKeys || {};
           const activeKey = (globalKeys[`${nodeProvider}Key`] || "").trim() || nodeKey;
+          if (!activeKey) {
+            const info = classifyClientAIError(selectedProvider, 401, "missing api key");
+            pushFriendlyAIError(nextMessages, node.id, selectedProvider, info, 401);
+          }
           const selectedProvider = nodeProvider === "gemini" ? "google" : nodeProvider as "openai" | "anthropic" | "google";
 
           const { system, messages: contextMessages } = buildAgentContext({
@@ -1020,6 +1099,10 @@ export const TestPanel = ({
                 if (res.ok) {
                   const data = await res.json();
                   aiReply = data.choices?.[0]?.message?.content || null;
+                } else {
+                  const errorBody = await res.text().catch(() => "");
+                  const info = classifyClientAIError(selectedProvider, res.status, errorBody);
+                  pushFriendlyAIError(nextMessages, node.id, selectedProvider, info, res.status);
                 }
               } else if (selectedProvider === "google") {
                 const model = (cfg.model || "gemini-2.0-flash").trim();
@@ -1034,9 +1117,15 @@ export const TestPanel = ({
                 if (res.ok) {
                   const data = await res.json();
                   aiReply = data.candidates?.[0]?.content?.parts?.[0]?.text || null;
+                } else {
+                  const errorBody = await res.text().catch(() => "");
+                  const info = classifyClientAIError(selectedProvider, res.status, errorBody);
+                  pushFriendlyAIError(nextMessages, node.id, selectedProvider, info, res.status);
                 }
               }
             } catch (e) {
+              const info = classifyClientAIError(selectedProvider, undefined, "", e);
+              pushFriendlyAIError(nextMessages, node.id, selectedProvider, info);
               console.error("[ai-node] AI call failed", e);
             }
           }
@@ -1129,6 +1218,10 @@ export const TestPanel = ({
           const nodeProvider = (cfg.provider || "openai").toLowerCase();
           const globalKeys = settings?.aiKeys || {};
           const activeKey = (globalKeys[`${nodeProvider}Key`] || "").trim() || nodeKey;
+          if (!activeKey) {
+            const info = classifyClientAIError(selectedProvider, 401, "missing api key");
+            pushFriendlyAIError(nextMessages, node.id, selectedProvider, info, 401);
+          }
           const selectedProvider = nodeProvider === "gemini" ? "google" : nodeProvider as "openai" | "anthropic" | "google";
 
           const { system, messages: contextMessages } = buildAgentContext({
@@ -1181,6 +1274,10 @@ export const TestPanel = ({
                     } : null;
                   }
                   aiReply = msg?.content || null;
+                } else {
+                  const errorBody = await res.text().catch(() => "");
+                  const info = classifyClientAIError(selectedProvider, res.status, errorBody);
+                  pushFriendlyAIError(nextMessages, node.id, selectedProvider, info, res.status);
                 }
               } else if (selectedProvider === "google") {
                 const model = (cfg.model || "gemini-2.0-flash").trim();
@@ -1221,11 +1318,6 @@ export const TestPanel = ({
                     } : {})
                   }),
                 });
-                if (!res.ok) {
-                  const errBody = await res.text().catch(() => "");
-                  console.error(`[agent-node] Gemini ${res.status}:`, errBody);
-                  aiReply = `⚠️ Erro ${res.status} do provedor de IA (Gemini). Verifique a chave, o modelo (${model}) ou a configuração das skills. Detalhes: ${errBody.slice(0, 300)}`;
-                }
                 if (res.ok) {
                   const data = await res.json();
                   const parts = data.candidates?.[0]?.content?.parts || [];
@@ -1244,9 +1336,15 @@ export const TestPanel = ({
                     };
                   }
                   aiReply = parts.map((part: any) => part.text).filter(Boolean).join("\n").trim() || null;
+                } else {
+                  const errorBody = await res.text().catch(() => "");
+                  const info = classifyClientAIError(selectedProvider, res.status, errorBody);
+                  pushFriendlyAIError(nextMessages, node.id, selectedProvider, info, res.status);
                 }
               }
             } catch (e) {
+              const info = classifyClientAIError(selectedProvider, undefined, "", e);
+              pushFriendlyAIError(nextMessages, node.id, selectedProvider, info);
               console.error("[agent-node] AI call failed", e);
             }
           }
