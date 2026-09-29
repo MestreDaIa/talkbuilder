@@ -946,7 +946,7 @@ Deno.serve(async (req: Request) => {
     // 1. Explicit body.channel
     // 2. presence of whatsapp-specific fields
     const hasWhatsappFields = isEvolution || !!(body.instance || body.remoteJid || body.data?.key?.remoteJid);
-    const channel = body.channel || (hasWhatsappFields ? "whatsapp" : "webchat");
+    const channel = body.channel || body.channel_id || (hasWhatsappFields ? "whatsapp" : "webchat");
     
     const payload = body.payload || body.data || body;
 
