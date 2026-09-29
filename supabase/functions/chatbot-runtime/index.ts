@@ -964,6 +964,20 @@ Deno.serve(async (req: Request) => {
 
     if (!flow) return json({ error: "Flow não encontrado" }, 404);
 
+    // Analytics: cada chamada real do runtime representa uma execução.
+    // O TestPanel local não passa por esta função, portanto não entra na métrica.
+    try {
+      await supabase.from("flow_execution_events").insert({
+        workspace_id: flow.workspace_id ?? flow.user_id,
+        flow_id: flow.id,
+        contact_id,
+        channel_id: channel,
+        action,
+      });
+    } catch (analyticsError) {
+      console.warn("[runtime] não foi possível registrar métrica:", analyticsError);
+    }
+
     // 2. Manage Session
     let session = null;
     try {
