@@ -70,7 +70,7 @@ export default function WorkspaceLogsPage() {
       const supabase = getSupabase();
       const { data, error: queryError } = await supabase
         .from("flow_runtime_logs")
-        .select("id,flow_id,workspace_item_id,node_id,level,category,provider,error_code,http_status,title,message,suggestion,created_at,resolved_at")
+        .select("id,flow_id,node_id,level,category,provider,error_code,http_status,title,message,suggestion,created_at,resolved_at")
         .eq("workspace_id", currentWorkspace.id)
         .order("created_at", { ascending: false })
         .limit(100);
