@@ -1,10 +1,8 @@
 "use client";
 
-import { Activity, ExternalLink } from "lucide-react";
+import { Activity } from "lucide-react";
 import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { formatDistanceToNow } from "date-fns";
-import { ptBR } from "date-fns/locale";
 import { useAuth } from "../../../context/AuthContext";
 import { getSupabase } from "../../../lib/supabaseClient";
 import { botRoute } from "../../../lib/workspaceRoutes";
@@ -27,7 +25,7 @@ export default function WorkspaceExecutionsPage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
-  useEffect(() => {
+  const relativeTime = (value: string) => {\n    const diff = Math.max(0, Date.now() - new Date(value).getTime());\n    const minutes = Math.floor(diff / 60000);\n    if (minutes < 1) return "agora";\n    if (minutes < 60) return `há ${minutes} min`;\n    const hours = Math.floor(minutes / 60);\n    if (hours < 24) return `há ${hours}h`;\n    const days = Math.floor(hours / 24);\n    if (days < 30) return `há ${days}d`;\n    return new Date(value).toLocaleDateString("pt-BR");\n  };\n\n  useEffect(() => {
     if (!currentWorkspace?.id) {
       setExecutions([]);
       setLoading(false);
@@ -140,7 +138,7 @@ export default function WorkspaceExecutionsPage() {
                     {execution.contact_id}
                   </span>
                   <span className="text-sm text-muted-foreground" title={new Date(execution.created_at).toLocaleString("pt-BR")}>
-                    {formatDistanceToNow(new Date(execution.created_at), { addSuffix: true, locale: ptBR })}
+                    {relativeTime(execution.created_at)}
                   </span>
                 </div>
               ))}
