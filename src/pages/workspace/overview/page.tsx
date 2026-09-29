@@ -3,8 +3,6 @@
 import { Activity, ArrowRight, Boxes, Plug, CheckCircle2 } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import { useCallback, useEffect, useState } from "react";
-import { formatDistanceToNow } from "date-fns";
-import { ptBR } from "date-fns/locale";
 import { useAuth } from "../../../context/AuthContext";
 import { useWorkspace } from "../../../context/WorkspaceContext";
 import { botRoute, workspaceRoot } from "../../../lib/workspaceRoutes";
@@ -27,7 +25,7 @@ export default function WorkspaceOverviewPage() {
     flow_name: string;
   }>>([]);
 
-  const loadExecutionCount = useCallback(async () => {
+  const relativeTime = (value: string) => {\n    const diff = Math.max(0, Date.now() - new Date(value).getTime());\n    const minutes = Math.floor(diff / 60000);\n    if (minutes < 1) return "agora";\n    if (minutes < 60) return `há ${minutes} min`;\n    const hours = Math.floor(minutes / 60);\n    if (hours < 24) return `há ${hours}h`;\n    const days = Math.floor(hours / 24);\n    if (days < 30) return `há ${days}d`;\n    return new Date(value).toLocaleDateString("pt-BR");\n  };\n\n  const loadExecutionCount = useCallback(async () => {
     if (!flows.length) {
       setExecutionCount(0);
       return;
@@ -173,7 +171,7 @@ export default function WorkspaceOverviewPage() {
                   <div className="min-w-0 flex-1">
                     <p className="truncate text-sm font-medium">{execution.flow_name}</p>
                     <p className="truncate text-xs text-muted-foreground">
-                      {execution.channel_id} · {formatDistanceToNow(new Date(execution.created_at), { addSuffix: true, locale: ptBR })}
+                      {execution.channel_id} · {relativeTime(execution.created_at)}
                     </p>
                   </div>
                 </div>
