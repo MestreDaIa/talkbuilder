@@ -2694,48 +2694,43 @@ export const TestPanel = ({
   }, [isOpen]);
 
   useEffect(() => {
-    const latestBot = [...messages].reverse().find(
-      (message) =>
-        message.type === "bot" &&
-        !message.isHtml &&
-        !message.isImage &&
-        !message.isVideo &&
-        !message.isAudio &&
-        !message.isFile &&
-        typeof message.content === "string" &&
-        message.content.length > 0,
+    const botMessages = messages.filter((message) =>
+      message.type === "bot" &&
+      !message.isHtml && !message.isImage && !message.isVideo &&
+      !message.isAudio && !message.isFile &&
+      typeof message.content === "string" && message.content.length > 0
     );
-
-    if (!latestBot || latestBot.id === lastTypedMessageIdRef.current) return;
-
-    if (typingTimerRef.current !== null) {
-      window.clearInterval(typingTimerRef.current);
-      typingTimerRef.current = null;
+    for (const message of botMessages) {
+      if (currentTypingMessageIdRef.current === message.id) continue;
+      if (typingQueueRef.current.includes(message.id)) continue;
+      if (typedMessageIdsRef.current.has(message.id)) continue;
+      typingQueueRef.current.push(message.id);
     }
-
-    lastTypedMessageIdRef.current = latestBot.id;
-    setTypingMessageId(latestBot.id);
+    if (currentTypingMessageIdRef.current || typingTimerRef.current !== null) return;
+    const nextId = typingQueueRef.current.shift();
+    if (!nextId) return;
+    const nextMessage = botMessages.find((message) => message.id === nextId);
+    if (!nextMessage) return;
+    currentTypingMessageIdRef.current = nextMessage.id;
+    setTypingMessageId(nextMessage.id);
     setTypedBotContent("");
-
     let index = 0;
-    const text = latestBot.content;
+    const text = nextMessage.content;
     typingTimerRef.current = window.setInterval(() => {
       index += 1;
       setTypedBotContent(text.slice(0, index));
-
       if (index >= text.length) {
-        if (typingTimerRef.current !== null) {
-          window.clearInterval(typingTimerRef.current);
-          typingTimerRef.current = null;
-        }
+        if (typingTimerRef.current !== null) window.clearInterval(typingTimerRef.current);
+        typingTimerRef.current = null;
+        typedMessageIdsRef.current.add(nextMessage.id);
+        setTypedBotContents((prev) => ({ ...prev, [nextMessage.id]: text }));
+        currentTypingMessageIdRef.current = null;
+        setTypingMessageId(null);
+        setTypedBotContent("");
       }
     }, 18);
-
     return () => {
-      if (typingTimerRef.current !== null) {
-        window.clearInterval(typingTimerRef.current);
-        typingTimerRef.current = null;
-      }
+      if (typingTimerRef.current !== null) window.clearInterval(typingTimerRef.current);
     };
   }, [messages]);
 
@@ -3092,7 +3087,7 @@ export const TestPanel = ({
                               strong: ({node, ...props}) => <strong className="font-bold text-inherit" {...props} />,
                            }}
                          >
-                            {normalizeMarkdown(message.id === typingMessageId ? typedBotContent : message.content)}
+                            {normalizeMarkdown(typedBotContents[message.id] ?? (message.id === typingMessageId ? typedBotContent : ""))}
                          </ReactMarkdown>
                        </div>
                      )
