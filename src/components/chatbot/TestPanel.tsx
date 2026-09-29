@@ -2587,7 +2587,6 @@ export const TestPanel = ({
   const continueRuntime = async () => {
     setIsLoading(true);
     const data = await runLocalFlow(runtimeStateRef.current);
-    await persistFlowExecution(data);
     applyRuntimeData(data);
     if (!waitTimerRef.current) setIsLoading(false);
   };
@@ -2693,7 +2692,6 @@ export const TestPanel = ({
     }
 
     const data = await runLocalFlow(currentState, inputPayload);
-    await persistFlowExecution(data);
     applyRuntimeData(data);
     setIsLoading(false);
   };
