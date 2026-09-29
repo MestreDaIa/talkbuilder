@@ -1,11 +1,12 @@
 "use client";
 
-import { useState } from "react";
-import { Activity, Boxes, ChevronLeft, ChevronRight, Home, LogOut, Plug, Settings2, UserRound } from "lucide-react";
+import { useEffect, useState } from "react";
+import { Activity, AlertTriangle, Boxes, ChevronLeft, ChevronRight, Home, LogOut, Plug, Settings2, UserRound } from "lucide-react";
 import { useLocation, useNavigate } from "react-router-dom";
 import { useAuth } from "../context/AuthContext";
 import { configsRoute, perfilRoute, workspaceRoot } from "../lib/workspaceRoutes";
 import { useEmbed } from "../context/EmbedContext";
+import { getSupabase } from "../lib/supabaseClient";
 
 export default function WorkspaceSidebar() {
   const [collapsed, setCollapsed] = useState(false);
@@ -14,11 +15,48 @@ export default function WorkspaceSidebar() {
   const { pathname } = useLocation();
   const navigate = useNavigate();
   const slug = currentWorkspace?.slug ?? profile?.slug;
+  const [problemCount, setProblemCount] = useState(0);
+
+  useEffect(() => {
+    if (!currentWorkspace?.id) {
+      setProblemCount(0);
+      return;
+    }
+
+    const supabase = getSupabase();
+    const loadProblemCount = async () => {
+      const since = new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString();
+      const { count, error } = await supabase
+        .from("flow_runtime_logs")
+        .select("id", { count: "exact", head: true })
+        .eq("workspace_id", currentWorkspace.id)
+        .is("resolved_at", null)
+        .gte("created_at", since);
+      if (!error) setProblemCount(count ?? 0);
+    };
+
+    void loadProblemCount();
+
+    const channel = supabase
+      .channel(`workspace-sidebar-logs-${currentWorkspace.id}`)
+      .on("postgres_changes", {
+        event: "INSERT",
+        schema: "public",
+        table: "flow_runtime_logs",
+        filter: `workspace_id=eq.${currentWorkspace.id}`,
+      }, () => {
+        setProblemCount((value) => value + 1);
+      })
+      .subscribe();
+
+    return () => { void supabase.removeChannel(channel); };
+  }, [currentWorkspace?.id]);
 
   const items = [
     { label: "Visão geral", icon: Home, path: slug ? `/${slug}/workspace/overview` : "/" },
     { label: "Fluxos", icon: Boxes, path: workspaceRoot(slug) },
     { label: "Execuções", icon: Activity, path: slug ? `/${slug}/workspace/executions` : "/" },
+    { label: "Logs", icon: AlertTriangle, path: slug ? `/${slug}/workspace/logs` : "/", badge: problemCount },
     { label: "Integrações", icon: Plug, path: slug ? `/${slug}/workspace/integrations` : "/" },
   ];
 
@@ -66,6 +104,11 @@ export default function WorkspaceSidebar() {
           >
             <Icon className="h-4 w-4 shrink-0" />
             {!collapsed && <span>{label}</span>}
+            {label === "Logs" && problemCount > 0 && (
+              <span className={`ml-auto min-w-5 rounded-full bg-destructive px-1.5 py-0.5 text-center text-[10px] font-bold text-white ${collapsed ? "absolute -right-1 -top-1" : ""}`}>
+                {problemCount > 99 ? "99+" : problemCount}
+              </span>
+            )}
           </button>
         ))}
       </nav>
