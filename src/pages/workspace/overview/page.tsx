@@ -25,9 +25,10 @@ export default function WorkspaceOverviewPage() {
     try {
       const supabase = getSupabase();
       const { count, error } = await supabase
-        .from("flow_execution_events")
+        .from("conversations")
         .select("id", { count: "exact", head: true })
-        .in("flow_id", flows.map((flow) => flow.id));
+        .in("bot_id", flows.map((flow) => flow.id))
+        .eq("workspace_id", currentWorkspace?.id);
 
       if (error) throw error;
       setExecutionCount(count ?? 0);
