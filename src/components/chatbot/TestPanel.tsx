@@ -3067,7 +3067,12 @@ export const TestPanel = ({
         <div className="relative flex-1 min-h-0">
         <ScrollArea className="h-full p-3" ref={scrollRef}>
           <div className="space-y-3">
-            {messages.map((message) => (
+            {messages.map((message) => {
+              const isPlainBotMessage = message.type === "bot" && !message.isHtml && !message.isImage && !message.isVideo && !message.isAudio && !message.isFile;
+              const renderedBotContent = typedBotContents[message.id] ?? (message.id === typingMessageId ? typedBotContent : "");
+              if (isPlainBotMessage && !renderedBotContent) return null;
+
+              return (
 
               <div key={message.id} className={`flex ${message.type === "bot" ? "justify-start" : "justify-end"}`}>
                 <div className={`max-w-[85%] px-3 py-2 rounded-2xl text-sm shadow-md text-left ${message.type === "bot" ? "rounded-bl-sm" : "rounded-br-sm"}`}
@@ -3094,7 +3099,7 @@ export const TestPanel = ({
                    : <div className="whitespace-pre-wrap break-words">{renderTextSegments(message.content)}</div>}
                 </div>
               </div>
-            ))}
+            )})}
             {isLoading && <div className="flex justify-start"><div className="bg-muted px-4 py-2 rounded-2xl rounded-bl-sm"><Loader2 className="w-4 h-4 animate-spin text-muted-foreground" /></div></div>}
           </div>
         </ScrollArea>
