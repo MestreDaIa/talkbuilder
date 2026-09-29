@@ -30,6 +30,7 @@ import NotificationView from "./pages/workspace/notification/[id]/page";
 import WorkspaceOverviewPage from "./pages/workspace/overview/page";
 import WorkspaceExecutionsPage from "./pages/workspace/executions/page";
 import WorkspaceIntegrationsPage from "./pages/workspace/integrations/page";
+import WorkspaceLogsPage from "./pages/workspace/logs/page";
 
 
 import Layout from "./components/layout";
@@ -204,6 +205,16 @@ function App() {
           <ProtectedRoute>
             <SlugGuard>
               <Layout><WorkspaceIntegrationsPage /></Layout>
+            </SlugGuard>
+          </ProtectedRoute>
+        }
+      />
+      <Route
+        path="/:slug/workspace/logs"
+        element={
+          <ProtectedRoute>
+            <SlugGuard>
+              <Layout><WorkspaceLogsPage /></Layout>
             </SlugGuard>
           </ProtectedRoute>
         }
