@@ -20,7 +20,6 @@ export default function WorkspaceSidebar() {
     { label: "Fluxos", icon: Boxes, path: workspaceRoot(slug) },
     { label: "Execuções", icon: Activity, path: slug ? `/${slug}/workspace/executions` : "/" },
     { label: "Integrações", icon: Plug, path: slug ? `/${slug}/workspace/integrations` : "/" },
-    { label: "Configurações", icon: Settings2, path: configsRoute(slug) },
   ];
 
   const isActive = (path: string, label: string) => {
