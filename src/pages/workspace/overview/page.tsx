@@ -25,7 +25,7 @@ export default function WorkspaceOverviewPage() {
     try {
       const supabase = getSupabase();
       const { count, error } = await supabase
-        .from("flow_executions")
+        .from("flow_execution_events")
         .select("id", { count: "exact", head: true })
         .in("flow_id", flows.map((flow) => flow.id));
 
