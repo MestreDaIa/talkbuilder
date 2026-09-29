@@ -1064,12 +1064,12 @@ export const TestPanel = ({
           const nodeKey = (cfg.apiKey || "").trim();
           const nodeProvider = (cfg.provider || "openai").toLowerCase();
           const globalKeys = settings?.aiKeys || {};
+          const selectedProvider = nodeProvider === "gemini" ? "google" : nodeProvider as "openai" | "anthropic" | "google";
           const activeKey = (globalKeys[`${nodeProvider}Key`] || "").trim() || nodeKey;
           if (!activeKey) {
             const info = classifyClientAIError(selectedProvider, 401, "missing api key");
             pushFriendlyAIError(nextMessages, node.id, selectedProvider, info, 401);
           }
-          const selectedProvider = nodeProvider === "gemini" ? "google" : nodeProvider as "openai" | "anthropic" | "google";
 
           const { system, messages: contextMessages } = buildAgentContext({
             systemPrompt: `Objetivo: ${objective}\nInstruções: ${instructions}`,
@@ -1217,12 +1217,12 @@ export const TestPanel = ({
           const nodeKey = (cfg.apiKey || "").trim();
           const nodeProvider = (cfg.provider || "openai").toLowerCase();
           const globalKeys = settings?.aiKeys || {};
+          const selectedProvider = nodeProvider === "gemini" ? "google" : nodeProvider as "openai" | "anthropic" | "google";
           const activeKey = (globalKeys[`${nodeProvider}Key`] || "").trim() || nodeKey;
           if (!activeKey) {
             const info = classifyClientAIError(selectedProvider, 401, "missing api key");
             pushFriendlyAIError(nextMessages, node.id, selectedProvider, info, 401);
           }
-          const selectedProvider = nodeProvider === "gemini" ? "google" : nodeProvider as "openai" | "anthropic" | "google";
 
           const { system, messages: contextMessages } = buildAgentContext({
             systemPrompt: `Objetivo: ${objective}\nInstruções: ${instructions}${buildSkillSystemPrompt(skills)}`,
