@@ -25,7 +25,7 @@ export default function WorkspaceOverviewPage() {
     try {
       const supabase = getSupabase();
       const { count, error } = await supabase
-        .from("conversations")
+        .from("flow_executions")
         .select("id", { count: "exact", head: true })
         .in("bot_id", flows.map((flow) => flow.id));
 
