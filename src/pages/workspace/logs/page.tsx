@@ -22,6 +22,7 @@ type RuntimeLog = {
   created_at: string;
   resolved_at: string | null;
   flow_name?: string;
+  workspace_item_id?: string | null;
 };
 
 const relativeTime = (value: string) => {
@@ -69,7 +70,7 @@ export default function WorkspaceLogsPage() {
       const supabase = getSupabase();
       const { data, error: queryError } = await supabase
         .from("flow_runtime_logs")
-        .select("id,flow_id,node_id,level,category,provider,error_code,http_status,title,message,suggestion,created_at,resolved_at")
+        .select("id,flow_id,workspace_item_id,node_id,level,category,provider,error_code,http_status,title,message,suggestion,created_at,resolved_at")
         .eq("workspace_id", currentWorkspace.id)
         .order("created_at", { ascending: false })
         .limit(100);
@@ -238,7 +239,8 @@ export default function WorkspaceLogsPage() {
                     {log.node_id && <span>Nó: {log.node_id}</span>}
                     <button
                       type="button"
-                      onClick={() => navigate(botRoute(slug, log.flow_id))}
+                      disabled={!log.workspace_item_id}
+                      onClick={() => log.workspace_item_id && navigate(botRoute(slug, log.workspace_item_id))}
                       className="inline-flex items-center gap-1 font-medium text-primary hover:underline"
                     >
                       Abrir fluxo <ExternalLink className="h-3 w-3" />
