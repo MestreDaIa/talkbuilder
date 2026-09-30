@@ -2544,7 +2544,7 @@ export const TestPanel = ({
                   lastData = data;
                   (variables as any).__lastSkillExecution = { ok: res.ok, status: res.status, method, endpoint: ep.id, error: res.ok ? null : (data?.message || data?.error || `HTTP ${res.status}`) };
                   console.log(`[node:http-request][dynamic] ${ep.id} → status ${res.status}`);
-                  rememberKnownEntities(data, [varBase, ep.name, ep.id, ep.url]);
+                  rememberKnownEntities(data, [ep.name, ep.id, ep.url]);
                   updateBookingState(data);
 
                   // salva resposta completa em variável baseada no nome/id da skill
