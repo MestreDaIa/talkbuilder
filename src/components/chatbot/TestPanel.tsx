@@ -772,6 +772,67 @@ export const TestPanel = ({
       let status: NodeExecutionStatus = "running";
       const skillCallsThisRun: Record<string, number> = {};
 
+      // Estado transacional do agendamento: fatos já confirmados pelo usuário
+      // permanecem disponíveis entre turnos, sem depender apenas do histórico.
+      const bookingState: Record<string, any> = {
+        ...(((variables as any).__bookingState && typeof (variables as any).__bookingState === "object") ? (variables as any).__bookingState : {}),
+      };
+      (variables as any).__bookingState = bookingState;
+
+      const normalizeBookingKey = (key: unknown) =>
+        String(key || "").toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "").replace(/[^a-z0-9]/g, "");
+
+      const bookingAliases: Record<string, string[]> = {
+        service: ["service", "servico", "servicename", "servicelabel", "serviceid", "servicoid"],
+        professional: ["professional", "profissional", "employee", "funcionario", "professionalid", "employeeid", "funcionarioid"],
+        date: ["date", "data", "dia", "appointmentdate", "scheduleddate", "startdate"],
+        time: ["time", "hora", "horario", "appointmenttime", "scheduledtime", "starttime"],
+        client: ["client", "cliente", "customer", "contato", "clientid", "customerid", "clienteid"],
+        phone: ["phone", "telefone", "celular", "clientphone", "customerphone"],
+        email: ["email", "emailaddress", "clientemail", "customeremail"],
+        paymentMethod: ["paymentmethod", "metodopagamento", "formapagamento", "payment", "pagamento"],
+        bookingId: ["bookingid", "appointmentid", "agendamentoid"],
+        paymentId: ["paymentid", "cobrancaid"],
+      };
+
+      const updateBookingState = (source: any) => {
+        if (!source || typeof source !== "object" || Array.isArray(source)) return;
+        const flat: Record<string, any> = {};
+        const walk = (value: any, depth = 0) => {
+          if (value == null || typeof value !== "object" || Array.isArray(value) || depth > 5) return;
+          Object.entries(value).forEach(([key, child]) => {
+            if (child != null && typeof child === "object" && !Array.isArray(child)) walk(child, depth + 1);
+            else if (child != null && String(child).trim()) flat[normalizeBookingKey(key)] = child;
+          });
+        };
+        walk(source);
+        Object.entries(bookingAliases).forEach(([field, aliases]) => {
+          const hit = Object.entries(flat).find(([key]) => aliases.some((alias) => normalizeBookingKey(alias) === key));
+          if (hit?.[1] !== undefined && hit?.[1] !== null && String(hit[1]).trim()) bookingState[field] = hit[1];
+        });
+        const selections = (variables as any).__verifiedEntitySelections;
+        if (selections && typeof selections === "object") {
+          const find = (terms: string[]) => Object.values(selections).find((s: any) =>
+            s?.id && terms.some((term) => normalizeBookingKey(s.paramName).includes(term))
+          ) as any;
+          const professional = find(["professional", "employee", "profissional", "funcionario"]);
+          const service = find(["service", "servico"]);
+          const client = find(["client", "customer", "cliente"]);
+          if (professional) bookingState.professional = { id: professional.id, name: professional.label };
+          if (service) bookingState.service = { id: service.id, name: service.label };
+          if (client) bookingState.client = { id: client.id, name: client.label };
+        }
+        (variables as any).__bookingState = { ...bookingState, updatedAt: new Date().toISOString() };
+      };
+
+      const bookingStatePrompt = () => {
+        const entries = Object.entries(bookingState).filter(([key, value]) => key !== "updatedAt" && value != null && value !== "");
+        if (!entries.length) return "";
+        return "\n\n[ESTADO ATUAL DO AGENDAMENTO]\n" +
+          entries.map(([key, value]) => "- " + key + ": " + (typeof value === "object" ? JSON.stringify(value) : String(value))).join("\n") +
+          "\nUse estes dados já confirmados. NÃO pergunte novamente por algo que já esteja preenchido, salvo se o usuário pedir para alterar.";
+      };
+
       const firstText = (...values: any[]) => String(values.find((v) => typeof v === "string" && v.trim()) || "");
       const cleanText = (text: string) => richToPlainText(text);
       const replaceVars = (text: string) => cleanText(text).replace(/{{(.*?)}}/g, (_, key) => {
@@ -1260,7 +1321,7 @@ export const TestPanel = ({
           }
 
           const { system, messages: contextMessages } = buildAgentContext({
-            systemPrompt: `Objetivo: ${objective}\nInstruções: ${instructions}${buildSkillSystemPrompt(skills)}`,
+            systemPrompt: `Objetivo: ${objective}\nInstruções: ${instructions}${bookingStatePrompt()}${buildSkillSystemPrompt(skills)}\n\n[REGRA DE EXECUÇÃO]\nNunca diga que uma cobrança, pagamento ou agendamento foi criado, confirmado ou enviado apenas porque você decidiu fazê-lo. Só afirme sucesso quando o resultado da skill indicar execução bem-sucedida. Se a execução falhar, informe a falha e não invente que a operação ocorreu.`,
             history: getAgentHistory(!!(input as any)?.__fromSkill),
             persistentMemory,
             variables,
@@ -1434,6 +1495,7 @@ export const TestPanel = ({
               };
             }
 
+            updateBookingState(skillCall.arguments || {});
             const varsBefore = JSON.parse(JSON.stringify(variables));
             const skillResult = await runLocalFlow(
               {
@@ -1481,9 +1543,7 @@ export const TestPanel = ({
               if (k.startsWith("__")) return;
               if (JSON.stringify(skillVars[k]) !== JSON.stringify(varsBefore[k])) diff[k] = skillVars[k];
             });
-            const payload = Object.keys(diff).length
-              ? diff
-              : { httpResponse: skillVars.httpResponse ?? { ok: true, message: "Consulta executada sem novas variáveis." } };
+            const payload = {\n              execution: skillVars.__lastSkillExecution || { ok: true, status: 200 },\n              ...((Object.keys(diff).length ? diff : { httpResponse: skillVars.httpResponse ?? { message: "Consulta executada sem novas variáveis." } }))\n            };
             const compactForAgent = (value: any, depth = 0): any => {
               if (value == null || typeof value === "boolean" || typeof value === "number") return value;
               if (typeof value === "string") return value.length > 800 ? `${value.slice(0, 800)}…` : value;
@@ -1513,7 +1573,7 @@ export const TestPanel = ({
               id: crypto.randomUUID(),
               conversation_id: conversationId || "temp",
               role: "user",
-              content: `[Resultado da skill "${skillMeta?.label || skillCall.skill_id}"]:\n${payloadStr}\n\nCom base neste resultado, responda ao usuário de forma natural e útil (em português). Não chame a mesma skill novamente a menos que seja realmente necessário.`,
+              content: `[Resultado da skill "${skillMeta?.label || skillCall.skill_id}"]:\n${payloadStr}\n\nCom base neste resultado, responda ao usuário de forma natural e útil (em português). Se execution.ok for false, NÃO diga que a operação foi concluída, criada, confirmada ou enviada. Explique a falha de forma curta e peça apenas o dado necessário para continuar. Não chame a mesma skill novamente a menos que seja realmente necessário.`,
               metadata: {
                 kind: "skill_result",
                 skill_id: skillCall.skill_id,
@@ -2352,6 +2412,8 @@ export const TestPanel = ({
                   let data: any; try { data = JSON.parse(text); } catch { data = text; }
                   lastOk = res.ok;
                   lastData = data;
+                  (variables as any).__lastSkillExecution = { ok: res.ok, status: res.status, method, endpoint: ep.id, error: res.ok ? null : (data?.message || data?.error || `HTTP ${res.status}`) };
+                  updateBookingState(data);
                   console.log(`[node:http-request][dynamic] ${ep.id} → status ${res.status}`);
 
 
