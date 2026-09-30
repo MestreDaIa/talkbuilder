@@ -28,6 +28,21 @@ import { conversationService } from "../../services/conversationService";
 import { buildAgentContext } from "../../services/aiContextBuilder";
 import { getSupabase } from "@/lib/supabaseClient";
 
+
+
+const FLOW_AI_TIMEOUT_MS = 30000;
+const FLOW_HTTP_TIMEOUT_MS = 15000;
+
+async function fetchWithTimeout(input: RequestInfo | URL, init: RequestInit = {}, timeoutMs: number) {
+  const controller = new AbortController();
+  const timer = window.setTimeout(() => controller.abort(), timeoutMs);
+  try {
+    return await fetch(input, { ...init, signal: controller.signal });
+  } finally {
+    window.clearTimeout(timer);
+  }
+}
+
 function evaluateSetVariableValue(cfg: any, variables: Record<string, any>, replaceVars: (s: string) => string): any {
   const valueType = cfg.valueType || "expression";
   const raw = String(cfg.value ?? "");
@@ -1103,14 +1118,15 @@ export const TestPanel = ({
           if (activeKey) {
             try {
               if (selectedProvider === "openai") {
-                const res = await fetch("https://api.openai.com/v1/chat/completions", {
+                const res = await fetchWithTimeout("https://api.openai.com/v1/chat/completions", {
                   method: "POST",
                   headers: { "Authorization": `Bearer ${activeKey}`, "Content-Type": "application/json" },
                   body: JSON.stringify({
                     model: cfg.model || "gpt-4o-mini",
+                    max_tokens: 500,
                     messages: [{ role: "system", content: system }, { role: "user", content: variables["last_message"] || "Olá" }],
                   }),
-                });
+                }, FLOW_AI_TIMEOUT_MS);
                 if (res.ok) {
                   const data = await res.json();
                   aiReply = data.choices?.[0]?.message?.content || null;
@@ -1121,14 +1137,14 @@ export const TestPanel = ({
                 }
               } else if (selectedProvider === "google") {
                 const model = (cfg.model || "gemini-2.0-flash").trim();
-                const res = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${activeKey}`, {
+                const res = await fetchWithTimeout(`https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${activeKey}`, {
                   method: "POST",
                   headers: { "Content-Type": "application/json" },
                   body: JSON.stringify({
                     system_instruction: { parts: [{ text: system }] },
                     contents: [{ parts: [{ text: variables["last_message"] || "Olá" }] }]
                   }),
-                });
+                }, FLOW_AI_TIMEOUT_MS);
                 if (res.ok) {
                   const data = await res.json();
                   aiReply = data.candidates?.[0]?.content?.parts?.[0]?.text || null;
@@ -1267,15 +1283,16 @@ export const TestPanel = ({
           if (activeKey) {
             try {
               if (selectedProvider === "openai") {
-                const res = await fetch("https://api.openai.com/v1/chat/completions", {
+                const res = await fetchWithTimeout("https://api.openai.com/v1/chat/completions", {
                   method: "POST",
                   headers: { "Authorization": `Bearer ${activeKey}`, "Content-Type": "application/json" },
                   body: JSON.stringify({
                     model: cfg.model || "gpt-4o-mini",
+                    max_tokens: 500,
                     messages: [{ role: "system", content: system }, ...contextMessages],
                     ...(useSkillTool ? { tools: [useSkillTool], tool_choice: "auto" } : {}),
                   }),
-                });
+                }, FLOW_AI_TIMEOUT_MS);
                 if (res.ok) {
                   const data = await res.json();
                   const msg = data.choices?.[0]?.message;
@@ -1296,7 +1313,7 @@ export const TestPanel = ({
                 }
               } else if (selectedProvider === "google") {
                 const model = (cfg.model || "gemini-2.0-flash").trim();
-                const res = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${activeKey}`, {
+                const res = await fetchWithTimeout(`https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${activeKey}`, {
                   method: "POST",
                   headers: { "Content-Type": "application/json" },
                   body: JSON.stringify({
@@ -1332,7 +1349,7 @@ export const TestPanel = ({
                       tool_config: { function_calling_config: { mode: "AUTO" } }
                     } : {})
                   }),
-                });
+                }, FLOW_AI_TIMEOUT_MS);
                 if (res.ok) {
                   const data = await res.json();
                   const parts = data.candidates?.[0]?.content?.parts || [];
@@ -1366,45 +1383,8 @@ export const TestPanel = ({
 
           skillCall = skillCall || parseSkillFromText(aiReply);
 
-          // If the model produced a progress message without actually emitting a tool call,
-          // give the Agent one bounded internal turn to decide whether a skill is still
-          // required. This avoids forcing the visitor to send "estou esperando" just to
-          // resume an unfinished task. It is deliberately not based on matching phrases.
-          const internalAgentTurn = Boolean((input as any)?.__internalAgentTurn);
-          const shouldCheckForPendingSkill = Boolean(
-            aiReply &&
-            !skillCall &&
-            skills.length > 0 &&
-            !internalAgentTurn &&
-            !(input as any)?.__fromSkill
-          );
-
-          if (shouldCheckForPendingSkill) {
-            const internalPrompt: RuntimeMessage = {
-              id: crypto.randomUUID(),
-              conversation_id: conversationId || "temp",
-              role: "user",
-              content: "[CONTINUAÇÃO INTERNA DO AGENTE] A mensagem anterior foi apenas uma etapa da tarefa. Antes de encerrar este turno, verifique se ainda existe alguma skill disponível que precise ser executada para concluir o pedido do usuário. Se existir, chame use_skill agora com os argumentos atuais. Se nenhuma skill for necessária, não produza outra resposta ao usuário.",
-              metadata: { kind: "agent_internal_control" },
-              created_at: new Date().toISOString()
-            };
-
-            // Keep the progress message in the conversation/UI, then let the next
-            // bounded Agent turn decide whether a tool call is required.
-            const progressMsg: RuntimeMessage = {
-              id: crypto.randomUUID(),
-              conversation_id: conversationId || "temp",
-              role: "assistant",
-              content: aiReply!,
-              created_at: new Date().toISOString()
-            };
-            messageHistory.push(progressMsg);
-            nextMessages.push({ ...progressMsg, type: "bot", content: aiReply!, isHtml: false } as Message);
-            messageHistory.push(internalPrompt);
-            currentNodeId = activeAgentNodeId;
-            input = { message: internalPrompt.content, __fromSkill: true, __internalAgentTurn: true } as any;
-            continue;
-          }
+          // The Agent already had access to its skills in this model turn. Do not
+          // spend a second full AI request just to re-check whether a skill is needed.
 
           const matchedSkill = skillCall?.skill_id ? skills.find((s) => s.id === skillCall!.skill_id) : null;
           if (skillCall?.skill_id && matchedSkill) {
@@ -2363,7 +2343,7 @@ export const TestPanel = ({
                     console.groupEnd();
                   }
                   console.log(`[node:http-request][dynamic] ${method} ${url}`, { dispatched: isDispatched, strictIds, agentArgs, effectiveBody, id_audit: idAuditTrail });
-                  const res = await fetch(url, { method, headers, body });
+                  const res = await fetchWithTimeout(url, { method, headers, body }, FLOW_HTTP_TIMEOUT_MS);
                   const text = await res.text();
                   let data: any; try { data = JSON.parse(text); } catch { data = text; }
                   lastOk = res.ok;
@@ -2450,7 +2430,7 @@ export const TestPanel = ({
               }
 
               console.log(`[node:http-request] ${method} ${url}`);
-              const res = await fetch(url, { method, headers, body });
+              const res = await fetchWithTimeout(url, { method, headers, body }, FLOW_HTTP_TIMEOUT_MS);
               const responseText = await res.text();
               let responseData: any;
               try { responseData = JSON.parse(responseText); } catch { responseData = responseText; }
