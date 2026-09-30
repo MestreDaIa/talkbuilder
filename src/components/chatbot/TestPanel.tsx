@@ -1,5 +1,5 @@
 import { useState, useEffect, useLayoutEffect, useRef } from "react";
-import { X, Send, Headphones, Play, Pause, FileText, Loader2, RefreshCw, Camera, Video, Mic, Image as ImageIcon, Phone, Upload, Paperclip } from "lucide-react";
+import { X, Send, Headphones, Play, Pause, FileText, Loader2, RefreshCw, Camera, Video, Mic, Image as ImageIcon, Phone, Upload, Paperclip, Copy, Check, ExternalLink } from "lucide-react";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
 import { Button } from "../../components/ui/button";
@@ -137,6 +137,16 @@ interface Message extends RuntimeMessage {
   isHtml?: boolean;
   alt?: string;
   autoplay?: boolean;
+  isRichPayload?: boolean;
+  richPayload?: {
+    title?: string;
+    description?: string;
+    image?: string;
+    copyText?: string;
+    copyLabel?: string;
+    link?: string;
+    linkLabel?: string;
+  };
 }
 
 
@@ -217,6 +227,79 @@ const AudioPlayer = ({ src, autoPlay }: AudioPlayerProps) => {
       </div>
     </div>
   );
+};
+
+interface RichPayloadBubbleProps {
+  payload: NonNullable<Message["richPayload"]>;
+}
+
+const RichPayloadBubble = ({ payload }: RichPayloadBubbleProps) => {
+  const [copied, setCopied] = useState(false);
+  const handleCopy = async () => {
+    const text = String(payload.copyText || "");
+    if (!text) return;
+    try { await navigator.clipboard.writeText(text); } catch {}
+    setCopied(true);
+    window.setTimeout(() => setCopied(false), 1800);
+  };
+  return (
+    <div className="space-y-3 min-w-[240px]">
+      {payload.title && <div className="font-semibold">{payload.title}</div>}
+      {payload.description && <div className="text-xs opacity-80">{payload.description}</div>}
+      {payload.image && <img src={payload.image} alt={payload.title || "Imagem"} className="w-full max-w-[280px] rounded-xl bg-white p-2" />}
+      {payload.copyText && (
+        <div className="space-y-2">
+          <div className="rounded-lg border border-current/15 bg-black/5 p-2 text-xs break-all select-text">{payload.copyText}</div>
+          <Button type="button" size="sm" variant="secondary" className="w-full gap-2" onClick={handleCopy}>
+            {copied ? <Check className="h-4 w-4" /> : <Copy className="h-4 w-4" />}
+            {copied ? "Copiado!" : (payload.copyLabel || "Copiar código")}
+          </Button>
+        </div>
+      )}
+      {payload.link && (
+        <Button type="button" size="sm" variant="outline" className="w-full gap-2" onClick={() => window.open(payload.link, "_blank", "noopener,noreferrer")}>
+          <ExternalLink className="h-4 w-4" />
+          {payload.linkLabel || "Abrir pagamento"}
+        </Button>
+      )}
+    </div>
+  );
+};
+
+const normalizeRichImageSource = (value: unknown) => {
+  const raw = String(value ?? "").trim();
+  if (!raw) return "";
+  if (/^data:image\//i.test(raw) || /^https?:\/\//i.test(raw) || /^blob:/i.test(raw)) return raw;
+  if (/^[A-Za-z0-9+/=]+$/.test(raw) && raw.length > 120) return `data:image/png;base64,${raw}`;
+  return "";
+};
+
+const findRichField = (value: any, keys: string[], depth = 0): unknown => {
+  if (value == null || depth > 6) return undefined;
+  if (Array.isArray(value)) {
+    for (const item of value) { const found = findRichField(item, keys, depth + 1); if (found !== undefined) return found; }
+    return undefined;
+  }
+  if (typeof value !== "object") return undefined;
+  const wanted = new Set(keys.map((key) => key.toLowerCase()));
+  for (const [key, child] of Object.entries(value)) {
+    if (wanted.has(key.toLowerCase()) && child != null && String(child).trim()) return child;
+  }
+  for (const child of Object.values(value)) { const found = findRichField(child, keys, depth + 1); if (found !== undefined) return found; }
+  return undefined;
+};
+
+const extractRichPayload = (value: any) => {
+  if (!value || typeof value !== "object") return null;
+  const image = normalizeRichImageSource(findRichField(value, ["pix_qr_code","pixQrCode","qr_code_image","qrCodeImage","qr_code","qrCode","image_url","imageUrl","image","encodedImage"]));
+  const copyRaw = findRichField(value, ["pix_payload","pixPayload","copy_paste","copyPaste","copy_code","copyCode","qr_code_text","qrCodeText","clipboard"]);
+  const copyText = typeof copyRaw === "string" ? copyRaw.trim() : "";
+  const linkRaw = findRichField(value, ["invoice_url","invoiceUrl","payment_url","paymentUrl","checkout_url","checkoutUrl","bank_slip_url","bankSlipUrl"]);
+  const link = typeof linkRaw === "string" && /^https?:\/\//i.test(linkRaw.trim()) ? linkRaw.trim() : "";
+  if (!image && !copyText && !link) return null;
+  const method = String(findRichField(value, ["method","payment_method","paymentMethod","billingType"]) || "").toLowerCase();
+  const isPix = method.includes("pix") || !!copyText;
+  return { title: isPix ? "Pagamento via PIX" : "Pagamento", description: isPix && copyText ? "Escaneie o QR Code ou copie o código PIX para pagar." : undefined, image, copyText, copyLabel: isPix ? "Copiar código PIX" : "Copiar código", link, linkLabel: "Abrir pagamento" };
 };
 
 export interface TestPanelTheme {
@@ -797,8 +880,7 @@ export const TestPanel = ({
 
       const updateBookingState = (source: any) => {
         if (!source || typeof source !== "object" || Array.isArray(source)) return;
-        const flat: Record<string, any> = {};
-        const walk = (value: any, depth = 0) => {
+        const flat: Record<string, any> = {};        const walk = (value: any, depth = 0) => {
           if (value == null || typeof value !== "object" || Array.isArray(value) || depth > 5) return;
           Object.entries(value).forEach(([key, child]) => {
             if (child != null && typeof child === "object" && !Array.isArray(child)) walk(child, depth + 1);
@@ -971,6 +1053,30 @@ export const TestPanel = ({
         };
 
         const nextArgs = JSON.parse(JSON.stringify(fallbackArgs || {}));
+
+        const confirmedStateValue = (targetKey: string) => {
+          const normalized = normalizeKeyName(targetKey);
+          const state: any = bookingState || {};
+          const pick = (value: any) => value && typeof value === "object" ? (value.id ?? value.uuid ?? value.value ?? value.name ?? value.label) : value;
+          let candidates: string[] = [];
+          if (normalized.includes("client") || normalized.includes("customer") || normalized.includes("cliente")) candidates = ["client"];
+          else if (normalized.includes("employee") || normalized.includes("professional") || normalized.includes("funcionario") || normalized.includes("profissional")) candidates = ["professional"];
+          else if (normalized.includes("service") || normalized.includes("servico")) candidates = ["service"];
+          else if (normalized.includes("payment") || normalized.includes("pagamento") || normalized.includes("method")) candidates = ["paymentMethod"];
+          else if (normalized.includes("phone") || normalized.includes("telefone") || normalized.includes("celular")) candidates = ["phone"];
+          else if (normalized.includes("email")) candidates = ["email"];
+          else if (normalized.includes("booking") && normalized.endsWith("id")) candidates = ["bookingId"];
+          else if (normalized.includes("date") || normalized.includes("data") || normalized.includes("dia")) candidates = ["date"];
+          else if (normalized.includes("time") || normalized.includes("hora") || normalized.includes("horario")) candidates = ["time"];
+          for (const key of candidates) {
+            const value = pick(state[key]);
+            if (value != null && String(value).trim()) {
+              if (key === "paymentMethod" && String(value).trim().toLowerCase() === "pix") return "PIX";
+              return value;
+            }
+          }
+          return undefined;
+        };
         if (typeof nextArgs.body === "string") {
           const parsedBody = extractJsonFromText(nextArgs.body);
           if (parsedBody && typeof parsedBody === "object" && !Array.isArray(parsedBody)) nextArgs.body = parsedBody;
@@ -998,6 +1104,13 @@ export const TestPanel = ({
             } else if (confirmedTime !== undefined && (normalizedKey.includes("time") || normalizedKey.includes("hora") || normalizedKey.includes("horario"))) {
               nextArgs.body[key] = toTime(confirmedTime);
             }
+          });
+        }
+        if (nextArgs.body && typeof nextArgs.body === "object" && !Array.isArray(nextArgs.body)) {
+          Object.keys(nextArgs.body).forEach((key) => {
+            const stateValue = confirmedStateValue(key);
+            const current = nextArgs.body[key];
+            if (stateValue !== undefined && (current == null || String(current).trim() === "" || /^(undefined|null|\{\{.*\}\})$/i.test(String(current).trim()))) nextArgs.body[key] = stateValue;
           });
         }
         return nextArgs;
@@ -1521,6 +1634,20 @@ export const TestPanel = ({
             Object.assign(variables, skillVars);
             nextMessages.push(...(skillResult.messages || []));
 
+            const richPayload = extractRichPayload(skillVars.httpResponse);
+            if (richPayload) {
+              nextMessages.push({
+                id: crypto.randomUUID(),
+                conversation_id: conversationId || "temp",
+                role: "assistant",
+                content: richPayload.title || "Pagamento",
+                isRichPayload: true,
+                richPayload,
+                isHtml: false,
+                created_at: new Date().toISOString(),
+              } as Message);
+            }
+
             // Se a skill pausou aguardando input do usuário, entrega o controle e sai.
             const skillPaused = skillResult.status === "waiting_input" || !!skillResult.runtime_state?.waiting_for;
             if (skillPaused) {
@@ -1597,8 +1724,7 @@ export const TestPanel = ({
           if (aiReply) {
             const botMsg: RuntimeMessage = {
               id: crypto.randomUUID(),
-              conversation_id: conversationId || "temp",
-              role: "assistant",
+              conversation_id: conversationId || "temp",              role: "assistant",
               content: aiReply,
               created_at: new Date().toISOString()
             };
@@ -2397,8 +2523,7 @@ export const TestPanel = ({
                       effectiveBody = body;
                       if (ep.bodyContentType === "json" && !headers["Content-Type"]) headers["Content-Type"] = "application/json";
                       if (ep.bodyContentType === "form-urlencoded" && !headers["Content-Type"]) headers["Content-Type"] = "application/x-www-form-urlencoded";
-                    }
-                  }
+                    }                  }
 
                   if (!url) {
                     console.warn(`[node:http-request][dynamic] endpoint ${ep.id} sem URL — pulando`);
@@ -2418,9 +2543,9 @@ export const TestPanel = ({
                   lastOk = res.ok;
                   lastData = data;
                   (variables as any).__lastSkillExecution = { ok: res.ok, status: res.status, method, endpoint: ep.id, error: res.ok ? null : (data?.message || data?.error || `HTTP ${res.status}`) };
-                  updateBookingState(data);
                   console.log(`[node:http-request][dynamic] ${ep.id} → status ${res.status}`);
-
+                  rememberKnownEntities(data, [varBase, ep.name, ep.id, ep.url]);
+                  updateBookingState(data);
 
                   // salva resposta completa em variável baseada no nome/id da skill
                   const varBase = String(ep.name || ep.id || "endpoint")
@@ -2430,7 +2555,6 @@ export const TestPanel = ({
                   variables[varBase] = data;
                   variables["httpResponse"] = data; // compat com nodes que leem httpResponse
                   const mappedKeys = applyMappings(data, ep.responseMappings || []);
-                  rememberKnownEntities(data, [varBase, ep.name, ep.id, ep.url]);
                   if (ep.resultType === "live") {
                     const liveKeys = new Set(
                       Array.isArray((variables as any).__liveVariableKeys)
@@ -2511,6 +2635,7 @@ export const TestPanel = ({
                 variables[varName] = responseData;
                 console.log(`[node:http-request] saved response in "${varName}"`);
               }
+              updateBookingState(responseData);
               applyMappings(responseData, cfg.responseMappings || []);
 
               const handle = res.ok ? "success" : "error";
@@ -3141,7 +3266,7 @@ export const TestPanel = ({
         <ScrollArea className="h-full p-3" ref={scrollRef}>
           <div className="space-y-3">
             {messages.map((message) => {
-              const isPlainBotMessage = message.type === "bot" && !message.isHtml && !message.isImage && !message.isVideo && !message.isAudio && !message.isFile;
+              const isPlainBotMessage = message.type === "bot" && !message.isHtml && !message.isImage && !message.isVideo && !message.isAudio && !message.isFile && !message.isRichPayload;
               const renderedBotContent = typedBotContents[message.id] ?? (message.id === typingMessageId ? typedBotContent : "");
               if (isPlainBotMessage && !renderedBotContent) return null;
 
@@ -3152,7 +3277,8 @@ export const TestPanel = ({
                   style={message.type === "user" 
                     ? { background: theme?.userBubbleColor || "var(--user-msg-bg)", color: "var(--user-msg-fg)" } 
                     : { background: theme?.botBubbleColor || "var(--bot-msg-bg)", color: "var(--bot-msg-fg)" }}>
-                  {message.isImage ? <img src={message.content} alt={message.alt} className="max-w-full rounded" />
+                  {message.isRichPayload ? <RichPayloadBubble payload={message.richPayload || {}} />
+                   : message.isImage ? <img src={message.content} alt={message.alt} className="max-w-full rounded" />
                    : message.isVideo ? <video src={message.content} controls className="max-w-full rounded" />
                    : message.isAudio ? <div className="flex items-center gap-2"><Headphones className="h-4 w-4 shrink-0" /><AudioPlayer src={message.content} autoPlay={message.autoplay} /></div>
                    : message.isFile ? <div className="flex items-center gap-2"><FileText className="h-4 w-4 shrink-0" /><span className="truncate max-w-[180px]">{message.content}</span></div>
@@ -3197,8 +3323,7 @@ export const TestPanel = ({
             </div>
           </div>
         )}
-        {waitingForInput && (
-          <div className="p-3 border-t border-border flex flex-col gap-2" style={{ background: theme?.inputBackgroundColor }}>
+        {waitingForInput && (          <div className="p-3 border-t border-border flex flex-col gap-2" style={{ background: theme?.inputBackgroundColor }}>
             {!waitingForButton && (
               <div className="flex flex-col gap-2">
                 {waitingForType === "input-universal" ? (
