@@ -1543,7 +1543,12 @@ export const TestPanel = ({
               if (k.startsWith("__")) return;
               if (JSON.stringify(skillVars[k]) !== JSON.stringify(varsBefore[k])) diff[k] = skillVars[k];
             });
-            const payload = {\n              execution: skillVars.__lastSkillExecution || { ok: true, status: 200 },\n              ...((Object.keys(diff).length ? diff : { httpResponse: skillVars.httpResponse ?? { message: "Consulta executada sem novas variáveis." } }))\n            };
+            const payload = {
+              execution: skillVars.__lastSkillExecution || { ok: true, status: 200 },
+              ...(Object.keys(diff).length
+                ? diff
+                : { httpResponse: skillVars.httpResponse ?? { message: "Consulta executada sem novas variáveis." } })
+            };
             const compactForAgent = (value: any, depth = 0): any => {
               if (value == null || typeof value === "boolean" || typeof value === "number") return value;
               if (typeof value === "string") return value.length > 800 ? `${value.slice(0, 800)}…` : value;
