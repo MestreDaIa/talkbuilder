@@ -292,7 +292,7 @@ function EndpointCard({
       const text = await res.text();
       let json: any = null; try { json = JSON.parse(text); } catch {}
       const formatted = json ? JSON.stringify(json, null, 2) : text;
-      setTestResult(`Status ${res.status}\n\n${formatted.slice(0, 4000)}`);
+      setTestResult(`Status ${res.status}\n\n${formatted}`);
       onChange({ lastTestResponse: json ?? text });
       toast.success(`Status ${res.status}`);
     } catch (e: any) {
