@@ -1243,7 +1243,11 @@ export const TestPanel = ({
           const objective = cfg.objective || "assistente conversacional";
           const instructions = cfg.instructions || "Ajude o usuário de forma natural.";
           const skills = cfg.toolCallingEnabled === false ? [] : collectAgentSkills(containers, node.id);
-          const useSkillTool = buildUseSkillTool(skills);
+          // Depois que uma skill já foi executada, este turno serve apenas para
+          // transformar o resultado em resposta ao usuário. Não ofereça a mesma
+          // ferramenta novamente, evitando o ciclo skill -> IA -> mesma skill -> erro.
+          const isSkillResultTurn = Boolean((input as any)?.__fromSkill);
+          const useSkillTool = isSkillResultTurn ? undefined : buildUseSkillTool(skills);
           
           const nodeKey = (cfg.apiKey || "").trim();
           const nodeProvider = (cfg.provider || "openai").toLowerCase();
