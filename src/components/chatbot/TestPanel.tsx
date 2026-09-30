@@ -1081,6 +1081,15 @@ export const TestPanel = ({
           const parsedBody = extractJsonFromText(nextArgs.body);
           if (parsedBody && typeof parsedBody === "object" && !Array.isArray(parsedBody)) nextArgs.body = parsedBody;
         }
+
+        // Se o modelo não enviou body, usa o exemplo configurado da própria
+        // skill como molde e preenche os campos confirmados pela sessão.
+        if ((!nextArgs.body || typeof nextArgs.body !== "object" || Array.isArray(nextArgs.body)) && skill?.argsSchema?.bodyExample) {
+          const exampleBody = extractJsonFromText(String(skill.argsSchema.bodyExample));
+          if (exampleBody && typeof exampleBody === "object" && !Array.isArray(exampleBody)) {
+            nextArgs.body = exampleBody;
+          }
+        }
         if ((!nextArgs.body || typeof nextArgs.body !== "object" || Array.isArray(nextArgs.body)) && nextArgs.body !== "") {
           const flatBody = Object.fromEntries(
             Object.entries(nextArgs).filter(([key]) => !["pathParams", "queryParams", "body"].includes(key))
@@ -1110,7 +1119,7 @@ export const TestPanel = ({
           Object.keys(nextArgs.body).forEach((key) => {
             const stateValue = confirmedStateValue(key);
             const current = nextArgs.body[key];
-            if (stateValue !== undefined && (current == null || String(current).trim() === "" || /^(undefined|null|\{\{.*\}\})$/i.test(String(current).trim()))) nextArgs.body[key] = stateValue;
+            if (stateValue !== undefined && (current == null || String(current).trim() === "" || /^(undefined|null|\{\{.*\}\}|<[^>]+>)$/i.test(String(current).trim()))) nextArgs.body[key] = stateValue;
           });
         }
         return nextArgs;
