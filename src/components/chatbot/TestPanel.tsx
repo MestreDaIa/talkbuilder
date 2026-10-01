@@ -1649,6 +1649,7 @@ export const TestPanel = ({
                 id: crypto.randomUUID(),
                 conversation_id: conversationId || "temp",
                 role: "assistant",
+                type: "bot",
                 content: richPayload.title || "Pagamento",
                 isRichPayload: true,
                 richPayload,
