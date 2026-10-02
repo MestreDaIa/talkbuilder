@@ -1998,7 +1998,8 @@ export const TestPanel = ({
                       if (seen.has(obj)) return;
                       seen.add(obj);
 
-                      const idKey = idFields.find((key) => typeof obj[key] === "string" || typeof obj[key] === "number");
+                      const idKey = [...idFields, ...Object.keys(obj).filter((key) => isIdLikeParam(key))]
+                        .find((key) => typeof obj[key] === "string" || typeof obj[key] === "number");
                       const rawId = idKey ? obj[idKey] : undefined;
                       const labelKey = labelFields.find((key) => typeof obj[key] === "string" && String(obj[key]).trim());
                       const label = labelKey ? String(obj[labelKey]).trim() : "";
@@ -2007,11 +2008,19 @@ export const TestPanel = ({
                         .map(([, value]) => String(value).trim())
                         .filter(Boolean);
 
-                      if (rawId !== undefined && (label || aliases.length)) {
-                        const typeHints = Array.from(new Set([...sourceHints, ...pathHints.map(singularize)].filter((term) => term.length >= 3)));
+                      // Persist any identifier returned by an API, even when the
+                      // response does not provide a human-readable label. This is
+                      // generic session context: IDs such as `hold_id`, `payment_id`,
+                      // `token_id`, etc. must remain reusable by later skills.
+                      if (rawId !== undefined) {
+                        const typeHints = Array.from(new Set([
+                          ...sourceHints,
+                          ...pathHints.map(singularize),
+                          ...(idKey ? splitNameTerms(idKey).map(singularize) : []),
+                        ].filter((term) => term.length >= 3)));
                         const entity: KnownEntity = {
                           id: String(rawId),
-                          label: label || aliases[0],
+                          label: label || aliases[0] || String(idKey || "id"),
                           aliases: Array.from(new Set(aliases)),
                           typeHints,
                           source,
@@ -2218,6 +2227,28 @@ export const TestPanel = ({
                       }
                       // UUID/ID inventado pelo agente não é fonte de verdade. Em vez de abortar de cara,
                       // ignora esse valor e tenta resolver pelo texto do usuário/argumentos contra as entidades vistas na sessão.
+                    }
+
+                    // If the model supplied an identifier-like placeholder or stale ID,
+                    // prefer a unique identifier of the expected type already returned by
+                    // the current session. This is intentionally generic and does not depend
+                    // on any specific API/domain.
+                    if (hasValue && valueLooksLikeIdentifier(rawText)) {
+                      const uniqueCandidates = candidates.filter((candidate, index, list) =>
+                        list.findIndex((item) => String(item.id) === String(candidate.id)) === index
+                      );
+                      if (uniqueCandidates.length === 1) {
+                        const resolvedEntity = uniqueCandidates[0];
+                        rememberVerifiedEntitySelection(paramName, resolvedEntity.id);
+                        audit({
+                          resolved: resolvedEntity.id,
+                          action: "resolved_by_context",
+                          reason: "unique_typed_identifier_from_session",
+                          source: resolvedEntity.source,
+                          sourceEntityLabel: resolvedEntity.label,
+                        });
+                        return { ok: true, value: resolvedEntity.id };
+                      }
                     }
 
                     const terms = new Set<string>(collectLookupTerms());
