@@ -825,6 +825,10 @@ export const TestPanel = ({
         mimetype?: string;
         __fromSkill?: boolean;
         __internalAgentTurn?: boolean;
+        // Internal control flag: a skill may traverse the graph, but reaching
+        // the Agent node again must return control to the outer skill handler
+        // instead of starting a new user-facing Agent turn.
+        __internalSkillExecution?: boolean;
       },
       containersIn?: Container[],
       edgesIn?: Edge[],
@@ -1373,6 +1377,19 @@ export const TestPanel = ({
           mode = "agent";
           activeAgentNodeId = node.id;
           
+          // A skill execution can traverse the graph until it reaches the
+          // Agent node again (for example, when the HTTP skill points back to
+          // the conversational Agent). That is an internal control-flow
+          // boundary, not a new turn from the visitor. Return control to the
+          // outer skill handler so it can feed the result back to the Agent
+          // immediately. This keeps the conversation running without requiring
+          // a second user message.
+          if ((input as any)?.__internalSkillExecution) {
+            console.log("[node:agent_boundary] internal skill reached Agent; returning control to skill dispatcher");
+            status = "running";
+            break;
+          }
+
           const startMode = cfg.startMode || "automatic";
           const welcomeMessage = cfg.welcomeMessage || "";
 
@@ -1631,7 +1648,7 @@ export const TestPanel = ({
                 conversation_id: conversationId,
                 waiting_for_input: false
               },
-              undefined,
+              { __internalSkillExecution: true },
               containers,
               edgesList,
               visitedRedirects
