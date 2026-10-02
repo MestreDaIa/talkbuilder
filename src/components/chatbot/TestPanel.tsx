@@ -1648,11 +1648,10 @@ export const TestPanel = ({
             }
           }
 
-          // Quando o Agent está recebendo o resultado de uma skill, este é
-          // um turno interno de continuação. Nunca transforme a resposta do modelo
-          // em uma nova chamada de skill aqui: isso criava o ciclo skill -> Agent ->
-          // mesma skill -> guard de duplicidade.
-          skillCall = skillCall || (!isSkillResultTurn ? parseSkillFromText(aiReply) : null);
+          // A resposta normal do Agent pode selecionar uma skill. Quando estamos
+          // numa continuação interna, o resultado da skill já é tratado pelo
+          // dispatcher e não deve virar uma nova chamada por parsing textual.
+          skillCall = skillCall || (!(input as any)?.__fromSkill ? parseSkillFromText(aiReply) : null);
 
           // The Agent already had access to its skills in this model turn. Do not
           // spend a second full AI request just to re-check whether a skill is needed.
@@ -1767,19 +1766,32 @@ export const TestPanel = ({
               // mantendo o runtime em "executando".
               const maxDelayedReadRetries = 3;
               const delayedReadRetryMs = 2000;
+              // A diretiva de dispatch identifica o endpoint exato escolhido pelo
+              // Agent. Ela precisa sobreviver a TODOS os retries; removê-la faz o
+              // HTTP-Request dinâmico voltar a executar a lista inteira de endpoints.
+              const retryDispatch = (variables as any).__dynamicSkillDispatch
+                ? JSON.parse(JSON.stringify((variables as any).__dynamicSkillDispatch))
+                : null;
+
               for (let attempt = 1; attempt <= maxDelayedReadRetries; attempt++) {
+                if (retryDispatch) {
+                  (variables as any).__dynamicSkillDispatch = JSON.parse(JSON.stringify(retryDispatch));
+                }
+
                 skillResult = await executeSkillFlow();
 
                 // Uma tentativa interna pode produzir contexto novo (IDs, tokens,
-                // resposta HTTP, mapeamentos). Preserve esse contexto para a próxima
-                // tentativa, mas nunca copie flags de controle da execução da skill.
+                // resposta HTTP e mapeamentos). Preserve o contexto, mas restaure a
+                // diretiva exata para a próxima tentativa.
                 const retryVariables = skillResult?.runtime_state?.variables;
                 if (retryVariables && typeof retryVariables === "object") {
                   Object.entries(retryVariables).forEach(([key, value]) => {
                     if (key === "__dynamicSkillDispatch") return;
                     (variables as any)[key] = value;
                   });
-                  delete (variables as any).__dynamicSkillDispatch;
+                }
+                if (retryDispatch) {
+                  (variables as any).__dynamicSkillDispatch = JSON.parse(JSON.stringify(retryDispatch));
                 }
 
                 const execution = skillResult?.runtime_state?.variables?.__lastSkillExecution;
@@ -1795,8 +1807,9 @@ export const TestPanel = ({
                 await new Promise((resolve) => window.setTimeout(resolve, delayedReadRetryMs));
               }
             }
+            // O dispatch é efêmero: só deve ser removido depois que a skill inteira,
+            // incluindo todos os retries, terminar.
             delete (variables as any).__dynamicSkillDispatch;
-
 
             const skillVars = skillResult.runtime_state?.variables || {};
             Object.assign(variables, skillVars);
