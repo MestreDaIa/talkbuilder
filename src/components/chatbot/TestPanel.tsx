@@ -1652,7 +1652,6 @@ export const TestPanel = ({
           // um turno interno de continuação. Nunca transforme a resposta do modelo
           // em uma nova chamada de skill aqui: isso criava o ciclo skill -> Agent ->
           // mesma skill -> guard de duplicidade.
-          const isSkillResultTurn = Boolean((input as any)?.__fromSkill);
           skillCall = skillCall || (!isSkillResultTurn ? parseSkillFromText(aiReply) : null);
 
           // The Agent already had access to its skills in this model turn. Do not
