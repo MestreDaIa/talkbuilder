@@ -43,6 +43,35 @@ async function fetchWithTimeout(input: RequestInfo | URL, init: RequestInit = {}
   }
 }
 
+async function fetchReadWithRetry(
+  input: RequestInfo | URL,
+  init: RequestInit = {},
+  timeoutMs: number,
+  maxAttempts = 3,
+) {
+  const method = String(init.method || "GET").toUpperCase();
+  if (method !== "GET") return fetchWithTimeout(input, init, timeoutMs);
+
+  let lastResponse: Response | null = null;
+  let lastError: unknown = null;
+  const retryableStatus = new Set([408, 425, 429, 500, 502, 503, 504]);
+
+  for (let attempt = 1; attempt <= maxAttempts; attempt++) {
+    try {
+      const response = await fetchWithTimeout(input, init, timeoutMs);
+      lastResponse = response;
+      if (response.ok || !retryableStatus.has(response.status) || attempt === maxAttempts) return response;
+    } catch (error) {
+      lastError = error;
+      if (attempt === maxAttempts) throw error;
+    }
+    await new Promise((resolve) => window.setTimeout(resolve, 700 * attempt));
+  }
+
+  if (lastResponse) return lastResponse;
+  throw lastError instanceof Error ? lastError : new Error("read_request_failed");
+}
+
 function evaluateSetVariableValue(cfg: any, variables: Record<string, any>, replaceVars: (s: string) => string): any {
   const valueType = cfg.valueType || "expression";
   const raw = String(cfg.value ?? "");
@@ -291,15 +320,40 @@ const findRichField = (value: any, keys: string[], depth = 0): unknown => {
 
 const extractRichPayload = (value: any) => {
   if (!value || typeof value !== "object") return null;
-  const image = normalizeRichImageSource(findRichField(value, ["pix_qr_code","pixQrCode","qr_code_image","qrCodeImage","qr_code","qrCode","image_url","imageUrl","image","encodedImage"]));
+
+  // Generic API responses may contain image_url/image/imageUrl. Those fields
+  // alone must never activate the payment/rich renderer.
+  const explicitPaymentImage = normalizeRichImageSource(findRichField(value, [
+    "pix_qr_code","pixQrCode","qr_code_image","qrCodeImage","qr_code","qrCode","encodedImage"
+  ]));
+  const genericImage = normalizeRichImageSource(findRichField(value, ["image_url","imageUrl","image"]));
   const copyRaw = findRichField(value, ["pix_payload","pixPayload","copy_paste","copyPaste","copy_code","copyCode","qr_code_text","qrCodeText","clipboard"]);
   const copyText = typeof copyRaw === "string" ? copyRaw.trim() : "";
   const linkRaw = findRichField(value, ["invoice_url","invoiceUrl","payment_url","paymentUrl","checkout_url","checkoutUrl","bank_slip_url","bankSlipUrl"]);
   const link = typeof linkRaw === "string" && /^https?:\/\//i.test(linkRaw.trim()) ? linkRaw.trim() : "";
-  if (!image && !copyText && !link) return null;
+
+  const paymentMarker = findRichField(value, [
+    "payment_id","paymentId","payment_status","paymentStatus",
+    "payment_method","paymentMethod","billingType","pix_payload","pixPayload",
+    "pix_qr_code","pixQrCode","qr_code","qrCode","qr_code_image","qrCodeImage",
+    "invoice_url","invoiceUrl","payment_url","paymentUrl","checkout_url","checkoutUrl",
+    "bank_slip_url","bankSlipUrl"
+  ]);
+
+  const image = explicitPaymentImage || (paymentMarker !== undefined ? genericImage : "");
+  if (!paymentMarker || (!image && !copyText && !link)) return null;
+
   const method = String(findRichField(value, ["method","payment_method","paymentMethod","billingType"]) || "").toLowerCase();
-  const isPix = method.includes("pix") || !!copyText;
-  return { title: isPix ? "Pagamento via PIX" : "Pagamento", description: isPix && copyText ? "Escaneie o QR Code ou copie o código PIX para pagar." : undefined, image, copyText, copyLabel: isPix ? "Copiar código PIX" : "Copiar código", link, linkLabel: "Abrir pagamento" };
+  const isPix = method.includes("pix") || !!copyText || !!explicitPaymentImage;
+  return {
+    title: isPix ? "Pagamento via PIX" : "Pagamento",
+    description: isPix && copyText ? "Escaneie o QR Code ou copie o código PIX para pagar." : undefined,
+    image,
+    copyText,
+    copyLabel: isPix ? "Copiar código PIX" : "Copiar código",
+    link,
+    linkLabel: "Abrir pagamento"
+  };
 };
 
 export interface TestPanelTheme {
@@ -1636,23 +1690,62 @@ export const TestPanel = ({
 
             updateBookingState(skillCall.arguments || {});
             const varsBefore = JSON.parse(JSON.stringify(variables));
-            const skillResult = await runLocalFlow(
-              {
-                mode: "flow",
-                current_node_id: targetNodeId,
-                active_agent_node_id: null,
-                variables,
-                message_history: messageHistory,
-                persistent_memory: persistentMemory,
-                visitor_id: visitorId,
-                conversation_id: conversationId,
-                waiting_for_input: false
-              },
-              { __internalSkillExecution: true },
-              containers,
-              edgesList,
-              visitedRedirects
-            );
+            const skillGuard = (variables as any).__skillExecutionGuard;
+            const blockedMutation = Boolean(matchedSkill._http?.isMutating && skillGuard?.blocked);
+
+            let skillResult: any;
+            if (blockedMutation) {
+              const guardMessage =
+                "A previous read/verification skill failed and could not be verified after automatic retries. " +
+                "A mutating operation is blocked until that verification succeeds.";
+              variables.httpResponse = {
+                ok: false,
+                error: "verification_required",
+                message: guardMessage,
+                blocked_skill_id: skillGuard.skillId ?? null,
+                blocked_endpoint: skillGuard.endpoint ?? null,
+              };
+              (variables as any).__lastSkillExecution = {
+                ok: false,
+                status: 409,
+                method: matchedSkill._http?.method ?? "POST",
+                endpoint: matchedSkill._http?.endpointId ?? matchedSkill.id,
+                error: "verification_required",
+              };
+              skillResult = {
+                status: "running",
+                messages: [],
+                runtime_state: {
+                  variables: { ...variables },
+                  current_node_id: currentNodeId,
+                  active_agent_node_id: activeAgentNodeId,
+                  mode: "agent",
+                  message_history: messageHistory,
+                  persistent_memory: persistentMemory,
+                  visitor_id: visitorId,
+                  conversation_id: conversationId,
+                  waiting_for_input: false,
+                },
+              };
+            } else {
+              skillResult = await runLocalFlow(
+                {
+                  mode: "flow",
+                  current_node_id: targetNodeId,
+                  active_agent_node_id: null,
+                  variables,
+                  message_history: messageHistory,
+                  persistent_memory: persistentMemory,
+                  visitor_id: visitorId,
+                  conversation_id: conversationId,
+                  waiting_for_input: false
+                },
+                { __internalSkillExecution: true },
+                containers,
+                edgesList,
+                visitedRedirects
+              );
+            }
             delete (variables as any).__dynamicSkillDispatch;
 
 
@@ -2595,12 +2688,28 @@ export const TestPanel = ({
                     console.groupEnd();
                   }
                   console.log(`[node:http-request][dynamic] ${method} ${url}`, { dispatched: isDispatched, strictIds, agentArgs, effectiveBody, id_audit: idAuditTrail });
-                  const res = await fetchWithTimeout(url, { method, headers, body }, FLOW_HTTP_TIMEOUT_MS);
+                  const res = await fetchReadWithRetry(url, { method, headers, body }, FLOW_HTTP_TIMEOUT_MS);
                   const text = await res.text();
                   let data: any; try { data = JSON.parse(text); } catch { data = text; }
                   lastOk = res.ok;
                   lastData = data;
-                  (variables as any).__lastSkillExecution = { ok: res.ok, status: res.status, method, endpoint: ep.id, error: res.ok ? null : (data?.message || data?.error || `HTTP ${res.status}`) };
+                  const executionError = res.ok ? null : (data?.message || data?.error || `HTTP ${res.status}`);
+                  (variables as any).__lastSkillExecution = { ok: res.ok, status: res.status, method, endpoint: ep.id, error: executionError };
+                  if (method === "GET") {
+                    if (res.ok) {
+                      delete (variables as any).__skillExecutionGuard;
+                    } else {
+                      (variables as any).__skillExecutionGuard = {
+                        blocked: true,
+                        skillId: ep.id,
+                        endpoint: ep.url,
+                        method,
+                        status: res.status,
+                        error: executionError,
+                        retryExhausted: true,
+                      };
+                    }
+                  }
                   console.log(`[node:http-request][dynamic] ${ep.id} → status ${res.status}`);
                   rememberKnownEntities(data, [ep.name, ep.id, ep.url]);
                   updateBookingState(data);
@@ -2683,7 +2792,7 @@ export const TestPanel = ({
               }
 
               console.log(`[node:http-request] ${method} ${url}`);
-              const res = await fetchWithTimeout(url, { method, headers, body }, FLOW_HTTP_TIMEOUT_MS);
+              const res = await fetchReadWithRetry(url, { method, headers, body }, FLOW_HTTP_TIMEOUT_MS);
               const responseText = await res.text();
               let responseData: any;
               try { responseData = JSON.parse(responseText); } catch { responseData = responseText; }
@@ -2692,6 +2801,28 @@ export const TestPanel = ({
               if (varName) {
                 variables[varName] = responseData;
                 console.log(`[node:http-request] saved response in "${varName}"`);
+              }
+              (variables as any).__lastSkillExecution = {
+                ok: res.ok,
+                status: res.status,
+                method,
+                endpoint: cfg.id || cfg.name || cfg.url || "http-request",
+                error: res.ok ? null : (responseData?.message || responseData?.error || `HTTP ${res.status}`)
+              };
+              if (method === "GET") {
+                if (res.ok) {
+                  delete (variables as any).__skillExecutionGuard;
+                } else {
+                  (variables as any).__skillExecutionGuard = {
+                    blocked: true,
+                    skillId: cfg.id || cfg.name || "http-request",
+                    endpoint: cfg.url || "",
+                    method,
+                    status: res.status,
+                    error: responseData?.message || responseData?.error || `HTTP ${res.status}`,
+                    retryExhausted: true,
+                  };
+                }
               }
               updateBookingState(responseData);
               applyMappings(responseData, cfg.responseMappings || []);
