@@ -69,7 +69,16 @@ async function fetchReadWithRetry(
   }
 
   if (lastResponse) return lastResponse;
-  throw lastError instanceof Error ? lastError : new Error("read_request_failed");
+
+  // Keep the failure inside the normal HTTP-skill result path so the
+  // verification guard can block unsafe downstream mutations.
+  return new Response(
+    JSON.stringify({
+      ok: false,
+      error: lastError instanceof Error ? lastError.message : "read_request_failed",
+    }),
+    { status: 599, headers: { "Content-Type": "application/json" } },
+  );
 }
 
 function evaluateSetVariableValue(cfg: any, variables: Record<string, any>, replaceVars: (s: string) => string): any {
