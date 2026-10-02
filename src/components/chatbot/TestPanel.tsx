@@ -1703,6 +1703,26 @@ export const TestPanel = ({
             const blockedMutation = Boolean(matchedSkill._http?.isMutating && skillGuard?.blocked);
 
             let skillResult: any;
+            const executeSkillFlow = async () => {
+              return runLocalFlow(
+                {
+                  mode: "flow",
+                  current_node_id: targetNodeId,
+                  active_agent_node_id: null,
+                  variables,
+                  message_history: messageHistory,
+                  persistent_memory: persistentMemory,
+                  visitor_id: visitorId,
+                  conversation_id: conversationId,
+                  waiting_for_input: false
+                },
+                { __internalSkillExecution: true },
+                containers,
+                edgesList,
+                visitedRedirects
+              );
+            };
+
             if (blockedMutation) {
               const guardMessage =
                 "A previous read/verification skill failed and could not be verified after automatic retries. " +
@@ -1737,23 +1757,27 @@ export const TestPanel = ({
                 },
               };
             } else {
-              skillResult = await runLocalFlow(
-                {
-                  mode: "flow",
-                  current_node_id: targetNodeId,
-                  active_agent_node_id: null,
-                  variables,
-                  message_history: messageHistory,
-                  persistent_memory: persistentMemory,
-                  visitor_id: visitorId,
-                  conversation_id: conversationId,
-                  waiting_for_input: false
-                },
-                { __internalSkillExecution: true },
-                containers,
-                edgesList,
-                visitedRedirects
-              );
+              // Uma leitura (GET) que falha após os retries imediatos ainda faz
+              // parte da mesma execução da skill. Não devolvemos o controle ao
+              // usuário nesse ponto: tentamos novamente com um pequeno intervalo,
+              // mantendo o runtime em "executando".
+              const maxDelayedReadRetries = 3;
+              const delayedReadRetryMs = 2000;
+              for (let attempt = 1; attempt <= maxDelayedReadRetries; attempt++) {
+                skillResult = await executeSkillFlow();
+
+                const execution = skillResult?.runtime_state?.variables?.__lastSkillExecution;
+                const isFailedRead = execution?.ok === false && String(execution?.method || "").toUpperCase() === "GET";
+
+                if (!isFailedRead || attempt === maxDelayedReadRetries) break;
+
+                console.warn(
+                  `[skill:read-retry] GET ${execution.endpoint || targetNodeId} falhou após retry imediato; ` +
+                  `nova tentativa ${attempt + 1}/${maxDelayedReadRetries} em ${delayedReadRetryMs}ms`
+                );
+
+                await new Promise((resolve) => window.setTimeout(resolve, delayedReadRetryMs));
+              }
             }
             delete (variables as any).__dynamicSkillDispatch;
 
