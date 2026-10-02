@@ -93,6 +93,46 @@ type AIErrorInfo = {
   suggestion: string;
 };
 
+async function fetchReadWithRetry(
+  input: RequestInfo | URL,
+  init: RequestInit = {},
+  timeoutMs = 15000,
+  maxAttempts = 3,
+): Promise<Response> {
+  const method = String(init.method || "GET").toUpperCase();
+  if (method !== "GET") return fetch(input, init);
+
+  const retryableStatus = new Set([408, 425, 429, 500, 502, 503, 504]);
+  let lastResponse: Response | null = null;
+  let lastError: unknown = null;
+
+  for (let attempt = 1; attempt <= maxAttempts; attempt++) {
+    const controller = new AbortController();
+    const timer = setTimeout(() => controller.abort(), timeoutMs);
+    try {
+      const response = await fetch(input, { ...init, signal: controller.signal });
+      lastResponse = response;
+      if (response.ok || !retryableStatus.has(response.status) || attempt === maxAttempts) return response;
+    } catch (error) {
+      lastError = error;
+      if (attempt === maxAttempts) break;
+    } finally {
+      clearTimeout(timer);
+    }
+
+    await new Promise((resolve) => setTimeout(resolve, 700 * attempt));
+  }
+
+  if (lastResponse) return lastResponse;
+  return new Response(JSON.stringify({
+    ok: false,
+    error: lastError instanceof Error ? lastError.message : "read_request_failed",
+  }), {
+    status: 599,
+    headers: { "Content-Type": "application/json" },
+  });
+}
+
 function classifyAIError(provider: string, status?: number, rawBody?: string, caughtError?: unknown): AIErrorInfo {
   const body = String(rawBody || "").toLowerCase();
   const errorText = caughtError instanceof Error ? caughtError.message.toLowerCase() : String(caughtError || "").toLowerCase();
@@ -1007,11 +1047,39 @@ class FlowEngine {
         const masked = val.length > 8 ? `${val.substring(0, 4)}...${val.substring(val.length - 4)}` : "***";
         console.log(`[FlowEngine:HttpRequest] header: ${k} = ${masked}`);
       });
-      const res = await fetch(url, {
+      const verificationGuard = this.variables.__skillExecutionGuard;
+      const isMutating = ["POST", "PUT", "PATCH", "DELETE"].includes(method);
+
+      if (isMutating && verificationGuard?.blocked) {
+        const blocked = {
+          ok: false,
+          error: "verification_required",
+          message: "A previous read/verification request failed after automatic retries. The mutating operation is blocked until verification succeeds.",
+          blocked_skill_id: verificationGuard.skillId ?? null,
+          blocked_endpoint: verificationGuard.endpoint ?? null,
+        };
+        this.variables.httpResponse = blocked;
+        this.variables.__lastSkillExecution = {
+          ok: false,
+          status: 409,
+          method,
+          endpoint: node.id,
+          error: "verification_required",
+        };
+        const blockedNext = this.nextFromNode(node.id, container, "error", true);
+        if (blockedNext) this.currentNodeId = blockedNext;
+        else this.currentNodeId = this.nextFromNode(node.id, container);
+        return;
+      }
+
+      const requestInit: RequestInit = {
         method,
         headers,
         body: (method !== "GET" && body) ? (typeof body === "string" ? body : JSON.stringify(body)) : undefined
-      });
+      };
+      const res = method === "GET"
+        ? await fetchReadWithRetry(url, requestInit)
+        : await fetch(url, requestInit);
       
       console.log(`[FlowEngine:HttpRequest] Response status: ${res.status}`);
 
@@ -1021,6 +1089,33 @@ class FlowEngine {
         responseData = JSON.parse(responseText);
       } catch {
         responseData = responseText;
+      }
+
+      const executionError = res.ok
+        ? null
+        : (responseData?.message || responseData?.error || `HTTP ${res.status}`);
+      this.variables.__lastSkillExecution = {
+        ok: res.ok,
+        status: res.status,
+        method,
+        endpoint: node.id,
+        error: executionError,
+      };
+
+      if (method === "GET") {
+        if (res.ok) {
+          delete this.variables.__skillExecutionGuard;
+        } else {
+          this.variables.__skillExecutionGuard = {
+            blocked: true,
+            skillId: node.id,
+            endpoint: cfg.url || "",
+            method,
+            status: res.status,
+            error: executionError,
+            retryExhausted: true,
+          };
+        }
       }
 
       const varName = normalizeVariableName(cfg.responseVariable || cfg.saveVariable || "httpResponse");
@@ -1052,6 +1147,24 @@ class FlowEngine {
       }
     } catch (e) {
       console.error("[FlowEngine:HttpRequest] Error:", e);
+      if (method === "GET") {
+        this.variables.__lastSkillExecution = {
+          ok: false,
+          status: 599,
+          method,
+          endpoint: node.id,
+          error: e instanceof Error ? e.message : String(e),
+        };
+        this.variables.__skillExecutionGuard = {
+          blocked: true,
+          skillId: node.id,
+          endpoint: cfg.url || "",
+          method,
+          status: 599,
+          error: e instanceof Error ? e.message : String(e),
+          retryExhausted: true,
+        };
+      }
       const nextId = this.nextFromNode(node.id, container, "error", true);
       if (nextId) {
         this.currentNodeId = nextId;
