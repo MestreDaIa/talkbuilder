@@ -1766,6 +1766,13 @@ export const TestPanel = ({
               for (let attempt = 1; attempt <= maxDelayedReadRetries; attempt++) {
                 skillResult = await executeSkillFlow();
 
+                // Cada tentativa recebe o contexto produzido pela tentativa
+                // anterior, sem perder IDs/resultados genéricos já persistidos.
+                const retryVariables = skillResult?.runtime_state?.variables;
+                if (retryVariables && typeof retryVariables === "object") {
+                  Object.assign(variables, retryVariables);
+                }
+
                 const execution = skillResult?.runtime_state?.variables?.__lastSkillExecution;
                 const isFailedRead = execution?.ok === false && String(execution?.method || "").toUpperCase() === "GET";
 
