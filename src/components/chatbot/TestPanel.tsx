@@ -1648,7 +1648,12 @@ export const TestPanel = ({
             }
           }
 
-          skillCall = skillCall || parseSkillFromText(aiReply);
+          // Quando o Agent está recebendo o resultado de uma skill, este é
+          // um turno interno de continuação. Nunca transforme a resposta do modelo
+          // em uma nova chamada de skill aqui: isso criava o ciclo skill -> Agent ->
+          // mesma skill -> guard de duplicidade.
+          const isSkillResultTurn = Boolean((input as any)?.__fromSkill);
+          skillCall = skillCall || (!isSkillResultTurn ? parseSkillFromText(aiReply) : null);
 
           // The Agent already had access to its skills in this model turn. Do not
           // spend a second full AI request just to re-check whether a skill is needed.
@@ -1765,6 +1770,18 @@ export const TestPanel = ({
               const delayedReadRetryMs = 2000;
               for (let attempt = 1; attempt <= maxDelayedReadRetries; attempt++) {
                 skillResult = await executeSkillFlow();
+
+                // Uma tentativa interna pode produzir contexto novo (IDs, tokens,
+                // resposta HTTP, mapeamentos). Preserve esse contexto para a próxima
+                // tentativa, mas nunca copie flags de controle da execução da skill.
+                const retryVariables = skillResult?.runtime_state?.variables;
+                if (retryVariables && typeof retryVariables === "object") {
+                  Object.entries(retryVariables).forEach(([key, value]) => {
+                    if (key === "__dynamicSkillDispatch") return;
+                    (variables as any)[key] = value;
+                  });
+                  delete (variables as any).__dynamicSkillDispatch;
+                }
 
                 const execution = skillResult?.runtime_state?.variables?.__lastSkillExecution;
                 const isFailedRead = execution?.ok === false && String(execution?.method || "").toUpperCase() === "GET";
