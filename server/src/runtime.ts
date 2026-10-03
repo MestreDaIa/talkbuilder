@@ -1059,7 +1059,7 @@ async function runFlow(execution: any, containersIn: any[], edgesIn: any[], inpu
                 body: JSON.stringify({
                   model: cfg.model || "gpt-4o-mini",
                   messages: messages,
-                  temperature: cfg.temperature ?? 0.2,
+                  temperature: cfg.temperature ?? 0.7,
                   max_tokens: cfg.maxTokens ?? 1000,
                 }),
               });
@@ -1334,7 +1334,7 @@ async function runFlow(execution: any, containersIn: any[], edgesIn: any[], inpu
                     contents:geminiContents,
                     ...(runtimeSkillTool?{tools:[{function_declarations:[{name:runtimeSkillTool.function.name,description:runtimeSkillTool.function.description,parameters:runtimeSkillTool.function.parameters}]}],tool_config:{function_calling_config:{mode:"AUTO"}}}:{}),
                     generationConfig: {
-                      temperature: cfg.temperature ?? 0.7,
+                      temperature: cfg.temperature ?? 0.2,
                       maxOutputTokens: cfg.maxTokens ?? 1000,
                     }
                   }),
