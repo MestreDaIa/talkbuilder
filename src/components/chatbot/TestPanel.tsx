@@ -1994,6 +1994,25 @@ const runLocalFlow = async (
           }
 
           if (aiReply) {
+            // Se o modelo devolveu uma chamada interna mas ela não pôde ser
+            // resolvida, jamais exponha o JSON do protocolo ao usuário.
+            const unresolvedSkill = parseSkillFromText(aiReply);
+            if (unresolvedSkill?.skill_id) {
+              const safeMsg: RuntimeMessage = {
+                id: crypto.randomUUID(),
+                conversation_id: conversationId || "temp",
+                role: "assistant",
+                content: "Não consegui executar essa etapa agora. Tente novamente em instantes.",
+                created_at: new Date().toISOString()
+              };
+              messageHistory.push(safeMsg);
+              nextMessages.push({ ...safeMsg, type: "bot", content: safeMsg.content, isHtml: false } as Message);
+              waitingFor = "input-text";
+              waitingForCfg = { placeholder: "Converse com o agente..." };
+              status = "waiting_input";
+              break;
+            }
+
             const botMsg: RuntimeMessage = {
               id: crypto.randomUUID(),
               conversation_id: conversationId || "temp",              role: "assistant",
