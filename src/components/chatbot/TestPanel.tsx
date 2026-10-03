@@ -1443,23 +1443,6 @@ const runLocalFlow = async (
           }
 
           if (aiReply) {
-            const internalSkillJson = parseSkillFromText(aiReply);
-            if (internalSkillJson?.skill_id) {
-              const botMsg: RuntimeMessage = {
-                id: crypto.randomUUID(),
-                conversation_id: conversationId || "temp",
-                role: "assistant",
-                content: "Não consegui executar a etapa solicitada agora. Tente novamente em instantes.",
-                created_at: new Date().toISOString()
-              };
-              messageHistory.push(botMsg);
-              nextMessages.push({ ...botMsg, type: "bot", content: botMsg.content, isHtml: false } as Message);
-              waitingFor = "input-text";
-              waitingForCfg = { placeholder: "Converse com o agente..." };
-              status = "waiting_input";
-              break;
-            }
-
             const botMsg: RuntimeMessage = {
               id: crypto.randomUUID(),
               conversation_id: conversationId || "temp",
