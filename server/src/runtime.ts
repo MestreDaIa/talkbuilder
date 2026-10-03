@@ -1233,8 +1233,11 @@ async function runFlow(execution: any, containersIn: any[], edgesIn: any[], inpu
                 });
                 if (res.ok) {
                   const data: any = await res.json();
-                  aiReply = data.choices?.[0]?.message?.content || "";
-                  console.log(`[ai-agent:openai] reply len=${aiReply.length}`);
+                  const agentMessage=data.choices?.[0]?.message;
+                  const toolCall=agentMessage?.tool_calls?.find((x:any)=>x?.function?.name==="use_skill");
+                  if(toolCall?.function?.arguments){try{const p=JSON.parse(toolCall.function.arguments);if(p?.skill_id)(variables as any).__runtimeSkillCall={skill_id:String(p.skill_id),arguments:p.arguments&&typeof p.arguments==="object"?p.arguments:{},message:p.message?String(p.message):""};}catch{}}
+                  aiReply=agentMessage?.content||"";
+                  console.log(`[ai-agent:openai] reply len=${aiReply.length} skill=${!!(variables as any).__runtimeSkillCall}`);
                 } else {
                   const errText = await res.text().catch(() => "");
                   console.error(`[ai-agent:openai] HTTP ${res.status}: ${errText.slice(0, 500)}`);
@@ -1292,8 +1295,11 @@ async function runFlow(execution: any, containersIn: any[], edgesIn: any[], inpu
                 });
                 if (res.ok) {
                   const data: any = await res.json();
-                  aiReply = data.candidates?.[0]?.content?.parts?.[0]?.text || "";
-                  console.log(`[ai-agent:gemini] reply len=${aiReply.length} finishReason=${data.candidates?.[0]?.finishReason}`);
+                  const parts=data.candidates?.[0]?.content?.parts||[];
+                  const fn=parts.find((p:any)=>p?.functionCall?.name==="use_skill")?.functionCall;
+                  if(fn?.args?.skill_id)(variables as any).__runtimeSkillCall={skill_id:String(fn.args.skill_id),arguments:fn.args.arguments&&typeof fn.args.arguments==="object"?fn.args.arguments:{},message:fn.args.message?String(fn.args.message):""};
+                  aiReply=parts.map((p:any)=>p.text).filter(Boolean).join("\n").trim()||"";
+                  console.log(`[ai-agent:gemini] reply len=${aiReply.length} skill=${!!(variables as any).__runtimeSkillCall} finishReason=${data.candidates?.[0]?.finishReason}`);
                   if (!aiReply) {
                     console.error(`[ai-agent:gemini] empty reply. Full response: ${JSON.stringify(data).slice(0, 800)}`);
                   }
