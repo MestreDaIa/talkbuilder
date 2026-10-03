@@ -1693,17 +1693,26 @@ const runLocalFlow = async (
             if (sep < 1) return null;
             const nodeId = wanted.slice(0, sep);
             const endpointId = wanted.slice(sep + 2);
+            // Last-resort resolution: the Agent's textual/native call contains the
+            // exact composite id, so resolve that endpoint directly from the graph.
+            // Do NOT require isSkill/operationMode here: those flags are used to
+            // advertise tools, but once the Agent has selected a concrete endpoint
+            // its composite id is already authoritative for dispatch.
             for (const container of containers) {
               for (const candidate of container.nodes || []) {
-                if (candidate.id !== nodeId || !candidate.config?.isSkill) continue;
+                if (candidate.id !== nodeId) continue;
                 const cfg: any = candidate.config || {};
-                if (candidate.type !== "http-request" || cfg.operationMode !== "dynamic" || !Array.isArray(cfg.endpoints)) continue;
+                if (candidate.type !== "http-request" || !Array.isArray(cfg.endpoints)) continue;
+                const normalizeEndpointId = (value: any) =>
+                  String(value || "").trim().replace(/\\s+/g, " ");
+                const wantedEndpoint = normalizeEndpointId(endpointId);
                 const ep = cfg.endpoints.find((item: any) => {
-                  const id = String(item?.id || `${item?.method || "GET"} ${item?.url || ""}`).trim();
-                  return id === endpointId;
+                  const explicitId = normalizeEndpointId(item?.id);
+                  const generatedId = normalizeEndpointId(`${item?.method || "GET"} ${item?.url || ""}`);
+                  return explicitId === wantedEndpoint || generatedId === wantedEndpoint;
                 });
                 if (!ep) continue;
-                const epId = String(ep.id || `${ep.method || "GET"} ${ep.url || ""}`);
+                const epId = String(ep.id || `${ep.method || "GET"} ${ep.url || ""}`).trim();
                 return {
                   id: `${candidate.id}::${epId}`,
                   type: "http-endpoint",
