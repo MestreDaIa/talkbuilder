@@ -361,6 +361,14 @@ function writeMemoryState(key: string, state: any) {
   runtimeMemory.set(key, { state, expiresAt: now + MEMORY_TTL_MS });
 }
 
+function collectRuntimeAgentSkills(containers: any[], agentNodeId?: string | null) {
+  const skills:any[]=[]; for(const container of containers||[]) for(const node of container.nodes||[]){const cfg=node?.config||{};if(!cfg.isSkill||node.id===agentNodeId)continue;const containerName=container.nameContainer||`Bloco #${String(container.id||"").slice(-4)}`;if(String(node.type||"").toLowerCase()==="http-request"&&cfg.operationMode==="dynamic"&&Array.isArray(cfg.endpoints)){for(const ep of cfg.endpoints){const id=String(ep.id||`${ep.method||"GET"} ${ep.url||""}`),method=String(ep.method||"GET").toUpperCase();skills.push({id:`${node.id}::${id}`,type:"http-endpoint",containerId:container.id,containerName,description:String(ep.description||ep.name||"Use este endpoint quando necessário para concluir a intenção."),label:String(ep.name||id),argsSchema:ep.argsSchema||null,_http:{nodeId:node.id,endpointId:id,permissions:ep.permissions||{},resultType:ep.resultType==="live"?"live":"context",method,isMutating:["POST","PUT","PATCH","DELETE"].includes(method)}})}}else skills.push({id:String(node.id),type:String(node.type||""),containerId:container.id,containerName,description:String(cfg.skillDescription||"Use esta ação quando necessária para concluir a intenção."),label:String(cfg.name||cfg.label||node.type||node.id)})}return skills;
+}
+function runtimeSkillArgsDescription(skill:any){const s=skill?.argsSchema;if(!s)return "";const lines:string[]=[];for(const p of Array.isArray(s.pathParams)?s.pathParams:[])if(p?.name)lines.push(`path: ${p.name}${p.description?` — ${p.description}`:""}`);for(const p of Array.isArray(s.queryParams)?s.queryParams:[])if(p?.name)lines.push(`query: ${p.name}${p.description?` — ${p.description}`:""}`);if(s.bodyExample||s.bodyDescription)lines.push(`body${s.bodyDescription?` — ${s.bodyDescription}`:""}${s.bodyExample?`: ${String(s.bodyExample).replace(/\\s+/g," ").slice(0,500)}`:""}`);return lines.length?"\nArgumentos esperados:\n"+lines.map(x=>"- "+x).join("\n"):"";}
+function buildRuntimeSkillPrompt(skills:any[]){if(!skills.length)return "\n\n[SKILLS]\nNenhuma Skill configurada.";const list=skills.map((s,i)=>`${i+1}. ID: ${s.id}\nNome: ${s.label}\nDescrição: ${s.description}${runtimeSkillArgsDescription(s)}`).join("\n\n");return `\n\n[SKILLS DISPONÍVEIS]\n${list}\n\n[PLANEJAMENTO]\nPlaneje o objetivo inteiro como uma sequência de etapas. Antecipe a próxima Skill e os dados que ela exige. Se a próxima Skill puder ser executada com dados já disponíveis, execute-a imediatamente. Após cada resultado, reavalie o plano e continue automaticamente; não espere nova mensagem do usuário só para prosseguir. Só peça algo quando realmente faltar informação e nenhuma Skill/contexto puder obtê-la. Se houver várias opções cuja escolha pertence ao usuário, mostre-as e aguarde somente essa escolha. Nunca pergunte se deve executar uma Skill que já é claramente necessária. Nunca invente IDs. Não declare sucesso crítico sem resultado positivo.`;}
+function buildRuntimeUseSkillTool(skills:any[]){if(!skills.length)return undefined;return{type:"function",function:{name:"use_skill",description:"Executa a próxima Skill necessária para concluir a intenção.",parameters:{type:"object",properties:{skill_id:{type:"string",enum:skills.map(s=>s.id)},arguments:{type:"object",additionalProperties:true},message:{type:"string"}},required:["skill_id"]}}};}
+function parseRuntimeSkillCall(reply:string|null){if(!reply)return null;const m=String(reply).match(/\{[\s\S]*"skill_id"[\s\S]*\}/);if(!m)return null;try{const p=JSON.parse(m[0]);return p?.skill_id?{skill_id:String(p.skill_id),arguments:p.arguments&&typeof p.arguments==="object"?p.arguments:{},message:p.message?String(p.message):""}:null;}catch{return null;}}
+
 async function runFlow(execution: any, containersIn: any[], edgesIn: any[], input: any, flow: any, supabase: any, visitedRedirects = new Set<string>()): Promise<any> {
   const containers: any[] = containersIn;
   const edges: any[] = edgesIn;
@@ -368,6 +376,7 @@ async function runFlow(execution: any, containersIn: any[], edgesIn: any[], inpu
   let activeAgentNodeId: string | null = execution.active_agent_node_id || null;
   let mode: string = execution.runtime_mode || "flow";
   const variables: Record<string, any> = { ...(execution.variables || {}) };
+  if (!(variables as any).__runtimeSkillPlan) (variables as any).__runtimeSkillPlan={intent:null,completed:[],next:null};
   
   // Ensure system variables are available
   const channelValue = execution.channel_id || "webchat";
@@ -1013,7 +1022,7 @@ async function runFlow(execution: any, containersIn: any[], edgesIn: any[], inpu
               });
               if (res.ok) {
                 const data: any = await res.json();
-                aiReply = data.choices?.[0]?.message?.content || "";
+                const agentMessage=data.choices?.[0]?.message;const toolCall=agentMessage?.tool_calls?.find((x:any)=>x?.function?.name==="use_skill");if(toolCall?.function?.arguments){try{const p=JSON.parse(toolCall.function.arguments);if(p?.skill_id)(variables as any).__runtimeSkillCall={skill_id:String(p.skill_id),arguments:p.arguments&&typeof p.arguments==="object"?p.arguments:{},message:p.message?String(p.message):""};}catch{}}aiReply=agentMessage?.content||"";
               }
             } else if (provider === "gemini") {
               const model = cfg.model || "gemini-2.0-flash";
@@ -1058,11 +1067,12 @@ async function runFlow(execution: any, containersIn: any[], edgesIn: any[], inpu
               });
               if (res.ok) {
                 const data: any = await res.json();
-                aiReply = data.candidates?.[0]?.content?.parts?.[0]?.text || "";
+                const parts=data.candidates?.[0]?.content?.parts||[];const fn=parts.find((p:any)=>p?.functionCall?.name==="use_skill")?.functionCall;if(fn?.args?.skill_id)(variables as any).__runtimeSkillCall={skill_id:String(fn.args.skill_id),arguments:fn.args.arguments&&typeof fn.args.arguments==="object"?fn.args.arguments:{},message:fn.args.message?String(fn.args.message):""};aiReply=parts.map((p:any)=>p.text).filter(Boolean).join("\n").trim()||"";
               }
             }
 
-            if (aiReply) {
+            const runtimeSkillCall=(variables as any).__runtimeSkillCall||parseRuntimeSkillCall(aiReply);delete (variables as any).__runtimeSkillCall;if(runtimeSkillCall){const matchedSkill=runtimeSkills.find((s:any)=>s.id===runtimeSkillCall.skill_id);if(matchedSkill?._http){const key=`${matchedSkill.id}:${JSON.stringify(runtimeSkillCall.arguments||{})}`;const counts=(variables as any).__runtimeSkillCalls||{};counts[key]=Number(counts[key]||0)+1;(variables as any).__runtimeSkillCalls=counts;if(counts[key]>2){messages.push({id:crypto.randomUUID(),type:"bot",content:"Não consegui concluir esta etapa com os dados disponíveis. Preciso de uma informação diferente para continuar."});status="waiting_input";break;}if(runtimeSkillCall.message)messages.push({id:crypto.randomUUID(),type:"bot",content:runtimeSkillCall.message});(variables as any).__dynamicSkillDispatch={nodeId:matchedSkill._http.nodeId,endpointId:matchedSkill._http.endpointId,args:runtimeSkillCall.arguments||{},permissions:matchedSkill._http.permissions||{},isMutating:matchedSkill._http.isMutating};runtimePlan.next=matchedSkill.id;activeAgentNodeId=node.id;mode="agent";currentNodeId=matchedSkill._http.nodeId;input={__internalSkillExecution:true};continue;}}
+              if (aiReply) {
               if (cfg.saveVariable) variables[cfg.saveVariable] = aiReply;
               else messages.push({ id: crypto.randomUUID(), type: "bot", content: aiReply });
             }
@@ -1170,6 +1180,10 @@ async function runFlow(execution: any, containersIn: any[], edgesIn: any[], inpu
             if (userPrompt || hasMedia) {
               let aiReply = "";
               const instructions = replaceVars(cfg.instructions || "");
+              const runtimeSkills=collectRuntimeAgentSkills(containers,node.id);
+              const runtimeSkillPrompt=buildRuntimeSkillPrompt(runtimeSkills);
+              const runtimeSkillTool=buildRuntimeUseSkillTool(runtimeSkills);
+              const runtimePlan=(variables as any).__runtimeSkillPlan;
               
               // Gerenciamento de Memória (Histórico) para o Agente
               const memoryKey = `agent_history_${execution.id}_${node.id}`;
@@ -1185,7 +1199,7 @@ async function runFlow(execution: any, containersIn: any[], edgesIn: any[], inpu
               }
 
               if (provider === "openai") {
-                const apiMessages: any[] = [{ role: "system", content: instructions }];
+                const apiMessages:any[]=[{role:"system",content:instructions+runtimeSkillPrompt+"\n\n[PLANO ATUAL]\n"+JSON.stringify(runtimePlan)}];
                 
                 // Adiciona histórico se houver
                 if (useMemory && history.length > 0) {
@@ -1214,6 +1228,7 @@ async function runFlow(execution: any, containersIn: any[], edgesIn: any[], inpu
                   body: JSON.stringify({
                     model: cfg.model || "gpt-4o-mini",
                     messages: apiMessages,
+                    ...(runtimeSkillTool?{tools:[runtimeSkillTool],tool_choice:"auto"}:{}),
                   }),
                 });
                 if (res.ok) {
@@ -1266,8 +1281,9 @@ async function runFlow(execution: any, containersIn: any[], edgesIn: any[], inpu
                   method: "POST",
                   headers: { "Content-Type": "application/json" },
                   body: JSON.stringify({
-                    system_instruction: { parts: [{ text: instructions }] },
-                    contents: geminiContents,
+                    system_instruction:{parts:[{text:instructions+runtimeSkillPrompt+"\n\n[PLANO ATUAL]\n"+JSON.stringify(runtimePlan)}]},
+                    contents:geminiContents,
+                    ...(runtimeSkillTool?{tools:[{function_declarations:[{name:runtimeSkillTool.function.name,description:runtimeSkillTool.function.description,parameters:runtimeSkillTool.function.parameters}]}],tool_config:{function_calling_config:{mode:"AUTO"}}}:{}),
                     generationConfig: {
                       temperature: cfg.temperature ?? 0.7,
                       maxOutputTokens: cfg.maxTokens ?? 1000,
@@ -1316,6 +1332,12 @@ async function runFlow(execution: any, containersIn: any[], edgesIn: any[], inpu
       }
       case "http-request":
       case "http": {
+        const dispatch=(variables as any).__dynamicSkillDispatch;
+        if(dispatch&&dispatch.nodeId===node.id){
+          const endpoint=(cfg.endpoints||[]).find((ep:any)=>String(ep.id||`${ep.method||"GET"} ${ep.url||""}`)===String(dispatch.endpointId)),args=dispatch.args||{},path=args.pathParams||{},query=args.queryParams||{},valueFor=(n:string)=>path[n]??query[n]??args[n]??variables[n],method=String(endpoint?.method||"GET").toUpperCase();
+          let ok=false,statusCode=500,data:any={ok:false,error:"skill_execution_failed"};
+          try{if(!endpoint)throw new Error("Skill endpoint não encontrado");if(dispatch.isMutating&&(variables as any).__skillExecutionGuard?.blocked){statusCode=409;data={ok:false,error:"verification_required",message:"Operação crítica bloqueada porque a verificação anterior falhou."};}else{let url=replaceVars(String(endpoint.url||"")).replace(/%3A/gi,":").replace(/%7B/gi,"{").replace(/%7D/gi,"}");const names=new Set<string>();for(const p of endpoint.argsSchema?.pathParams||[])if(p?.name)names.add(String(p.name));for(const m of url.matchAll(/\{([^}]+)\}/g))names.add(m[1]);for(const m of url.matchAll(/:([A-Za-z_][A-Za-z0-9_]*)/g))names.add(m[1]);for(const n of names){const v=valueFor(n);if(v===undefined||v===null||v==="")throw new Error(`Faltou o argumento necessário: ${n}`);const enc=encodeURIComponent(String(v));url=url.replace(new RegExp("\\{"+n+"\\}","g"),enc).replace(new RegExp(":"+n+"(?=/|$|\\?)","g"),enc);}const u=new URL(url);for(const p of endpoint.queryParams||[]){if(!p?.name)continue;const v=valueFor(String(p.name));if(v!==undefined&&v!==null&&v!=="")u.searchParams.set(String(p.name),String(v));}for(const[k,v]of Object.entries(query))if(v!=null&&!Array.from(endpoint.queryParams||[]).some((p:any)=>String(p?.name)===k))u.searchParams.set(k,String(v));const headers:Record<string,string>={Accept:"application/json, text/plain, */*"};for(const h of endpoint.headers||[])if(h?.name)headers[h.name]=replaceVars(String(h.value??""));if(endpoint.auth?.type==="bearer"&&endpoint.auth.token)headers.Authorization="Bearer "+replaceVars(String(endpoint.auth.token));else if(endpoint.auth?.type==="apiKey"&&endpoint.auth.name)headers[endpoint.auth.name]=replaceVars(String(endpoint.auth.value||""));let body:any=undefined;if(!["GET","HEAD"].includes(method)){if(dispatch.isMutating&&args.body===undefined)throw new Error("Operação crítica exige arguments.body atual.");const b=args.body!==undefined?args.body:(endpoint.body||undefined);if(b!==undefined){body=typeof b==="string"?replaceVars(b,true):JSON.stringify(b);headers["Content-Type"]="application/json";}}const attempts=method==="GET"?4:1;let res:any=null,text="";for(let a=1;a<=attempts;a++){try{res=await fetch(u.toString(),{method,headers,body});text=await res.text();}catch(e){res=null;text=String(e)}if(res?.ok||method!=="GET"||a===attempts)break;await new Promise(r=>setTimeout(r,2000));}statusCode=res?.status||500;try{data=JSON.parse(text)}catch{data=text}ok=!!res?.ok;const err=ok?null:(data?.message||data?.error||text||`HTTP ${statusCode}`);(variables as any).__lastSkillExecution={ok,status:statusCode,method,endpoint:endpoint.id,error:err};if(method==="GET"){if(ok)delete (variables as any).__skillExecutionGuard;else(variables as any).__skillExecutionGuard={blocked:true,skillId:endpoint.id,endpoint:endpoint.url,method,status:statusCode,error:err,retryExhausted:true}}variables.httpResponse=data;if(endpoint.responseVariable)variables[endpoint.responseVariable]=data;for(const m of endpoint.responseMappings||[]){if(!m?.jsonPath||!m?.variableName)continue;let v=data;for(const part of String(m.jsonPath).replace(/^data\./,"").split(".")){if(v==null)break;v=v[part]}if(v!==undefined)variables[m.variableName]=v}}}catch(e){statusCode=422;data={ok:false,error:"skill_execution_failed",message:e instanceof Error?e.message:String(e)};(variables as any).__lastSkillExecution={ok:false,status:statusCode,method,endpoint:endpoint?.id||dispatch.endpointId,error:data.message}}if(!(variables as any).__lastSkillExecution)(variables as any).__lastSkillExecution={ok,status:statusCode,method,endpoint:dispatch.endpointId,error:ok?null:data?.message||data?.error};if(!ok)variables.httpResponse=data;const plan=(variables as any).__runtimeSkillPlan||{intent:null,completed:[],next:null};if(ok)plan.completed=[...(plan.completed||[]),String(dispatch.endpointId)];plan.next=null;(variables as any).__runtimeSkillPlan=plan;delete (variables as any).__dynamicSkillDispatch;currentNodeId=activeAgentNodeId||node.id;input={message:`[Resultado da Skill "${String(dispatch.endpointId)}"] ${JSON.stringify(data)}`,__internalAgentTurn:true};continue;
+        }
         let url = replaceVars(cfg.url || "", true);
         const method = (cfg.method || "GET").toUpperCase();
         const headers: Record<string, string> = {};
