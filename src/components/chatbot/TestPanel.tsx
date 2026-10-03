@@ -860,23 +860,45 @@ export const TestPanel = ({
 
 
   const parseSkillFromText = (reply: string | null) => {
-    if (!reply) return null;
-    const jsonMatch = reply.match(/\{[\s\S]*"skill_id"[\s\S]*\}/);
-    if (!jsonMatch) return null;
-    try {
-      const parsed = JSON.parse(jsonMatch[0]);
-      return parsed?.skill_id ? {
-        skill_id: String(parsed.skill_id),
-        message: parsed.message ? String(parsed.message) : "",
-        arguments: (parsed.arguments && typeof parsed.arguments === "object") ? parsed.arguments : undefined,
-      } : null;
-    } catch {
-      return null;
+  if (!reply) return null;
+  const text = String(reply).trim();
+  const candidates: string[] = [text];
+  const start = text.indexOf("{");
+  if (start >= 0) {
+    let depth = 0;
+    let inString = false;
+    let escaped = false;
+    for (let i = start; i < text.length; i++) {
+      const ch = text[i];
+      if (inString) {
+        if (escaped) escaped = false;
+        else if (ch === "\\") escaped = true;
+        else if (ch === '"') inString = false;
+        continue;
+      }
+      if (ch === '"') { inString = true; continue; }
+      if (ch === "{") depth++;
+      else if (ch === "}") { depth--; if (depth === 0) { candidates.push(text.slice(start, i + 1)); break; } }
     }
-  };
+  }
+  for (const candidate of candidates) {
+    try {
+      const parsed = JSON.parse(candidate);
+      if (!parsed?.skill_id) continue;
+      return { skill_id: String(parsed.skill_id).trim(), message: parsed.message ? String(parsed.message) : "", arguments: (parsed.arguments && typeof parsed.arguments === "object") ? parsed.arguments : undefined };
+    } catch {}
+  }
+  return null;
+};
 
-
-    const runLocalFlow = async (
+const resolveAgentSkill = (skills: ReturnType<typeof collectAgentSkills>, skillId: string | undefined) => {
+  if (!skillId) return null;
+  const wanted = String(skillId).trim().replace(/^[\'"`]+|[\'"`]+$/g, "");
+  return skills.find((skill) => String(skill.id).trim() === wanted)
+    || skills.find((skill) => { const current = String(skill.id).trim(); return current.endsWith("::" + wanted) || wanted.endsWith("::" + current); })
+    || null;
+};
+const runLocalFlow = async (
       state: RuntimeState | null, 
       input?: { 
         message?: string; 
@@ -1665,7 +1687,7 @@ export const TestPanel = ({
           // The Agent already had access to its skills in this model turn. Do not
           // spend a second full AI request just to re-check whether a skill is needed.
 
-          const matchedSkill = skillCall?.skill_id ? skills.find((s) => s.id === skillCall!.skill_id) : null;
+          const matchedSkill = resolveAgentSkill(skills, skillCall?.skill_id);
           if (skillCall?.skill_id && matchedSkill) {
             const skillCallKey = `${skillCall.skill_id}:${JSON.stringify(skillCall.arguments || {})}`;
             skillCallsThisRun[skillCallKey] = (skillCallsThisRun[skillCallKey] || 0) + 1;
