@@ -1687,51 +1687,64 @@ const runLocalFlow = async (
           // The Agent already had access to its skills in this model turn. Do not
           // spend a second full AI request just to re-check whether a skill is needed.
 
-          const matchedSkill = resolveAgentSkill(skills, skillCall?.skill_id) || (() => {
+          // Resolve the Agent's selected skill. Native tool calls and textual JSON
+          // must use the exact composite id emitted by the model. If the skill
+          // catalog cannot resolve it (for example because metadata is stale),
+          // the composite id itself is still sufficient to dispatch the concrete
+          // HTTP endpoint, so build a minimal runtime descriptor instead of
+          // leaking the tool JSON to the user.
+          const matchedSkill = (() => {
+            const resolved = resolveAgentSkill(skills, skillCall?.skill_id);
+            if (resolved) return resolved;
+
             const wanted = String(skillCall?.skill_id || "").trim();
             const sep = wanted.indexOf("::");
             if (sep < 1) return null;
-            const nodeId = wanted.slice(0, sep);
-            const endpointId = wanted.slice(sep + 2);
-            // Last-resort resolution: the Agent's textual/native call contains the
-            // exact composite id, so resolve that endpoint directly from the graph.
-            // Do NOT require isSkill/operationMode here: those flags are used to
-            // advertise tools, but once the Agent has selected a concrete endpoint
-            // its composite id is already authoritative for dispatch.
+
+            const nodeId = wanted.slice(0, sep).trim();
+            const endpointId = wanted.slice(sep + 2).trim();
+
             for (const container of containers) {
-              for (const candidate of container.nodes || []) {
-                if (candidate.id !== nodeId) continue;
-                const cfg: any = candidate.config || {};
-                if (candidate.type !== "http-request" || !Array.isArray(cfg.endpoints)) continue;
-                const normalizeEndpointId = (value: any) =>
-                  String(value || "").trim().replace(/\\s+/g, " ");
-                const wantedEndpoint = normalizeEndpointId(endpointId);
-                const ep = cfg.endpoints.find((item: any) => {
-                  const explicitId = normalizeEndpointId(item?.id);
-                  const generatedId = normalizeEndpointId(`${item?.method || "GET"} ${item?.url || ""}`);
-                  return explicitId === wantedEndpoint || generatedId === wantedEndpoint;
-                });
-                if (!ep) continue;
-                const epId = String(ep.id || `${ep.method || "GET"} ${ep.url || ""}`).trim();
-                return {
-                  id: `${candidate.id}::${epId}`,
-                  type: "http-endpoint",
-                  containerId: container.id,
-                  containerName: container.nameContainer || `Bloco #${container.id.slice(-4)}`,
-                  description: String(ep.description || ep.name || ""),
-                  label: `${ep.method || "GET"} ${ep.name || epId}`,
-                  argsSchema: ep.argsSchema || null,
-                  _http: {
-                    nodeId: candidate.id,
-                    endpointId: epId,
-                    permissions: ep.permissions || {},
-                    resultType: ep.resultType === "live" ? "live" : "context",
-                    method: String(ep.method || "GET").toUpperCase(),
-                    isMutating: ["POST", "PUT", "PATCH", "DELETE"].includes(String(ep.method || "GET").toUpperCase()),
-                  },
-                } as any;
-              }
+              const candidate = (container.nodes || []).find((n) => n.id === nodeId);
+              if (!candidate || candidate.type !== "http-request") continue;
+
+              const cfg: any = candidate.config || {};
+              const normalizeEndpointId = (value: any) =>
+                String(value || "").trim().replace(/\\s+/g, " ");
+
+              const wantedEndpoint = normalizeEndpointId(endpointId);
+              const endpoints = Array.isArray(cfg.endpoints) ? cfg.endpoints : [];
+              const ep = endpoints.find((item: any) => {
+                const explicitId = normalizeEndpointId(item?.id);
+                const generatedId = normalizeEndpointId(`${item?.method || "GET"} ${item?.url || ""}`);
+                return explicitId === wantedEndpoint || generatedId === wantedEndpoint;
+              });
+
+              // The node exists but the endpoint metadata could be unavailable
+              // in an older saved flow. Keep the exact endpoint id so the HTTP
+              // executor can still resolve it from the node configuration.
+              const epId = String(ep?.id || endpointId).trim();
+              const method = String(ep?.method || endpointId.match(/^(GET|POST|PUT|PATCH|DELETE)\\s/i)?.[1] || "GET").toUpperCase();
+
+              return {
+                id: `${candidate.id}::${epId}`,
+                type: "http-endpoint",
+                containerId: container.id,
+                containerName: container.nameContainer || `Bloco #${container.id.slice(-4)}`,
+                description: String(ep?.description || ep?.name || "Endpoint selecionado pelo Agent."),
+                label: `${method} ${ep?.name || epId}`,
+                argsSchema: ep?.argsSchema || null,
+                _http: {
+                  nodeId: candidate.id,
+                  endpointId: epId,
+                  permissions: ep?.permissions || {},
+                  resultType: ep?.resultType === "live" ? "live" : "context",
+                  method,
+                  isMutating: ["POST", "PUT", "PATCH", "DELETE"].includes(method),
+                },
+              } as any;
             }
+
             return null;
           })();
           if (skillCall?.skill_id && matchedSkill) {
