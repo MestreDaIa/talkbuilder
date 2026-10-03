@@ -1186,7 +1186,16 @@ export const TestPanel = ({
           Object.keys(nextArgs.body).forEach((key) => {
             const stateValue = confirmedStateValue(key);
             const current = nextArgs.body[key];
-            if (stateValue !== undefined && (current == null || String(current).trim() === "" || /^(undefined|null|\{\{.*\}\}|<[^>]+>)$/i.test(String(current).trim()))) nextArgs.body[key] = stateValue;
+            const normalizedKey = normalizeKeyName(key);
+            const isEntityIdField = /(client|customer|cliente|employee|professional|profissional|funcionario|service|servico|payment|booking|appointment).*(id|uuid)$/i.test(normalizedKey);
+            if (stateValue !== undefined && (
+              isEntityIdField ||
+              current == null ||
+              String(current).trim() === "" ||
+              /^(undefined|null|\{\{.*\}\}|<[^>]+>)$/i.test(String(current).trim())
+            )) {
+              nextArgs.body[key] = stateValue;
+            }
           });
         }
         return nextArgs;
