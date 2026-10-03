@@ -378,6 +378,7 @@ function buildRuntimeExecutionContext(skills:any[], variables:any, runtimePlan:a
   const last = (source as any).__lastSkillExecution;
   if (last) clean.__lastSkillExecution = last;
   const lastResult = (source as any).__lastSkillResult;
+  const knownData = (source as any).__runtimeKnownData && typeof (source as any).__runtimeKnownData === "object" ? (source as any).__runtimeKnownData : {};
   const request = (source as any).__runtimeUserRequest;
   const plan = runtimePlan && typeof runtimePlan === "object" ? {
     intent: runtimePlan.intent || null,
@@ -386,22 +387,23 @@ function buildRuntimeExecutionContext(skills:any[], variables:any, runtimePlan:a
     next: runtimePlan.next || null,
     blocked: Array.isArray(runtimePlan.blocked) ? runtimePlan.blocked : []
   } : null;
-  return { user_request: request || plan?.user_input || plan?.intent || null, known_data:clean, last_skill_result:lastResult || null, plan };
+  return { user_request: request || plan?.user_input || plan?.intent || null, known_data: { ...knownData, ...clean }, last_skill_result:lastResult || null, plan };
 }
 function buildRuntimeSkillPrompt(skills:any[], variables:any={}, runtimePlan:any=null){
   if(!skills.length)return "\n\n[SKILLS]\nNenhuma Skill configurada.";
   const list=skills.map((s,i)=>String(i+1)+". ID: "+s.id+"\nNome: "+s.label+"\nDescrição: "+s.description+runtimeSkillArgsDescription(s)).join("\n\n");
   const context = buildRuntimeExecutionContext(skills, variables, runtimePlan);
   const rules = "A solicitação original do usuário é a fonte da intenção e deve ser preservada durante toda a cadeia de Skills. O campo last_skill_result é o resultado real da última operação e deve ser tratado como dado factual da execução.\n" +
+    "Primeiro interprete a mensagem inteira: identifique o objetivo principal e extraia todos os fatos, entidades e parâmetros que o usuário já informou, sem descartar nenhum dado por não ser um argumento da Skill atual. Armazene esses dados em parameters e use-os nas etapas seguintes.\n" +
     "Trate as Skills como operações genéricas de qualquer API; não assuma nenhum domínio, produto ou sequência específica. Planeje a intenção como uma cadeia de etapas baseada nos dados realmente disponíveis.\n" +
-    "Antes de escolher uma Skill, verifique os argumentos exigidos por ela e quais dados já existem no estado ou foram produzidos por Skills anteriores. Se um argumento necessário ainda não existir, procure primeiro uma Skill capaz de obtê-lo. Não tente uma operação downstream com identificadores que ainda não foram obtidos.\n" +
+    "Antes de escolher uma Skill, verifique os argumentos exigidos por ela e quais dados já existem no estado ou foram produzidos por Skills anteriores. Faça o mapeamento semântico entre parameters e os nomes reais dos argumentos da Skill; não exija que o usuário tenha usado o mesmo nome do parâmetro. Se um argumento necessário ainda não existir, procure primeiro uma Skill capaz de obtê-lo. Não tente uma operação downstream com identificadores que ainda não foram obtidos.\n" +
     "Após cada resultado, reavalie o estado e escolha a próxima operação necessária automaticamente. Se uma Skill já foi concluída com sucesso e o resultado está em last_skill_result, NÃO a execute novamente com os mesmos argumentos. Use o resultado para decidir a próxima etapa.\n" +
     "Se uma Skill foi marcada em blocked, escolha outra operação ou produza o dado faltante; não repita a mesma assinatura. Só peça algo ao usuário quando realmente faltar informação que nenhuma Skill/contexto puder obter.\n" +
     "Nunca invente IDs, parâmetros ou resultados. Nunca declare sucesso crítico sem resultado positivo.";
   return "\n\n[SKILLS DISPONÍVEIS]\n"+list+"\n\n[ESTADO DA EXECUÇÃO]\n"+JSON.stringify(context)+"\n\n[REGRAS DO EXECUTOR]\n"+rules;
 }
-function buildRuntimeUseSkillTool(skills:any[]){if(!skills.length)return undefined;return{type:"function",function:{name:"use_skill",description:"Executa a próxima Skill necessária para concluir a intenção.",parameters:{type:"object",properties:{skill_id:{type:"string",enum:skills.map(s=>s.id)},arguments:{type:"object",additionalProperties:true},message:{type:"string"}},required:["skill_id"]}}};}
-function parseRuntimeSkillCall(reply:string|null){if(!reply)return null;const m=String(reply).match(/\{[\s\S]*"skill_id"[\s\S]*\}/);if(!m)return null;try{const p=JSON.parse(m[0]);return p?.skill_id?{skill_id:String(p.skill_id),arguments:p.arguments&&typeof p.arguments==="object"?p.arguments:{},message:p.message?String(p.message):""}:null;}catch{return null;}}
+function buildRuntimeUseSkillTool(skills:any[]){if(!skills.length)return undefined;return{type:"function",function:{name:"use_skill",description:"Registra a interpretação da solicitação e executa a próxima Skill necessária. Preserve os dados que o usuário já informou, mesmo quando eles ainda não correspondem ao formato de argumentos da Skill atual.",parameters:{type:"object",properties:{skill_id:{type:"string",enum:skills.map(s=>s.id)},arguments:{type:"object",additionalProperties:true},intent:{type:"string"},parameters:{type:"object",additionalProperties:true},message:{type:"string"}},required:["skill_id"]}}};}
+function parseRuntimeSkillCall(reply:string|null){if(!reply)return null;const m=String(reply).match(/\{[\s\S]*"skill_id"[\s\S]*\}/);if(!m)return null;try{const p=JSON.parse(m[0]);return p?.skill_id?{skill_id:String(p.skill_id),arguments:p.arguments&&typeof p.arguments==="object"?p.arguments:{},parameters:p.parameters&&typeof p.parameters==="object"?p.parameters:{},intent:p.intent?String(p.intent):"",message:p.message?String(p.message):""}:null;}catch{return null;}}
 
 async function runFlow(execution: any, containersIn: any[], edgesIn: any[], input: any, flow: any, supabase: any, visitedRedirects = new Set<string>()): Promise<any> {
   const containers: any[] = containersIn;
@@ -1277,7 +1279,7 @@ async function runFlow(execution: any, containersIn: any[], edgesIn: any[], inpu
                   const data: any = await res.json();
                   const agentMessage=data.choices?.[0]?.message;
                   const toolCall=agentMessage?.tool_calls?.find((x:any)=>x?.function?.name==="use_skill");
-                  if(toolCall?.function?.arguments){try{const p=JSON.parse(toolCall.function.arguments);if(p?.skill_id)(variables as any).__runtimeSkillCall={skill_id:String(p.skill_id),arguments:p.arguments&&typeof p.arguments==="object"?p.arguments:{},message:p.message?String(p.message):""};}catch{}}
+                  if(toolCall?.function?.arguments){try{const p=JSON.parse(toolCall.function.arguments);if(p?.skill_id)(variables as any).__runtimeSkillCall={skill_id:String(p.skill_id),arguments:p.arguments&&typeof p.arguments==="object"?p.arguments:{},parameters:p.parameters&&typeof p.parameters==="object"?p.parameters:{},intent:p.intent?String(p.intent):"",message:p.message?String(p.message):""};}catch{}}
                   aiReply=agentMessage?.content||"";
                   if(!(variables as any).__runtimeSkillCall){
                     const parsed=parseRuntimeSkillCall(aiReply);
@@ -1343,7 +1345,7 @@ async function runFlow(execution: any, containersIn: any[], edgesIn: any[], inpu
                   const data: any = await res.json();
                   const parts=data.candidates?.[0]?.content?.parts||[];
                   const fn=parts.find((p:any)=>p?.functionCall?.name==="use_skill")?.functionCall;
-                  if(fn?.args?.skill_id)(variables as any).__runtimeSkillCall={skill_id:String(fn.args.skill_id),arguments:fn.args.arguments&&typeof fn.args.arguments==="object"?fn.args.arguments:{},message:fn.args.message?String(fn.args.message):""};
+                  if(fn?.args?.skill_id)(variables as any).__runtimeSkillCall={skill_id:String(fn.args.skill_id),arguments:fn.args.arguments&&typeof fn.args.arguments==="object"?fn.args.arguments:{},parameters:fn.args.parameters&&typeof fn.args.parameters==="object"?fn.args.parameters:{},intent:fn.args.intent?String(fn.args.intent):"",message:fn.args.message?String(fn.args.message):""};
                   aiReply=parts.map((p:any)=>p.text).filter(Boolean).join("\n").trim()||"";
                   if(!(variables as any).__runtimeSkillCall){
                     const parsed=parseRuntimeSkillCall(aiReply);
@@ -1360,6 +1362,11 @@ async function runFlow(execution: any, containersIn: any[], edgesIn: any[], inpu
               }
               const runtimeSkillCall=(variables as any).__runtimeSkillCall;
               if (runtimeSkillCall) {
+                const previousKnown = (variables as any).__runtimeKnownData && typeof (variables as any).__runtimeKnownData === "object" ? (variables as any).__runtimeKnownData : {};
+                const extracted = runtimeSkillCall.parameters && typeof runtimeSkillCall.parameters === "object" ? runtimeSkillCall.parameters : {};
+                if (Object.keys(extracted).length) (variables as any).__runtimeKnownData = { ...previousKnown, ...extracted };
+                if (runtimeSkillCall.intent) runtimePlan.intent = runtimeSkillCall.intent;
+                (variables as any).__runtimeSkillPlan = runtimePlan;
                 delete (variables as any).__runtimeSkillCall;
                 const matchedSkill = (() => {
                 const wanted = String(runtimeSkillCall?.skill_id || "").trim().replace(/^[\'"\`]+|[\'"\`]+$/g, "");
