@@ -1687,7 +1687,44 @@ const runLocalFlow = async (
           // The Agent already had access to its skills in this model turn. Do not
           // spend a second full AI request just to re-check whether a skill is needed.
 
-          const matchedSkill = resolveAgentSkill(skills, skillCall?.skill_id);
+          const matchedSkill = resolveAgentSkill(skills, skillCall?.skill_id) || (() => {
+            const wanted = String(skillCall?.skill_id || "").trim();
+            const sep = wanted.indexOf("::");
+            if (sep < 1) return null;
+            const nodeId = wanted.slice(0, sep);
+            const endpointId = wanted.slice(sep + 2);
+            for (const container of containers) {
+              for (const candidate of container.nodes || []) {
+                if (candidate.id !== nodeId || !candidate.config?.isSkill) continue;
+                const cfg: any = candidate.config || {};
+                if (candidate.type !== "http-request" || cfg.operationMode !== "dynamic" || !Array.isArray(cfg.endpoints)) continue;
+                const ep = cfg.endpoints.find((item: any) => {
+                  const id = String(item?.id || `${item?.method || "GET"} ${item?.url || ""}`).trim();
+                  return id === endpointId;
+                });
+                if (!ep) continue;
+                const epId = String(ep.id || `${ep.method || "GET"} ${ep.url || ""}`);
+                return {
+                  id: `${candidate.id}::${epId}`,
+                  type: "http-endpoint",
+                  containerId: container.id,
+                  containerName: container.nameContainer || `Bloco #${container.id.slice(-4)}`,
+                  description: String(ep.description || ep.name || ""),
+                  label: `${ep.method || "GET"} ${ep.name || epId}`,
+                  argsSchema: ep.argsSchema || null,
+                  _http: {
+                    nodeId: candidate.id,
+                    endpointId: epId,
+                    permissions: ep.permissions || {},
+                    resultType: ep.resultType === "live" ? "live" : "context",
+                    method: String(ep.method || "GET").toUpperCase(),
+                    isMutating: ["POST", "PUT", "PATCH", "DELETE"].includes(String(ep.method || "GET").toUpperCase()),
+                  },
+                } as any;
+              }
+            }
+            return null;
+          })();
           if (skillCall?.skill_id && matchedSkill) {
             const skillCallKey = `${skillCall.skill_id}:${JSON.stringify(skillCall.arguments || {})}`;
             skillCallsThisRun[skillCallKey] = (skillCallsThisRun[skillCallKey] || 0) + 1;
