@@ -1443,6 +1443,23 @@ const runLocalFlow = async (
           }
 
           if (aiReply) {
+            const internalSkillJson = parseSkillFromText(aiReply);
+            if (internalSkillJson?.skill_id) {
+              const botMsg: RuntimeMessage = {
+                id: crypto.randomUUID(),
+                conversation_id: conversationId || "temp",
+                role: "assistant",
+                content: "Não consegui executar a etapa solicitada agora. Tente novamente em instantes.",
+                created_at: new Date().toISOString()
+              };
+              messageHistory.push(botMsg);
+              nextMessages.push({ ...botMsg, type: "bot", content: botMsg.content, isHtml: false } as Message);
+              waitingFor = "input-text";
+              waitingForCfg = { placeholder: "Converse com o agente..." };
+              status = "waiting_input";
+              break;
+            }
+
             const botMsg: RuntimeMessage = {
               id: crypto.randomUUID(),
               conversation_id: conversationId || "temp",
@@ -1541,7 +1558,7 @@ const runLocalFlow = async (
           // transformar o resultado em resposta ao usuário. Não ofereça a mesma
           // ferramenta novamente, evitando o ciclo skill -> IA -> mesma skill -> erro.
           const isSkillResultTurn = Boolean((input as any)?.__fromSkill);
-          const useSkillTool = isSkillResultTurn ? undefined : buildUseSkillTool(skills);
+          const useSkillTool = buildUseSkillTool(skills);
           
           const nodeKey = (cfg.apiKey || "").trim();
           const nodeProvider = (cfg.provider || "openai").toLowerCase();
@@ -1682,7 +1699,7 @@ const runLocalFlow = async (
           // A resposta normal do Agent pode selecionar uma skill. Quando estamos
           // numa continuação interna, o resultado da skill já é tratado pelo
           // dispatcher e não deve virar uma nova chamada por parsing textual.
-          skillCall = skillCall || (!(input as any)?.__fromSkill ? parseSkillFromText(aiReply) : null);
+          skillCall = skillCall || parseSkillFromText(aiReply);
 
           // The Agent already had access to its skills in this model turn. Do not
           // spend a second full AI request just to re-check whether a skill is needed.
@@ -1706,11 +1723,11 @@ const runLocalFlow = async (
 
             for (const container of containers) {
               const candidate = (container.nodes || []).find((n) => n.id === nodeId);
-              if (!candidate || candidate.type !== "http-request") continue;
+              if (!candidate) continue;
 
               const cfg: any = candidate.config || {};
               const normalizeEndpointId = (value: any) =>
-                String(value || "").trim().replace(/\\s+/g, " ");
+                String(value || "").trim().replace(/\s+/g, " ");
 
               const wantedEndpoint = normalizeEndpointId(endpointId);
               const endpoints = Array.isArray(cfg.endpoints) ? cfg.endpoints : [];
