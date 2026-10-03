@@ -1071,7 +1071,6 @@ async function runFlow(execution: any, containersIn: any[], edgesIn: any[], inpu
               }
             }
 
-            const runtimeSkillCall=(variables as any).__runtimeSkillCall||parseRuntimeSkillCall(aiReply);delete (variables as any).__runtimeSkillCall;if(runtimeSkillCall){const matchedSkill=runtimeSkills.find((s:any)=>s.id===runtimeSkillCall.skill_id);if(matchedSkill?._http){const key=`${matchedSkill.id}:${JSON.stringify(runtimeSkillCall.arguments||{})}`;const counts=(variables as any).__runtimeSkillCalls||{};counts[key]=Number(counts[key]||0)+1;(variables as any).__runtimeSkillCalls=counts;if(counts[key]>2){messages.push({id:crypto.randomUUID(),type:"bot",content:"Não consegui concluir esta etapa com os dados disponíveis. Preciso de uma informação diferente para continuar."});status="waiting_input";break;}if(runtimeSkillCall.message)messages.push({id:crypto.randomUUID(),type:"bot",content:runtimeSkillCall.message});(variables as any).__dynamicSkillDispatch={nodeId:matchedSkill._http.nodeId,endpointId:matchedSkill._http.endpointId,args:runtimeSkillCall.arguments||{},permissions:matchedSkill._http.permissions||{},isMutating:matchedSkill._http.isMutating};runtimePlan.next=matchedSkill.id;activeAgentNodeId=node.id;mode="agent";currentNodeId=matchedSkill._http.nodeId;input={__internalSkillExecution:true};continue;}}
               if (aiReply) {
               if (cfg.saveVariable) variables[cfg.saveVariable] = aiReply;
               else messages.push({ id: crypto.randomUUID(), type: "bot", content: aiReply });
