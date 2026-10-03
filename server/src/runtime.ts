@@ -1205,9 +1205,9 @@ async function runFlow(execution: any, containersIn: any[], edgesIn: any[], inpu
               let aiReply = "";
               const instructions = replaceVars(cfg.instructions || "");
               const runtimeSkills=collectRuntimeAgentSkills(containers,node.id);
+              const runtimePlan=(variables as any).__runtimeSkillPlan;
               const runtimeSkillPrompt=buildRuntimeSkillPrompt(runtimeSkills,variables,runtimePlan);
               const runtimeSkillTool=buildRuntimeUseSkillTool(runtimeSkills);
-              const runtimePlan=(variables as any).__runtimeSkillPlan;
               
               // Gerenciamento de Memória (Histórico) para o Agente
               const memoryKey = `agent_history_${execution.id}_${node.id}`;
