@@ -1318,7 +1318,47 @@ async function runFlow(execution: any, containersIn: any[], edgesIn: any[], inpu
               const runtimeSkillCall=(variables as any).__runtimeSkillCall;
               if (runtimeSkillCall) {
                 delete (variables as any).__runtimeSkillCall;
-                const matchedSkill=runtimeSkills.find((s:any)=>String(s.id)===String(runtimeSkillCall.skill_id));
+                const matchedSkill = (() => {
+                const wanted = String(runtimeSkillCall?.skill_id || "").trim().replace(/^[\'"\`]+|[\'"\`]+$/g, "");
+                const direct = runtimeSkills.find((s:any) => String(s.id).trim() === wanted);
+                if (direct) return direct;
+                const sep = wanted.indexOf("::");
+                if (sep < 1) return null;
+                const nodeId = wanted.slice(0, sep).trim();
+                const endpointId = wanted.slice(sep + 2).trim();
+                for (const container of containers) {
+                  const node = (container.nodes || []).find((n:any) => String(n.id) === nodeId);
+                  if (!node) continue;
+                  const cfgNode = node.config || {};
+                  const endpoints = Array.isArray(cfgNode.endpoints) ? cfgNode.endpoints : [];
+                  const normalizeId = (v:any) => String(v ?? "").trim().replace(/\s+/g, " ");
+                  const wantedEp = normalizeId(endpointId);
+                  const ep = endpoints.find((item:any) =>
+                    normalizeId(item?.id) === wantedEp ||
+                    normalizeId(`${item?.method || "GET"} ${item?.url || ""}`) === wantedEp
+                  );
+                  const epId = String(ep?.id || endpointId).trim();
+                  const method = String(ep?.method || endpointId.match(/^(GET|POST|PUT|PATCH|DELETE)\s/i)?.[1] || "GET").toUpperCase();
+                  return {
+                    id: `${node.id}::${epId}`,
+                    type: "http-endpoint",
+                    containerId: container.id,
+                    containerName: container.nameContainer || `Bloco #${String(container.id || "").slice(-4)}`,
+                    description: String(ep?.description || ep?.name || "Endpoint selecionado pelo Agent."),
+                    label: `${method} ${ep?.name || epId}`,
+                    argsSchema: ep?.argsSchema || null,
+                    _http: {
+                      nodeId: node.id,
+                      endpointId: epId,
+                      permissions: ep?.permissions || {},
+                      resultType: ep?.resultType === "live" ? "live" : "context",
+                      method,
+                      isMutating: ["POST","PUT","PATCH","DELETE"].includes(method),
+                    },
+                  };
+                }
+                return null;
+              })();
                 if (matchedSkill?._http) {
                   const callKey=String(matchedSkill.id)+":"+JSON.stringify(runtimeSkillCall.arguments||{});
                   const callCount=((variables as any).__runtimeSkillCalls?.[callKey]||0)+1;
