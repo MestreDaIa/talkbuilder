@@ -1022,7 +1022,7 @@ async function runFlow(execution: any, containersIn: any[], edgesIn: any[], inpu
               });
               if (res.ok) {
                 const data: any = await res.json();
-                const agentMessage=data.choices?.[0]?.message;const toolCall=agentMessage?.tool_calls?.find((x:any)=>x?.function?.name==="use_skill");if(toolCall?.function?.arguments){try{const p=JSON.parse(toolCall.function.arguments);if(p?.skill_id)(variables as any).__runtimeSkillCall={skill_id:String(p.skill_id),arguments:p.arguments&&typeof p.arguments==="object"?p.arguments:{},message:p.message?String(p.message):""};}catch{}}aiReply=agentMessage?.content||"";
+                aiReply=data.choices?.[0]?.message?.content||"";
               }
             } else if (provider === "gemini") {
               const model = cfg.model || "gemini-2.0-flash";
@@ -1067,7 +1067,7 @@ async function runFlow(execution: any, containersIn: any[], edgesIn: any[], inpu
               });
               if (res.ok) {
                 const data: any = await res.json();
-                const parts=data.candidates?.[0]?.content?.parts||[];const fn=parts.find((p:any)=>p?.functionCall?.name==="use_skill")?.functionCall;if(fn?.args?.skill_id)(variables as any).__runtimeSkillCall={skill_id:String(fn.args.skill_id),arguments:fn.args.arguments&&typeof fn.args.arguments==="object"?fn.args.arguments:{},message:fn.args.message?String(fn.args.message):""};aiReply=parts.map((p:any)=>p.text).filter(Boolean).join("\n").trim()||"";
+                aiReply=data.candidates?.[0]?.content?.parts?.[0]?.text||"";
               }
             }
 
@@ -1307,6 +1307,32 @@ async function runFlow(execution: any, containersIn: any[], edgesIn: any[], inpu
                   console.error(`[ai-agent:gemini] HTTP ${res.status}: ${errText.slice(0, 500)}`);
                 }
               }
+              const runtimeSkillCall=(variables as any).__runtimeSkillCall;
+              if (runtimeSkillCall) {
+                delete (variables as any).__runtimeSkillCall;
+                const matchedSkill=runtimeSkills.find((s:any)=>String(s.id)===String(runtimeSkillCall.skill_id));
+                if (matchedSkill?._http) {
+                  const callKey=String(matchedSkill.id)+":"+JSON.stringify(runtimeSkillCall.arguments||{});
+                  const callCount=((variables as any).__runtimeSkillCalls?.[callKey]||0)+1;
+                  (variables as any).__runtimeSkillCalls={...((variables as any).__runtimeSkillCalls||{}),[callKey]:callCount};
+                  if(callCount>1){
+                    const stopMsg="Não consegui concluir essa etapa com os dados disponíveis. Pode confirmar a opção desejada ou tentar novamente?";
+                    messages.push({id:crypto.randomUUID(),type:"bot",content:stopMsg});
+                    return {messages,waiting_for:"text",variables,next_node_id:node.id,active_agent_node_id:node.id,mode:"agent",steps,status:"waiting_input"};
+                  }
+                  runtimePlan.intent=runtimePlan.intent||userPrompt;
+                  runtimePlan.next=matchedSkill.id;
+                  (variables as any).__runtimeSkillPlan=runtimePlan;
+                  if(runtimeSkillCall.message)messages.push({id:crypto.randomUUID(),type:"bot",content:runtimeSkillCall.message});
+                  (variables as any).__dynamicSkillDispatch={nodeId:matchedSkill._http.nodeId,endpointId:matchedSkill._http.endpointId,args:runtimeSkillCall.arguments||{},permissions:matchedSkill._http.permissions||{},isMutating:!!matchedSkill._http.isMutating};
+                  activeAgentNodeId=node.id;
+                  mode="agent";
+                  currentNodeId=matchedSkill._http.nodeId;
+                  input={__internalSkillExecution:true};
+                  continue;
+                }
+              }
+
               if (aiReply) {
                 messages.push({ id: crypto.randomUUID(), type: "bot", content: aiReply });
                 
