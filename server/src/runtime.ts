@@ -365,7 +365,32 @@ function collectRuntimeAgentSkills(containers: any[], agentNodeId?: string | nul
   const skills:any[]=[]; for(const container of containers||[]) for(const node of container.nodes||[]){const cfg=node?.config||{};if(!cfg.isSkill||node.id===agentNodeId)continue;const containerName=container.nameContainer||`Bloco #${String(container.id||"").slice(-4)}`;if(String(node.type||"").toLowerCase()==="http-request"&&cfg.operationMode==="dynamic"&&Array.isArray(cfg.endpoints)){for(const ep of cfg.endpoints){const id=String(ep.id||`${ep.method||"GET"} ${ep.url||""}`),method=String(ep.method||"GET").toUpperCase();skills.push({id:`${node.id}::${id}`,type:"http-endpoint",containerId:container.id,containerName,description:String(ep.description||ep.name||"Use este endpoint quando necessário para concluir a intenção."),label:String(ep.name||id),argsSchema:ep.argsSchema||null,_http:{nodeId:node.id,endpointId:id,permissions:ep.permissions||{},resultType:ep.resultType==="live"?"live":"context",method,isMutating:["POST","PUT","PATCH","DELETE"].includes(method)}})}}else skills.push({id:String(node.id),type:String(node.type||""),containerId:container.id,containerName,description:String(cfg.skillDescription||"Use esta ação quando necessária para concluir a intenção."),label:String(cfg.name||cfg.label||node.type||node.id)})}return skills;
 }
 function runtimeSkillArgsDescription(skill:any){const s=skill?.argsSchema;if(!s)return "";const lines:string[]=[];for(const p of Array.isArray(s.pathParams)?s.pathParams:[])if(p?.name)lines.push(`path: ${p.name}${p.description?` — ${p.description}`:""}`);for(const p of Array.isArray(s.queryParams)?s.queryParams:[])if(p?.name)lines.push(`query: ${p.name}${p.description?` — ${p.description}`:""}`);if(s.bodyExample||s.bodyDescription)lines.push(`body${s.bodyDescription?` — ${s.bodyDescription}`:""}${s.bodyExample?`: ${String(s.bodyExample).replace(/\\s+/g," ").slice(0,500)}`:""}`);return lines.length?"\nArgumentos esperados:\n"+lines.map(x=>"- "+x).join("\n"):"";}
-function buildRuntimeSkillPrompt(skills:any[]){if(!skills.length)return "\n\n[SKILLS]\nNenhuma Skill configurada.";const list=skills.map((s,i)=>`${i+1}. ID: ${s.id}\nNome: ${s.label}\nDescrição: ${s.description}${runtimeSkillArgsDescription(s)}`).join("\n\n");return `\n\n[SKILLS DISPONÍVEIS]\n${list}\n\n[PLANEJAMENTO]\nPlaneje o objetivo inteiro como uma sequência de etapas. Antecipe a próxima Skill e os dados que ela exige. Se a próxima Skill puder ser executada com dados já disponíveis, execute-a imediatamente. Após cada resultado, reavalie o plano e continue automaticamente; não espere nova mensagem do usuário só para prosseguir. Só peça algo quando realmente faltar informação e nenhuma Skill/contexto puder obtê-la. Se houver várias opções cuja escolha pertence ao usuário, mostre-as e aguarde somente essa escolha. Nunca pergunte se deve executar uma Skill que já é claramente necessária. Nunca invente IDs. Não declare sucesso crítico sem resultado positivo.`;}
+function buildRuntimeExecutionContext(skills:any[], variables:any, runtimePlan:any){
+  const clean:any = {};
+  const source = variables && typeof variables === "object" ? variables : {};
+  for (const [key,value] of Object.entries(source)) {
+    if (String(key).startsWith("__")) continue;
+    if (["channel","contact_id","data","httpResponse"].includes(String(key))) {
+      const serialized = JSON.stringify(value);
+      clean[key] = serialized && serialized.length > 4000 ? serialized.slice(0,4000) + "…[truncado]" : value;
+    }
+  }
+  const last = (source as any).__lastSkillExecution;
+  if (last) clean.__lastSkillExecution = last;
+  const plan = runtimePlan && typeof runtimePlan === "object" ? {
+    intent: runtimePlan.intent || null,
+    completed: Array.isArray(runtimePlan.completed) ? runtimePlan.completed : [],
+    next: runtimePlan.next || null,
+    blocked: Array.isArray(runtimePlan.blocked) ? runtimePlan.blocked : []
+  } : null;
+  return {known_data:clean, plan};
+}
+function buildRuntimeSkillPrompt(skills:any[], variables:any={}, runtimePlan:any=null){
+  if(!skills.length)return "\n\n[SKILLS]\nNenhuma Skill configurada.";
+  const list=skills.map((s,i)=>`${i+1}. ID: ${s.id}\nNome: ${s.label}\nDescrição: ${s.description}${runtimeSkillArgsDescription(s)}`).join("\n\n");
+  const context = buildRuntimeExecutionContext(skills, variables, runtimePlan);
+  return `\n\n[SKILLS DISPONÍVEIS]\n${list}\n\n[ESTADO DA EXECUÇÃO]\n${JSON.stringify(context)}\n\n[PLANEJAMENTO E DEPENDÊNCIAS]\nTrate as Skills como operações genéricas de qualquer API; não assuma nenhum domínio, produto ou sequência específica. Planeje a intenção como uma cadeia de etapas baseada nos dados realmente disponíveis. Antes de escolher uma Skill, verifique os argumentos exigidos por ela e quais dados já existem no estado ou foram produzidos por Skills anteriores. Se um argumento necessário ainda não existir, procure primeiro uma Skill capaz de obtê-lo. Não tente uma operação downstream com identificadores que ainda não foram obtidos. Após cada resultado, reavalie o estado e escolha a próxima operação necessária automaticamente. Não repita uma Skill com os mesmos argumentos se a execução anterior falhou ou se o resultado já foi obtido; escolha uma alternativa ou uma etapa que produza o dado faltante. Só peça algo ao usuário quando realmente faltar informação que nenhuma Skill/contexto puder obter. Se houver várias opções cuja escolha pertence ao usuário, mostre-as e aguarde somente essa escolha. Nunca invente IDs, parâmetros ou resultados. Nunca declare sucesso crítico sem resultado positivo.`;
+}
 function buildRuntimeUseSkillTool(skills:any[]){if(!skills.length)return undefined;return{type:"function",function:{name:"use_skill",description:"Executa a próxima Skill necessária para concluir a intenção.",parameters:{type:"object",properties:{skill_id:{type:"string",enum:skills.map(s=>s.id)},arguments:{type:"object",additionalProperties:true},message:{type:"string"}},required:["skill_id"]}}};}
 function parseRuntimeSkillCall(reply:string|null){if(!reply)return null;const m=String(reply).match(/\{[\s\S]*"skill_id"[\s\S]*\}/);if(!m)return null;try{const p=JSON.parse(m[0]);return p?.skill_id?{skill_id:String(p.skill_id),arguments:p.arguments&&typeof p.arguments==="object"?p.arguments:{},message:p.message?String(p.message):""}:null;}catch{return null;}}
 
@@ -1180,7 +1205,7 @@ async function runFlow(execution: any, containersIn: any[], edgesIn: any[], inpu
               let aiReply = "";
               const instructions = replaceVars(cfg.instructions || "");
               const runtimeSkills=collectRuntimeAgentSkills(containers,node.id);
-              const runtimeSkillPrompt=buildRuntimeSkillPrompt(runtimeSkills);
+              const runtimeSkillPrompt=buildRuntimeSkillPrompt(runtimeSkills,variables,runtimePlan);
               const runtimeSkillTool=buildRuntimeUseSkillTool(runtimeSkills);
               const runtimePlan=(variables as any).__runtimeSkillPlan;
               
@@ -1364,9 +1389,22 @@ async function runFlow(execution: any, containersIn: any[], edgesIn: any[], inpu
                   const callCount=((variables as any).__runtimeSkillCalls?.[callKey]||0)+1;
                   (variables as any).__runtimeSkillCalls={...((variables as any).__runtimeSkillCalls||{}),[callKey]:callCount};
                   if(callCount>1){
-                    const stopMsg="Não consegui concluir essa etapa com os dados disponíveis. Pode confirmar a opção desejada ou tentar novamente?";
-                    messages.push({id:crypto.randomUUID(),type:"bot",content:stopMsg});
-                    return {messages,waiting_for:"text",variables,next_node_id:node.id,active_agent_node_id:node.id,mode:"agent",steps,status:"waiting_input"};
+                    runtimePlan.blocked=Array.isArray(runtimePlan.blocked)?runtimePlan.blocked:[];
+                    const signature=String(matchedSkill.id)+":"+JSON.stringify(runtimeSkillCall.arguments||{});
+                    if(!runtimePlan.blocked.includes(signature)) runtimePlan.blocked.push(signature);
+                    runtimePlan.next=null;
+                    (variables as any).__runtimeSkillPlan=runtimePlan;
+                    if(callCount>=3){
+                      const stopMsg="Não consegui concluir essa etapa com os dados disponíveis. Pode confirmar a informação que está faltando?";
+                      messages.push({id:crypto.randomUUID(),type:"bot",content:stopMsg});
+                      return {messages,waiting_for:"text",variables,next_node_id:node.id,active_agent_node_id:node.id,mode:"agent",steps,status:"waiting_input"};
+                    }
+                    delete (variables as any).__runtimeSkillCall;
+                    input={message:"[CORREÇÃO DO PLANEJADOR] A mesma Skill com os mesmos argumentos já foi tentada e não deve ser repetida. Analise o resultado da última execução, identifique qual dado ou pré-requisito falta e escolha outra Skill que possa obtê-lo antes de tentar a operação novamente.",__internalAgentTurn:true};
+                    activeAgentNodeId=node.id;
+                    mode="agent";
+                    currentNodeId=node.id;
+                    continue;
                   }
                   runtimePlan.intent=runtimePlan.intent||userPrompt;
                   runtimePlan.next=matchedSkill.id;
