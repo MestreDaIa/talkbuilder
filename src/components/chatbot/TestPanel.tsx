@@ -1398,6 +1398,8 @@ const runLocalFlow = async (
           let aiReply: string | null = null;
           if (activeKey) {
             try {
+              const forceTextOnlyAgentTurn = Boolean((variables as any).__forceTextOnlyAgentTurn);
+              delete (variables as any).__forceTextOnlyAgentTurn;
               if (selectedProvider === "openai") {
                 const res = await fetchWithTimeout("https://api.openai.com/v1/chat/completions", {
                   method: "POST",
@@ -1588,7 +1590,7 @@ const runLocalFlow = async (
                     model: cfg.model || "gpt-4o-mini",
                     max_tokens: 500,
                     messages: [{ role: "system", content: system }, ...contextMessages],
-                    ...(useSkillTool ? { tools: [useSkillTool], tool_choice: "auto" } : {}),
+                    ...(!forceTextOnlyAgentTurn && useSkillTool ? { tools: [useSkillTool], tool_choice: "auto" } : {}),
                   }),
                 }, FLOW_AI_TIMEOUT_MS);
                 if (res.ok) {
@@ -1620,7 +1622,7 @@ const runLocalFlow = async (
                       role: m.role === "assistant" ? "model" : "user",
                       parts: [{ text: m.content }]
                     })),
-                    ...(useSkillTool ? {
+                    ...(!forceTextOnlyAgentTurn && useSkillTool ? {
                       tools: [{ function_declarations: [{
                         name: useSkillTool.function.name,
                         description: useSkillTool.function.description,
@@ -1751,7 +1753,19 @@ const runLocalFlow = async (
             const skillCallKey = `${skillCall.skill_id}:${JSON.stringify(skillCall.arguments || {})}`;
             skillCallsThisRun[skillCallKey] = (skillCallsThisRun[skillCallKey] || 0) + 1;
             if (skillCallsThisRun[skillCallKey] > 1) {
-              const stopMsg = "Não consegui concluir essa consulta com os dados disponíveis. Pode confirmar a opção desejada ou tentar novamente em instantes?";
+              // Uma skill GET já executada com os mesmos argumentos não deve gerar
+              // erro artificial. O resultado anterior já está no contexto; force
+              // a próxima chamada do Agent a ser apenas textual para ele continuar
+              // dali, sem reexecutar a mesma operação.
+              console.log("[agent-node] mesma skill já executada com os mesmos argumentos; reutilizando o último resultado");
+              (variables as any).__forceTextOnlyAgentTurn = true;
+              skillCall = null;
+              input = { message: "[CONTROLE] Esta mesma skill já foi executada com esses argumentos e seu resultado está no contexto. Não execute nenhuma skill agora. Use o resultado disponível para responder ao usuário ou peça somente uma escolha/informação que realmente esteja faltando.", __fromSkill: true, __internalAgentTurn: true } as any;
+              continue;
+            }
+
+            if (false) {
+              const stopMsg = "Não consegui concluir essa consulta com os dados disponíveis.";
               const botMsg: RuntimeMessage = {
                 id: crypto.randomUUID(),
                 conversation_id: conversationId || "temp",
@@ -2446,6 +2460,15 @@ const runLocalFlow = async (
                     return score;
                   };
 
+                  const userExplicitlyMentionedEntity = (entity: KnownEntity) => {
+                    const text = normalizeLookupText(variables.last_message);
+                    if (!text) return false;
+                    const labels = [entity.label, ...(entity.aliases || [])]
+                      .map((value) => normalizeLookupText(value))
+                      .filter(Boolean);
+                    return labels.some((label) => text === label || text.includes(label));
+                  };
+
                   const resolveKnownEntityId = (paramName: string, proposedValue: any, location: "path" | "query" | "body" = "body") => {
                     if (!isIdLikeParam(paramName)) return { ok: true, value: proposedValue };
                     const hints = paramTypeHints(paramName);
@@ -2487,6 +2510,16 @@ const runLocalFlow = async (
                         }
                       }
                       if (exact) {
+                        if (!userExplicitlyMentionedEntity(exact) && !getVerifiedSelectionForParam(paramName, candidates)) {
+                          audit({ resolved: rawText, action: strictIds ? "rejected_strict" : "unverified", reason: "candidate_not_explicitly_selected", source: exact.source, sourceEntityLabel: exact.label });
+                          return {
+                            ok: false,
+                            error: "unverified_entity_selection",
+                            message: `A opção ${exact.label} foi encontrada nos dados da sessão, mas ainda não foi escolhida explicitamente pelo usuário.`,
+                            param: paramName,
+                            value: rawText,
+                          };
+                        }
                         rememberVerifiedEntitySelection(paramName, rawText);
                         audit({ resolved: rawText, action: "kept", source: exact.source, sourceEntityLabel: exact.label });
                         return { ok: true, value: rawText };
@@ -2557,8 +2590,18 @@ const runLocalFlow = async (
                         console.log(`[node:http-request][dynamic] ${paramName} resolvido por entidade da sessão: ${best.entity.label}`);
                         audit({ resolved: best.entity.id, action: "resolved_by_context", source: best.entity.source, sourceEntityLabel: best.entity.label });
                       }
-                      rememberVerifiedEntitySelection(paramName, best.entity.id);
-                      return { ok: true, value: best.entity.id };
+                      if (userExplicitlyMentionedEntity(best.entity)) {
+                        rememberVerifiedEntitySelection(paramName, best.entity.id);
+                        return { ok: true, value: best.entity.id };
+                      }
+                      audit({ resolved: best.entity.id, action: "unverified", reason: "context_match_without_explicit_user_selection", source: best.entity.source, sourceEntityLabel: best.entity.label });
+                      return {
+                        ok: false,
+                        error: "unverified_entity_selection",
+                        message: `Encontrei ${best.entity.label} nos dados da sessão, mas o usuário ainda não escolheu essa opção explicitamente.`,
+                        param: paramName,
+                        value: rawText || best.entity.id,
+                      };
                     }
                     if (hasValue && valueLooksLikeIdentifier(rawText) && isDispatched && !identifierExistsInSession(rawText)) {
                       audit({ resolved: rawText, action: strictIds ? "rejected_strict" : "unverified", reason: "id_not_in_session" });
@@ -2644,7 +2687,17 @@ const runLocalFlow = async (
 
                   const inferIdFromKnownLists = (paramName: string) => {
                     if (!/(^id$|_id$)/i.test(paramName)) return undefined;
-                    const terms = collectLookupTerms();
+                    // IDs só podem ser resolvidos automaticamente quando o rótulo foi
+                    // informado pelo usuário na mensagem atual. Resultados/confirmations
+                    // do próprio Agent não podem virar seleção implícita.
+                    const terms = new Set<string>();
+                    const addExplicit = (value: unknown) => {
+                      const normalized = normalizeLookupText(value);
+                      if (!normalized) return;
+                      terms.add(normalized);
+                      normalized.split(" ").filter((part) => part.length >= 3).forEach((part) => terms.add(part));
+                    };
+                    addExplicit(variables.last_message);
                     if (!terms.length) return undefined;
                     const seen = new WeakSet<object>();
                     let best: { id: string | number; score: number; label: string } | null = null;
@@ -2676,7 +2729,7 @@ const runLocalFlow = async (
                     inspect(variables);
                     const match = best as { id: string | number; score: number; label: string } | null;
                     if (match && match.score >= 3) {
-                      console.log(`[node:http-request][dynamic] path param "${paramName}" inferido por contexto: ${match.label}`);
+                      console.log(`[node:http-request][dynamic] path param "${paramName}" resolvido por seleção explícita do usuário: ${match.label}`);
                       return match.id;
                     }
                     return undefined;
