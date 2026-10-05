@@ -404,6 +404,33 @@ function buildRuntimeSkillPrompt(skills:any[], variables:any={}, runtimePlan:any
   return "\n\n[SKILLS DISPONÍVEIS]\n"+list+"\n\n[ESTADO DA EXECUÇÃO]\n"+JSON.stringify(context)+"\n\n[REGRAS DO EXECUTOR]\n"+rules;
 }
 function buildRuntimeUseSkillTool(skills:any[]){if(!skills.length)return undefined;return{type:"function",function:{name:"use_skill",description:"Registra a interpretação da solicitação e executa a próxima Skill necessária. Preserve os dados que o usuário já informou, mesmo quando eles ainda não correspondem ao formato de argumentos da Skill atual.",parameters:{type:"object",properties:{skill_id:{type:"string",enum:skills.map(s=>s.id)},arguments:{type:"object",additionalProperties:true},intent:{type:"string"},parameters:{type:"object",additionalProperties:true},message:{type:"string"}},required:["skill_id"]}}};}
+function runtimeFindCandidateLabels(value:any, root:any, labels:string[]=[]):string[]{
+  if(root===null||root===undefined)return labels;
+  if(Array.isArray(root)){for(const item of root)runtimeFindCandidateLabels(value,item,labels);return labels;}
+  if(typeof root!=="object")return labels;
+  for(const [key,item] of Object.entries(root)){
+    if(item===value){
+      for(const labelKey of ["name","label","title","display_name","displayName","full_name","fullName","description"]){
+        const label=(root as any)[labelKey];
+        if(typeof label==="string"&&label.trim())labels.push(label.trim());
+      }
+    }
+    runtimeFindCandidateLabels(value,item,labels);
+  }
+  return labels;
+}
+function runtimeHasImplicitCandidateSelection(skillCall:any, variables:any, userText:string):boolean{
+  const args=skillCall?.arguments&&typeof skillCall.arguments==="object"?skillCall.arguments:{};
+  const lastResult=(variables as any).__lastSkillResult?.data;
+  if(!lastResult)return false;
+  const explicit=String((variables as any).__runtimeExplicitSelectionText||"").toLowerCase()+" "+String(userText||"").toLowerCase();
+  for(const [key,value] of Object.entries(args)){
+    if(!/(^id$|_id$|uuid)/i.test(String(key))||value===null||value===undefined||value==="")continue;
+    const labels=runtimeFindCandidateLabels(value,lastResult,[]);
+    if(labels.length&& !labels.some(label=>explicit.includes(String(label).toLowerCase())))return true;
+  }
+  return false;
+}
 function parseRuntimeSkillCall(reply:string|null){if(!reply)return null;const m=String(reply).match(/\{[\s\S]*"skill_id"[\s\S]*\}/);if(!m)return null;try{const p=JSON.parse(m[0]);return p?.skill_id?{skill_id:String(p.skill_id),arguments:p.arguments&&typeof p.arguments==="object"?p.arguments:{},parameters:p.parameters&&typeof p.parameters==="object"?p.parameters:{},intent:p.intent?String(p.intent):"",message:p.message?String(p.message):""}:null;}catch{return null;}}
 
 async function runFlow(execution: any, containersIn: any[], edgesIn: any[], input: any, flow: any, supabase: any, visitedRedirects = new Set<string>()): Promise<any> {
@@ -716,6 +743,7 @@ async function runFlow(execution: any, containersIn: any[], edgesIn: any[], inpu
       delete (variables as any).__skillExecutionGuard;
       (variables as any).__runtimeSkillPlan = plan;
       variables["__runtimeUserRequest"] = currentUserRequest;
+      variables["__runtimeExplicitSelectionText"] = (String((variables as any).__runtimeExplicitSelectionText || "") + " " + currentUserRequest).trim().slice(-8000);
     }
 
 
@@ -1416,6 +1444,17 @@ async function runFlow(execution: any, containersIn: any[], edgesIn: any[], inpu
                 return null;
               })();
                 if (matchedSkill?._http) {
+                  if (runtimeHasImplicitCandidateSelection(runtimeSkillCall, variables, userPrompt)) {
+                    console.log("[ai-agent] bloqueando seleção implícita de candidato retornado por uma Skill; aguardando escolha explícita do usuário");
+                    delete (variables as any).__runtimeSkillCall;
+                    runtimePlan.next=null;
+                    (variables as any).__runtimeSkillPlan=runtimePlan;
+                    input={message:"[GUARD DE SELEÇÃO] A operação escolhida depende de um candidato retornado por uma etapa anterior, mas o usuário ainda não escolheu esse candidato explicitamente. Não execute a operação. Pergunte ao usuário qual opção ele deseja, usando as opções reais do último resultado.",__internalAgentTurn:true};
+                    activeAgentNodeId=node.id;
+                    mode="agent";
+                    currentNodeId=node.id;
+                    continue;
+                  }
                   const callKey=String(matchedSkill.id)+":"+JSON.stringify(runtimeSkillCall.arguments||{});
                   const callCount=((variables as any).__runtimeSkillCalls?.[callKey]||0)+1;
                   (variables as any).__runtimeSkillCalls={...((variables as any).__runtimeSkillCalls||{}),[callKey]:callCount};
