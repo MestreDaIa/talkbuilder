@@ -2698,7 +2698,7 @@ const runLocalFlow = async (
                       normalized.split(" ").filter((part) => part.length >= 3).forEach((part) => terms.add(part));
                     };
                     addExplicit(variables.last_message);
-                    if (!terms.length) return undefined;
+                    if (!terms.size) return undefined;
                     const seen = new WeakSet<object>();
                     let best: { id: string | number; score: number; label: string } | null = null;
                     const scoreLabel = (label: string) => {
