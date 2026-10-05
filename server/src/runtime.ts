@@ -396,9 +396,10 @@ function buildRuntimeSkillPrompt(skills:any[], variables:any={}, runtimePlan:any
   const rules = "A solicitação original do usuário é a fonte da intenção e deve ser preservada durante toda a cadeia de Skills. O campo last_skill_result é o resultado real da última operação e deve ser tratado como dado factual da execução.\n" +
     "Primeiro interprete a mensagem inteira: identifique o objetivo principal e extraia todos os fatos, entidades e parâmetros que o usuário já informou, sem descartar nenhum dado por não ser um argumento da Skill atual. Armazene esses dados em parameters e use-os nas etapas seguintes.\n" +
     "Trate as Skills como operações genéricas de qualquer API; não assuma nenhum domínio, produto ou sequência específica. Planeje a intenção como uma cadeia de etapas baseada nos dados realmente disponíveis.\n" +
-    "Antes de escolher uma Skill, verifique os argumentos exigidos por ela e quais dados já existem no estado ou foram produzidos por Skills anteriores. Faça o mapeamento semântico entre parameters e os nomes reais dos argumentos da Skill; não exija que o usuário tenha usado o mesmo nome do parâmetro. Porém, trate parâmetros de identificação como `id`, `*_id`, `uuid` e equivalentes como IDs reais: não transforme um nome humano como \"barba\" em `service_id` sem que uma Skill tenha retornado esse ID. Se a mensagem trouxer um nome mas a operação exigir um ID, use primeiro uma Skill de descoberta/busca que possa resolver o nome. Se um argumento necessário ainda não existir, procure primeiro uma Skill capaz de obtê-lo. Não tente uma operação downstream com identificadores que ainda não foram obtidos.\n" +
+    "Antes de escolher uma Skill, verifique os argumentos exigidos por ela e quais dados já existem no estado ou foram produzidos por Skills anteriores. Faça o mapeamento semântico entre parameters e os nomes reais dos argumentos da Skill; não exija que o usuário tenha usado o mesmo nome do parâmetro. Porém, trate parâmetros de identificação como `id`, `*_id`, `uuid` e equivalentes como IDs reais: nunca transforme diretamente um nome ou descrição humana em um identificador. Se a mensagem trouxer um nome mas a operação exigir um ID, use primeiro uma Skill de descoberta/busca que possa resolver o nome. Se um argumento necessário ainda não existir, procure primeiro uma Skill capaz de obtê-lo. Não tente uma operação downstream com identificadores que ainda não foram obtidos.\n" +
     "Após cada resultado, reavalie o estado e escolha a próxima operação necessária automaticamente. Se uma Skill já foi concluída com sucesso e o resultado está em last_skill_result, NÃO a execute novamente com os mesmos argumentos. Use o resultado para decidir a próxima etapa.\n" +
     "Se uma Skill foi marcada em blocked, escolha outra operação ou produza o dado faltante; não repita a mesma assinatura. Só peça algo ao usuário quando realmente faltar informação que nenhuma Skill/contexto puder obter.\n" +
+    "Resultados de busca, listagens ou consultas que retornem opções/candidatos são apenas dados disponíveis, nunca escolhas do usuário. Nunca selecione, associe ou trate automaticamente o primeiro, único ou mais provável candidato como escolhido. Só considere uma opção selecionada quando o usuário tiver indicado explicitamente essa opção em uma mensagem. Se uma etapa seguinte exigir a escolha de um candidato e ela ainda não tiver sido feita, peça essa escolha ao usuário.\n" +
     "Nunca invente IDs, parâmetros ou resultados. Nunca declare sucesso crítico sem resultado positivo.";
   return "\n\n[SKILLS DISPONÍVEIS]\n"+list+"\n\n[ESTADO DA EXECUÇÃO]\n"+JSON.stringify(context)+"\n\n[REGRAS DO EXECUTOR]\n"+rules;
 }
@@ -705,11 +706,16 @@ async function runFlow(execution: any, containersIn: any[], edgesIn: any[], inpu
 
     if (!(input as any).__internalAgentTurn && !(input as any).__internalSkillExecution) {
       const plan = (variables as any).__runtimeSkillPlan || {intent:null,user_input:null,completed:[],next:null,blocked:[]};
-      plan.intent = String(userValue ?? "").trim() || plan.intent || null;
-      plan.user_input = String(userValue ?? "").trim() || plan.user_input || null;
+      const currentUserRequest = String(userValue ?? "").trim();
+      plan.intent = plan.intent || currentUserRequest || null;
+      plan.user_input = currentUserRequest || plan.user_input || null;
       plan.blocked = [];
+      // Guards de uma tentativa anterior não podem contaminar uma nova mensagem do usuário.
+      // O contexto útil permanece preservado.
+      (variables as any).__runtimeSkillCalls = {};
+      delete (variables as any).__skillExecutionGuard;
       (variables as any).__runtimeSkillPlan = plan;
-      variables["__runtimeUserRequest"] = String(userValue ?? "").trim();
+      variables["__runtimeUserRequest"] = currentUserRequest;
     }
 
 
