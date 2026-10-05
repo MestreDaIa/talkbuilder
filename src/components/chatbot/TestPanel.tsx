@@ -2547,24 +2547,9 @@ const runLocalFlow = async (
                     // prefer a unique identifier of the expected type already returned by
                     // the current session. This is intentionally generic and does not depend
                     // on any specific API/domain.
-                    if (hasValue && valueLooksLikeIdentifier(rawText)) {
-                      const uniqueCandidates = candidates.filter((candidate, index, list) =>
-                        list.findIndex((item) => String(item.id) === String(candidate.id)) === index
-                      );
-                      if (uniqueCandidates.length === 1) {
-                        const resolvedEntity = uniqueCandidates[0];
-                        rememberVerifiedEntitySelection(paramName, resolvedEntity.id);
-                        audit({
-                          resolved: resolvedEntity.id,
-                          action: "resolved_by_context",
-                          reason: "unique_typed_identifier_from_session",
-                          source: resolvedEntity.source,
-                          sourceEntityLabel: resolvedEntity.label,
-                        });
-                        return { ok: true, value: resolvedEntity.id };
-                      }
-                    }
-
+                    // Um único candidato no contexto NÃO significa que o usuário o escolheu.
+                    // Só reutilizamos uma entidade quando houve seleção explícita nesta conversa.
+                    // Isso evita transformar "lista retornada pela API" em escolha automática.
                     const terms = new Set<string>(collectLookupTerms());
                     if (hasValue) {
                       const normalized = normalizeLookupText(rawText);
