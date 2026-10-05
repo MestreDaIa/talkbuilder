@@ -2538,6 +2538,76 @@ const runLocalFlow = async (
                     return labels.some((label) => text === label || text.includes(label));
                   };
 
+                  // Reaproveita somente entidades que o USUÁRIO mencionou explicitamente
+                  // em algum turno anterior. Mensagens do assistente/listas da API nunca
+                  // contam como seleção. A escolha só é persistida quando há uma única
+                  // melhor candidata por tipo, evitando auto-seleção por contexto.
+                  const rememberExplicitUserEntityMentions = () => {
+                    const userMessages = messageHistory
+                      .filter((msg) => msg.role === "user")
+                      .map((msg) => normalizeLookupText(msg.content))
+                      .filter(Boolean);
+                    if (!userMessages.length) return;
+
+                    const entities = getKnownEntities();
+                    const selections = getVerifiedEntitySelections();
+                    const looksEntityType = (hint: string) =>
+                      /service|servic|professional|profession|employee|employ|funcion|client|customer|cliente|product|item|category|categoria|provider|provedor|staff/.test(hint);
+
+                    const bestByType = new Map<string, { entity: KnownEntity; score: number; messageIndex: number }>();
+
+                    for (const [messageIndex, userText] of userMessages.entries()) {
+                      for (const entity of entities) {
+                        const score = scoreEntity(entity, [userText, ...userText.split(/\\s+/).filter((part) => part.length >= 3)]);
+                        if (score < 3) continue;
+
+                        for (const hint of entity.typeHints || []) {
+                          const normalizedHint = singularize(hint);
+                          if (normalizedHint.length < 3 || !looksEntityType(normalizedHint)) continue;
+
+                          const current = bestByType.get(normalizedHint);
+                          // Uma menção posterior do usuário representa a informação mais
+                          // recente; dentro do mesmo turno, o maior score vence.
+                          if (
+                            !current ||
+                            messageIndex > current.messageIndex ||
+                            (messageIndex === current.messageIndex && score > current.score)
+                          ) {
+                            bestByType.set(normalizedHint, { entity, score, messageIndex });
+                          } else if (
+                            messageIndex === current.messageIndex &&
+                            score === current.score &&
+                            String(current.entity.id) !== String(entity.id)
+                          ) {
+                            // Empate: não transforma uma lista/menção ambígua em escolha.
+                            bestByType.delete(normalizedHint);
+                          }
+                        }
+                      }
+                    }
+
+                    for (const [hint, best] of bestByType.entries()) {
+                      if (!best?.entity?.id) continue;
+                      const syntheticParam = hint + "Id";
+                      selectionKeysForParam(syntheticParam).forEach((key) => {
+                        selections[key] = {
+                          id: String(best.entity.id),
+                          paramName: syntheticParam,
+                          key,
+                          label: best.entity.label,
+                          aliases: best.entity.aliases || [],
+                          typeHints: best.entity.typeHints || [],
+                          source: best.entity.source,
+                          updatedAt: new Date().toISOString(),
+                        };
+                      });
+                    }
+
+                    (variables as any).__verifiedEntitySelections = selections;
+                  };
+
+                  rememberExplicitUserEntityMentions();
+
                   const resolveKnownEntityId = (paramName: string, proposedValue: any, location: "path" | "query" | "body" = "body") => {
                     if (!isIdLikeParam(paramName)) return { ok: true, value: proposedValue };
                     const hints = paramTypeHints(paramName);
