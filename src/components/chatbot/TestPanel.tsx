@@ -1398,8 +1398,6 @@ const runLocalFlow = async (
           let aiReply: string | null = null;
           if (activeKey) {
             try {
-              const forceTextOnlyAgentTurn = Boolean((variables as any).__forceTextOnlyAgentTurn);
-              delete (variables as any).__forceTextOnlyAgentTurn;
               if (selectedProvider === "openai") {
                 const res = await fetchWithTimeout("https://api.openai.com/v1/chat/completions", {
                   method: "POST",
@@ -1580,6 +1578,8 @@ const runLocalFlow = async (
 
           let aiReply: string | null = null;
           let skillCall: { skill_id: string; message?: string; arguments?: Record<string, any> } | null = null;
+          const forceTextOnlyAgentTurn = Boolean((variables as any).__forceTextOnlyAgentTurn);
+          delete (variables as any).__forceTextOnlyAgentTurn;
           if (activeKey) {
             try {
               if (selectedProvider === "openai") {
