@@ -1950,7 +1950,15 @@ const runLocalFlow = async (
             }
 
             // Skill finalizou — devolve resultado ao Agent IA para gerar a resposta final ao usuário.
-            const skillMeta = skills.find((s) => s.id === skillCall.skill_id);
+            // Mantemos uma referência imutável porque skillCall pode ser zerado em
+            // caminhos de controle anteriores e o TypeScript não consegue preservar
+            // o narrowing após a execução assíncrona.
+            const executedSkillCall = skillCall;
+            if (!executedSkillCall) {
+              console.warn("[agent-node] resultado de skill sem skillCall correspondente; encerrando execução desta rodada");
+              continue;
+            }
+            const skillMeta = skills.find((s) => s.id === executedSkillCall.skill_id);
             const diff: Record<string, any> = {};
             Object.keys(skillVars).forEach((k) => {
               if (k.startsWith("__")) return;
@@ -1991,10 +1999,10 @@ const runLocalFlow = async (
               id: crypto.randomUUID(),
               conversation_id: conversationId || "temp",
               role: "user",
-              content: `[Resultado da skill "${skillMeta?.label || skillCall.skill_id}"]:\n${payloadStr}\n\nCom base neste resultado, responda ao usuário de forma natural e útil (em português). Se execution.ok for false, NÃO diga que a operação foi concluída, criada, confirmada ou enviada. Explique a falha de forma curta e peça apenas o dado necessário para continuar. Não chame a mesma skill novamente a menos que seja realmente necessário.`,
+              content: `[Resultado da skill "${skillMeta?.label || executedSkillCall.skill_id}"]:\n${payloadStr}\n\nCom base neste resultado, responda ao usuário de forma natural e útil (em português). Se execution.ok for false, NÃO diga que a operação foi concluída, criada, confirmada ou enviada. Explique a falha de forma curta e peça apenas o dado necessário para continuar. Não chame a mesma skill novamente a menos que seja realmente necessário.`,
               metadata: {
                 kind: "skill_result",
-                skill_id: skillCall.skill_id,
+                skill_id: executedSkillCall.skill_id,
                 result_type: skillMeta?._http?.resultType || "context",
               },
               created_at: new Date().toISOString()
