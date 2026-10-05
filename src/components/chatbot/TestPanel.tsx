@@ -2423,6 +2423,67 @@ const runLocalFlow = async (
                     (variables as any).__verifiedEntitySelections = selections;
                   };
 
+                  const rememberExplicitConfirmationSelection = () => {
+                    const userText = normalizeLookupText(variables.last_message);
+                    if (!userText) return;
+                    const affirmative = /^(sim|s|confirmo|confirmado|isso|isso mesmo|exatamente|pode|pode sim|pode prosseguir|prosseguir|esse mesmo|essa mesma|é esse|e esse|é essa|pode seguir|vamos|ok|okay)(?:[.!?,\s].*)?$/i.test(userText);
+                    if (!affirmative) return;
+
+                    const confirmation = [...messageHistory]
+                      .reverse()
+                      .find((msg) => msg.role === "assistant" && !isSkillResultHistoryMessage(msg) && /\b(confirm|confirma|confirmar|escolh|selecion|prosseguir|continuar)\b/i.test(String(msg.content || "")));
+                    if (!confirmation) return;
+
+                    const confirmationText = normalizeLookupText(confirmation.content);
+                    const entities = getKnownEntities();
+                    const selections = getVerifiedEntitySelections();
+                    const byType = new Map<string, KnownEntity[]>();
+
+                    for (const entity of entities) {
+                      const label = normalizeLookupText(entity.label);
+                      if (!label || label.length < 2 || !confirmationText.includes(label)) continue;
+                      for (const hint of entity.typeHints || []) {
+                        const normalizedHint = singularize(hint);
+                        if (normalizedHint.length < 3) continue;
+                        const list = byType.get(normalizedHint) || [];
+                        if (!list.some((item) => String(item.id) === String(entity.id))) list.push(entity);
+                        byType.set(normalizedHint, list);
+                      }
+                    }
+
+                    // Uma confirmação afirmativa só valida uma entidade quando a
+                    // mensagem de confirmação contém uma única candidata daquele tipo.
+                    for (const [hint, candidates] of byType.entries()) {
+                      if (candidates.length !== 1) continue;
+                      const entity = candidates[0];
+                      const looksEntityType = /service|servic|professional|profession|employee|employ|funcion|client|customer|cliente|product|item|category|categoria|provider|provedor|staff|user|usuario/.test(hint);
+                      if (!looksEntityType) continue;
+
+                      const syntheticParam = hint + "Id";
+                      const updatedAt = new Date().toISOString();
+                      selectionKeysForParam(syntheticParam).forEach((key) => {
+                        selections[key] = {
+                          id: String(entity.id),
+                          paramName: syntheticParam,
+                          key,
+                          label: entity.label,
+                          aliases: entity.aliases || [],
+                          typeHints: entity.typeHints || [],
+                          source: entity.source,
+                          updatedAt,
+                        };
+                      });
+                      console.log("[node:http-request][dynamic] seleção confirmada pelo usuário:", {
+                        paramName: syntheticParam,
+                        id: entity.id,
+                        label: entity.label,
+                      });
+                    }
+
+                    (variables as any).__verifiedEntitySelections = selections;
+                  };
+                  rememberExplicitConfirmationSelection();
+
                   const getVerifiedSelectionForParam = (paramName: string, candidates: KnownEntity[]) => {
                     const normalized = normalizeKeyName(paramName);
                     const hints = paramTypeHints(paramName);
