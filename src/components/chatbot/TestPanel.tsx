@@ -2620,6 +2620,10 @@ const runLocalFlow = async (
                     const hasValue = rawValue !== undefined && rawValue !== null && String(rawValue).trim() !== "";
                     const rawText = hasValue ? String(rawValue).trim() : "";
 
+                    const audit = (entry: Omit<typeof idAuditTrail[number], "location" | "param" | "proposed">) => {
+                      idAuditTrail.push({ location, param: paramName, proposed: rawText || proposedValue, ...entry });
+                    };
+
                     // Uma seleção explicitamente feita pelo usuário é a fonte de
                     // verdade para aquela entidade durante o restante da conversa.
                     // O modelo pode sugerir outro ID depois de uma resposta de API,
@@ -2638,10 +2642,6 @@ const runLocalFlow = async (
                       });
                       return { ok: true, value: verifiedSelection.selection.id };
                     }
-
-                    const audit = (entry: Omit<typeof idAuditTrail[number], "location" | "param" | "proposed">) => {
-                      idAuditTrail.push({ location, param: paramName, proposed: rawText || proposedValue, ...entry });
-                    };
 
                     if (hasValue && valueLooksLikeIdentifier(rawText)) {
                       const exact = candidates.find((entity) => String(entity.id) === rawText)
