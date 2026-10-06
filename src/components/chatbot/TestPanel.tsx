@@ -2189,7 +2189,7 @@ const runLocalFlow = async (
                     param: string;
                     proposed: any;
                     resolved: any;
-                    action: "kept" | "substituted" | "resolved_by_context" | "rejected_strict" | "unverified";
+                    action: "kept" | "substituted" | "resolved_by_context" | "rejected_strict" | "unverified" | "reused_verified_selection";
                     reason?: string;
                     source?: string;
                     sourceEntityLabel?: string;
