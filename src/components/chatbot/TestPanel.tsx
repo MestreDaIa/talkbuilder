@@ -824,7 +824,7 @@ export const TestPanel = ({
       return `${index + 1}. ID: ${skill.id}\nTipo: ${skill.type}${resultTypeLine}${mutationLine}\nBloco: ${skill.containerName}\nNome: ${skill.label}\nInstrução da skill: ${skill.description}${describeSkillArgs(skill)}`;
     }).join("\n\n");
 
-    return `\n\n[SKILLS DISPONÍVEIS PARA O AGENTE]\n${list}\n\nQuando a mensagem do usuário combinar com a instrução de uma skill, use a ferramenta use_skill com o ID exato da skill. Sempre que a skill listar "Argumentos esperados", preencha o objeto \`arguments\` com esses campos (use os path params/query params/body descritos, extraindo os valores do contexto da conversa e das variáveis já coletadas). Para qualquer campo de ID (id, *_id, *Id, uuid), use somente IDs reais retornados por uma skill anterior nesta sessão; se você só souber o nome/label do item escolhido, envie o nome/label e deixe o runtime resolver para o ID real — nunca invente UUIDs ou IDs. Skills marcadas como Live Data são voláteis: sempre chame a skill novamente quando precisar desses dados, ignore resultados antigos no histórico e não use valores antigos para criar/alterar/excluir dados. Antes de chamar uma skill crítica (POST/PUT/PATCH/DELETE), use apenas os dados atuais que você acabou de confirmar com o usuário; se o usuário respondeu apenas "sim/pode", use exclusivamente a última mensagem de confirmação que você enviou, não valores mais antigos do histórico. Para skills críticas, envie o body completo em arguments.body quando o endpoint tiver body permitido; não confie em templates/variáveis antigas. Se um resultado de skill retornar erro ou parâmetro ausente, não chame a mesma skill de novo com os mesmos argumentos; responda ao usuário ou peça a informação faltante. Se a chamada de ferramenta não estiver disponível, responda apenas com JSON: {"skill_id":"ID","arguments":{...},"message":"opcional"}. Não invente perguntas antes de usar uma skill claramente solicitada. Antes de responder, planeje o objetivo inteiro como uma sequência de etapas: olhe para a Skill atual e também para a próxima Skill e os dados que ela exige. Se a próxima Skill puder ser executada com dados já disponíveis, execute-a automaticamente após o resultado atual, sem esperar nova mensagem do usuário. Só peça informação quando ela realmente faltar e nenhuma Skill/contexto puder obtê-la. Se houver várias opções cuja escolha pertence ao usuário, mostre as opções e aguarde somente essa escolha. Nunca pergunte "quer que eu liste..." quando a próxima ação já é determinada pelo objetivo e pelas Skills.`;
+    return `\n\n[SKILLS DISPONÍVEIS PARA O AGENTE]\n${list}\n\nQuando a mensagem do usuário combinar com a instrução de uma skill, use a ferramenta use_skill com o ID exato da skill. Sempre que a skill listar "Argumentos esperados", preencha o objeto \`arguments\` com esses campos (use os path params/query params/body descritos, extraindo os valores do contexto da conversa e das variáveis já coletadas). Para qualquer campo de ID (id, *_id, *Id, uuid), use somente IDs reais retornados por uma skill anterior nesta sessão; se você só souber o nome/label do item escolhido, envie o nome/label e deixe o runtime resolver para o ID real — nunca invente UUIDs ou IDs. Skills marcadas como Live Data são voláteis: sempre chame a skill novamente quando precisar desses dados, ignore resultados antigos no histórico e não use valores antigos para criar/alterar/excluir dados. Antes de chamar uma skill crítica (POST/PUT/PATCH/DELETE), use apenas os dados atuais que você acabou de confirmar com o usuário; se o usuário respondeu apenas "sim/pode", use exclusivamente a última mensagem de confirmação que você enviou, não valores mais antigos do histórico. Para skills críticas, envie o body completo em arguments.body quando o endpoint tiver body permitido; não confie em templates/variáveis antigas. Se um resultado de skill retornar erro ou parâmetro ausente, não chame a mesma skill de novo com os mesmos argumentos; responda ao usuário ou peça a informação faltante. Se a chamada de ferramenta não estiver disponível, responda apenas com JSON: {"skill_id":"ID","arguments":{...},"message":"opcional"}. Nunca invente perguntas antes de usar uma skill claramente solicitada. Ao interpretar o resultado de uma skill de consulta/disponibilidade, trate a resposta retornada pela skill como fonte de verdade: se ela listar opções disponíveis e a opção escolhida pelo usuário estiver presente, considere-a disponível. Nunca diga que um horário foi "reservado", "ocupado" ou "ficou indisponível" sem evidência explícita no resultado da skill. Nunca invente nomes, IDs, horários ou estados de disponibilidade. Antes de responder, planeje o objetivo inteiro como uma sequência de etapas: olhe para a Skill atual e também para a próxima Skill e os dados que ela exige. Se a próxima Skill puder ser executada com dados já disponíveis, execute-a automaticamente após o resultado atual, sem esperar nova mensagem do usuário. Só peça informação quando ela realmente faltar e nenhuma Skill/contexto puder obtê-la. Se houver várias opções cuja escolha pertence ao usuário, mostre as opções e aguarde somente essa escolha. Nunca pergunte "quer que eu liste..." quando a próxima ação já é determinada pelo objetivo e pelas Skills.`;
   };
 
   const buildUseSkillTool = (skills: ReturnType<typeof collectAgentSkills>) => {
@@ -1060,6 +1060,52 @@ const runLocalFlow = async (
 
       const normalizeKeyName = (key: string) => String(key || "").toLowerCase().replace(/[^a-z0-9]/g, "");
 
+      // Completa apenas argumentos ausentes com fatos já conhecidos da conversa.
+      // Isso também vale para GET/Live Data, evitando consultas com contexto incompleto.
+      const deriveCurrentSkillArgs = (skill: ReturnType<typeof collectAgentSkills>[number] | undefined, fallbackArgs: Record<string, any> = {}) => {
+        if (!skill?._http) return fallbackArgs;
+        const nextArgs: Record<string, any> = JSON.parse(JSON.stringify(fallbackArgs || {}));
+        const state: Record<string, any> = ((variables as any).__bookingState && typeof (variables as any).__bookingState === "object") ? (variables as any).__bookingState : {};
+        const pick = (value: any) => value && typeof value === "object" ? (value.id ?? value.uuid ?? value.value ?? value.name ?? value.label) : value;
+        const userText = String(variables.last_message || "").toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "");
+        const timeMatch = userText.match(/\b(?:as|a|para|no)?\s*(\d{1,2})(?::(\d{2}))?\s*(?:h|hrs?|horas?)?\b/);
+        const currentTime = timeMatch ? `${timeMatch[1].padStart(2, "0")}:${(timeMatch[2] || "00").padStart(2, "0")}` : undefined;
+        const valueForKey = (key: string) => {
+          const normalized = normalizeKeyName(key);
+          if (normalized.includes("time") || normalized.includes("hora") || normalized.includes("horario")) return currentTime ?? pick(state.time);
+          if (normalized.includes("date") || normalized.includes("data") || normalized.includes("dia")) return pick(state.date);
+          if (normalized.includes("service") || normalized.includes("servico")) return pick(state.service);
+          if (normalized.includes("professional") || normalized.includes("profissional") || normalized.includes("employee") || normalized.includes("funcionario")) return pick(state.professional);
+          if (normalized.includes("client") || normalized.includes("cliente") || normalized.includes("customer")) return pick(state.client);
+          if (normalized.includes("phone") || normalized.includes("telefone") || normalized.includes("celular")) return pick(state.phone);
+          if (normalized.includes("email")) return pick(state.email);
+          return undefined;
+        };
+        const fillObject = (obj: any) => {
+          if (!obj || typeof obj !== "object" || Array.isArray(obj)) return;
+          Object.keys(obj).forEach((key) => {
+            const current = obj[key];
+            const empty = current === undefined || current === null || String(current).trim() === "";
+            if (empty) {
+              const value = valueForKey(key);
+              if (value !== undefined && value !== null && String(value).trim() !== "") obj[key] = value;
+            }
+          });
+        };
+        fillObject(nextArgs.pathParams);
+        fillObject(nextArgs.queryParams);
+        fillObject(nextArgs.body);
+        Object.keys(nextArgs).forEach((key) => {
+          if (key === "pathParams" || key === "queryParams" || key === "body") return;
+          const current = nextArgs[key];
+          const empty = current === undefined || current === null || String(current).trim() === "";
+          if (empty) {
+            const value = valueForKey(key);
+            if (value !== undefined && value !== null && String(value).trim() !== "") nextArgs[key] = value;
+          }
+        });
+        return nextArgs;
+      };
       const deriveLatestConfirmedArgs = (skill: ReturnType<typeof collectAgentSkills>[number] | undefined, fallbackArgs: Record<string, any> = {}) => {
         if (!skill?._http?.isMutating) return fallbackArgs;
         const latestAssistantConfirmation = [...messageHistory]
@@ -1791,9 +1837,10 @@ const runLocalFlow = async (
             // como diretiva efêmera consumida pelo executor do node.
             let targetNodeId = skillCall.skill_id;
             if (matchedSkill._http) {
+              const currentArgs = deriveCurrentSkillArgs(matchedSkill, skillCall.arguments || {});
               const sanitizedArgs = matchedSkill._http.isMutating
-                ? deriveLatestConfirmedArgs(matchedSkill, skillCall.arguments || {})
-                : (skillCall.arguments || {});
+                ? deriveLatestConfirmedArgs(matchedSkill, currentArgs)
+                : currentArgs;
               targetNodeId = matchedSkill._http.nodeId;
               (variables as any).__dynamicSkillDispatch = {
                 nodeId: matchedSkill._http.nodeId,
