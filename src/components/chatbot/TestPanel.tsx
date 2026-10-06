@@ -2620,6 +2620,25 @@ const runLocalFlow = async (
                     const hasValue = rawValue !== undefined && rawValue !== null && String(rawValue).trim() !== "";
                     const rawText = hasValue ? String(rawValue).trim() : "";
 
+                    // Uma seleção explicitamente feita pelo usuário é a fonte de
+                    // verdade para aquela entidade durante o restante da conversa.
+                    // O modelo pode sugerir outro ID depois de uma resposta de API,
+                    // mas isso NÃO substitui a escolha do usuário. Para trocar,
+                    // o usuário precisa mencionar explicitamente outra entidade;
+                    // rememberExplicitUserEntityMentions() já atualiza a seleção
+                    // antes deste resolver ser chamado.
+                    const verifiedSelection = getVerifiedSelectionForParam(paramName, candidates);
+                    if (verifiedSelection && !userExplicitlyMentionedEntity(verifiedSelection.entity)) {
+                      audit({
+                        resolved: verifiedSelection.selection.id,
+                        action: "reused_verified_selection",
+                        reason: "explicit_user_selection_persisted",
+                        source: verifiedSelection.entity.source,
+                        sourceEntityLabel: verifiedSelection.entity.label,
+                      });
+                      return { ok: true, value: verifiedSelection.selection.id };
+                    }
+
                     const audit = (entry: Omit<typeof idAuditTrail[number], "location" | "param" | "proposed">) => {
                       idAuditTrail.push({ location, param: paramName, proposed: rawText || proposedValue, ...entry });
                     };
