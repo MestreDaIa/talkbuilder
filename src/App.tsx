@@ -30,7 +30,7 @@ import NotificationView from "./pages/workspace/notification/[id]/page";
 import WorkspaceOverviewPage from "./pages/workspace/overview/page";
 import WorkspaceExecutionsPage from "./pages/workspace/executions/page";
 import WorkspaceIntegrationsPage from "./pages/workspace/integrations/page";
-import WorkspaceLogsPage from "./pages/workspace/logs/page";
+import WorkspaceLogsPage from "./pages/workspace/logs/page";\nimport WorkspaceTemplatesPage from "./pages/workspace/templates/page";
 
 
 import Layout from "./components/layout";
@@ -220,7 +220,7 @@ function App() {
         }
       />
 
-      {/* Pasta: /:slug/workspace/folder/:id */}
+      {/* Catálogo de templates do workspace */}\n      <Route\n        path="/:slug/workspace/templates"\n        element={\n          <ProtectedRoute>\n            <SlugGuard>\n              <Layout><WorkspaceTemplatesPage /></Layout>\n            </SlugGuard>\n          </ProtectedRoute>\n        }\n      />\n\n      {/* Pasta: /:slug/workspace/folder/:id */}
       <Route
         path="/:slug/workspace/folder/:id"
         element={
