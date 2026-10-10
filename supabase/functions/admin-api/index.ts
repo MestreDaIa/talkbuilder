@@ -31,6 +31,18 @@ function json(status: number, body: unknown) {
   });
 }
 
+function sanitizeTemplateValue(value: unknown): unknown {
+  if (Array.isArray(value)) return value.map(sanitizeTemplateValue);
+  if (!value || typeof value !== "object") return value;
+  const secretKey = /(authorization|password|passwd|secret|api[_-]?key|access[_-]?token|refresh[_-]?token|private[_-]?key|^token$|^bearer$)/i;
+  return Object.fromEntries(
+    Object.entries(value as Record<string, unknown>).map(([key, nested]) => [
+      key,
+      secretKey.test(key) ? "" : sanitizeTemplateValue(nested),
+    ]),
+  );
+}
+
 const SUPABASE_URL = Deno.env.get("SUPABASE_URL")!;
 const SERVICE_ROLE = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
 const ANON_KEY = Deno.env.get("SUPABASE_ANON_KEY")!;
@@ -121,7 +133,7 @@ Deno.serve(async (req) => {
       let q = admin.from("v_admin_workspaces").select("*").order("created_at", { ascending: false }).limit(500);
       if (search) {
         q = q.or(
-          `name.ilike.%${search}%,slug.ilike.%${search}%,owner_email.ilike.%${search}%`,
+          `name.ilike.%${search.replace(/[(),]/g, " ")}%,slug.ilike.%${search.replace(/[(),]/g, " ")}%,owner_email.ilike.%${search.replace(/[(),]/g, " ")}%,owner_name.ilike.%${search.replace(/[(),]/g, " ")}%`,
         );
       }
       if (embedFilter === "true") q = q.eq("is_embed", true);
@@ -452,7 +464,7 @@ Deno.serve(async (req) => {
       const search = url.searchParams.get("search")?.trim() ?? "";
       const status = url.searchParams.get("status") ?? ""; // published|unpublished|blocked|banned
       let q = admin.from("v_admin_bots").select("*").order("created_at", { ascending: false }).limit(500);
-      if (search) q = q.or(`title.ilike.%${search}%,workspace_name.ilike.%${search}%,owner_email.ilike.%${search}%`);
+          `name.ilike.%${search.replace(/[(),]/g, " ")}%,slug.ilike.%${search.replace(/[(),]/g, " ")}%,owner_email.ilike.%${search.replace(/[(),]/g, " ")}%,owner_name.ilike.%${search.replace(/[(),]/g, " ")}%`,
       if (status === "published") q = q.eq("is_published", true);
       if (status === "unpublished") q = q.eq("is_published", false);
       if (status === "blocked") q = q.eq("is_blocked", true);
@@ -535,11 +547,12 @@ Deno.serve(async (req) => {
       if (sourceError) throw sourceError;
       if (!source) return json(404, { error: "source_bot_not_found" });
 
-      const snapshot = {
+      // Remove credentials from nested settings/nodes before publishing a template.
+      const snapshot = sanitizeTemplateValue({
         settings: source.settings ?? {},
         draft_containers: source.draft_containers ?? [],
         draft_edges: source.draft_edges ?? [],
-      };
+      });
       const { data, error } = await admin.from("bot_templates").insert({
         title,
         description: description || source.description || null,
