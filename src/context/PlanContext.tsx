@@ -54,7 +54,7 @@ export function PlanProvider({ children }: { children: React.ReactNode }) {
 	// Override standalone via localStorage (mantém compatibilidade com a UI
 	// de testes de plano). Ignorado quando o workspace é gerenciado pelo
 	// Zailom Booking — neste caso o tier vem do JWT/sync.
-	const [overridePlan, setOverridePlan] = useState<PlanId>("starter");
+	const [overridePlan, setOverridePlan] = useState<PlanId | null>(null);
 
 	useEffect(() => {
 		try {
@@ -69,9 +69,10 @@ export function PlanProvider({ children }: { children: React.ReactNode }) {
 
 	const resolved = useMemo(() => {
 		const base = resolveEffectivePlan(profile);
-		// Standalone: permite o override local sobrescrever (debug/teste).
-		if (base.managedBy === "internal") {
+		// Só sobrescreve o plano quando há um override de teste explicitamente salvo.
+		if (base.managedBy === "internal" && overridePlan) {
 			return resolveEffectivePlan({
+				...profile,
 				plan: overridePlan,
 				embed_source: null,
 				embed_plan_tier: null,
@@ -80,6 +81,20 @@ export function PlanProvider({ children }: { children: React.ReactNode }) {
 		}
 		return base;
 	}, [profile, overridePlan]);
+
+	// Os limites personalizados do Super Admin valem para standalone.
+	// No Booking, os limites sincronizados pelo Booking permanecem como fonte oficial.
+	const resolvedLimits = useMemo<ResolvedLimits>(() => ({
+		...resolved.limits,
+		bots: resolved.managedBy === "internal" ? profile?.custom_bots_limit ?? resolved.limits.bots : resolved.limits.bots,
+		messagesPerMonth: resolved.managedBy === "internal" ? profile?.custom_messages_limit ?? resolved.limits.messagesPerMonth : resolved.limits.messagesPerMonth,
+		integrations: resolved.managedBy === "internal" ? profile?.custom_integrations_limit ?? resolved.limits.integrations : resolved.limits.integrations,
+	}), [resolved, profile]);
+
+	const limits = useMemo(() => ({
+		bots: resolvedLimits.bots,
+		messages: resolvedLimits.messagesPerMonth,
+	}), [resolvedLimits]);
 
 	const setCurrentPlan = (plan: PlanId) => {
 		// Em workspaces gerenciados pelo Zailom Booking, ignora a alteração local.
@@ -111,7 +126,7 @@ export function PlanProvider({ children }: { children: React.ReactNode }) {
 				currentPlan: resolved.tier,
 				setCurrentPlan,
 				limits,
-				resolvedLimits: resolved.limits,
+				resolvedLimits,
 				botsUsed,
 				canAddBot,
 				remainingBots,
