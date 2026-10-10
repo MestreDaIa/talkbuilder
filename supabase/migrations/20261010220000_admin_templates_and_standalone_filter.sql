@@ -107,3 +107,94 @@ drop trigger if exists trg_bot_templates_updated_at on public.bot_templates;
 create trigger trg_bot_templates_updated_at
   before update on public.bot_templates
   for each row execute function public.bot_templates_set_updated_at();
+
+
+-- Enforce bot quotas in the database too, so template use and direct API inserts
+-- cannot bypass the workspace's effective plan limit.
+create or replace function public.enforce_workspace_bot_limit()
+returns trigger
+language plpgsql
+security definer
+set search_path = public
+as $$
+declare
+  v_owner_id uuid;
+  v_plan text;
+  v_embed_source text;
+  v_embed_plan text;
+  v_embed_limit integer;
+  v_custom_limit integer;
+  v_suspended boolean;
+  v_limit integer;
+  v_used integer;
+begin
+  if new.type <> 'bot' then
+    return new;
+  end if;
+
+  -- Lock the workspace row to serialize concurrent bot creation for one workspace.
+  select w.owner_id,
+         p.plan::text,
+         p.embed_source,
+         p.embed_plan_tier,
+         p.embed_max_chatbots,
+         p.custom_bots_limit,
+         coalesce(p.is_suspended, false)
+    into v_owner_id, v_plan, v_embed_source, v_embed_plan,
+         v_embed_limit, v_custom_limit, v_suspended
+  from public.workspaces w
+  left join public.profiles p on p.id = w.owner_id
+  where w.id = new.workspace_id
+  for update of w;
+
+  if not found or v_owner_id is null then
+    raise exception 'WORKSPACE_OWNER_NOT_FOUND: cannot verify bot quota'
+      using errcode = '23514';
+  end if;
+
+  if v_suspended or v_embed_plan = 'suspended' then
+    v_limit := 0;
+  elsif v_embed_source = 'booking' then
+    v_limit := coalesce(
+      v_embed_limit,
+      case v_embed_plan
+        when 'starter' then 1
+        when 'pro' then 5
+        when 'business' then 20
+        else 1
+      end
+    );
+  else
+    v_limit := coalesce(
+      v_custom_limit,
+      case coalesce(v_plan, 'starter')
+        when 'starter' then 1
+        when 'pro' then 5
+        when 'business' then 20
+        else 1
+      end
+    );
+  end if;
+
+  select count(*)::integer
+    into v_used
+  from public.workspace_items wi
+  where wi.workspace_id = new.workspace_id
+    and wi.type = 'bot';
+
+  if v_used >= v_limit then
+    raise exception 'BOT_LIMIT_REACHED: this workspace has reached its bot limit (% of %)', v_used, v_limit
+      using errcode = '23514';
+  end if;
+
+  return new;
+end;
+$$;
+
+revoke all on function public.enforce_workspace_bot_limit() from public;
+
+drop trigger if exists trg_enforce_workspace_bot_limit on public.workspace_items;
+create trigger trg_enforce_workspace_bot_limit
+  before insert on public.workspace_items
+  for each row execute function public.enforce_workspace_bot_limit();
+
