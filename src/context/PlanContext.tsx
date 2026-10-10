@@ -72,7 +72,7 @@ export function PlanProvider({ children }: { children: React.ReactNode }) {
 		// Só sobrescreve o plano quando há um override de teste explicitamente salvo.
 		if (base.managedBy === "internal" && overridePlan) {
 			return resolveEffectivePlan({
-				...profile,
+				...(profile ?? {}),
 				plan: overridePlan,
 				embed_source: null,
 				embed_plan_tier: null,
