@@ -109,6 +109,9 @@ create trigger trg_bot_templates_updated_at
   for each row execute function public.bot_templates_set_updated_at();
 
 
+create index if not exists idx_workspace_items_bot_quota
+  on public.workspace_items (workspace_id, type);
+
 -- Enforce bot quotas in the database too, so template use and direct API inserts
 -- cannot bypass the workspace's effective plan limit.
 create or replace function public.enforce_workspace_bot_limit()
@@ -128,7 +131,7 @@ declare
   v_limit integer;
   v_used integer;
 begin
-  if new.type <> 'bot' then
+  if new.type is distinct from 'bot' then
     return new;
   end if;
 
