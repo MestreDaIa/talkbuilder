@@ -464,7 +464,7 @@ Deno.serve(async (req) => {
       const search = url.searchParams.get("search")?.trim() ?? "";
       const status = url.searchParams.get("status") ?? ""; // published|unpublished|blocked|banned
       let q = admin.from("v_admin_bots").select("*").order("created_at", { ascending: false }).limit(500);
-          `name.ilike.%${search.replace(/[(),]/g, " ")}%,slug.ilike.%${search.replace(/[(),]/g, " ")}%,owner_email.ilike.%${search.replace(/[(),]/g, " ")}%,owner_name.ilike.%${search.replace(/[(),]/g, " ")}%`,
+      if (search) q = q.or(`title.ilike.%${search.replace(/[(),]/g, " ")}%,workspace_name.ilike.%${search.replace(/[(),]/g, " ")}%,owner_email.ilike.%${search.replace(/[(),]/g, " ")}%`);
       if (status === "published") q = q.eq("is_published", true);
       if (status === "unpublished") q = q.eq("is_published", false);
       if (status === "blocked") q = q.eq("is_blocked", true);
