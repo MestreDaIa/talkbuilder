@@ -57,7 +57,8 @@ export default function WorkspaceSidebar() {
     { label: "Fluxos", icon: Boxes, path: workspaceRoot(slug) },
     { label: "Execuções", icon: Activity, path: slug ? `/${slug}/workspace/executions` : "/" },
     { label: "Logs", icon: AlertTriangle, path: slug ? `/${slug}/workspace/logs` : "/", badge: problemCount },
-    { label: "Integrações", icon: Plug, path: slug ? `/${slug}/workspace/integrations` : "/" },\n    { label: "Templates", icon: BookOpen, path: slug ? `/${slug}/workspace/templates` : "/" },
+    { label: "Integrações", icon: Plug, path: slug ? `/${slug}/workspace/integrations` : "/" },
+    { label: "Templates", icon: BookOpen, path: slug ? `/${slug}/workspace/templates` : "/" },
   ];
 
   const isActive = (path: string, label: string) => {
