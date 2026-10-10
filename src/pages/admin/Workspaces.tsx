@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { adminApi } from "@/lib/adminApi";
-import { Search, ShieldAlert, ShieldCheck, Trash2, Link2, ExternalLink, Plus, X } from "lucide-react";
+import { Search, ShieldAlert, ShieldCheck, Trash2, Link2, ExternalLink, Plus, X, Eye } from "lucide-react";
 
 type Ws = {
   id: string; name: string; slug: string;
@@ -58,6 +58,7 @@ export default function AdminWorkspaces() {
   }
 
   const [showCreate, setShowCreate] = useState(false);
+  const [detailsId, setDetailsId] = useState<string | null>(null);
 
   return (
     <div className="space-y-5">
@@ -73,6 +74,7 @@ export default function AdminWorkspaces() {
       </div>
 
       {showCreate && <CreateWorkspaceModal onClose={() => setShowCreate(false)} onCreated={load} />}
+      {detailsId && <WorkspaceDetailsModal workspaceId={detailsId} onClose={() => setDetailsId(null)} />}
 
 
       <div className="flex flex-wrap gap-2">
@@ -162,6 +164,9 @@ export default function AdminWorkspaces() {
                 </td>
                 <td className="px-4 py-3">
                   <div className="flex items-center gap-1 justify-end">
+                    <button onClick={() => setDetailsId(w.id)} title="Detalhes da conta" className="p-1.5 rounded hover:bg-white/10">
+                      <Eye className="w-4 h-4 text-white/60" />
+                    </button>
                     <a href={`/${w.slug}/workspace`} target="_blank" rel="noreferrer"
                       title="Abrir workspace" className="p-1.5 rounded hover:bg-white/10">
                       <ExternalLink className="w-4 h-4 text-white/60" />
