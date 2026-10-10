@@ -110,7 +110,6 @@ export function PlanProvider({ children }: { children: React.ReactNode }) {
 		}
 	};
 
-	const limits = PLAN_LIMITS[resolved.tier];
 	const botsUsed = useMemo(
 		() => items.filter((i) => i.type === "bot").length,
 		[items]
