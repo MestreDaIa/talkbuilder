@@ -256,6 +256,63 @@ Deno.serve(async (req) => {
       return json(200, { ok: true });
     }
 
+    const wsDetail = path.match(/^\/workspaces\/([^/]+)$/);
+    if (wsDetail && method === "GET") {
+      const wsId = wsDetail[1];
+      const { data: workspace, error: wsError } = await admin
+        .from("v_admin_workspaces")
+        .select("*")
+        .eq("id", wsId)
+        .maybeSingle();
+      if (wsError) throw wsError;
+      if (!workspace) return json(404, { error: "workspace_not_found" });
+
+      const [profileResult, memberResult, botResult, historyResult] = await Promise.all([
+        admin.from("profiles")
+          .select("admin_notes,custom_bots_limit,custom_messages_limit,custom_integrations_limit")
+          .eq("id", workspace.owner_id)
+          .maybeSingle(),
+        admin.from("workspace_members")
+          .select("user_id,role,created_at")
+          .eq("workspace_id", wsId)
+          .order("created_at", { ascending: true }),
+        admin.from("v_admin_bots")
+          .select("id,title,public_id,is_published,is_blocked,is_banned,created_at")
+          .eq("workspace_id", wsId)
+          .order("created_at", { ascending: false }),
+        admin.from("plan_override_history")
+          .select("old_plan,new_plan,old_limits,new_limits,reason,created_at")
+          .eq("workspace_id", wsId)
+          .order("created_at", { ascending: false })
+          .limit(20),
+      ]);
+      if (profileResult.error) throw profileResult.error;
+      if (memberResult.error) throw memberResult.error;
+      if (botResult.error) throw botResult.error;
+      if (historyResult.error) throw historyResult.error;
+
+      const memberIds = (memberResult.data ?? []).map((m: any) => m.user_id);
+      const { data: memberProfiles, error: memberProfilesError } = await admin
+        .from("profiles")
+        .select("id,email,display_name")
+        .in("id", memberIds.length ? memberIds : ["00000000-0000-0000-0000-000000000000"]);
+      if (memberProfilesError) throw memberProfilesError;
+      const memberProfileMap = new Map((memberProfiles ?? []).map((p: any) => [p.id, p]));
+      const members = (memberResult.data ?? []).map((m: any) => ({
+        ...m,
+        profile: memberProfileMap.get(m.user_id) ?? null,
+      }));
+
+      await audit("workspace.view", "workspace", wsId, { slug: workspace.slug });
+      return json(200, {
+        workspace,
+        profile: profileResult.data,
+        members,
+        bots: botResult.data ?? [],
+        plan_history: historyResult.data ?? [],
+      });
+    }
+
     const wsDelete = path.match(/^\/workspaces\/([^/]+)$/);
     if (wsDelete && method === "DELETE") {
       const wsId = wsDelete[1];
