@@ -1,6 +1,6 @@
 import { NavLink, Outlet, Navigate } from "react-router-dom";
 import {
-  LayoutDashboard, Building2, Users, Bot, CreditCard, DollarSign, Bell, FileClock, ArrowLeft, GalleryVerticalEnd,
+  LayoutDashboard, Building2, Users, Bot, CreditCard, DollarSign, Bell, FileClock, ArrowLeft, BookOpen,
 } from "lucide-react";
 import { useSuperAdmin } from "@/hooks/useSuperAdmin";
 import { useAuth } from "@/context/AuthContext";
