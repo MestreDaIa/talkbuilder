@@ -131,7 +131,10 @@ export default function WorkspaceTemplatesPage() {
       toast.success("Template adicionado ao seu workspace.");
       navigate(botRoute(slug, itemId));
     } catch (e: any) {
-      setError(e?.message ?? "Não foi possível criar o bot a partir deste template.");
+      const message = e?.message ?? "";
+      setError(message.includes("BOT_LIMIT_REACHED")
+        ? "Você atingiu o limite de bots do seu plano. Exclua um bot ou altere o plano para continuar."
+        : message || "Não foi possível criar o bot a partir deste template.");
     } finally {
       setUsingId(null);
     }
