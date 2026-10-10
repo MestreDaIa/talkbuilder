@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { Activity, AlertTriangle, Boxes, ChevronLeft, ChevronRight, Home, LogOut, Plug, Settings2, UserRound } from "lucide-react";
+import { Activity, AlertTriangle, Boxes, BookOpen, ChevronLeft, ChevronRight, Home, LogOut, Plug, Settings2, UserRound } from "lucide-react";
 import { useLocation, useNavigate } from "react-router-dom";
 import { useAuth } from "../context/AuthContext";
 import { configsRoute, perfilRoute, workspaceRoot } from "../lib/workspaceRoutes";
@@ -57,7 +57,7 @@ export default function WorkspaceSidebar() {
     { label: "Fluxos", icon: Boxes, path: workspaceRoot(slug) },
     { label: "Execuções", icon: Activity, path: slug ? `/${slug}/workspace/executions` : "/" },
     { label: "Logs", icon: AlertTriangle, path: slug ? `/${slug}/workspace/logs` : "/", badge: problemCount },
-    { label: "Integrações", icon: Plug, path: slug ? `/${slug}/workspace/integrations` : "/" },
+    { label: "Integrações", icon: Plug, path: slug ? `/${slug}/workspace/integrations` : "/" },\n    { label: "Templates", icon: BookOpen, path: slug ? `/${slug}/workspace/templates` : "/" },
   ];
 
   const isActive = (path: string, label: string) => {
