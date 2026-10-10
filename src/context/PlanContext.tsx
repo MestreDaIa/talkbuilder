@@ -114,7 +114,8 @@ export function PlanProvider({ children }: { children: React.ReactNode }) {
 		() => items.filter((i) => i.type === "bot").length,
 		[items]
 	);
-	const canAddBot = !resolved.isSuspended && botsUsed < limits.bots;
+	const isSuspended = resolved.isSuspended || profile?.is_suspended === true;
+	const canAddBot = !isSuspended && botsUsed < limits.bots;
 	const remainingBots = Number.isFinite(limits.bots)
 		? Math.max(0, limits.bots - botsUsed)
 		: Infinity;
@@ -130,7 +131,7 @@ export function PlanProvider({ children }: { children: React.ReactNode }) {
 				canAddBot,
 				remainingBots,
 				managedBy: resolved.managedBy,
-				isSuspended: resolved.isSuspended,
+				isSuspended,
 				syncedAt: resolved.syncedAt,
 			}}
 		>
