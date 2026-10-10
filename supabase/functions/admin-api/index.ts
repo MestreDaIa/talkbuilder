@@ -31,7 +31,7 @@ function json(status: number, body: unknown) {
   });
 }
 
-function sanitizeTemplateValue(value: unknown): unknown {
+function sanitizeTemplateValue(value: unknown): any {
   if (Array.isArray(value)) return value.map(sanitizeTemplateValue);
   if (!value || typeof value !== "object") return value;
   const secretKey = /(authorization|password|passwd|secret|api[_-]?key|access[_-]?token|refresh[_-]?token|private[_-]?key|^token$|^bearer$)/i;
