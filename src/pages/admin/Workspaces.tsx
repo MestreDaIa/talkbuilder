@@ -105,8 +105,8 @@ export default function AdminWorkspaces() {
 
       {err && <div className="rounded-lg border border-red-500/30 bg-red-500/10 p-3 text-sm text-red-200">{err}</div>}
 
-      <div className="rounded-xl border border-white/10 overflow-hidden">
-        <table className="w-full text-sm">
+      <div className="rounded-xl border border-white/10 overflow-x-auto overscroll-x-contain">
+        <table className="min-w-[1050px] w-full text-sm">
           <thead className="bg-white/[0.04] text-white/50 text-xs uppercase">
             <tr>
               <th className="text-left px-4 py-2">Workspace</th>
