@@ -34,7 +34,7 @@ select
 from public.workspaces w
 left join public.profiles p on p.id = w.owner_id;
 
-grant select on public.v_admin_workspaces to authenticated, service_role;
+revoke select on public.v_admin_workspaces from anon, authenticated;\ngrant select on public.v_admin_workspaces to service_role;\n\n-- Estas views contêm dados globais de administração e são acessadas pelo admin-api.\nrevoke select on public.v_admin_bots from anon, authenticated;\ngrant select on public.v_admin_bots to service_role;\nrevoke select on public.v_admin_billing from anon, authenticated;\ngrant select on public.v_admin_billing to service_role;
 
 -- Snapshot independente do bot de origem, para templates continuarem disponíveis
 -- mesmo que o bot original seja renomeado ou removido.
