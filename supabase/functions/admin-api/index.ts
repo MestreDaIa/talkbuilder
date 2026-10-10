@@ -558,7 +558,7 @@ Deno.serve(async (req) => {
       return json(201, { template: data });
     }
 
-    const templateAction = path.match(/^\\/templates\\/([^/]+)\\/(publish|unpublish)$/);
+    const templateAction = path.match(/^\/templates\/([^/]+)\/(publish|unpublish)$/);
     if (templateAction && method === "POST") {
       const templateId = templateAction[1];
       const action = templateAction[2];
@@ -574,7 +574,7 @@ Deno.serve(async (req) => {
       return json(200, { template: data });
     }
 
-    const templateDelete = path.match(/^\\/templates\\/([^/]+)$/);
+    const templateDelete = path.match(/^\/templates\/([^/]+)$/);
     if (templateDelete && method === "DELETE") {
       const templateId = templateDelete[1];
       const { error } = await admin.from("bot_templates").delete().eq("id", templateId);
