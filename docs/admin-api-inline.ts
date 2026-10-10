@@ -35,11 +35,18 @@ function sanitizeTemplateValue(value: unknown): any {
   if (Array.isArray(value)) return value.map(sanitizeTemplateValue);
   if (!value || typeof value !== "object") return value;
   const secretKey = /(authorization|password|passwd|secret|api[_-]?key|access[_-]?token|refresh[_-]?token|private[_-]?key|^token$|^bearer$)/i;
+  const entries = Object.entries(value as Record<string, unknown>);
+  const containsSecretField = entries.some(([key, nested]) =>
+    ["key", "name", "header", "field"].includes(key.toLowerCase()) &&
+    typeof nested === "string" && secretKey.test(nested)
+  );
   return Object.fromEntries(
-    Object.entries(value as Record<string, unknown>).map(([key, nested]) => [
-      key,
-      secretKey.test(key) ? "" : sanitizeTemplateValue(nested),
-    ]),
+    entries.map(([key, nested]) => {
+      const normalizedKey = key.toLowerCase();
+      const secretValueField = containsSecretField &&
+        ["value", "content", "defaultvalue", "default_value"].includes(normalizedKey);
+      return [key, secretKey.test(key) || secretValueField ? "" : sanitizeTemplateValue(nested)];
+    }),
   );
 }
 
