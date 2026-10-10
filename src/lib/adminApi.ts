@@ -109,6 +109,21 @@ export const adminApi = {
     return res.blob();
   },
 
+
+  // Templates
+  listTemplates: () => call("/templates"),
+  createTemplate: (payload: {
+    source_flow_id: string;
+    title: string;
+    description?: string;
+    category?: string;
+    emoji?: string;
+    is_published?: boolean;
+  }) => call("/templates", { method: "POST", body: JSON.stringify(payload) }),
+  templateAction: (id: string, action: "publish" | "unpublish") =>
+    call(`/templates/${id}/${action}`, { method: "POST", body: "{}" }),
+  deleteTemplate: (id: string) => call(`/templates/${id}`, { method: "DELETE" }),
+
   // Billing
   billing: () => call("/billing"),
   updatePrice: (plan: string, price_brl: number) =>
