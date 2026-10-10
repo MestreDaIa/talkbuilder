@@ -29,6 +29,7 @@ export type Profile = {
 	custom_bots_limit?: number | null;
 	custom_messages_limit?: number | null;
 	custom_integrations_limit?: number | null;
+	is_suspended?: boolean | null;
 };
 
 type AuthContextType = {
@@ -121,7 +122,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 		if (!supabase) return;
 		const { data, error } = await supabase
 			.from("profiles")
-			.select("id, slug, display_name, avatar_url, plan, embed_source, embed_company_id, embed_plan_tier, embed_plan_synced_at, embed_max_chatbots, embed_max_messages, embed_max_integrations, custom_bots_limit, custom_messages_limit, custom_integrations_limit")
+			.select("id, slug, display_name, avatar_url, plan, embed_source, embed_company_id, embed_plan_tier, embed_plan_synced_at, embed_max_chatbots, embed_max_messages, embed_max_integrations, custom_bots_limit, custom_messages_limit, custom_integrations_limit, is_suspended")
 			.eq("id", userId)
 			.maybeSingle();
 		if (error) {
