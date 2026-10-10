@@ -113,7 +113,7 @@ export default function AdminTemplates() {
           <Plus className="h-5 w-5" />
           <h2 className="font-semibold">Criar template a partir de um bot existente</h2>
         </div>
-        <p className="text-sm text-white/50">O catálogo salva uma cópia do rascunho atual. Alterações futuras no bot original não alteram o modelo publicado.</p>
+        <p className="text-sm text-white/50">O catálogo salva uma cópia do rascunho atual e remove valores de credenciais conhecidos. Alterações futuras no bot original não alteram o modelo publicado.</p>
         <div className="grid gap-3 md:grid-cols-2">
           <label className="space-y-1 text-xs text-white/60">
             <span>Bot de origem</span>
