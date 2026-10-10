@@ -24,13 +24,15 @@ import AdminUsers from "./pages/admin/Users";
 import AdminPlans from "./pages/admin/Plans";
 import AdminNotifications from "./pages/admin/Notifications";
 import AdminAudit from "./pages/admin/Audit";
-import AdminBots from "./pages/admin/Bots";\nimport AdminTemplates from "./pages/admin/Templates";
+import AdminBots from "./pages/admin/Bots";
+import AdminTemplates from "./pages/admin/Templates";
 import AdminBilling from "./pages/admin/Billing";
 import NotificationView from "./pages/workspace/notification/[id]/page";
 import WorkspaceOverviewPage from "./pages/workspace/overview/page";
 import WorkspaceExecutionsPage from "./pages/workspace/executions/page";
 import WorkspaceIntegrationsPage from "./pages/workspace/integrations/page";
-import WorkspaceLogsPage from "./pages/workspace/logs/page";\nimport WorkspaceTemplatesPage from "./pages/workspace/templates/page";
+import WorkspaceLogsPage from "./pages/workspace/logs/page";
+import WorkspaceTemplatesPage from "./pages/workspace/templates/page";
 
 
 import Layout from "./components/layout";
@@ -144,7 +146,8 @@ function App() {
         <Route index element={<AdminDashboard />} />
         <Route path="workspaces" element={<AdminWorkspaces />} />
         <Route path="users" element={<AdminUsers />} />
-        <Route path="bots" element={<AdminBots />} />\n        <Route path="templates" element={<AdminTemplates />} />
+        <Route path="bots" element={<AdminBots />} />
+        <Route path="templates" element={<AdminTemplates />} />
         <Route path="plans" element={<AdminPlans />} />
         <Route path="billing" element={<AdminBilling />} />
         <Route path="notifications" element={<AdminNotifications />} />
@@ -220,7 +223,19 @@ function App() {
         }
       />
 
-      {/* Catálogo de templates do workspace */}\n      <Route\n        path="/:slug/workspace/templates"\n        element={\n          <ProtectedRoute>\n            <SlugGuard>\n              <Layout><WorkspaceTemplatesPage /></Layout>\n            </SlugGuard>\n          </ProtectedRoute>\n        }\n      />\n\n      {/* Pasta: /:slug/workspace/folder/:id */}
+      {/* Catálogo de templates do workspace */}
+      <Route
+        path="/:slug/workspace/templates"
+        element={
+          <ProtectedRoute>
+            <SlugGuard>
+              <Layout><WorkspaceTemplatesPage /></Layout>
+            </SlugGuard>
+          </ProtectedRoute>
+        }
+      />
+
+      {/* Pasta: /:slug/workspace/folder/:id */}
       <Route
         path="/:slug/workspace/folder/:id"
         element={
