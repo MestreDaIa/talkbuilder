@@ -38,10 +38,20 @@ revoke select on public.v_admin_workspaces from anon, authenticated;
 grant select on public.v_admin_workspaces to service_role;
 
 -- Estas views contêm dados globais de administração e são acessadas pelo admin-api.
-revoke select on public.v_admin_bots from anon, authenticated;
-grant select on public.v_admin_bots to service_role;
-revoke select on public.v_admin_billing from anon, authenticated;
-grant select on public.v_admin_billing to service_role;
+-- Verificamos a existência antes de alterar permissões para manter a migration compatível
+-- com ambientes onde a extensão de Bots/Billing ainda não foi instalada.
+do $
+begin
+  if to_regclass('public.v_admin_bots') is not null then
+    execute 'revoke select on public.v_admin_bots from anon, authenticated';
+    execute 'grant select on public.v_admin_bots to service_role';
+  end if;
+  if to_regclass('public.v_admin_billing') is not null then
+    execute 'revoke select on public.v_admin_billing from anon, authenticated';
+    execute 'grant select on public.v_admin_billing to service_role';
+  end if;
+end;
+$;
 
 -- Snapshot independente do bot de origem, para templates continuarem disponíveis
 -- mesmo que o bot original seja renomeado ou removido.
