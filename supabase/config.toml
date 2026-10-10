@@ -1,5 +1,8 @@
 project_id = "fwoescubnnagdvwasbjl"
 
+[functions.admin-api]
+verify_jwt = true
+
 [functions.booking-api]
 verify_jwt = false
 
