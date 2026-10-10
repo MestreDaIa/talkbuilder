@@ -41,6 +41,7 @@ export const adminApi = {
     const qs = q.toString();
     return call(`/workspaces${qs ? `?${qs}` : ""}`);
   },
+  workspaceDetails: (id: string) => call(`/workspaces/${id}`),
   suspendWorkspace: (id: string, reason?: string) =>
     call(`/workspaces/${id}/suspend`, { method: "POST", body: JSON.stringify({ reason }) }),
   unsuspendWorkspace: (id: string) =>
