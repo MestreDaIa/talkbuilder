@@ -507,6 +507,82 @@ Deno.serve(async (req) => {
       return json(200, { ok: true });
     }
 
+    // -------------------------- TEMPLATES -----------------------------------
+    if (path === "/templates" && method === "GET") {
+      const { data, error } = await admin
+        .from("bot_templates")
+        .select("id,title,description,category,emoji,source_flow_id,source_bot_name,is_published,created_at,updated_at")
+        .order("created_at", { ascending: false })
+        .limit(500);
+      if (error) throw error;
+      return json(200, { templates: data });
+    }
+
+    if (path === "/templates" && method === "POST") {
+      const sourceFlowId = String(body?.source_flow_id ?? "").trim();
+      const title = String(body?.title ?? "").trim();
+      const description = body?.description == null ? null : String(body.description).trim();
+      const category = String(body?.category ?? "Geral").trim() || "Geral";
+      const emoji = String(body?.emoji ?? "🤖").trim() || "🤖";
+      const isPublished = body?.is_published !== false;
+      if (!sourceFlowId || !title) return json(400, { error: "missing_fields", detail: "Escolha um bot de origem e informe o nome do template." });
+
+      const { data: source, error: sourceError } = await admin
+        .from("chatbot_flows")
+        .select("id,name,description,settings,draft_containers,draft_edges")
+        .eq("id", sourceFlowId)
+        .maybeSingle();
+      if (sourceError) throw sourceError;
+      if (!source) return json(404, { error: "source_bot_not_found" });
+
+      const snapshot = {
+        settings: source.settings ?? {},
+        draft_containers: source.draft_containers ?? [],
+        draft_edges: source.draft_edges ?? [],
+      };
+      const { data, error } = await admin.from("bot_templates").insert({
+        title,
+        description: description || source.description || null,
+        category,
+        emoji,
+        source_flow_id: source.id,
+        source_bot_name: source.name,
+        snapshot,
+        is_published: isPublished,
+        created_by: user.id,
+      }).select("id,title,description,category,emoji,source_flow_id,source_bot_name,is_published,created_at,updated_at").single();
+      if (error) throw error;
+      await audit("template.create", "template", data.id, {
+        title, source_flow_id: source.id, is_published: isPublished,
+      });
+      return json(201, { template: data });
+    }
+
+    const templateAction = path.match(/^\\/templates\\/([^/]+)\\/(publish|unpublish)$/);
+    if (templateAction && method === "POST") {
+      const templateId = templateAction[1];
+      const action = templateAction[2];
+      const isPublished = action === "publish";
+      const { data, error } = await admin.from("bot_templates")
+        .update({ is_published: isPublished })
+        .eq("id", templateId)
+        .select("id,title,is_published")
+        .maybeSingle();
+      if (error) throw error;
+      if (!data) return json(404, { error: "template_not_found" });
+      await audit(`template.${action}`, "template", templateId, { is_published: isPublished });
+      return json(200, { template: data });
+    }
+
+    const templateDelete = path.match(/^\\/templates\\/([^/]+)$/);
+    if (templateDelete && method === "DELETE") {
+      const templateId = templateDelete[1];
+      const { error } = await admin.from("bot_templates").delete().eq("id", templateId);
+      if (error) throw error;
+      await audit("template.delete", "template", templateId, null);
+      return json(200, { ok: true });
+    }
+
     // -------------------------- BILLING -------------------------------------
     if (path === "/billing" && method === "GET") {
       const { data: rows, error } = await admin.from("v_admin_billing").select("*");
