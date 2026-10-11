@@ -86,18 +86,14 @@ function hasIdentifierOverlap(left: any, right: any) {
 
 function isInstanceOnline(...sources: any[]): boolean {
   const onlineStates = new Set(["open", "connected", "online", "authenticated", "ready"]);
-  return sources.some((source) => {
-    const state = String(
-      source?.state ??
-      source?.status ??
-      source?.connectionStatus ??
-      source?.connection_state ??
-      source?.instance?.state ??
-      source?.instance?.status ??
-      ""
-    ).trim().toLowerCase();
-    return onlineStates.has(state);
-  });
+  return sources.some((source) => [
+    source?.state,
+    source?.status,
+    source?.connectionStatus,
+    source?.connection_state,
+    source?.instance?.state,
+    source?.instance?.status,
+  ].some((value) => onlineStates.has(String(value ?? "").trim().toLowerCase())));
 }
 
 function remoteInstanceName(remote: any): string | null {
