@@ -51,7 +51,7 @@ begin
     execute 'grant select on public.v_admin_billing to service_role';
   end if;
 end;
-$;
+$$;
 
 -- Snapshot independente do bot de origem, para templates continuarem disponíveis
 -- mesmo que o bot original seja renomeado ou removido.
