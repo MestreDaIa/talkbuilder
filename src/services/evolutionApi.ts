@@ -96,6 +96,10 @@ export const evoApi = {
   async getQrCode(instanceName: string) {
     try { return await waRequest<any>(`/api/wa/instances/${enc(instanceName)}/qr`); } catch { return null; }
   },
+  /** Variante estrita para telas que precisam exibir o erro real do backend. */
+  async getQrCodeStrict(instanceName: string) {
+    return waRequest<any>(`/api/wa/instances/${enc(instanceName)}/qr`);
+  },
   async getInstanceStatus(instanceName: string) {
     try { return await waRequest<any>(`/api/wa/instances/${enc(instanceName)}/status`); } catch { return null; }
   },
