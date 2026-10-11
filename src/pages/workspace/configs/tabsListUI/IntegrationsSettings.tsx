@@ -514,12 +514,53 @@ export default function IntegrationsSettings() {
   const handleRefreshWhatsappStatus = async (name: string) => {
     try {
       const status = await evoApi.getInstanceStatus(name);
-      const newState = status?.instance?.state === "open" ? "connected" : "disconnected";
-      await supabase.from("whatsapp_connections").update({ status: newState }).eq("instance_name", name);
-      loadWhatsappConnections();
-      toast({ title: "Status atualizado" });
-    } catch (err) {
-      toast({ title: "Erro ao atualizar status", variant: "destructive" });
+
+      // getInstanceStatus pode retornar null quando o endpoint falha.
+      // Nunca converter uma falha de consulta em "offline": isso altera o estado local incorretamente.
+      if (!status || typeof status !== "object") {
+        throw new Error("Não foi possível consultar o status real da instância. O status salvo não foi alterado.");
+      }
+
+      const rawState = [
+        status?.instance?.state,
+        status?.state,
+        status?.instance?.status,
+        status?.status,
+        status?.connectionStatus,
+      ].find((value) => typeof value === "string" && value.trim());
+
+      if (!rawState) {
+        throw new Error("A API não retornou o estado da conexão. O status salvo não foi alterado.");
+      }
+
+      const normalizedState = String(rawState).trim().toLowerCase();
+      const onlineStates = new Set(["open", "connected", "online", "authenticated", "ready"]);
+      const offlineStates = new Set(["close", "closed", "disconnected", "offline", "connecting", "pairing", "qr"]);
+
+      let newState: "connected" | "disconnected";
+      if (onlineStates.has(normalizedState)) {
+        newState = "connected";
+      } else if (offlineStates.has(normalizedState)) {
+        newState = "disconnected";
+      } else {
+        throw new Error(`A API retornou um estado desconhecido (${normalizedState}). O status salvo não foi alterado.`);
+      }
+
+      const { error } = await supabase
+        .from("whatsapp_connections")
+        .update({ status: newState })
+        .eq("instance_name", name)
+        .eq("workspace_id", currentWorkspace?.id);
+
+      if (error) throw error;
+      await loadWhatsappConnections({ syncRemote: false });
+      toast({ title: "Status atualizado", description: newState === "connected" ? "A instância está online." : "A instância está offline." });
+    } catch (err: any) {
+      toast({
+        title: "Erro ao atualizar status",
+        description: err?.message || "Não foi possível consultar o status da instância.",
+        variant: "destructive",
+      });
     }
   };
 
