@@ -84,6 +84,22 @@ function hasIdentifierOverlap(left: any, right: any) {
   return collectInstanceIdentifiers(left).some((id) => rightIds.has(id));
 }
 
+function isInstanceOnline(...sources: any[]): boolean {
+  const onlineStates = new Set(["open", "connected", "online", "authenticated", "ready"]);
+  return sources.some((source) => {
+    const state = String(
+      source?.state ??
+      source?.status ??
+      source?.connectionStatus ??
+      source?.connection_state ??
+      source?.instance?.state ??
+      source?.instance?.status ??
+      ""
+    ).trim().toLowerCase();
+    return onlineStates.has(state);
+  });
+}
+
 function remoteInstanceName(remote: any): string | null {
   const value =
     remote?.name ||
@@ -431,6 +447,19 @@ export default function IntegrationsSettings() {
       let remoteDeleteError: Error | null = null;
 
       try {
+        // Uma instância online deve ser desconectada antes da exclusão.
+        // Se não conseguirmos colocá-la offline, interrompemos para evitar remover uma integração ativa.
+        if (isInstanceOnline(current, matchingRemote)) {
+          const loggedOut = await evoApi.logoutInstance(name);
+          if (!loggedOut) {
+            throw new Error("A instância está online e não foi possível colocá-la offline. Nenhuma exclusão foi realizada.");
+          }
+          const afterLogout = await evoApi.getInstanceStatus(name);
+          if (isInstanceOnline(afterLogout)) {
+            throw new Error("A instância continua online. Desconecte-a antes de excluir.");
+          }
+        }
+
         const removed = await evoApi.deleteInstance(name);
         if (!removed) throw new Error("A instância não foi removida no serviço WhatsApp.");
       } catch (err: any) {
