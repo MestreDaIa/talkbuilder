@@ -444,22 +444,22 @@ export default function IntegrationsSettings() {
         .map((conn: any) => conn.id)
         .filter(Boolean);
       if (!targetIds.includes(id)) targetIds.push(id);
+      // Primeiro colocamos a instância offline. Falha aqui aborta a operação
+      // sem ocultar a conexão local nem tentar apagar a instância remota.
+      if (isInstanceOnline(current, matchingRemote)) {
+        const loggedOut = await evoApi.logoutInstance(name);
+        if (!loggedOut) {
+          throw new Error("A instância está online e não foi possível colocá-la offline. Nenhuma exclusão foi realizada.");
+        }
+        const afterLogout = await evoApi.getInstanceStatus(name);
+        if (isInstanceOnline(afterLogout)) {
+          throw new Error("A instância continua online. Desconecte-a antes de excluir.");
+        }
+      }
+
       let remoteDeleteError: Error | null = null;
 
       try {
-        // Uma instância online deve ser desconectada antes da exclusão.
-        // Se não conseguirmos colocá-la offline, interrompemos para evitar remover uma integração ativa.
-        if (isInstanceOnline(current, matchingRemote)) {
-          const loggedOut = await evoApi.logoutInstance(name);
-          if (!loggedOut) {
-            throw new Error("A instância está online e não foi possível colocá-la offline. Nenhuma exclusão foi realizada.");
-          }
-          const afterLogout = await evoApi.getInstanceStatus(name);
-          if (isInstanceOnline(afterLogout)) {
-            throw new Error("A instância continua online. Desconecte-a antes de excluir.");
-          }
-        }
-
         const removed = await evoApi.deleteInstance(name);
         if (!removed) throw new Error("A instância não foi removida no serviço WhatsApp.");
       } catch (err: any) {
@@ -472,7 +472,6 @@ export default function IntegrationsSettings() {
         const { error } = await supabase
           .from("whatsapp_connections")
           .update({
-            status: "deleted",
             settings: {
               ...settingsObject(current?.settings),
               flow_hidden: true,
@@ -492,7 +491,6 @@ export default function IntegrationsSettings() {
         const { error } = await supabase
           .from("whatsapp_connections")
           .update({
-            status: "deleted",
             settings: {
               ...settingsObject(current?.settings),
               flow_hidden: true,
