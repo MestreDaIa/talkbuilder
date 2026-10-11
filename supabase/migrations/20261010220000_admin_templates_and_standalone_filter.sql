@@ -40,7 +40,7 @@ grant select on public.v_admin_workspaces to service_role;
 -- Estas views contêm dados globais de administração e são acessadas pelo admin-api.
 -- Verificamos a existência antes de alterar permissões para manter a migration compatível
 -- com ambientes onde a extensão de Bots/Billing ainda não foi instalada.
-do $
+do $$
 begin
   if to_regclass('public.v_admin_bots') is not null then
     execute 'revoke select on public.v_admin_bots from anon, authenticated';
