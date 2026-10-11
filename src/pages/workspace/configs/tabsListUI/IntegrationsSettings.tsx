@@ -401,17 +401,23 @@ export default function IntegrationsSettings() {
     try {
       setQrCodeData(null);
       setShowQrModal(true);
-      const result = await evoApi.getQrCode(name);
-      if (result?.base64) {
-        setQrCodeData(result.base64);
+      const result = await evoApi.getQrCodeStrict(name);
+      if (result?.base64 || result?.qrcode?.base64) {
+        setQrCodeData(result.base64 || result.qrcode.base64);
         startPolling(name);
       } else if (result?.code === "instance_already_connected") {
           toast({ title: "Instância já está conectada" });
           setShowQrModal(false);
           loadWhatsappConnections();
+      } else {
+        throw new Error("O serviço WhatsApp respondeu sem QR Code. Verifique o estado da instância no backend.");
       }
-    } catch (err) {
-      toast({ title: "Erro ao buscar QR Code", variant: "destructive" });
+    } catch (err: any) {
+      toast({
+        title: "Erro ao buscar QR Code",
+        description: err?.message || "A API não conseguiu gerar o QR Code.",
+        variant: "destructive",
+      });
       setShowQrModal(false);
     }
   };
