@@ -34,19 +34,25 @@ function json(status: number, body: unknown) {
 function sanitizeTemplateValue(value: unknown): any {
   if (Array.isArray(value)) return value.map(sanitizeTemplateValue);
   if (!value || typeof value !== "object") return value;
-  const secretKey = /(authorization|password|passwd|secret|api[_-]?key|access[_-]?token|refresh[_-]?token|private[_-]?key|^token$|^bearer$)/i;
+
+  // IA keys são configuração privada do dono do bot, não fazem parte do template.
+  // Removemos os campos em vez de apenas zerá-los para não publicar a estrutura de credenciais.
+  const secretKey = /(authorization|password|passwd|secret|api[_-]?key|access[_-]?token|refresh[_-]?token|private[_-]?key|ai[_-]?keys?|openai[_-]?key|anthropic[_-]?key|google[_-]?key|gemini[_-]?key|^token$|^bearer$)/i;
   const entries = Object.entries(value as Record<string, unknown>);
   const containsSecretField = entries.some(([key, nested]) =>
     ["key", "name", "header", "field"].includes(key.toLowerCase()) &&
     typeof nested === "string" && secretKey.test(nested)
   );
+
   return Object.fromEntries(
-    entries.map(([key, nested]) => {
-      const normalizedKey = key.toLowerCase();
-      const secretValueField = containsSecretField &&
-        ["value", "content", "defaultvalue", "default_value"].includes(normalizedKey);
-      return [key, secretKey.test(key) || secretValueField ? "" : sanitizeTemplateValue(nested)];
-    }),
+    entries
+      .filter(([key, nested]) => {
+        const normalizedKey = key.toLowerCase();
+        const secretValueField = containsSecretField &&
+          ["value", "content", "defaultvalue", "default_value"].includes(normalizedKey);
+        return !secretKey.test(key) && !secretValueField;
+      })
+      .map(([key, nested]) => [key, sanitizeTemplateValue(nested)]),
   );
 }
 
