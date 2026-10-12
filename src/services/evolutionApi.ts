@@ -107,6 +107,10 @@ export const evoApi = {
   async getInstanceStatus(instanceName: string) {
     try { return await waRequest<any>(`/api/wa/instances/${enc(instanceName)}/status`); } catch { return null; }
   },
+  /** Variante estrita: permite distinguir instância inexistente de falha de consulta. */
+  async getInstanceStatusStrict(instanceName: string) {
+    return waRequest<any>(`/api/wa/instances/${enc(instanceName)}/status`);
+  },
 
   // --- Webhook / Settings ---------------------------------------------------
   async fetchWebhook(instanceName: string) {
