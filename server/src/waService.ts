@@ -425,7 +425,7 @@ export function waApi(apiKey: string) {
     logoutInstance: (name: string) =>
       call<any>(`/v1/instances/${encodeURIComponent(name)}/logout`, { method: "POST" }),
     getQrCode: (name: string) =>
-      call<any>(`/v1/instances/${encodeURIComponent(name)}/connect`, { method: "POST" }),
+      call<any>(`/v1/instances/${encodeURIComponent(name)}/connect`, { method: "POST", body: {} }),
     getStatus: (name: string) =>
       call<any>(`/v1/instances/${encodeURIComponent(name)}/connectionState`),
     refreshStatus: (name: string) =>
