@@ -444,7 +444,46 @@ export function waApi(apiKey: string) {
       if (!id) {
         throw new Error(`wa-service: não encontrei o UUID da instância "${name}" no tenant atual`);
       }
-      return call<any>(`/v1/instances/${encodeURIComponent(id)}/connect`, { method: "POST", body: {} });
+      const response: any = await call<any>(`/v1/instances/${encodeURIComponent(id)}/connect`, { method: "POST", body: {} });
+
+      // Normalize the wa-service response for the Flow UI. The Hub may expose
+      // the Evolution QR as qr_code, base64, qrcode.base64, or inside data.
+      const qr = [
+        response?.qr_code,
+        response?.qrCode,
+        response?.base64,
+        response?.qrcode?.base64,
+        response?.qrcode?.qr_code,
+        response?.data?.qr_code,
+        response?.data?.qrCode,
+        response?.data?.base64,
+        response?.data?.qrcode?.base64,
+      ].find((value) => typeof value === "string" && value.trim().length > 0) || null;
+      const pairingCode =
+        response?.pairing_code ??
+        response?.pairingCode ??
+        response?.qrcode?.pairingCode ??
+        response?.data?.pairing_code ??
+        response?.data?.pairingCode ??
+        null;
+
+      if (!qr) {
+        console.warn("[wa-service] connect sem imagem QR para Flow", {
+          instanceId: id,
+          responseKeys: response && typeof response === "object" ? Object.keys(response) : [],
+          nestedKeys: response?.data && typeof response.data === "object" ? Object.keys(response.data) : [],
+        });
+      }
+
+      // Preserve upstream fields and expose the aliases consumed by UI variants.
+      return {
+        ...(response && typeof response === "object" ? response : {}),
+        qr_code: qr,
+        qrCode: qr,
+        base64: qr,
+        pairing_code: pairingCode,
+        pairingCode,
+      };
     },
     getStatus: (name: string) =>
       call<any>(`/v1/instances/${encodeURIComponent(name)}/connectionState`),
