@@ -96,6 +96,23 @@ function isInstanceOnline(...sources: any[]): boolean {
   ].some((value) => onlineStates.has(String(value ?? "").trim().toLowerCase())));
 }
 
+function normalizeRemoteConnectionStatus(source: any): string {
+  const raw = [
+    source?.state,
+    source?.status,
+    source?.connectionStatus,
+    source?.connection_state,
+    source?.instance?.state,
+    source?.instance?.status,
+  ].find((value) => typeof value === "string" && value.trim());
+  const state = String(raw ?? "").trim().toLowerCase();
+  if (["open", "connected", "online", "authenticated", "ready"].includes(state)) return "connected";
+  if (["close", "closed", "disconnected", "offline"].includes(state)) return "disconnected";
+  if (["qrcode", "qr", "qr_code", "waiting_qr"].includes(state)) return "qrcode";
+  if (["connecting", "pairing", "connection_pending"].includes(state)) return "connecting";
+  return state || "disconnected";
+}
+
 function remoteInstanceName(remote: any): string | null {
   const value =
     remote?.name ||
@@ -284,16 +301,64 @@ export default function IntegrationsSettings() {
         // Trazemos apenas as que ainda não existem localmente e que não foram
         // removidas/ocultadas antes neste workspace, mesmo quando o wa-service
         // retorna outro identificador para a mesma instância.
-        const remote = await evoApi.fetchInstances().catch((err) => {
+        let remoteFetchSucceeded = true;
+        const remote = await evoApi.listInstancesStrict().catch((err) => {
+          remoteFetchSucceeded = false;
           console.warn("[wa-service] fetch instances falhou:", err);
           return [];
         });
-        const known = isBookingWorkspace ? list : list.filter((conn: any) => !isLocallyRemovedConnection(conn));
+        let known = isBookingWorkspace ? list : list.filter((conn: any) => !isLocallyRemovedConnection(conn));
         const tombstones = isBookingWorkspace ? [] : list.filter(isLocallyRemovedConnection);
+        let statusChanged = false;
+        let orphanIds: string[] = [];
+
+        if (remoteFetchSucceeded) {
+          // O status de conexão vem do serviço compartilhado; assim, logout/conexão
+          // realizados no Booking também atualizam o cartão do Flow.
+          for (const conn of known) {
+            const match = remote.find((item: any) => hasIdentifierOverlap(conn, item));
+            if (!match) continue;
+            const nextStatus = normalizeRemoteConnectionStatus(match);
+            if (conn.status !== nextStatus) {
+              const { error: statusError } = await supabase
+                .from("whatsapp_connections")
+                .update({ status: nextStatus })
+                .eq("id", conn.id)
+                .eq("workspace_id", currentWorkspace.id);
+              if (!statusError) {
+                conn.status = nextStatus;
+                statusChanged = true;
+              } else {
+                console.warn("[wa-service] status local não atualizado:", statusError.message);
+              }
+            }
+          }
+
+          // Em modo espelho, registros locais sem equivalente remoto são órfãos
+          // (ex.: instância apagada pelo Booking). Removemos apenas após uma
+          // listagem remota bem-sucedida, nunca quando a API falha.
+          if (isBookingWorkspace) {
+            orphanIds = known
+              .filter((conn: any) => !(remote || []).some((item: any) => hasIdentifierOverlap(conn, item)))
+              .map((conn: any) => conn.id)
+              .filter(Boolean);
+            if (orphanIds.length) {
+              const { error: orphanError } = await supabase
+                .from("whatsapp_connections")
+                .delete()
+                .eq("workspace_id", currentWorkspace.id)
+                .in("id", orphanIds);
+              if (orphanError) throw orphanError;
+              list = list.filter((conn: any) => !orphanIds.includes(conn.id));
+              known = known.filter((conn: any) => !orphanIds.includes(conn.id));
+            }
+          }
+        }
+
         const missing = (remote || [])
           .map((r: any) => ({
             instance_name: remoteInstanceName(r),
-            status: r?.status || r?.connectionStatus || r?.state || "disconnected",
+            status: normalizeRemoteConnectionStatus(r),
             settings: r,
           }))
           .filter((r: any) => {
@@ -303,7 +368,7 @@ export default function IntegrationsSettings() {
             return true;
           });
 
-        if (missing.length || forceRemotePersist) {
+        if (missing.length || forceRemotePersist || statusChanged || orphanIds.length) {
           const rows = missing.map((m: any) => ({
             workspace_id: currentWorkspace.id,
             instance_name: m.instance_name,
@@ -312,7 +377,8 @@ export default function IntegrationsSettings() {
             settings: m.settings,
           }));
           if (rows.length) {
-            await supabase.from("whatsapp_connections").insert(rows);
+            const { error: insertError } = await supabase.from("whatsapp_connections").insert(rows);
+            if (insertError) throw insertError;
           }
           const { data: refreshed } = await supabase
             .from("whatsapp_connections")
