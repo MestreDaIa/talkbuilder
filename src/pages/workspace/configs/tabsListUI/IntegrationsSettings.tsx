@@ -562,6 +562,14 @@ export default function IntegrationsSettings() {
         if (!/\b404\b|not found|instance_not_found|does not exist/i.test(message)) {
           throw new Error("Não foi possível confirmar o status real da instância. Nenhuma exclusão foi realizada.");
         }
+        // Se o inventário ainda lista a instância, um 404 no endpoint de status
+        // não prova que ela foi removida. Não apague o registro local nesse caso,
+        // pois a sincronização o recriaria imediatamente.
+        if (matchingRemote) {
+          throw new Error(
+            `O serviço ainda lista "${remoteOperationName}", mas não encontrou essa instância no endpoint de status. Nenhuma exclusão foi realizada; atualize a lista e tente novamente.`
+          );
+        }
         remoteAlreadyGone = true;
       }
 
