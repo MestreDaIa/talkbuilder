@@ -200,7 +200,7 @@ export default function IntegrationsSettings() {
       // Refaz o vínculo com o wa-service (tenant compartilhado com o Zailom Booking)
       await evoApi.reprovision();
       const remote = await evoApi.listInstancesStrict();
-      await loadWhatsappConnections({ syncRemote: true, forceRemotePersist: true });
+      const visibleCount = await loadWhatsappConnections({ syncRemote: true, forceRemotePersist: true });
       if (!remote.length) {
         const diag = await evoApi.diagnose().catch(() => null);
         console.warn("[wa-service] diagnóstico:", diag);
@@ -212,7 +212,13 @@ export default function IntegrationsSettings() {
           variant: "destructive",
         });
       } else {
-        toast({ title: `${remote.length} instância(s) sincronizada(s)` });
+        const count = typeof visibleCount === "number" ? visibleCount : connections.length;
+        toast({
+          title: `${count} instância(s) visível(is) no Flow`,
+          description: remote.length !== count
+            ? `${remote.length} instância(s) existem no serviço compartilhado; conexões ocultadas/removidas neste workspace não são exibidas.`
+            : undefined,
+        });
       }
     } catch (err: any) {
       toast({ title: "Falha ao sincronizar", description: err?.message, variant: "destructive" });
@@ -305,6 +311,7 @@ export default function IntegrationsSettings() {
         return !tombstones.some((removed: any) => hasIdentifierOverlap(removed, conn));
       });
       setConnections(visible);
+      return visible.length;
     } catch (err) {
       console.error("Erro ao carregar conexões WhatsApp:", err);
       if (!silent) {
@@ -448,7 +455,10 @@ export default function IntegrationsSettings() {
       if (!targetIds.includes(id)) targetIds.push(id);
       // Primeiro colocamos a instância offline. Falha aqui aborta a operação
       // sem ocultar a conexão local nem tentar apagar a instância remota.
-      if (isInstanceOnline(current, matchingRemote)) {
+      // Só tenta desconectar quando a instância realmente existe no serviço remoto
+      // e o estado remoto confirma que ela está online. Dados locais antigos não
+      // podem impedir a remoção de uma instância já apagada na origem.
+      if (matchingRemote && isInstanceOnline(matchingRemote)) {
         const loggedOut = await evoApi.logoutInstance(name);
         if (!loggedOut) {
           throw new Error("A instância está online e não foi possível colocá-la offline. Nenhuma exclusão foi realizada.");
