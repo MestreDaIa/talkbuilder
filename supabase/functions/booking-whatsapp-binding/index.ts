@@ -77,9 +77,36 @@ Deno.serve(async (req) => {
     const { data: flow } = await admin.from("chatbot_flows").select("public_id, name, is_published")
       .eq("workspace_id", workspaceId).eq("public_id", botPublicId).eq("is_published", true).maybeSingle();
     if (!flow) return json({ error: "published_bot_not_found" }, 404);
-    const { data, error } = await admin.from("whatsapp_bindings").upsert({ instance_name: instanceName, bot_public_id: botPublicId, updated_at: new Date().toISOString() }, { onConflict: "instance_name" }).select("instance_name, bot_public_id, updated_at").single();
-    if (error) return json({ error: "binding_write_failed", details: error.message }, 500);
-    return json({ binding: { ...data, bot_name: flow.name } });
+    // Do not assume instance_name has a UNIQUE constraint in every deployed
+    // Flow database. Read first, then update the existing row or insert a new one.
+    const { data: currentBinding, error: readBindingError } = await admin
+      .from("whatsapp_bindings")
+      .select("instance_name")
+      .eq("instance_name", instanceName)
+      .maybeSingle();
+    if (readBindingError) {
+      return json({ error: "binding_read_failed", details: readBindingError.message }, 500);
+    }
+
+    const bindingPayload = {
+      bot_public_id: botPublicId,
+      updated_at: new Date().toISOString(),
+    };
+    const write = currentBinding
+      ? await admin.from("whatsapp_bindings")
+          .update(bindingPayload)
+          .eq("instance_name", instanceName)
+          .select("instance_name, bot_public_id, updated_at")
+          .single()
+      : await admin.from("whatsapp_bindings")
+          .insert({ instance_name: instanceName, ...bindingPayload })
+          .select("instance_name, bot_public_id, updated_at")
+          .single();
+
+    if (write.error) {
+      return json({ error: "binding_write_failed", details: write.error.message }, 500);
+    }
+    return json({ binding: { ...write.data, bot_name: flow.name } });
   }
   if (body.action === "delete") {
     const { data: current, error: currentError } = await admin.from("whatsapp_bindings")
