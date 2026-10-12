@@ -113,6 +113,13 @@ export default function WhatsAppInstanceSettings({ instanceName, isOpen, onClose
     ignoreJids: "",
   });
 
+  // Marca alterações locais para impedir que a sincronização periódica sobrescreva
+  // o que o usuário está editando antes de salvar.
+  const updateBotSettings = (patch: Partial<typeof botSettings>) => {
+    setBotSettings((current) => ({ ...current, ...patch }));
+    setBotDirty(true);
+  };
+
   useEffect(() => {
     if (isOpen && instanceName) {
       loadInstanceData();
