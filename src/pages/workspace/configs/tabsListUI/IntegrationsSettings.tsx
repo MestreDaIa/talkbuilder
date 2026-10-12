@@ -116,21 +116,29 @@ function normalizeRemoteConnectionStatus(source: any): string {
 }
 
 function remoteInstanceName(remote: any): string | null {
+  // O nome da linha do inventário pode ser apenas um alias local. Para chamadas
+  // de status/exclusão, priorize sempre o nome real registrado na Evolution.
   const value =
-    remote?.name ||
-    remote?.instanceName ||
-    remote?.instance_name ||
-    remote?.label ||
-    remote?.display_name ||
+    remote?.evolution_instance_name ||
+    remote?.evolutionInstanceName ||
+    remote?.instance?.evolution_instance_name ||
+    remote?.instance?.evolutionInstanceName ||
+    remote?.metadata?.evolution_instance_name ||
+    remote?.metadata?.evolutionInstanceName ||
+    remote?.metadata?.wa_service_response?.evolution_instance_name ||
+    remote?.metadata?.wa_service_response?.evolutionInstanceName ||
+    remote?.instance?.metadata?.evolution_instance_name ||
+    remote?.instance?.metadata?.evolutionInstanceName ||
     remote?.instance?.name ||
     remote?.instance?.instanceName ||
     remote?.instance?.instance_name ||
-    remote?.instance?.evolution_instance_name ||
-    remote?.instance?.evolutionInstanceName ||
-    remote?.evolution_instance_name ||
-    remote?.evolutionInstanceName ||
+    remote?.name ||
+    remote?.instanceName ||
+    remote?.instance_name ||
     remote?.instance?.label ||
-    remote?.instance?.display_name;
+    remote?.instance?.display_name ||
+    remote?.label ||
+    remote?.display_name;
   return value ? String(value) : null;
 }
 
@@ -531,9 +539,9 @@ export default function IntegrationsSettings() {
       // usar o nome canônico do wa-service para evitar 404 falso e recriação no sync.
       const currentSettings = settingsObject(current?.settings);
       const remoteOperationName =
-        remoteInstanceName(matchingRemote) ||
         currentSettings.evolution_instance_name ||
         currentSettings.evolutionInstanceName ||
+        remoteInstanceName(matchingRemote) ||
         name;
       const hiddenIdentifiers = Array.from(new Set([
         ...collectInstanceIdentifiers(current),
