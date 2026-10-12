@@ -123,6 +123,8 @@ function remoteInstanceName(remote: any): string | null {
     remote?.evolutionInstanceName ||
     remote?.instance?.evolution_instance_name ||
     remote?.instance?.evolutionInstanceName ||
+    remote?.settings?.evolution_instance_name ||
+    remote?.settings?.evolutionInstanceName ||
     remote?.metadata?.evolution_instance_name ||
     remote?.metadata?.evolutionInstanceName ||
     remote?.metadata?.wa_service_response?.evolution_instance_name ||
