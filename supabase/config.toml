@@ -28,4 +28,5 @@ verify_jwt = false
 [functions.whatsapp-webhook]
 verify_jwt = false
 
-
+[functions.booking-whatsapp-binding]
+verify_jwt = false
