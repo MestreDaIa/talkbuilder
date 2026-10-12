@@ -352,6 +352,7 @@ export default function WhatsAppInstanceSettings({ instanceName, isOpen, onClose
       toast({ title: "Evolution Bot e Vínculo removidos com sucesso!" });
       setBotSettings(prev => ({ ...prev, enabled: false }));
       setSelectedBotId("");
+      setBotDirty(false);
     } catch (err: any) {
       toast({ title: "Erro ao remover Evolution Bot", description: err.message, variant: "destructive" });
     } finally {
