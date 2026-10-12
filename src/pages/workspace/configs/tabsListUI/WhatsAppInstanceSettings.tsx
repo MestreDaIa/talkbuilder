@@ -55,6 +55,7 @@ export default function WhatsAppInstanceSettings({ instanceName, isOpen, onClose
   // Bots list for linking
   const [availableBots, setAvailableBots] = useState<any[]>([]);
   const [selectedBotId, setSelectedBotId] = useState<string>("");
+  const [botDirty, setBotDirty] = useState(false);
 
   // Webhook State
   const [webhookByEvents, setWebhookByEvents] = useState(true);
@@ -118,6 +119,70 @@ export default function WhatsAppInstanceSettings({ instanceName, isOpen, onClose
     }
   }, [isOpen, instanceName]);
 
+  useEffect(() => {
+    if (!isOpen || !instanceName || botDirty) return;
+    let cancelled = false;
+
+    const syncSharedBotState = async () => {
+      try {
+        const [botData, bindingResult] = await Promise.all([
+          evoApi.fetchEvolutionBot(instanceName),
+          supabase.from("whatsapp_bindings").select("bot_public_id").eq("instance_name", instanceName).limit(1),
+        ]);
+        if (cancelled) return;
+        const b = botData?.evolutionBot || botData?.bot || botData || {};
+        setBotSettings((current) => ({
+          ...current,
+          enabled: b.enabled ?? false,
+          description: b.description ?? "Evolution Bot Settings",
+          apiUrl: b.apiUrl || current.apiUrl,
+          apiKey: b.apiKey ?? "",
+          triggerType: b.triggerType || "Keyword",
+          triggerKeyword: b.triggerKeyword || b.triggerValue || "",
+          triggerOperator: b.triggerOperator || "Contains",
+          expire: b.expire ?? 300,
+          keywordFinish: b.keywordFinish ?? "bye",
+          delayMessage: b.delayMessage ?? 1000,
+          unknownMessage: b.unknownMessage ?? "Sorry, I dont understand",
+          listeningFromMe: !!b.listeningFromMe,
+          stopBotFromMe: !!b.stopBotFromMe,
+          keepOpen: !!b.keepOpen,
+          debounceTime: b.debounceTime ?? 1,
+          splitMessages: !!b.splitMessages,
+          ignoreJids: b.ignoreJids ? (Array.isArray(b.ignoreJids) ? b.ignoreJids.join(", ") : b.ignoreJids) : "",
+        }));
+        const binding = bindingResult.data?.[0]?.bot_public_id ?? "";
+        setSelectedBotId((current) => current === binding ? current : binding);
+      } catch (error) {
+        console.warn("[Evolution Bot] Falha ao sincronizar estado compartilhado:", error);
+      }
+    };
+
+    void syncSharedBotState();
+    const timer = window.setInterval(() => void syncSharedBotState(), 8000);
+    const channel = supabase
+      .channel(`whatsapp-binding-${instanceName}`)
+      .on("postgres_changes", {
+        event: "*",
+        schema: "public",
+        table: "whatsapp_bindings",
+        filter: `instance_name=eq.${instanceName}`,
+      }, (payload) => {
+        if (cancelled) return;
+        const next = (payload.new as any)?.bot_public_id ?? "";
+        setSelectedBotId((current) => current === next ? current : next);
+      })
+      .subscribe();
+
+    return () => {
+      cancelled = true;
+      window.clearInterval(timer);
+      void supabase.removeChannel(channel);
+    };
+  }, [isOpen, instanceName, botDirty]);
+
+
+
   const loadInstanceData = async () => {
     setLoading(true);
     try {
@@ -131,10 +196,14 @@ export default function WhatsAppInstanceSettings({ instanceName, isOpen, onClose
         supabase.from("whatsapp_bindings").select("*").eq("instance_name", instanceName).limit(1)
       ]);
 
-      setAvailableBots(flows || []);
+      setAvailableBots((flows || []).filter((flow: any) => flow.is_published));
       if (bindings && bindings.length > 0) {
         setSelectedBotId(bindings[0].bot_public_id);
+      } else {
+        setSelectedBotId("");
+      setBotDirty(false);
       }
+      setBotDirty(false);
 
       console.log("Instance data:", instanceData);
       console.log("Settings data:", settingsData);
@@ -260,6 +329,7 @@ export default function WhatsAppInstanceSettings({ instanceName, isOpen, onClose
 
       if (bindError) throw bindError;
 
+      setBotDirty(false);
       toast({ title: "Evolution Bot e Vínculo atualizados com sucesso!" });
     } catch (err: any) {
       console.error("Erro ao salvar bot/vínculo:", err);
@@ -566,7 +636,7 @@ export default function WhatsAppInstanceSettings({ instanceName, isOpen, onClose
                       <div className="flex items-center gap-2">
                         <Switch 
                           checked={botSettings.enabled} 
-                          onCheckedChange={(val) => setBotSettings(s => ({...s, enabled: val}))} 
+                          onCheckedChange={(val) => updateBotSettings({ enabled: val })} 
                         />
                         <Label className="text-xs font-medium">Habilitar Bot</Label>
                       </div>
@@ -583,7 +653,7 @@ export default function WhatsAppInstanceSettings({ instanceName, isOpen, onClose
                           <select 
                             className="flex h-9 w-full rounded-md border border-input bg-background px-3 py-1 text-xs shadow-sm focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
                             value={selectedBotId}
-                            onChange={(e) => setSelectedBotId(e.target.value)}
+                            onChange={(e) => { setSelectedBotId(e.target.value); setBotDirty(true); }}
                           >
                             <option value="">Selecione um Bot publicado...</option>
                             {availableBots.map(bot => (
@@ -605,7 +675,7 @@ export default function WhatsAppInstanceSettings({ instanceName, isOpen, onClose
                           <Label className="text-xs font-bold uppercase text-muted-foreground">Descrição</Label>
                           <Input 
                             value={botSettings.description}
-                            onChange={(e) => setBotSettings(s => ({...s, description: e.target.value}))}
+                            onChange={(e) => updateBotSettings({ description: e.target.value })}
                             className="text-xs"
                           />
                         </div>
@@ -613,7 +683,7 @@ export default function WhatsAppInstanceSettings({ instanceName, isOpen, onClose
                           <Label className="text-xs font-bold uppercase text-muted-foreground">API URL</Label>
                           <Input 
                             value={botSettings.apiUrl}
-                            onChange={(e) => setBotSettings(s => ({...s, apiUrl: e.target.value}))}
+                            onChange={(e) => updateBotSettings({ apiUrl: e.target.value })}
                             placeholder="https://sua-api.com/bot"
                             className="text-xs"
                           />
@@ -626,7 +696,7 @@ export default function WhatsAppInstanceSettings({ instanceName, isOpen, onClose
                           <Input 
                             type="password"
                             value={botSettings.apiKey}
-                            onChange={(e) => setBotSettings(s => ({...s, apiKey: e.target.value}))}
+                            onChange={(e) => updateBotSettings({ apiKey: e.target.value })}
                             placeholder="Key do Typebot ou API externa"
                             className="text-xs"
                           />
@@ -636,7 +706,7 @@ export default function WhatsAppInstanceSettings({ instanceName, isOpen, onClose
                           <select 
                             className="flex h-9 w-full rounded-md border border-input bg-transparent px-3 py-1 text-xs shadow-sm focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
                             value={botSettings.triggerType}
-                            onChange={(e) => setBotSettings(s => ({...s, triggerType: e.target.value}))}
+                            onChange={(e) => updateBotSettings({ triggerType: e.target.value })}
                           >
                             <option value="Keyword">Keyword</option>
                             <option value="All">All</option>
@@ -649,7 +719,7 @@ export default function WhatsAppInstanceSettings({ instanceName, isOpen, onClose
                               <select 
                                 className="flex h-9 w-full rounded-md border border-input bg-transparent px-3 py-1 text-xs shadow-sm focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
                                 value={botSettings.triggerOperator}
-                                onChange={(e) => setBotSettings(s => ({...s, triggerOperator: e.target.value}))}
+                                onChange={(e) => updateBotSettings({ triggerOperator: e.target.value })}
                               >
                                 <option value="Contains">Contains</option>
                                 <option value="Equals">Equals</option>
@@ -660,7 +730,7 @@ export default function WhatsAppInstanceSettings({ instanceName, isOpen, onClose
                               <Label className="text-xs font-bold uppercase text-muted-foreground">Trigger Keyword</Label>
                               <Input 
                                 value={botSettings.triggerKeyword}
-                                onChange={(e) => setBotSettings(s => ({...s, triggerKeyword: e.target.value}))}
+                                onChange={(e) => updateBotSettings({ triggerKeyword: e.target.value })}
                                 placeholder="Palavra-chave"
                                 className="text-xs"
                               />
@@ -676,7 +746,7 @@ export default function WhatsAppInstanceSettings({ instanceName, isOpen, onClose
                           <Label className="text-xs font-bold uppercase text-muted-foreground">Keyword Finish</Label>
                           <Input 
                             value={botSettings.keywordFinish}
-                            onChange={(e) => setBotSettings(s => ({...s, keywordFinish: e.target.value}))}
+                            onChange={(e) => updateBotSettings({ keywordFinish: e.target.value })}
                             placeholder="ex: sair"
                             className="text-xs"
                           />
@@ -686,7 +756,7 @@ export default function WhatsAppInstanceSettings({ instanceName, isOpen, onClose
                           <Input 
                             type="number"
                             value={botSettings.expire}
-                            onChange={(e) => setBotSettings(s => ({...s, expire: parseInt(e.target.value) || 0}))}
+                            onChange={(e) => updateBotSettings({ expire: parseInt(e.target.value) || 0 })}
                             className="text-xs"
                           />
                         </div>
@@ -695,7 +765,7 @@ export default function WhatsAppInstanceSettings({ instanceName, isOpen, onClose
                           <Input 
                             type="number"
                             value={botSettings.delayMessage}
-                            onChange={(e) => setBotSettings(s => ({...s, delayMessage: parseInt(e.target.value) || 0}))}
+                            onChange={(e) => updateBotSettings({ delayMessage: parseInt(e.target.value) || 0 })}
                             className="text-xs"
                           />
                         </div>
@@ -704,7 +774,7 @@ export default function WhatsAppInstanceSettings({ instanceName, isOpen, onClose
                           <Input 
                             type="number"
                             value={botSettings.debounceTime}
-                            onChange={(e) => setBotSettings(s => ({...s, debounceTime: parseInt(e.target.value) || 0}))}
+                            onChange={(e) => updateBotSettings({ debounceTime: parseInt(e.target.value) || 0 })}
                             className="text-xs"
                           />
                         </div>
@@ -714,7 +784,7 @@ export default function WhatsAppInstanceSettings({ instanceName, isOpen, onClose
                         <Label className="text-xs font-bold uppercase text-muted-foreground">Mensagem Desconhecida</Label>
                         <Input 
                           value={botSettings.unknownMessage}
-                          onChange={(e) => setBotSettings(s => ({...s, unknownMessage: e.target.value}))}
+                          onChange={(e) => updateBotSettings({ unknownMessage: e.target.value })}
                           className="text-xs"
                         />
                       </div>
@@ -724,28 +794,28 @@ export default function WhatsAppInstanceSettings({ instanceName, isOpen, onClose
                           <Label className="text-xs font-medium">Ouvir minhas mensagens</Label>
                           <Switch 
                             checked={botSettings.listeningFromMe} 
-                            onCheckedChange={(val) => setBotSettings(s => ({...s, listeningFromMe: val}))} 
+                            onCheckedChange={(val) => updateBotSettings({ listeningFromMe: val })} 
                           />
                         </div>
                         <div className="flex items-center justify-between p-3 border rounded-lg bg-card shadow-sm">
                           <Label className="text-xs font-medium">Parar bot de mim</Label>
                           <Switch 
                             checked={botSettings.stopBotFromMe} 
-                            onCheckedChange={(val) => setBotSettings(s => ({...s, stopBotFromMe: val}))} 
+                            onCheckedChange={(val) => updateBotSettings({ stopBotFromMe: val })} 
                           />
                         </div>
                         <div className="flex items-center justify-between p-3 border rounded-lg bg-card shadow-sm">
                           <Label className="text-xs font-medium">Manter Aberto</Label>
                           <Switch 
                             checked={botSettings.keepOpen} 
-                            onCheckedChange={(val) => setBotSettings(s => ({...s, keepOpen: val}))} 
+                            onCheckedChange={(val) => updateBotSettings({ keepOpen: val })} 
                           />
                         </div>
                         <div className="flex items-center justify-between p-3 border rounded-lg bg-card shadow-sm">
                           <Label className="text-xs font-medium">Dividir Mensagens</Label>
                           <Switch 
                             checked={botSettings.splitMessages} 
-                            onCheckedChange={(val) => setBotSettings(s => ({...s, splitMessages: val}))} 
+                            onCheckedChange={(val) => updateBotSettings({ splitMessages: val })} 
                           />
                         </div>
                       </div>
@@ -754,7 +824,7 @@ export default function WhatsAppInstanceSettings({ instanceName, isOpen, onClose
                         <Label className="text-xs font-bold uppercase text-muted-foreground">Ignorar JIDs (separados por vírgula)</Label>
                         <Input 
                           value={botSettings.ignoreJids}
-                          onChange={(e) => setBotSettings(s => ({...s, ignoreJids: e.target.value}))}
+                          onChange={(e) => updateBotSettings({ ignoreJids: e.target.value })}
                           placeholder="ex: 123@s.whatsapp.net, 456@g.us"
                           className="text-xs"
                         />
