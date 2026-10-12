@@ -471,47 +471,47 @@ export default function IntegrationsSettings() {
         .map((conn: any) => conn.id)
         .filter(Boolean);
       if (!targetIds.includes(id)) targetIds.push(id);
-      // Em um workspace provisionado pelo Booking, só permitimos exclusão
-      // quando o status real confirma que a instância está offline. Uma falha
-      // na consulta não pode ser interpretada como offline.
-      if (matchingRemote) {
-        let liveStatus: any = null;
-        try {
-          liveStatus = await evoApi.getInstanceStatusStrict(name);
-        } catch (statusError: any) {
-          const message = String(statusError?.message || statusError || "");
-          if (!/\\b404\\b|not found|instance_not_found|does not exist/i.test(message)) {
-            throw new Error("Não foi possível confirmar o status real da instância. Nenhuma exclusão foi realizada.");
-          }
-          // 404: o serviço já não tem a instância; o DELETE abaixo fará a reconciliação.
+      // Exclusão segura: só remove uma instância existente se o status real
+      // confirmar que ela está offline. Falha de consulta nunca significa offline.
+      let remoteAlreadyGone = false;
+      let liveStatus: any = null;
+      try {
+        liveStatus = await evoApi.getInstanceStatusStrict(name);
+      } catch (statusError: any) {
+        const message = String(statusError?.message || statusError || "");
+        if (!/\b404\b|not found|instance_not_found|does not exist/i.test(message)) {
+          throw new Error("Não foi possível confirmar o status real da instância. Nenhuma exclusão foi realizada.");
         }
+        remoteAlreadyGone = true;
+      }
 
-        if (liveStatus) {
-          if (isInstanceOnline(liveStatus)) {
-            throw new Error("A instância está online. Desconecte-a pelo Booking ou Flow antes de excluir.");
-          }
-          const offlineStates = new Set(["close", "closed", "disconnected", "offline", "qrcode", "qr", "connecting", "pairing"]);
-          const rawState = [
-            liveStatus?.instance?.state,
-            liveStatus?.state,
-            liveStatus?.instance?.status,
-            liveStatus?.status,
-            liveStatus?.connectionStatus,
-            liveStatus?.connection_state,
-          ].find((value) => typeof value === "string" && value.trim());
-          if (!rawState || !offlineStates.has(String(rawState).trim().toLowerCase())) {
-            throw new Error("O serviço não confirmou que a instância está offline. Nenhuma exclusão foi realizada.");
-          }
+      if (liveStatus) {
+        if (isInstanceOnline(liveStatus)) {
+          throw new Error("A instância está online. Desconecte-a pelo Booking ou Flow antes de excluir.");
+        }
+        const offlineStates = new Set(["close", "closed", "disconnected", "offline", "qrcode", "qr", "connecting", "pairing"]);
+        const rawState = [
+          liveStatus?.instance?.state,
+          liveStatus?.state,
+          liveStatus?.instance?.status,
+          liveStatus?.status,
+          liveStatus?.connectionStatus,
+          liveStatus?.connection_state,
+        ].find((value) => typeof value === "string" && value.trim());
+        if (!rawState || !offlineStates.has(String(rawState).trim().toLowerCase())) {
+          throw new Error("O serviço não confirmou que a instância está offline. Nenhuma exclusão foi realizada.");
         }
       }
 
       let remoteDeleteError: Error | null = null;
 
-      try {
-        const removed = await evoApi.deleteInstance(name);
-        if (!removed) throw new Error("A instância não foi removida no serviço WhatsApp.");
-      } catch (err: any) {
-        remoteDeleteError = err instanceof Error ? err : new Error(String(err?.message || err));
+      if (!remoteAlreadyGone) {
+        try {
+          const removed = await evoApi.deleteInstance(name);
+          if (!removed) throw new Error("A instância não foi removida no serviço WhatsApp.");
+        } catch (err: any) {
+          remoteDeleteError = err instanceof Error ? err : new Error(String(err?.message || err));
+        }
       }
 
       await supabase.from("whatsapp_bindings").delete().eq("instance_name", name);
