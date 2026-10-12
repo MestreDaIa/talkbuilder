@@ -527,6 +527,14 @@ export default function IntegrationsSettings() {
       const matchingRemote = remoteBeforeDelete.find((remote: any) =>
         hasIdentifierOverlap(current, remote) || hasIdentifierOverlap({ instance_name: name }, remote)
       );
+      // O nome exibido/local pode ser um alias antigo. Status e exclusão precisam
+      // usar o nome canônico do wa-service para evitar 404 falso e recriação no sync.
+      const currentSettings = settingsObject(current?.settings);
+      const remoteOperationName =
+        remoteInstanceName(matchingRemote) ||
+        currentSettings.evolution_instance_name ||
+        currentSettings.evolutionInstanceName ||
+        name;
       const hiddenIdentifiers = Array.from(new Set([
         ...collectInstanceIdentifiers(current),
         ...collectInstanceIdentifiers({ instance_name: name }),
@@ -548,7 +556,7 @@ export default function IntegrationsSettings() {
       let remoteAlreadyGone = false;
       let liveStatus: any = null;
       try {
-        liveStatus = await evoApi.getInstanceStatusStrict(name);
+        liveStatus = await evoApi.getInstanceStatusStrict(remoteOperationName);
       } catch (statusError: any) {
         const message = String(statusError?.message || statusError || "");
         if (!/\b404\b|not found|instance_not_found|does not exist/i.test(message)) {
@@ -579,14 +587,14 @@ export default function IntegrationsSettings() {
 
       if (!remoteAlreadyGone) {
         try {
-          const removed = await evoApi.deleteInstance(name);
+          const removed = await evoApi.deleteInstance(remoteOperationName);
           if (!removed) throw new Error("A instância não foi removida no serviço WhatsApp.");
         } catch (err: any) {
           remoteDeleteError = err instanceof Error ? err : new Error(String(err?.message || err));
         }
       }
 
-      await supabase.from("whatsapp_bindings").delete().eq("instance_name", name);
+      await supabase.from("whatsapp_bindings").delete().in("instance_name", Array.from(new Set([name, remoteOperationName])));
 
       // Em workspace provisionado pelo Booking, o serviço remoto é a fonte de verdade.
       // Não criamos tombstones locais que façam os dois painéis divergirem.
