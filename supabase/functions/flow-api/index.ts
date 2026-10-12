@@ -49,7 +49,7 @@ Deno.serve(async (req: Request) => {
 			const { supabase, workspaceId } = auth.ctx;
 			const { data, error } = await supabase
 				.from("chatbot_flows")
-				.select("id, name, description, is_published, updated_at, created_at")
+				.select("id, public_id, name, description, is_published, updated_at, created_at")
 				.eq("workspace_id", workspaceId)
 				.order("updated_at", { ascending: false })
 				.limit(200);
