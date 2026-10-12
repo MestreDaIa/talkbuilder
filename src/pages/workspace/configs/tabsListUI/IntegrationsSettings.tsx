@@ -453,12 +453,12 @@ export default function IntegrationsSettings() {
         .map((conn: any) => conn.id)
         .filter(Boolean);
       if (!targetIds.includes(id)) targetIds.push(id);
-      // Primeiro colocamos a instância offline. Falha aqui aborta a operação
-      // sem ocultar a conexão local nem tentar apagar a instância remota.
-      // Só tenta desconectar quando a instância realmente existe no serviço remoto
-      // e o estado remoto confirma que ela está online. Dados locais antigos não
-      // podem impedir a remoção de uma instância já apagada na origem.
-      if (matchingRemote && isInstanceOnline(matchingRemote)) {
+      // A lista remota pode conter estado em cache/desatualizado.
+      // Antes do logout, consulte o endpoint de status ao vivo. Se a instância
+      // já não existir nesse endpoint (404/null) ou estiver offline, não tente
+      // fazer logout: isso bloqueava a exclusão de registros órfãos.
+      const liveStatus = matchingRemote ? await evoApi.getInstanceStatus(name) : null;
+      if (matchingRemote && liveStatus && isInstanceOnline(liveStatus)) {
         const loggedOut = await evoApi.logoutInstance(name);
         if (!loggedOut) {
           throw new Error("A instância está online e não foi possível colocá-la offline. Nenhuma exclusão foi realizada.");
