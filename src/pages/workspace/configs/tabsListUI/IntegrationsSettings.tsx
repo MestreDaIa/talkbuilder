@@ -98,12 +98,13 @@ function isInstanceOnline(...sources: any[]): boolean {
 
 function normalizeRemoteConnectionStatus(source: any): string {
   const raw = [
+    source?.instance?.state,
+    source?.instance?.connectionStatus,
+    source?.instance?.status,
     source?.state,
-    source?.status,
     source?.connectionStatus,
     source?.connection_state,
-    source?.instance?.state,
-    source?.instance?.status,
+    source?.status,
   ].find((value) => typeof value === "string" && value.trim());
   const state = String(raw ?? "").trim().toLowerCase();
   if (["open", "connected", "online", "authenticated", "ready"].includes(state)) return "connected";
