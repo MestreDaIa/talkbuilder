@@ -59,6 +59,7 @@ function collectInstanceIdentifiers(source: any): string[] {
       "instanceName", "instance_name", "instanceId", "instance_id",
       "instanceUuid", "instance_uuid", "waInstanceId", "wa_instance_id",
       "evoName", "evo_name", "evolutionName", "evolution_name",
+      "evolutionInstanceName", "evolution_instance_name",
       "local_id", "localId",
     ].forEach((key) => add(record[key]));
 
@@ -124,6 +125,10 @@ function remoteInstanceName(remote: any): string | null {
     remote?.instance?.name ||
     remote?.instance?.instanceName ||
     remote?.instance?.instance_name ||
+    remote?.instance?.evolution_instance_name ||
+    remote?.instance?.evolutionInstanceName ||
+    remote?.evolution_instance_name ||
+    remote?.evolutionInstanceName ||
     remote?.instance?.label ||
     remote?.instance?.display_name;
   return value ? String(value) : null;
