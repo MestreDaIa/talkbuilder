@@ -270,8 +270,8 @@ export default function IntegrationsSettings() {
           console.warn("[wa-service] fetch instances falhou:", err);
           return [];
         });
-        const known = list.filter((conn: any) => !isLocallyRemovedConnection(conn));
-        const tombstones = list.filter(isLocallyRemovedConnection);
+        const known = isBookingWorkspace ? list : list.filter((conn: any) => !isLocallyRemovedConnection(conn));
+        const tombstones = isBookingWorkspace ? [] : list.filter(isLocallyRemovedConnection);
         const missing = (remote || [])
           .map((r: any) => ({
             instance_name: remoteInstanceName(r),
@@ -307,7 +307,7 @@ export default function IntegrationsSettings() {
 
       const tombstones = list.filter(isLocallyRemovedConnection);
       const visible = list.filter((conn: any) => {
-        if (isLocallyRemovedConnection(conn)) return false;
+        if (!isBookingWorkspace && isLocallyRemovedConnection(conn)) return false;
         return !tombstones.some((removed: any) => hasIdentifierOverlap(removed, conn));
       });
       setConnections(visible);
@@ -479,6 +479,21 @@ export default function IntegrationsSettings() {
       }
 
       await supabase.from("whatsapp_bindings").delete().eq("instance_name", name);
+
+      // Em workspace provisionado pelo Booking, o serviço remoto é a fonte de verdade.
+      // Não criamos tombstones locais que façam os dois painéis divergirem.
+      if (isBookingWorkspace) {
+        if (remoteDeleteError) throw remoteDeleteError;
+        const { error } = await supabase
+          .from("whatsapp_connections")
+          .delete()
+          .in("id", targetIds);
+        if (error) throw error;
+        setConnections((prev) => prev.filter((conn) => !targetIds.includes(conn.id)));
+        toast({ title: "Instância excluída do Flow e do serviço compartilhado" });
+        void loadWhatsappConnections({ syncRemote: true, silent: true });
+        return;
+      }
 
       if (remoteDeleteError) {
         const { error } = await supabase
