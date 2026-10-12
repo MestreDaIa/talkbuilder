@@ -254,6 +254,24 @@ export default function IntegrationsSettings() {
       if (error) throw error;
       let list = data || [];
 
+      // No workspace provisionado, tombstones antigos não podem prevalecer sobre
+      // o serviço compartilhado. Limpe-os para que a lista remota reconcilie a UI.
+      if (isBookingWorkspace) {
+        const staleHiddenRows = list.filter(isLocallyRemovedConnection);
+        if (staleHiddenRows.length) {
+          const ids = staleHiddenRows.map((row: any) => row.id).filter(Boolean);
+          if (ids.length) {
+            const { error: cleanupError } = await supabase
+              .from("whatsapp_connections")
+              .delete()
+              .eq("workspace_id", currentWorkspace.id)
+              .in("id", ids);
+            if (cleanupError) throw cleanupError;
+            list = list.filter((row: any) => !ids.includes(row.id));
+          }
+        }
+      }
+
       if (syncRemote) {
         if (allowAutoProvision && isBookingWorkspace && list.length === 0 && autoSyncAttemptedRef.current !== currentWorkspace.id) {
           autoSyncAttemptedRef.current = currentWorkspace.id;
