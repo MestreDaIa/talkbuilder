@@ -305,7 +305,7 @@ export default function IntegrationsSettings() {
         }
       }
 
-      const tombstones = list.filter(isLocallyRemovedConnection);
+      const tombstones = isBookingWorkspace ? [] : list.filter(isLocallyRemovedConnection);
       const visible = list.filter((conn: any) => {
         if (!isBookingWorkspace && isLocallyRemovedConnection(conn)) return false;
         return !tombstones.some((removed: any) => hasIdentifierOverlap(removed, conn));
