@@ -82,6 +82,14 @@ Deno.serve(async (req) => {
     return json({ binding: { ...data, bot_name: flow.name } });
   }
   if (body.action === "delete") {
+    const { data: current, error: currentError } = await admin.from("whatsapp_bindings")
+      .select("bot_public_id").eq("instance_name", instanceName).maybeSingle();
+    if (currentError) return json({ error: "binding_read_failed", details: currentError.message }, 500);
+    if (current?.bot_public_id) {
+      const { data: ownedBot } = await admin.from("chatbot_flows").select("id")
+        .eq("workspace_id", workspaceId).eq("public_id", current.bot_public_id).maybeSingle();
+      if (!ownedBot) return json({ error: "binding_not_owned_by_workspace" }, 403);
+    }
     const { error } = await admin.from("whatsapp_bindings").delete().eq("instance_name", instanceName);
     if (error) return json({ error: "binding_delete_failed", details: error.message }, 500);
     return json({ success: true });
