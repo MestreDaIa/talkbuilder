@@ -308,8 +308,8 @@ export default function WhatsAppInstanceSettings({ instanceName, isOpen, onClose
       toast({ title: "Trigger obrigatório", description: "Informe a palavra-chave (Trigger) ou mude o Trigger Type.", variant: "destructive" });
       return;
     }
-    if (!selectedBotId) {
-      toast({ title: "Vínculo obrigatório", description: "Selecione um Bot do Flow Builder para vincular a esta instância.", variant: "destructive" });
+    if (botSettings.enabled && !selectedBotId) {
+      toast({ title: "Vínculo obrigatório", description: "Selecione um Bot publicado do Flow para habilitar esta instância.", variant: "destructive" });
       return;
     }
 
@@ -318,16 +318,23 @@ export default function WhatsAppInstanceSettings({ instanceName, isOpen, onClose
       // 1. Salvar no Evolution API
       await evoApi.setEvolutionBot(instanceName, botSettings);
 
-      // 2. Salvar Vínculo no Supabase
-      const { error: bindError } = await supabase
-        .from("whatsapp_bindings")
-        .upsert({
-          instance_name: instanceName,
-          bot_public_id: selectedBotId,
-          updated_at: new Date().toISOString()
-        }, { onConflict: 'instance_name' });
-
-      if (bindError) throw bindError;
+      // 2. Salvar/remover o vínculo compartilhado no Supabase do Flow.
+      if (selectedBotId) {
+        const { error: bindError } = await supabase
+          .from("whatsapp_bindings")
+          .upsert({
+            instance_name: instanceName,
+            bot_public_id: selectedBotId,
+            updated_at: new Date().toISOString()
+          }, { onConflict: 'instance_name' });
+        if (bindError) throw bindError;
+      } else {
+        const { error: bindError } = await supabase
+          .from("whatsapp_bindings")
+          .delete()
+          .eq("instance_name", instanceName);
+        if (bindError) throw bindError;
+      }
 
       setBotDirty(false);
       toast({ title: "Evolution Bot e Vínculo atualizados com sucesso!" });
