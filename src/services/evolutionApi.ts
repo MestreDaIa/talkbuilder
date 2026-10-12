@@ -31,14 +31,18 @@ async function waRequest<T = any>(
   init: { method?: string; body?: any } = {}
 ): Promise<T> {
   const { token, workspaceId } = await currentWorkspaceContext();
+  const method = init.method || "GET";
+  const hasBody = init.body !== undefined;
   const res = await fetch(`${BACKEND_URL}${path}`, {
-    method: init.method || "GET",
+    method,
     headers: {
-      "Content-Type": "application/json",
+      ...(hasBody ? { "Content-Type": "application/json" } : {}),
       Authorization: `Bearer ${token}`,
       "x-workspace-id": workspaceId,
     },
-    body: init.body ? JSON.stringify(init.body) : undefined,
+    // Fastify rejects an empty request when Content-Type is application/json.
+    // Bodyless POST/DELETE requests must omit that header.
+    body: hasBody ? JSON.stringify(init.body) : undefined,
   });
   const text = await res.text();
   let data: any = null;
