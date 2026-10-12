@@ -424,8 +424,28 @@ export function waApi(apiKey: string) {
     },
     logoutInstance: (name: string) =>
       call<any>(`/v1/instances/${encodeURIComponent(name)}/logout`, { method: "POST" }),
-    getQrCode: (name: string) =>
-      call<any>(`/v1/instances/${encodeURIComponent(name)}/connect`, { method: "POST", body: {} }),
+    getQrCode: async (name: string) => {
+      // wa-service identifica instâncias pelo UUID interno, não pelo nome visível.
+      const list: any = await call<any>("/v1/instances/all-instances");
+      const instances: any[] = instanceListFrom(list);
+      const target = instances.find((item) => {
+        const names = [
+          item?.name,
+          item?.instance_name,
+          item?.instanceName,
+          item?.evolution_instance_name,
+          item?.instance?.name,
+          item?.instance?.instance_name,
+          item?.instance?.evolution_instance_name,
+        ].filter(Boolean).map((value) => String(value).trim().toLowerCase());
+        return names.includes(String(name).trim().toLowerCase());
+      });
+      const id = readInstanceId(target);
+      if (!id) {
+        throw new Error(`wa-service: não encontrei o UUID da instância "${name}" no tenant atual`);
+      }
+      return call<any>(`/v1/instances/${encodeURIComponent(id)}/connect`, { method: "POST", body: {} });
+    },
     getStatus: (name: string) =>
       call<any>(`/v1/instances/${encodeURIComponent(name)}/connectionState`),
     refreshStatus: (name: string) =>
