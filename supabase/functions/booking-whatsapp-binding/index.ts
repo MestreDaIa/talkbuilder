@@ -51,19 +51,35 @@ Deno.serve(async (req) => {
   if (!instanceName || instanceName.length > 200) return json({ error: "invalid_instance_name" }, 400);
 
   const admin = createClient(supabaseUrl, serviceRole, { auth: { autoRefreshToken: false, persistSession: false } });
+
+  // Resolve the Flow workspace provisioned for this Booking company.
+  const { data: profile, error: profileError } = await admin.from("profiles")
+    .select("id").eq("embed_company_id", claims.company_id).maybeSingle();
+  if (profileError) return json({ error: "workspace_lookup_failed", details: profileError.message }, 500);
+  if (!profile?.id) return json({ error: "flow_workspace_not_linked" }, 404);
+  const { data: membership, error: membershipError } = await admin.from("workspace_members")
+    .select("workspace_id").eq("user_id", profile.id).maybeSingle();
+  if (membershipError) return json({ error: "workspace_lookup_failed", details: membershipError.message }, 500);
+  if (!membership?.workspace_id) return json({ error: "flow_workspace_not_linked" }, 404);
+  const workspaceId = membership.workspace_id;
+
   if (body.action === "get") {
     const { data, error } = await admin.from("whatsapp_bindings").select("instance_name, bot_public_id, updated_at").eq("instance_name", instanceName).maybeSingle();
     if (error) return json({ error: "binding_read_failed", details: error.message }, 500);
-    return json({ binding: data ?? null });
+    if (!data?.bot_public_id) return json({ binding: null });
+    const { data: bot } = await admin.from("chatbot_flows").select("public_id, name, is_published")
+      .eq("workspace_id", workspaceId).eq("public_id", data.bot_public_id).eq("is_published", true).maybeSingle();
+    return json({ binding: bot ? { ...data, bot_name: bot.name } : null });
   }
   if (body.action === "set") {
     const botPublicId = String(body.bot_public_id ?? "").trim();
     if (!botPublicId || botPublicId.length > 200) return json({ error: "invalid_bot_public_id" }, 400);
-    const { data: flow } = await admin.from("chatbot_flows").select("public_id, is_published").eq("public_id", botPublicId).eq("is_published", true).maybeSingle();
+    const { data: flow } = await admin.from("chatbot_flows").select("public_id, name, is_published")
+      .eq("workspace_id", workspaceId).eq("public_id", botPublicId).eq("is_published", true).maybeSingle();
     if (!flow) return json({ error: "published_bot_not_found" }, 404);
     const { data, error } = await admin.from("whatsapp_bindings").upsert({ instance_name: instanceName, bot_public_id: botPublicId, updated_at: new Date().toISOString() }, { onConflict: "instance_name" }).select("instance_name, bot_public_id, updated_at").single();
     if (error) return json({ error: "binding_write_failed", details: error.message }, 500);
-    return json({ binding: data });
+    return json({ binding: { ...data, bot_name: flow.name } });
   }
   if (body.action === "delete") {
     const { error } = await admin.from("whatsapp_bindings").delete().eq("instance_name", instanceName);
