@@ -380,6 +380,20 @@ export function waApi(apiKey: string) {
   const call = <T = any>(path: string, init: { method?: string; body?: any; query?: Record<string, any> } = {}) =>
     waFetch<T>(path, { ...init, apiKey });
 
+  // Booking/Flow use the Evolution instance name; wa-service bot routes require its internal UUID.
+  const resolveInstanceUuid = async (nameOrId: string): Promise<string> => {
+    const value = safeDecode(String(nameOrId ?? "")).trim();
+    if (/^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(value)) return value;
+    const payload: any = await call<any>("/v1/instances/all-instances");
+    const items = instanceListFrom(payload);
+    const found = items.find((item) => {
+      const names = [item?.evolution_instance_name, item?.evolutionInstanceName, item?.instance_name, item?.instanceName, item?.name, item?.instance?.evolution_instance_name, item?.instance?.evolutionInstanceName, item?.instance?.instance_name, item?.instance?.instanceName, item?.instance?.name].filter(Boolean);
+      return names.some((candidate) => sameIdentifier(String(candidate), value)) || sameIdentifier(readInstanceId(item), value);
+    });
+    const id = readInstanceId(found);
+    if (!id) throw new Error(`wa-service: não encontrei o UUID interno da instância compartilhada "${value}" no tenant atual`);
+    return id;
+  };
   const resolveInstanceDeleteCandidates = async (name: string): Promise<string[]> => {
     try {
       const list: any = await call<any>("/v1/instances/all-instances");
@@ -500,13 +514,19 @@ export function waApi(apiKey: string) {
     getSettings: (name: string) =>
       call<any>(`/v1/instances/${encodeURIComponent(name)}/settings`),
 
-    // Bot pass-through (opcional)
-    setBot: (name: string, data: Record<string, any>) =>
-      call<any>(`/v1/instances/${encodeURIComponent(name)}/bot`, { method: "POST", body: data }),
-    getBot: (name: string) =>
-      call<any>(`/v1/instances/${encodeURIComponent(name)}/bot`),
-    deleteBot: (name: string) =>
-      call<any>(`/v1/instances/${encodeURIComponent(name)}/bot`, { method: "DELETE" }),
+    // Resolve shared Evolution names to wa-service UUIDs before bot operations.
+    setBot: async (name: string, data: Record<string, any>) => {
+      const id = await resolveInstanceUuid(name);
+      return call<any>(`/v1/instances/${encodeURIComponent(id)}/bot`, { method: "POST", body: data });
+    },
+    getBot: async (name: string) => {
+      const id = await resolveInstanceUuid(name);
+      return call<any>(`/v1/instances/${encodeURIComponent(id)}/bot`);
+    },
+    deleteBot: async (name: string) => {
+      const id = await resolveInstanceUuid(name);
+      return call<any>(`/v1/instances/${encodeURIComponent(id)}/bot`, { method: "DELETE" });
+    },
 
     // Mensagens
     sendText: (instance: string, to: string, text: string) =>
