@@ -45,6 +45,23 @@ const WHATSAPP_EVENTS = [
   "SEND_MESSAGE",
 ];
 
+function unwrapEvolutionBot(payload: any) {
+  // O wa-service/Evolution podem devolver o mesmo bot em envelopes diferentes:
+  // { bot }, { evolutionBot }, { data }, ou combinações aninhadas desses formatos.
+  let current = payload;
+  for (let depth = 0; depth < 6; depth++) {
+    if (Array.isArray(current)) {
+      current = current[0] ?? null;
+      continue;
+    }
+    if (!current || typeof current !== "object") return {};
+    const nested = current.evolutionBot ?? current.bot ?? current.data;
+    if (!nested || nested === current) return current;
+    current = nested;
+  }
+  return current && typeof current === "object" && !Array.isArray(current) ? current : {};
+}
+
 export default function WhatsAppInstanceSettings({ instanceName, isOpen, onClose }: WhatsAppInstanceSettingsProps) {
   const { toast } = useToast();
   const [loading, setLoading] = useState(true);
@@ -137,7 +154,7 @@ export default function WhatsAppInstanceSettings({ instanceName, isOpen, onClose
           supabase.from("whatsapp_bindings").select("bot_public_id").eq("instance_name", instanceName).limit(1),
         ]);
         if (cancelled) return;
-        const b = botData?.evolutionBot || botData?.bot || botData || {};
+        const b = unwrapEvolutionBot(botData);
         setBotSettings((current) => ({
           ...current,
           enabled: b.enabled ?? false,
@@ -247,7 +264,7 @@ export default function WhatsAppInstanceSettings({ instanceName, isOpen, onClose
       }
 
       if (botData) {
-        const b = botData.evolutionBot || botData;
+        const b = unwrapEvolutionBot(botData);
         setBotSettings({
           enabled: b.enabled ?? false,
           description: b.description ?? "Evolution Bot Settings",
