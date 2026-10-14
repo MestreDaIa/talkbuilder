@@ -45,6 +45,23 @@ const WHATSAPP_EVENTS = [
   "SEND_MESSAGE",
 ];
 
+function normalizeTriggerType(value: unknown): "Keyword" | "All" {
+  return String(value ?? "").trim().toLowerCase() === "all" ? "All" : "Keyword";
+}
+
+function normalizeTriggerOperator(value: unknown): string {
+  const normalized = String(value ?? "").trim().toLowerCase().replace(/[\\s_-]/g, "");
+  const operators: Record<string, string> = {
+    contains: "Contains",
+    equals: "Equals",
+    startswith: "Starts With",
+    endswith: "Ends With",
+    regex: "Regex",
+    none: "Contains",
+  };
+  return operators[normalized] ?? "Contains";
+}
+
 function unwrapEvolutionBot(payload: any) {
   // O wa-service/Evolution podem devolver o mesmo bot em envelopes diferentes:
   // { bot }, { evolutionBot }, { data }, ou combinações aninhadas desses formatos.
@@ -161,9 +178,9 @@ export default function WhatsAppInstanceSettings({ instanceName, isOpen, onClose
           description: b.description ?? "Evolution Bot Settings",
           apiUrl: b.apiUrl || current.apiUrl,
           apiKey: b.apiKey ?? "",
-          triggerType: b.triggerType || "Keyword",
+          triggerType: normalizeTriggerType(b.triggerType),
           triggerKeyword: b.triggerKeyword || b.triggerValue || "",
-          triggerOperator: b.triggerOperator || "Contains",
+          triggerOperator: normalizeTriggerOperator(b.triggerOperator),
           expire: b.expire ?? 300,
           keywordFinish: b.keywordFinish ?? "bye",
           delayMessage: b.delayMessage ?? 1000,
@@ -270,9 +287,9 @@ export default function WhatsAppInstanceSettings({ instanceName, isOpen, onClose
           description: b.description ?? "Evolution Bot Settings",
           apiUrl: b.apiUrl || getWebhookUrlWithBot(selectedBotId),
           apiKey: b.apiKey ?? "",
-          triggerType: b.triggerType || "Keyword",
+          triggerType: normalizeTriggerType(b.triggerType),
           triggerKeyword: b.triggerKeyword || b.triggerValue || "",
-          triggerOperator: b.triggerOperator || "Contains",
+          triggerOperator: normalizeTriggerOperator(b.triggerOperator),
           expire: b.expire ?? 300,
           keywordFinish: b.keywordFinish ?? "bye",
           delayMessage: b.delayMessage ?? 1000,
