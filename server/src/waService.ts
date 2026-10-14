@@ -414,7 +414,7 @@ export function waApi(apiKey: string) {
   return {
     // Instâncias
     listInstances: () => call<any[]>("/v1/instances/all-instances"),
-    getInstance: (name: string) => call<any>(`/v1/instances/${encodeURIComponent(name)}`),
+    getInstance: async (name: string) => { const id = await resolveInstanceUuid(name); return call<any>(`/v1/instances/${encodeURIComponent(id)}`); },
     createInstance: (name: string) =>
       call<any>("/v1/instances/create", { method: "POST", body: { name } }),
     deleteInstance: async (name: string) => {
@@ -436,8 +436,10 @@ export function waApi(apiKey: string) {
       error.body = { attempts: failures };
       throw error;
     },
-    logoutInstance: (name: string) =>
-      call<any>(`/v1/instances/${encodeURIComponent(name)}/logout`, { method: "POST" }),
+    logoutInstance: async (name: string) => {
+      const id = await resolveInstanceUuid(name);
+      return call<any>(`/v1/instances/${encodeURIComponent(id)}/logout`, { method: "POST" });
+    },
     getQrCode: async (name: string) => {
       // wa-service identifica instâncias pelo UUID interno, não pelo nome visível.
       const list: any = await call<any>("/v1/instances/all-instances");
@@ -499,20 +501,32 @@ export function waApi(apiKey: string) {
         pairingCode,
       };
     },
-    getStatus: (name: string) =>
-      call<any>(`/v1/instances/${encodeURIComponent(name)}/connectionState`),
-    refreshStatus: (name: string) =>
-      call<any>(`/v1/instances/${encodeURIComponent(name)}/refresh-status`, { method: "POST" }),
+    getStatus: async (name: string) => {
+      const id = await resolveInstanceUuid(name);
+      return call<any>(`/v1/instances/connectionState/${encodeURIComponent(id)}`);
+    },
+    refreshStatus: async (name: string) => {
+      const id = await resolveInstanceUuid(name);
+      return call<any>(`/v1/instances/${encodeURIComponent(id)}/refresh-status`, { method: "POST" });
+    },
 
     // Config
-    setWebhook: (name: string, data: { url: string; events?: string[]; base64?: boolean; byEvents?: boolean; enabled?: boolean }) =>
-      call<any>(`/v1/instances/${encodeURIComponent(name)}/webhook/set`, { method: "POST", body: data }),
-    getWebhook: (name: string) =>
-      call<any>(`/v1/instances/${encodeURIComponent(name)}/webhook/find`),
-    setSettings: (name: string, settings: Record<string, any>) =>
-      call<any>(`/v1/instances/${encodeURIComponent(name)}/settings/set`, { method: "POST", body: settings }),
-    getSettings: (name: string) =>
-      call<any>(`/v1/instances/${encodeURIComponent(name)}/settings`),
+    setWebhook: async (name: string, data: { url: string; events?: string[]; base64?: boolean; byEvents?: boolean; enabled?: boolean }) => {
+      const id = await resolveInstanceUuid(name);
+      return call<any>(`/v1/instances/${encodeURIComponent(id)}/webhook/set`, { method: "POST", body: data });
+    },
+    getWebhook: async (name: string) => {
+      const id = await resolveInstanceUuid(name);
+      return call<any>(`/v1/instances/${encodeURIComponent(id)}/webhook/find`);
+    },
+    setSettings: async (name: string, settings: Record<string, any>) => {
+      const id = await resolveInstanceUuid(name);
+      return call<any>(`/v1/instances/${encodeURIComponent(id)}/settings/set`, { method: "POST", body: settings });
+    },
+    getSettings: async (name: string) => {
+      const id = await resolveInstanceUuid(name);
+      return call<any>(`/v1/instances/${encodeURIComponent(id)}/settings`);
+    },
 
     // Resolve shared Evolution names to wa-service UUIDs before bot operations.
     setBot: async (name: string, data: Record<string, any>) => {
