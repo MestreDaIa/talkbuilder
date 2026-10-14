@@ -327,14 +327,28 @@ export default function WhatsAppInstanceSettings({ instanceName, isOpen, onClose
 
       // 2. Salvar/remover o vínculo compartilhado no Supabase do Flow.
       if (selectedBotId) {
-        const { error: bindError } = await supabase
+        const bindingPayload = {
+          instance_name: instanceName,
+          bot_public_id: selectedBotId,
+          updated_at: new Date().toISOString()
+        };
+
+        // A tabela existente nem sempre possui UNIQUE(instance_name).
+        // Atualiza o vínculo existente; só insere se ainda não houver linha.
+        const { data: updatedBindings, error: updateBindingError } = await supabase
           .from("whatsapp_bindings")
-          .upsert({
-            instance_name: instanceName,
-            bot_public_id: selectedBotId,
-            updated_at: new Date().toISOString()
-          }, { onConflict: 'instance_name' });
-        if (bindError) throw bindError;
+          .update(bindingPayload)
+          .eq("instance_name", instanceName)
+          .select("instance_name");
+
+        if (updateBindingError) throw updateBindingError;
+
+        if (!updatedBindings || updatedBindings.length === 0) {
+          const { error: insertBindingError } = await supabase
+            .from("whatsapp_bindings")
+            .insert(bindingPayload);
+          if (insertBindingError) throw insertBindingError;
+        }
       } else {
         const { error: bindError } = await supabase
           .from("whatsapp_bindings")
