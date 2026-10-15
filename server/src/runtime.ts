@@ -406,12 +406,12 @@ function buildRuntimeSkillPrompt(skills:any[], variables:any={}, runtimePlan:any
 function runtimeToolObject(value:any):Record<string,any>{if(value&&typeof value==="object"&&!Array.isArray(value))return value;if(typeof value==="string"){try{const parsed=JSON.parse(value);if(parsed&&typeof parsed==="object"&&!Array.isArray(parsed))return parsed;}catch{}}return{};}
 function runtimeContactField(key:string):boolean{return /(email|e[_-]?mail|phone|mobile|telephone|tax[_-]?id|cpf|cnpj|document|full[_-]?name|first[_-]?name|last[_-]?name|customer[_-]?name|client[_-]?name|address)/i.test(key);}
 function runtimeIdField(key:string):boolean{return /(^id$|_id$|uuid)/i.test(key);}
-function runtimeNormalizeGrounding(value:any,key:string):string{const raw=String(value??"").trim();if(/email|e[_-]?mail/i.test(key))return raw.toLowerCase();if(/phone|mobile|telephone|tax[_-]?id|cpf|cnpj|document/i.test(key))return raw.replace(/\\D/g,"");return raw.toLowerCase().replace(/\\s+/g," ");}
+function runtimeNormalizeGrounding(value:any,key:string):string{const raw=String(value??"").trim();if(/email|e[_-]?mail/i.test(key))return raw.toLowerCase();if(/phone|mobile|telephone|tax[_-]?id|cpf|cnpj|document/i.test(key))return raw.replace(/\D/g,"");return raw.toLowerCase().replace(/\s+/g," ");}
 function runtimeTrustedText(variables:any,history:any[],userPrompt:string):string{
   const chunks:string[]=[];
   const original=(variables as any)?.__runtimeUserRequest;
   if(typeof original==="string")chunks.push(original);
-  if(userPrompt&&!/^\\[(?:RESULTADO DA SKILL|CORREÇÃO DO PLANEJADOR|GUARD DE SELEÇÃO)/i.test(userPrompt))chunks.push(userPrompt);
+  if(userPrompt&&!/^\[(?:RESULTADO DA SKILL|CORREÇÃO DO PLANEJADOR|GUARD DE SELEÇÃO)/i.test(userPrompt))chunks.push(userPrompt);
   for(const item of Array.isArray(history)?history:[]){
     if(item?.role!=="user")continue;
     const parts=Array.isArray(item?.parts)?item.parts.map((p:any)=>p?.text||"").join(" "):"";
@@ -427,7 +427,7 @@ function runtimeTrustedText(variables:any,history:any[],userPrompt:string):strin
   chunks.push(JSON.stringify(safeVars));
   chunks.push(JSON.stringify((variables as any)?.__runtimeApiHistory||[]));
   chunks.push(JSON.stringify((variables as any)?.__lastSkillResult?.data||null));
-  return chunks.join("\\n").slice(-100000);
+  return chunks.join("\n").slice(-100000);
 }
 function runtimeSanitizeModelData(value:any,trustedText:string,path=""):any{
   if(Array.isArray(value))return value.map((item,i)=>runtimeSanitizeModelData(item,trustedText,path+"["+i+"]"));
