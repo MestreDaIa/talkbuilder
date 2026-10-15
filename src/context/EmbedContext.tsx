@@ -170,15 +170,21 @@ function detectInitialMode(): {
 	}
 
 	try {
-		const hash = window.location.hash.startsWith("#")
+		// O main.tsx converte URLs antigas no formato /#/rota?token para
+		// /rota?token antes de montar o BrowserRouter. Por isso o token pode
+		// estar tanto na query normal quanto na query dentro do hash.
+		const rawHash = window.location.hash.startsWith("#")
 			? window.location.hash.slice(1)
 			: window.location.hash;
-		const params = new URLSearchParams(hash);
-		const token = params.get("embed_token");
-		const hostParam = params.get("host");
+		const hashQueryIndex = rawHash.indexOf("?");
+		const hashRoute = hashQueryIndex >= 0 ? rawHash.slice(0, hashQueryIndex) : rawHash;
+		const hashParams = new URLSearchParams(
+			hashQueryIndex >= 0 ? rawHash.slice(hashQueryIndex + 1) : ""
+		);
+		const searchParams = new URLSearchParams(window.location.search);
+		const token = hashParams.get("embed_token") ?? searchParams.get("embed_token");
+		const hostParam = hashParams.get("host") ?? searchParams.get("host");
 
-		// Aceita "flow-appoint" e "bookingfy". Default = flow-appoint
-		// (já que é o novo host principal).
 		const host: EmbedHost =
 			hostParam === "bookingfy"
 				? "bookingfy"
@@ -188,38 +194,35 @@ function detectInitialMode(): {
 
 		if (token && host) {
 			const { session, error } = buildSession(host, token);
-			// Remove apenas os parâmetros temporários do embed, preservando a rota
-			// do HashRouter. Apagar o hash inteiro fazia o Flow voltar à lista inicial
-			// quando o iframe era restaurado/recarregado pelo navegador.
-			const rawRoute = window.location.hash.startsWith("#")
-				? window.location.hash.slice(1)
-				: window.location.hash;
-			const queryIndex = rawRoute.indexOf("?");
-			const routePath = queryIndex >= 0 ? rawRoute.slice(0, queryIndex) : rawRoute;
-			const routeParams = new URLSearchParams(queryIndex >= 0 ? rawRoute.slice(queryIndex + 1) : "");
-			routeParams.delete("embed_token");
-			routeParams.delete("sync");
-			routeParams.delete("force_sync");
-			routeParams.delete("plan_tier");
-			const cleanedQuery = routeParams.toString();
-			const cleanedHash = `#${routePath}${cleanedQuery ? `?${cleanedQuery}` : ""}`;
+
+			// Remove os parâmetros temporários sem apagar a rota atual. Isso
+			// mantém o editor aberto após uma restauração/reinicialização do iframe.
+			for (const key of ["embed_token", "sync", "force_sync", "plan_tier"]) {
+				hashParams.delete(key);
+				searchParams.delete(key);
+			}
+			const cleanHashQuery = hashParams.toString();
+			const cleanSearch = searchParams.toString();
+			const cleanedHash = rawHash
+				? `#${hashRoute}${cleanHashQuery ? `?${cleanHashQuery}` : ""}`
+				: "";
 			window.history.replaceState(
 				null,
 				"",
-				window.location.pathname + window.location.search + cleanedHash
+				window.location.pathname +
+					(cleanSearch ? `?${cleanSearch}` : "") +
+					cleanedHash
 			);
-			if (session) {
-				return { mode: "embedded", host, session, error: null };
-			}
+
+			if (session) return { mode: "embedded", host, session, error: null };
 			return { mode: "standalone", host: null, session: null, error };
 		}
 	} catch (e) {
-		console.warn("[Embed] Falha ao parsear token do hash:", e);
+		console.warn("[Embed] Falha ao identificar sessão de embed:", e);
 	}
 
 	return { mode: "standalone", host: null, session: null, error: null };
 }
-
 export function EmbedProvider({ children }: { children: React.ReactNode }) {
 	const [{ mode, host, session, error }, setState] = useState(() =>
 		detectInitialMode()
