@@ -1,7 +1,7 @@
 import { supabase } from "./supabase.js";
 import { processRuntime } from "./runtime.js";
 import { evolutionApi, EVO_BASE_URL } from "./evolution.js";
-import { verifyWebhookSignature, findWorkspaceByInstance } from "./waService.js";
+import { verifyWebhookSignature, findWorkspaceByInstance, waApi } from "./waService.js";
 import { shouldFlowHandle } from "./channelRoute.js";
 
 
@@ -284,4 +284,78 @@ export async function handleWhatsAppWebhook(
     messages: botResponses 
   };
 
+}
+
+/**
+ * Adaptador do contrato Evolution Bot (POST apiUrl).
+ * Diferente do webhook assinado do wa-service, a Evolution envia
+ * Authorization: Bearer <apiKey do Evolution Bot> e espera { message: string }.
+ * Este endpoint NÃO envia mensagens pela API da Evolution: ela própria entrega
+ * a mensagem retornada, evitando respostas duplicadas.
+ */
+export async function handleEvolutionBotRequest(payload: any, query: any, authorization?: string) {
+  const inputs = payload?.inputs ?? {};
+  const instanceName = String(inputs.instanceName ?? "").trim();
+  const remoteJid = String(inputs.remoteJid ?? payload?.user ?? "").trim();
+  const text = typeof payload?.query === "string" ? payload.query.trim() : String(payload?.query?.text ?? "").trim();
+  const botPublicId = String(query?.bot_id ?? query?.flow_id ?? "").trim();
+
+  const fail = (message: string, statusCode: number): never => {
+    const error: any = new Error(message);
+    error.statusCode = statusCode;
+    throw error;
+  };
+
+  if (!instanceName || !remoteJid || !text || !botPublicId) {
+    fail("Evolution Bot payload incompleto: instanceName, remoteJid, query e bot_id são obrigatórios.", 400);
+  }
+
+  const creds = await findWorkspaceByInstance(instanceName);
+  if (!creds) fail("Instância não vinculada a um workspace do Flow.", 401);
+
+  const authMatch = /^Bearer\s+(.+)$/i.exec(String(authorization ?? ""));
+  if (!authMatch?.[1]) fail("Evolution Bot API Key ausente.", 401);
+
+  const botResponse: any = await waApi(creds.apiKey).getBot(instanceName);
+  let bot: any = botResponse;
+  for (let depth = 0; depth < 6; depth++) {
+    if (Array.isArray(bot)) { bot = bot[0] ?? null; continue; }
+    if (!bot || typeof bot !== "object") break;
+    const nested = bot.evolutionBot ?? bot.bot ?? bot.data;
+    if (!nested || nested === bot) break;
+    bot = nested;
+  }
+  const configuredKey = typeof bot?.apiKey === "string" ? bot.apiKey.trim() : "";
+  if (!configuredKey || authMatch[1].trim() !== configuredKey) {
+    fail("Evolution Bot API Key inválida ou não configurada no bot da instância.", 401);
+  }
+
+  const runtimeResult = await processRuntime({
+    action: "message",
+    flow_id: botPublicId,
+    contact_id: remoteJid,
+    channel: "whatsapp",
+    payload: {
+      message: text,
+      body: payload,
+      headers: { authorization: "Bearer [redacted]" },
+      query,
+      method: "POST",
+      receivedAt: new Date().toISOString(),
+      messageId: inputs.messageId ?? payload?.message_id,
+      remoteJid,
+      pushName: String(inputs.pushName ?? ""),
+      instanceName,
+      serverUrl: String(inputs.serverUrl ?? ""),
+      apiKey: creds.apiKey,
+      apikey: creds.apiKey,
+      fromMe: inputs.fromMe === true,
+    },
+  });
+
+  const messages = Array.isArray(runtimeResult?.messages)
+    ? runtimeResult.messages.map((item: any) => String(item?.content ?? "").trim()).filter(Boolean)
+    : [];
+  const message = messages.join("\n\n") || "Não consegui concluir essa resposta agora. Pode repetir?";
+  return { message };
 }
