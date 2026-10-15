@@ -1452,6 +1452,17 @@ async function runFlow(execution: any, containersIn: any[], edgesIn: any[], inpu
                 return null;
               })();
                 if (matchedSkill?._http) {
+                  // Se o modelo já formulou uma pergunta para o usuário, essa etapa precisa
+                  // pausar aqui. Não execute a próxima Skill no mesmo turno: isso permite que
+                  // o modelo peça uma escolha e, contraditoriamente, avance sem recebê-la.
+                  const pendingUserQuestion = String(runtimeSkillCall.message || "").trim();
+                  const pendingQuestionHasInternalId = /[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}|\\bnode-[a-z0-9-]+|::(?:GET|POST|PUT|PATCH|DELETE)\\b/i.test(pendingUserQuestion);
+                  const asksForUserInput = /\\?/.test(pendingUserQuestion) || /\\b(escolha|selecione|informe|diga|qual .* prefere|qual .* deseja|qual .* gostaria|confirme|me diga)\\b/i.test(pendingUserQuestion);
+                  if (pendingUserQuestion && asksForUserInput && !pendingQuestionHasInternalId) {
+                    messages.push({id:crypto.randomUUID(),type:"bot",content:pendingUserQuestion});
+                    console.log("[ai-agent] pausando a cadeia de Skills porque a mensagem solicita uma resposta do usuário");
+                    return {messages,waiting_for:"text",variables,next_node_id:node.id,active_agent_node_id:node.id,mode:"agent",steps,status:"waiting_input"};
+                  }
                   if (runtimeHasImplicitCandidateSelection(runtimeSkillCall, variables, userPrompt)) {
                     console.log("[ai-agent] bloqueando seleção implícita de candidato retornado por uma Skill; aguardando escolha explícita do usuário");
                     delete (variables as any).__runtimeSkillCall;
