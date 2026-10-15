@@ -1481,7 +1481,7 @@ async function runFlow(execution: any, containersIn: any[], edgesIn: any[], inpu
                       String(previousResult.skill_id||"")===String(matchedSkill._http.endpointId||"");
                     const repeatedMessage=String(runtimeSkillCall.message||"").trim();
                     if(sameSuccessfulSkill && repeatedMessage){
-                      const containsInternalId=/[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}|\\bnode-[a-z0-9-]+|::(?:GET|POST|PUT|PATCH|DELETE)\\b/i.test(repeatedMessage);
+                      const containsInternalId=/[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}|\bnode-[a-z0-9-]+|::(?:GET|POST|PUT|PATCH|DELETE)\b/i.test(repeatedMessage);
                       if(!containsInternalId){
                         messages.push({id:crypto.randomUUID(),type:"bot",content:repeatedMessage});
                         console.log("[ai-agent] encerrando chamada repetida com resposta baseada em Skill já concluída");
