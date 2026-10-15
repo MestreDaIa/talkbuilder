@@ -1,7 +1,8 @@
 
 import './App.css'
 
-import { Routes, Route, Navigate, useParams } from "react-router-dom";
+import { Routes, Route, Navigate, useParams, useLocation } from "react-router-dom";
+import { useEffect } from "react";
 
 import BotPage from "./pages/workspace/bot/[id]/page";
 import DocsPage from "./pages/docs/page";
@@ -118,9 +119,36 @@ function NotFoundPage() {
   );
 }
 
+/**
+ * Mantém a rota interna do Flow sincronizada com a URL do Booking.
+ * Se o navegador suspender/restaurar o iframe, o host poderá reabri-lo
+ * diretamente no fluxo e no editor que estavam ativos, em vez da lista inicial.
+ */
+function EmbedRouteSync() {
+  const location = useLocation();
+  const { mode } = useEmbed();
+
+  useEffect(() => {
+    if (mode !== "embedded" || window.parent === window) return;
+
+    const path = `${location.pathname}${location.search}`;
+    let targetOrigin = "*";
+    try {
+      if (document.referrer) targetOrigin = new URL(document.referrer).origin;
+    } catch {
+      // O wildcard só é usado quando o referrer não está disponível.
+    }
+
+    window.parent.postMessage({ type: "zailomflow:navigate", path }, targetOrigin);
+  }, [mode, location.pathname, location.search]);
+
+  return null;
+}
+
 function App() {
   return (
     <>
+      <EmbedRouteSync />
       <EmbedErrorScreen />
       <Routes>
       {/* Landing pública */}
