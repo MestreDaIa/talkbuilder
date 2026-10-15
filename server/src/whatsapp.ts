@@ -253,9 +253,10 @@ export async function handleWhatsAppWebhook(
         // Se a retomada gerou mensagens, enviamos elas agora
         if (resumeResult?.messages && resumeResult.messages.length > 0) {
           for (const msg of resumeResult.messages) {
-            const messageText = normalizeBotText(msg.content);\n      if (!messageText) continue;
+            const messageText = normalizeBotText(msg.content);
+            if (!messageText) continue;
             if (resumeResult.buttons && resumeResult.buttons.length > 0) {
-              await evolutionApi.sendButtons(instanceName, remoteJid, msg.content, resumeResult.buttons, currentApiKey);
+              await evolutionApi.sendButtons(instanceName, remoteJid, messageText, resumeResult.buttons, currentApiKey);
             } else {
               await evolutionApi.sendText(instanceName, remoteJid, messageText, currentApiKey);
             }
