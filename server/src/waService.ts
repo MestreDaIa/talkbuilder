@@ -200,7 +200,7 @@ export async function getWorkspaceCredentials(workspaceId: string): Promise<Work
     body: {
       tenant_id: tenantId,
       name: `flow-workspace-${workspaceId}`,
-      scopes: ["instances:read", "instances:write", "messages:write", "webhooks:write"],
+      scopes: ["instances:read", "instances:write", "messages:write", "webhooks:read", "webhooks:write"],
     },
   });
   const plaintext: string = keyResp.plaintext || keyResp.key || keyResp.api_key;
