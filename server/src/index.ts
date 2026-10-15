@@ -3,7 +3,7 @@ import cors from "cors";
 import morgan from "morgan";
 import dotenv from "dotenv";
 import { supabase } from "./supabase.js";
-import { handleWhatsAppWebhook } from "./whatsapp.js";
+import { handleWhatsAppWebhook, handleEvolutionBotRequest } from "./whatsapp.js";
 import { processRuntime } from "./runtime.js";
 import { getWorkspaceCredentials, reprovisionWorkspace, diagnoseWorkspace, waApi } from "./waService.js";
 import { resolveChannelRoute, invalidateChannelRoute } from "./channelRoute.js";
@@ -138,6 +138,19 @@ app.get("/webhook/whatsapp", (req: Request, res: Response) => {
     message: "Webhook endpoint is active. Use POST to send data from Evolution API.",
     usage: "POST /webhook/whatsapp"
   });
+});
+
+// Adaptador específico para Evolution Bot (apiUrl). O webhook assinado do wa-service
+// continua isolado em /webhook/whatsapp e mantém seu contrato/HMAC original.
+app.post("/evolution-bot", async (req: Request, res: Response) => {
+  try {
+    const result = await handleEvolutionBotRequest(req.body, req.query, req.header("authorization"));
+    res.json(result);
+  } catch (error: any) {
+    const statusCode = Number(error?.statusCode) || 500;
+    if (statusCode >= 500) console.error("[EVOLUTION-BOT] Erro ao processar mensagem:", error?.message || error);
+    res.status(statusCode).json({ error: error?.message || "evolution_bot_error" });
+  }
 });
 
 // Endpoint para Webhook da Evolution API
