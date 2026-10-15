@@ -50,7 +50,7 @@ function normalizeTriggerType(value: unknown): "Keyword" | "All" {
 }
 
 function normalizeTriggerOperator(value: unknown): string {
-  const normalized = String(value ?? "").trim().toLowerCase().replace(/[\\s_-]/g, "");
+  const normalized = String(value ?? "").trim().toLowerCase().replace(/[\s_-]/g, "");
   const operators: Record<string, string> = {
     contains: "Contains",
     equals: "Equals",
@@ -148,7 +148,7 @@ export default function WhatsAppInstanceSettings({ instanceName, isOpen, onClose
   const [botSettings, setBotSettings] = useState({
     enabled: false,
     description: "Evolution Bot Settings",
-    apiUrl: getWebhookUrlWithBot(selectedBotId),
+    apiUrl: getEvolutionBotUrlWithBot(selectedBotId),
     apiKey: "",
     triggerType: "Keyword",
     triggerKeyword: "",
