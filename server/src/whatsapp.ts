@@ -350,7 +350,7 @@ export async function handleEvolutionBotRequest(payload: any, query: any, author
     bot = nested;
   }
   const configuredKey = typeof bot?.apiKey === "string" ? bot.apiKey.trim() : "";
-  if (!configuredKey || authMatch[1].trim() !== configuredKey) {
+  if (!configuredKey || authorizationKey !== configuredKey) {
     fail("Evolution Bot API Key inválida ou não configurada no bot da instância.", 401);
   }
 
