@@ -793,6 +793,8 @@ async function runFlow(execution: any, containersIn: any[], edgesIn: any[], inpu
       // Guards de uma tentativa anterior não podem contaminar uma nova mensagem do usuário.
       // O contexto útil permanece preservado.
       (variables as any).__runtimeSkillCalls = {};
+      (variables as any).__runtimeTurnSkillResults = [];
+      (variables as any).__runtimeLookupPreflightAttempts = {};
       delete (variables as any).__skillExecutionGuard;
       (variables as any).__runtimeSkillPlan = plan;
       variables["__runtimeUserRequest"] = currentUserRequest;
@@ -1526,6 +1528,63 @@ async function runFlow(execution: any, containersIn: any[], edgesIn: any[], inpu
                     currentNodeId=node.id;
                     continue;
                   }
+                  // Preflight genérico: consultar por telefone antes de criar registro no mesmo recurso.
+                  if(String(matchedSkill._http.method||"GET").toUpperCase()==="POST"){
+                    const findEndpoint=(skill:any)=>{
+                      for(const container of containers){
+                        const httpNode=(container.nodes||[]).find((n:any)=>String(n.id)===String(skill?._http?.nodeId));
+                        if(!httpNode)continue;
+                        const endpoints=Array.isArray(httpNode.config?.endpoints)?httpNode.config.endpoints:[];
+                        return endpoints.find((ep:any)=>String(ep.id||(ep.method||"GET")+" "+(ep.url||""))===String(skill?._http?.endpointId))||null;
+                      }
+                      return null;
+                    };
+                    const getPhone=(obj:any):string=>{
+                      if(!obj||typeof obj!=="object")return "";
+                      if(Array.isArray(obj)){for(const item of obj){const v=getPhone(item);if(v)return v;}return "";}
+                      for(const [key,value] of Object.entries(obj)){
+                        if(/^(phone|mobile|telephone|contact_phone|whatsapp_phone)$/i.test(key)&&value!==null&&value!==undefined&&String(value).trim())return String(value).replace(/\D/g,"");
+                      }
+                      for(const value of Object.values(obj)){const v=getPhone(value);if(v)return v;}
+                      return "";
+                    };
+                    const phoneValue=getPhone(runtimeSkillCall.arguments)||String((variables as any).contact_phone||"").replace(/\D/g,"");
+                    const postEndpoint=findEndpoint(matchedSkill);
+                    const postPath=String(postEndpoint?.url||"").replace(/\?.*$/,"").replace(/%3A/gi,":");
+                    const postPathname=(()=>{try{return new URL(postPath).pathname.replace(/\/+$/,"");}catch{return postPath.replace(/\/+$/,"");}})();
+                    if(phoneValue&&postPathname){
+                      const lookupSkill=runtimeSkills.find((candidate:any)=>{
+                        if(String(candidate?._http?.method||"").toUpperCase()!=="GET")return false;
+                        const ep=findEndpoint(candidate);
+                        if(!ep)return false;
+                        const candidatePath=String(ep.url||"").replace(/\?.*$/,"").replace(/%3A/gi,":");
+                        let pathname="";try{pathname=new URL(candidatePath).pathname.replace(/\/+$/,"");}catch{pathname=candidatePath.replace(/\/+$/,"");}
+                        if(pathname!==postPathname)return false;
+                        const queryDefs=[...(Array.isArray(ep.queryParams)?ep.queryParams:[]),...(Array.isArray(ep.argsSchema?.queryParams)?ep.argsSchema.queryParams:[])];
+                        return queryDefs.some((q:any)=>/^(phone|mobile|telephone|contact_phone|whatsapp_phone)$/i.test(String(q?.name||q?.key||"")));
+                      });
+                      if(lookupSkill){
+                        const turnResults=Array.isArray((variables as any).__runtimeTurnSkillResults)?(variables as any).__runtimeTurnSkillResults:[];
+                        const lookupResult=turnResults.find((item:any)=>String(item.skill_id)===String(lookupSkill._http.endpointId)&&item.ok&&String(item.phone||"")===phoneValue);
+                        const lookupWasDone=!!lookupResult;
+                        const recordExists=lookupWasDone&&getPhone(lookupResult.data)===phoneValue;
+                        if(!lookupWasDone||recordExists){
+                          const attempts=(variables as any).__runtimeLookupPreflightAttempts||{};
+                          const count=Number(attempts[String(matchedSkill._http.endpointId)]||0);
+                          if(count>=1){
+                            messages.push({id:crypto.randomUUID(),type:"bot",content:recordExists?"Já localizei um cadastro para esse telefone e não vou criar outro. Não consegui continuar automaticamente; por favor, tente novamente.":"Não consegui confirmar se esse telefone já está cadastrado. Tente novamente em instantes."});
+                            return {messages,waiting_for:"text",variables,next_node_id:node.id,active_agent_node_id:node.id,mode:"agent",steps,status:"waiting_input"};
+                          }
+                          (variables as any).__runtimeLookupPreflightAttempts={...attempts,[String(matchedSkill._http.endpointId)]:count+1};
+                          input={message:recordExists?"[CORREÇÃO DO PLANEJADOR] A consulta GET já encontrou um registro com este telefone. Não execute a operação de criação novamente. Use os dados e o ID reais do registro retornado para continuar a solicitação original.":"[CORREÇÃO DO PLANEJADOR] Antes de criar este registro, execute a Skill GET do mesmo recurso com o telefone normalizado e verifique o resultado real. Só crie se a consulta confirmar que não existe registro para este telefone.",__internalAgentTurn:true};
+                          activeAgentNodeId=node.id;
+                          mode="agent";
+                          currentNodeId=node.id;
+                          continue;
+                        }
+                      }
+                    }
+                  }
                   const callKey=String(matchedSkill.id)+":"+JSON.stringify(runtimeSkillCall.arguments||{});
                   const callCount=((variables as any).__runtimeSkillCalls?.[callKey]||0)+1;
                   (variables as any).__runtimeSkillCalls={...((variables as any).__runtimeSkillCalls||{}),[callKey]:callCount};
@@ -1629,7 +1688,7 @@ async function runFlow(execution: any, containersIn: any[], edgesIn: any[], inpu
           plan.next=null;
           (variables as any).__runtimeSkillPlan=plan;
           (variables as any).__lastSkillResult={skill_id:String(dispatch.endpointId),ok,status:statusCode,method,data};
-          if(ok){const apiHistory=Array.isArray((variables as any).__runtimeApiHistory)?(variables as any).__runtimeApiHistory:[];const serialized=JSON.stringify(data);apiHistory.push({skill_id:String(dispatch.endpointId),method,status:statusCode,data:serialized&&serialized.length>8000?serialized.slice(0,8000)+"…[truncado]":data});(variables as any).__runtimeApiHistory=apiHistory.slice(-12);}
+          if(ok){const apiHistory=Array.isArray((variables as any).__runtimeApiHistory)?(variables as any).__runtimeApiHistory:[];const serialized=JSON.stringify(data);apiHistory.push({skill_id:String(dispatch.endpointId),method,status:statusCode,data:serialized&&serialized.length>8000?serialized.slice(0,8000)+"…[truncado]":data});(variables as any).__runtimeApiHistory=apiHistory.slice(-12);const turnResults=Array.isArray((variables as any).__runtimeTurnSkillResults)?(variables as any).__runtimeTurnSkillResults:[];const resultPhone=String((variables as any).contact_phone||"").replace(/\D/g,"");turnResults.push({skill_id:String(dispatch.endpointId),method,ok,phone:resultPhone,data:serialized&&serialized.length>8000?serialized.slice(0,8000)+"…[truncado]":data});(variables as any).__runtimeTurnSkillResults=turnResults.slice(-12);}
           delete (variables as any).__dynamicSkillDispatch;
           currentNodeId=activeAgentNodeId||node.id;
           const originalRequest = plan.user_input || plan.intent || variables["__runtimeUserRequest"] || "";
