@@ -1548,6 +1548,15 @@ async function runFlow(execution: any, containersIn: any[], edgesIn: any[], inpu
                       for(const value of Object.values(obj)){const v=getPhone(value);if(v)return v;}
                       return "";
                     };
+                    const containsPhone=(obj:any,target:string):boolean=>{
+                      if(!obj||typeof obj!=="object")return false;
+                      if(Array.isArray(obj))return obj.some(item=>containsPhone(item,target));
+                      for(const [key,value] of Object.entries(obj)){
+                        if(/^(phone|mobile|telephone|contact_phone|whatsapp_phone)$/i.test(key)&&value!==null&&value!==undefined&&String(value).replace(/\D/g,"")===target)return true;
+                        if(value&&typeof value==="object"&&containsPhone(value,target))return true;
+                      }
+                      return false;
+                    };
                     const phoneValue=getPhone(runtimeSkillCall.arguments)||String((variables as any).contact_phone||"").replace(/\D/g,"");
                     const postEndpoint=findEndpoint(matchedSkill);
                     const postPath=String(postEndpoint?.url||"").replace(/\?.*$/,"").replace(/%3A/gi,":");
@@ -1567,7 +1576,7 @@ async function runFlow(execution: any, containersIn: any[], edgesIn: any[], inpu
                         const turnResults=Array.isArray((variables as any).__runtimeTurnSkillResults)?(variables as any).__runtimeTurnSkillResults:[];
                         const lookupResult=turnResults.find((item:any)=>String(item.skill_id)===String(lookupSkill._http.endpointId)&&item.ok&&String(item.phone||"")===phoneValue);
                         const lookupWasDone=!!lookupResult;
-                        const recordExists=lookupWasDone&&getPhone(lookupResult.data)===phoneValue;
+                        const recordExists=lookupWasDone&&containsPhone(lookupResult.data,phoneValue);
                         if(!lookupWasDone||recordExists){
                           const attempts=(variables as any).__runtimeLookupPreflightAttempts||{};
                           const count=Number(attempts[String(matchedSkill._http.endpointId)]||0);
@@ -1688,7 +1697,7 @@ async function runFlow(execution: any, containersIn: any[], edgesIn: any[], inpu
           plan.next=null;
           (variables as any).__runtimeSkillPlan=plan;
           (variables as any).__lastSkillResult={skill_id:String(dispatch.endpointId),ok,status:statusCode,method,data};
-          if(ok){const apiHistory=Array.isArray((variables as any).__runtimeApiHistory)?(variables as any).__runtimeApiHistory:[];const serialized=JSON.stringify(data);apiHistory.push({skill_id:String(dispatch.endpointId),method,status:statusCode,data:serialized&&serialized.length>8000?serialized.slice(0,8000)+"…[truncado]":data});(variables as any).__runtimeApiHistory=apiHistory.slice(-12);const turnResults=Array.isArray((variables as any).__runtimeTurnSkillResults)?(variables as any).__runtimeTurnSkillResults:[];const resultPhone=String((variables as any).contact_phone||"").replace(/\D/g,"");turnResults.push({skill_id:String(dispatch.endpointId),method,ok,phone:resultPhone,data:serialized&&serialized.length>8000?serialized.slice(0,8000)+"…[truncado]":data});(variables as any).__runtimeTurnSkillResults=turnResults.slice(-12);}
+          if(ok){const apiHistory=Array.isArray((variables as any).__runtimeApiHistory)?(variables as any).__runtimeApiHistory:[];const serialized=JSON.stringify(data);apiHistory.push({skill_id:String(dispatch.endpointId),method,status:statusCode,data:serialized&&serialized.length>8000?serialized.slice(0,8000)+"…[truncado]":data});(variables as any).__runtimeApiHistory=apiHistory.slice(-12);const turnResults=Array.isArray((variables as any).__runtimeTurnSkillResults)?(variables as any).__runtimeTurnSkillResults:[];const resultPhone=String(u.searchParams.get("phone")||u.searchParams.get("mobile")||u.searchParams.get("telephone")||u.searchParams.get("contact_phone")||u.searchParams.get("whatsapp_phone")||(variables as any).contact_phone||"").replace(/\D/g,"");turnResults.push({skill_id:String(dispatch.endpointId),method,ok,phone:resultPhone,data:serialized&&serialized.length>8000?serialized.slice(0,8000)+"…[truncado]":data});(variables as any).__runtimeTurnSkillResults=turnResults.slice(-12);}
           delete (variables as any).__dynamicSkillDispatch;
           currentNodeId=activeAgentNodeId||node.id;
           const originalRequest = plan.user_input || plan.intent || variables["__runtimeUserRequest"] || "";
