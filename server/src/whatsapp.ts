@@ -335,10 +335,19 @@ export async function handleEvolutionBotRequest(payload: any, query: any, author
   }
 
   const creds = await findWorkspaceByInstance(instanceName);
-  if (!creds) fail("Instância não vinculada a um workspace do Flow.", 401);
+  if (!creds) {
+    const error: any = new Error("Instância não vinculada a um workspace do Flow.");
+    error.statusCode = 401;
+    throw error;
+  }
 
   const authMatch = /^Bearer\s+(.+)$/i.exec(String(authorization ?? ""));
-  if (!authMatch?.[1]) fail("Evolution Bot API Key ausente.", 401);
+  const authorizationKey = authMatch?.[1]?.trim();
+  if (!authorizationKey) {
+    const error: any = new Error("Evolution Bot API Key ausente.");
+    error.statusCode = 401;
+    throw error;
+  }
 
   const botResponse: any = await waApi(creds.apiKey).getBot(instanceName);
   let bot: any = botResponse;
