@@ -404,7 +404,7 @@ function buildRuntimeSkillPrompt(skills:any[], variables:any={}, runtimePlan:any
   return "\n\n[SKILLS DISPONÍVEIS]\n"+list+"\n\n[ESTADO DA EXECUÇÃO]\n"+JSON.stringify(context)+"\n\n[REGRAS DO EXECUTOR]\n"+rules;
 }
 function runtimeToolObject(value:any):Record<string,any>{if(value&&typeof value==="object"&&!Array.isArray(value))return value;if(typeof value==="string"){try{const parsed=JSON.parse(value);if(parsed&&typeof parsed==="object"&&!Array.isArray(parsed))return parsed;}catch{}}return{};}
-function runtimeContactField(key:string):boolean{return /(email|e[_-]?mail|phone|mobile|telephone|tax[_-]?id|cpf|cnpj|document|full[_-]?name|first[_-]?name|last[_-]?name|customer[_-]?name|client[_-]?name|address)/i.test(key);}
+function runtimeContactField(key:string):boolean{return /(^name$|email|e[_-]?mail|phone|mobile|telephone|tax[_-]?id|cpf|cnpj|document|full[_-]?name|first[_-]?name|last[_-]?name|customer[_-]?name|client[_-]?name|address)/i.test(key);}
 function runtimeIdField(key:string):boolean{return /(^id$|_id$|uuid)/i.test(key);}
 function runtimeNormalizeGrounding(value:any,key:string):string{const raw=String(value??"").trim();if(/email|e[_-]?mail/i.test(key))return raw.toLowerCase();if(/phone|mobile|telephone|tax[_-]?id|cpf|cnpj|document/i.test(key))return raw.replace(/\D/g,"");return raw.toLowerCase().replace(/\s+/g," ");}
 function runtimeTrustedText(variables:any,history:any[],userPrompt:string):string{
@@ -434,7 +434,6 @@ function runtimeSanitizeModelData(value:any,trustedText:string,path=""):any{
   if(!value||typeof value!=="object")return value;
   const out:any={};
   for(const [key,item] of Object.entries(value)){
-    const fullPath=path?path+"."+key:key;
     if((runtimeContactField(key)||runtimeIdField(key))&&item!==null&&item!==undefined&&item!==""){
       const normalized=runtimeNormalizeGrounding(item,key);
       const trusted=runtimeNormalizeGrounding(trustedText,key);
