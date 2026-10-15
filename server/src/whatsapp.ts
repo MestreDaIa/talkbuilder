@@ -386,6 +386,18 @@ export async function handleEvolutionBotRequest(payload: any, query: any, author
     },
   });
 
+  console.log("[EVOLUTION-BOT] runtime result", JSON.stringify({
+    flow_id: botPublicId,
+    channel: "whatsapp",
+    messageLength: text.length,
+    status: runtimeResult?.debug?.status ?? null,
+    node: runtimeResult?.debug?.node ?? null,
+    steps: runtimeResult?.debug?.steps ?? null,
+    messages: Array.isArray(runtimeResult?.messages) ? runtimeResult.messages.length : 0,
+    waiting_for: runtimeResult?.waiting_for ?? null,
+    wait_ms: runtimeResult?.wait_ms ?? 0,
+  }));
+
   const messages = Array.isArray(runtimeResult?.messages)
     ? runtimeResult.messages.map((item: any) => String(item?.content ?? "").trim()).filter(Boolean)
     : [];
