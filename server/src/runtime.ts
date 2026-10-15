@@ -687,7 +687,19 @@ async function runFlow(execution: any, containersIn: any[], edgesIn: any[], inpu
     if (input.messageId) variables["messageId"] = input.messageId;
     if (input.remoteJid) variables["remoteJid"] = input.remoteJid;
     if (input.pushName) variables["pushName"] = input.pushName;
-    if (input.instanceName) variables["instanceName"] = input.instanceName;\n    // Metadados genéricos do contato para Skills de qualquer API; contact_id continua sendo a chave da sessão.\n    const contactJid = String(input.remoteJid || input.contact_jid || input.contactJid || "").trim();\n    if (contactJid) {\n      variables.contact_jid = contactJid;\n      variables.remoteJid = contactJid;\n      const jidLocalPart = contactJid.split("@")[0];\n      if (/^[+\\d().\\s-]+$/.test(jidLocalPart)) {\n        const normalizedPhone = jidLocalPart.replace(/\\D/g, "");\n        if (normalizedPhone) { variables.contact_phone = normalizedPhone; variables.phone = normalizedPhone; }\n      }\n    }\n    if (input.pushName) variables.contact_name = String(input.pushName).trim();
+    if (input.instanceName) variables["instanceName"] = input.instanceName;
+    // Metadados genéricos do contato para Skills de qualquer API; contact_id continua sendo a chave da sessão.
+    const contactJid = String(input.remoteJid || input.contact_jid || input.contactJid || "").trim();
+    if (contactJid) {
+      variables.contact_jid = contactJid;
+      variables.remoteJid = contactJid;
+      const jidLocalPart = contactJid.split("@")[0];
+      if (/^[+\d().\s-]+$/.test(jidLocalPart)) {
+        const normalizedPhone = jidLocalPart.replace(/\D/g, "");
+        if (normalizedPhone) { variables.contact_phone = normalizedPhone; variables.phone = normalizedPhone; }
+      }
+    }
+    if (input.pushName) variables.contact_name = String(input.pushName).trim();
     if (input.serverUrl) variables["serverUrl"] = input.serverUrl;
     if (input.apiKey) variables["apiKey"] = input.apiKey;
     
