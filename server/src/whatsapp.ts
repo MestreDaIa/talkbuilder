@@ -57,6 +57,30 @@ export async function handleWhatsAppWebhook(
     return { status: "ignored" };
   }
 
+  // Quando o Evolution Bot aponta para o adaptador /evolution-bot, ele é o
+  // único responsável por executar o runtime e devolver a resposta à Evolution.
+  // Ignoramos aqui a mesma mensagem recebida pelo webhook assinado para evitar
+  // duas execuções e duas respostas no WhatsApp.
+  if (instanceName && creds?.apiKey) {
+    try {
+      const configured: any = await waApi(creds.apiKey).getBot(instanceName);
+      let configuredBot: any = configured;
+      for (let depth = 0; depth < 6; depth++) {
+        if (Array.isArray(configuredBot)) { configuredBot = configuredBot[0] ?? null; continue; }
+        if (!configuredBot || typeof configuredBot !== "object") break;
+        const nested = configuredBot.evolutionBot ?? configuredBot.bot ?? configuredBot.data;
+        if (!nested || nested === configuredBot) break;
+        configuredBot = nested;
+      }
+      if (configuredBot?.enabled === true && String(configuredBot?.apiUrl ?? "").includes("/evolution-bot")) {
+        console.log(`[webhook] Ignorando ${instanceName}: execução está delegada ao Evolution Bot adapter.`);
+        return { status: "ignored_evolution_bot_mode" };
+      }
+    } catch (err: any) {
+      console.warn("[webhook] não foi possível verificar o modo Evolution Bot; mantendo processamento padrão:", err?.message || err);
+    }
+  }
+
   // 1.5 Rota do canal: só processa se esta instância estiver atribuída ao Flow.
   //     Fonte da verdade: wa-service (se expuser rota) → Booking API → fallback.
   if (instanceName) {
