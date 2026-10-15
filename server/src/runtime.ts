@@ -1472,6 +1472,23 @@ async function runFlow(execution: any, containersIn: any[], edgesIn: any[], inpu
                     if(!runtimePlan.blocked.includes(signature)) runtimePlan.blocked.push(signature);
                     runtimePlan.next=null;
                     (variables as any).__runtimeSkillPlan=runtimePlan;
+
+                    // Se a mesma Skill já terminou com sucesso e o modelo agora trouxe
+                    // uma mensagem baseada nesse resultado, finalize a resposta sem
+                    // executar a requisição novamente nem entrar em loop de tool calls.
+                    const previousResult=(variables as any).__lastSkillResult;
+                    const sameSuccessfulSkill=!!previousResult?.ok &&
+                      String(previousResult.skill_id||"")===String(matchedSkill._http.endpointId||"");
+                    const repeatedMessage=String(runtimeSkillCall.message||"").trim();
+                    if(sameSuccessfulSkill && repeatedMessage){
+                      const containsInternalId=/[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}|\\bnode-[a-z0-9-]+|::(?:GET|POST|PUT|PATCH|DELETE)\\b/i.test(repeatedMessage);
+                      if(!containsInternalId){
+                        messages.push({id:crypto.randomUUID(),type:"bot",content:repeatedMessage});
+                        console.log("[ai-agent] encerrando chamada repetida com resposta baseada em Skill já concluída");
+                        return {messages,waiting_for:"text",variables,next_node_id:node.id,active_agent_node_id:node.id,mode:"agent",steps,status:"waiting_input"};
+                      }
+                    }
+
                     if(callCount>=3){
                       const stopMsg="Não consegui concluir essa etapa com os dados disponíveis. Pode confirmar a informação que está faltando?";
                       messages.push({id:crypto.randomUUID(),type:"bot",content:stopMsg});
