@@ -283,7 +283,8 @@ export async function handleWhatsAppWebhook(
   if (runtimeResult && runtimeResult.messages && runtimeResult.messages.length > 0) {
 
     for (const msg of runtimeResult.messages) {
-      if (!msg.content) continue;
+      const messageText = normalizeBotText(msg.content);
+      if (!messageText) continue;
       
       // Preparar para o retorno da Evolution Bot (caso seja chamada via API de Bot)
       if (runtimeResult.buttons && runtimeResult.buttons.length > 0) {
@@ -303,10 +304,10 @@ export async function handleWhatsAppWebhook(
         const result = await evolutionApi.sendButtons(instanceName, remoteJid, messageText, runtimeResult.buttons, currentApiKey);
         console.log(`[WHATSAPP] Resultado envio botões:`, JSON.stringify(result));
       } else {
-        botResponses.push({ text: msg.content });
+        botResponses.push({ text: messageText });
         // Também enviamos via API para garantir (Webhook mode)
         console.log(`[WHATSAPP] Enviando texto via API Evolution para ${remoteJid}`);
-        const result = await evolutionApi.sendText(instanceName, remoteJid, msg.content, currentApiKey);
+        const result = await evolutionApi.sendText(instanceName, remoteJid, messageText, currentApiKey);
         console.log(`[WHATSAPP] Resultado envio texto:`, JSON.stringify(result));
       }
     }
