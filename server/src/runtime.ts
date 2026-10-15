@@ -403,7 +403,8 @@ function buildRuntimeSkillPrompt(skills:any[], variables:any={}, runtimePlan:any
     "Nunca invente IDs, parâmetros ou resultados. Nunca declare sucesso crítico sem resultado positivo.";
   return "\n\n[SKILLS DISPONÍVEIS]\n"+list+"\n\n[ESTADO DA EXECUÇÃO]\n"+JSON.stringify(context)+"\n\n[REGRAS DO EXECUTOR]\n"+rules;
 }
-function buildRuntimeUseSkillTool(skills:any[]){if(!skills.length)return undefined;return{type:"function",function:{name:"use_skill",description:"Registra a interpretação da solicitação e executa a próxima Skill necessária. Preserve os dados que o usuário já informou, mesmo quando eles ainda não correspondem ao formato de argumentos da Skill atual.",parameters:{type:"object",properties:{skill_id:{type:"string",enum:skills.map(s=>s.id)},arguments:{type:"object",additionalProperties:true},intent:{type:"string"},parameters:{type:"object",additionalProperties:true},message:{type:"string"}},required:["skill_id"]}}};}
+function runtimeToolObject(value:any):Record<string,any>{if(value&&typeof value==="object"&&!Array.isArray(value))return value;if(typeof value==="string"){try{const parsed=JSON.parse(value);if(parsed&&typeof parsed==="object"&&!Array.isArray(parsed))return parsed;}catch{}}return{};}
+function buildRuntimeUseSkillTool(skills:any[]){if(!skills.length)return undefined;return{type:"function",function:{name:"use_skill",description:"Registra a interpretação da solicitação e executa a próxima Skill necessária. Preserve os dados que o usuário já informou, mesmo quando eles ainda não correspondem ao formato de argumentos da Skill atual.",parameters:{type:"object",properties:{skill_id:{type:"string",enum:skills.map(s=>s.id)},arguments:{type:"string",description:"Argumentos da Skill em formato JSON serializado."},intent:{type:"string"},parameters:{type:"string",description:"Parâmetros extraídos em formato JSON serializado."},message:{type:"string"}},required:["skill_id"]}}};}
 function runtimeFindCandidateLabels(value:any, root:any, labels:string[]=[]):string[]{
   if(root===null||root===undefined)return labels;
   if(Array.isArray(root)){for(const item of root)runtimeFindCandidateLabels(value,item,labels);return labels;}
@@ -1313,7 +1314,7 @@ async function runFlow(execution: any, containersIn: any[], edgesIn: any[], inpu
                   const data: any = await res.json();
                   const agentMessage=data.choices?.[0]?.message;
                   const toolCall=agentMessage?.tool_calls?.find((x:any)=>x?.function?.name==="use_skill");
-                  if(toolCall?.function?.arguments){try{const p=JSON.parse(toolCall.function.arguments);if(p?.skill_id)(variables as any).__runtimeSkillCall={skill_id:String(p.skill_id),arguments:p.arguments&&typeof p.arguments==="object"?p.arguments:{},parameters:p.parameters&&typeof p.parameters==="object"?p.parameters:{},intent:p.intent?String(p.intent):"",message:p.message?String(p.message):""};}catch{}}
+                  if(toolCall?.function?.arguments){try{const p=JSON.parse(toolCall.function.arguments);if(p?.skill_id)(variables as any).__runtimeSkillCall={skill_id:String(p.skill_id),arguments:runtimeToolObject(p.arguments),parameters:runtimeToolObject(p.parameters),intent:p.intent?String(p.intent):"",message:p.message?String(p.message):""};}catch{}}
                   aiReply=agentMessage?.content||"";
                   if(!(variables as any).__runtimeSkillCall){
                     const parsed=parseRuntimeSkillCall(aiReply);
@@ -1379,7 +1380,7 @@ async function runFlow(execution: any, containersIn: any[], edgesIn: any[], inpu
                   const data: any = await res.json();
                   const parts=data.candidates?.[0]?.content?.parts||[];
                   const fn=parts.find((p:any)=>p?.functionCall?.name==="use_skill")?.functionCall;
-                  if(fn?.args?.skill_id)(variables as any).__runtimeSkillCall={skill_id:String(fn.args.skill_id),arguments:fn.args.arguments&&typeof fn.args.arguments==="object"?fn.args.arguments:{},parameters:fn.args.parameters&&typeof fn.args.parameters==="object"?fn.args.parameters:{},intent:fn.args.intent?String(fn.args.intent):"",message:fn.args.message?String(fn.args.message):""};
+                  if(fn?.args?.skill_id)(variables as any).__runtimeSkillCall={skill_id:String(fn.args.skill_id),arguments:runtimeToolObject(fn.args.arguments),parameters:runtimeToolObject(fn.args.parameters),intent:fn.args.intent?String(fn.args.intent):"",message:fn.args.message?String(fn.args.message):""};
                   aiReply=parts.map((p:any)=>p.text).filter(Boolean).join("\n").trim()||"";
                   if(!(variables as any).__runtimeSkillCall){
                     const parsed=parseRuntimeSkillCall(aiReply);
