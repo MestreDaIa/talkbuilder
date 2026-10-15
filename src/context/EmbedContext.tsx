@@ -188,11 +188,25 @@ function detectInitialMode(): {
 
 		if (token && host) {
 			const { session, error } = buildSession(host, token);
-			// limpa o hash pra não vazar o token em logs/screenshots
+			// Remove apenas os parâmetros temporários do embed, preservando a rota
+			// do HashRouter. Apagar o hash inteiro fazia o Flow voltar à lista inicial
+			// quando o iframe era restaurado/recarregado pelo navegador.
+			const rawRoute = window.location.hash.startsWith("#")
+				? window.location.hash.slice(1)
+				: window.location.hash;
+			const queryIndex = rawRoute.indexOf("?");
+			const routePath = queryIndex >= 0 ? rawRoute.slice(0, queryIndex) : rawRoute;
+			const routeParams = new URLSearchParams(queryIndex >= 0 ? rawRoute.slice(queryIndex + 1) : "");
+			routeParams.delete("embed_token");
+			routeParams.delete("sync");
+			routeParams.delete("force_sync");
+			routeParams.delete("plan_tier");
+			const cleanedQuery = routeParams.toString();
+			const cleanedHash = `#${routePath}${cleanedQuery ? `?${cleanedQuery}` : ""}`;
 			window.history.replaceState(
 				null,
 				"",
-				window.location.pathname + window.location.search
+				window.location.pathname + window.location.search + cleanedHash
 			);
 			if (session) {
 				return { mode: "embedded", host, session, error: null };
