@@ -4,6 +4,8 @@ import { evolutionApi, EVO_BASE_URL } from "./evolution.js";
 import { verifyWebhookSignature, findWorkspaceByInstance, waApi } from "./waService.js";
 import { shouldFlowHandle } from "./channelRoute.js";
 
+// Converte escapes de quebra de linha que alguns modelos devolvem literalmente.\nfunction normalizeBotText(value: any): string {\n  return String(value ?? "")\n    .replace(/\\\\r\\\\n/g, "\\n")\n    .replace(/\\\\n/g, "\\n")\n    .replace(/\\\\r/g, "\\n")\n    .replace(/\\n{3,}/g, "\\n\\n")\n    .trim();\n}
+
 
 export async function handleWhatsAppWebhook(
   payload: any,
@@ -244,11 +246,11 @@ export async function handleWhatsAppWebhook(
         // Se a retomada gerou mensagens, enviamos elas agora
         if (resumeResult?.messages && resumeResult.messages.length > 0) {
           for (const msg of resumeResult.messages) {
-            if (!msg.content) continue;
+            const messageText = normalizeBotText(msg.content);\n      if (!messageText) continue;
             if (resumeResult.buttons && resumeResult.buttons.length > 0) {
               await evolutionApi.sendButtons(instanceName, remoteJid, msg.content, resumeResult.buttons, currentApiKey);
             } else {
-              await evolutionApi.sendText(instanceName, remoteJid, msg.content, currentApiKey);
+              await evolutionApi.sendText(instanceName, remoteJid, messageText, currentApiKey);
             }
           }
         }
@@ -279,7 +281,7 @@ export async function handleWhatsAppWebhook(
       if (runtimeResult.buttons && runtimeResult.buttons.length > 0) {
         botResponses.push({
           buttons: {
-            text: msg.content,
+            text: messageText,
             buttons: runtimeResult.buttons.map((b: any) => ({
               buttonId: b.id,
               buttonText: { displayText: b.label },
@@ -290,7 +292,7 @@ export async function handleWhatsAppWebhook(
         });
         // Também enviamos via API para garantir (Webhook mode)
         console.log(`[WHATSAPP] Enviando botões via API Evolution para ${remoteJid}`);
-        const result = await evolutionApi.sendButtons(instanceName, remoteJid, msg.content, runtimeResult.buttons, currentApiKey);
+        const result = await evolutionApi.sendButtons(instanceName, remoteJid, messageText, runtimeResult.buttons, currentApiKey);
         console.log(`[WHATSAPP] Resultado envio botões:`, JSON.stringify(result));
       } else {
         botResponses.push({ text: msg.content });
@@ -399,7 +401,7 @@ export async function handleEvolutionBotRequest(payload: any, query: any, author
   }));
 
   const messages = Array.isArray(runtimeResult?.messages)
-    ? runtimeResult.messages.map((item: any) => String(item?.content ?? "").trim()).filter(Boolean)
+    ? runtimeResult.messages.map((item: any) => normalizeBotText(item?.content)).filter(Boolean)
     : [];
   const message = messages.join("\n\n") || "Não consegui concluir essa resposta agora. Pode repetir?";
   return { message };
