@@ -4,8 +4,15 @@ import { evolutionApi, EVO_BASE_URL } from "./evolution.js";
 import { verifyWebhookSignature, findWorkspaceByInstance, waApi } from "./waService.js";
 import { shouldFlowHandle } from "./channelRoute.js";
 
-// Converte escapes de quebra de linha que alguns modelos devolvem literalmente.\nfunction normalizeBotText(value: any): string {\n  return String(value ?? "")\n    .replace(/\\\\r\\\\n/g, "\\n")\n    .replace(/\\\\n/g, "\\n")\n    .replace(/\\\\r/g, "\\n")\n    .replace(/\\n{3,}/g, "\\n\\n")\n    .trim();\n}
-
+// Converte escapes de quebra de linha que alguns modelos devolvem literalmente.
+function normalizeBotText(value: any): string {
+  return String(value ?? "")
+    .replace(/\\r\\n/g, "\n")
+    .replace(/\\n/g, "\n")
+    .replace(/\\r/g, "\n")
+    .replace(/\n{3,}/g, "\n\n")
+    .trim();
+}
 
 export async function handleWhatsAppWebhook(
   payload: any,
