@@ -384,9 +384,14 @@ export default function WhatsAppInstanceSettings({ instanceName, isOpen, onClose
     try {
       // 1. Salvar no Evolution API
       const botApiUrl = normalizeEvolutionBotUrl(botSettings.apiUrl, selectedBotId);
-      const botPayload = { ...botSettings, apiUrl: botApiUrl };
+      // O endpoint interno do Flow exige autenticação Bearer. Gera uma chave
+      // se ainda não existir, e deixa a Evolution Bot persistir/enviar essa chave.
+      const generatedKey = botApiUrl.includes("/evolution-bot") && !botSettings.apiKey.trim()
+        ? Array.from(crypto.getRandomValues(new Uint8Array(32)), (byte) => byte.toString(16).padStart(2, "0")).join("")
+        : botSettings.apiKey.trim();
+      const botPayload = { ...botSettings, apiUrl: botApiUrl, ...(generatedKey ? { apiKey: generatedKey } : {}) };
       await evoApi.setEvolutionBot(instanceName, botPayload);
-      setBotSettings((current) => ({ ...current, apiUrl: botApiUrl }));
+      setBotSettings((current) => ({ ...current, apiUrl: botApiUrl, apiKey: generatedKey }));
 
       // 2. Salvar/remover o vínculo compartilhado no Supabase do Flow.
       if (selectedBotId) {
