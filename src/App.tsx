@@ -131,7 +131,13 @@ function EmbedRouteSync() {
   useEffect(() => {
     if (mode !== "embedded" || window.parent === window) return;
 
-    const path = `${location.pathname}${location.search}`;
+    // Nunca propaga o token temporário de embed para a URL do Booking.
+    const searchParams = new URLSearchParams(location.search);
+    for (const key of ["embed_token", "sync", "force_sync", "plan_tier"]) {
+      searchParams.delete(key);
+    }
+    const cleanSearch = searchParams.toString();
+    const path = `${location.pathname}${cleanSearch ? `?${cleanSearch}` : ""}`;
     let targetOrigin = "*";
     try {
       if (document.referrer) targetOrigin = new URL(document.referrer).origin;
