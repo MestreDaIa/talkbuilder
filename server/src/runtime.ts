@@ -1397,6 +1397,13 @@ async function runFlow(execution: any, containersIn: any[], edgesIn: any[], inpu
               }
               const runtimeSkillCall=(variables as any).__runtimeSkillCall;
               if (runtimeSkillCall) {
+                // O modelo pode separar dados extraídos em "parameters" e argumentos executáveis em
+                // "arguments". Mesclamos ambos para não perder IDs/nomes necessários à chamada HTTP.
+                const normalizedSkillArguments = {
+                  ...runtimeToolObject(runtimeSkillCall.parameters),
+                  ...runtimeToolObject(runtimeSkillCall.arguments),
+                };
+                runtimeSkillCall.arguments = normalizedSkillArguments;
                 const previousKnown = (variables as any).__runtimeKnownData && typeof (variables as any).__runtimeKnownData === "object" ? (variables as any).__runtimeKnownData : {};
                 const extracted = runtimeSkillCall.parameters && typeof runtimeSkillCall.parameters === "object" ? runtimeSkillCall.parameters : {};
                 if (Object.keys(extracted).length) (variables as any).__runtimeKnownData = { ...previousKnown, ...extracted };
@@ -1480,7 +1487,12 @@ async function runFlow(execution: any, containersIn: any[], edgesIn: any[], inpu
                   runtimePlan.intent=runtimePlan.intent||userPrompt;
                   runtimePlan.next=matchedSkill.id;
                   (variables as any).__runtimeSkillPlan=runtimePlan;
-                  if(runtimeSkillCall.message)messages.push({id:crypto.randomUUID(),type:"bot",content:runtimeSkillCall.message});
+                  if(runtimeSkillCall.message) {
+                    const progressMessage = String(runtimeSkillCall.message).trim();
+                    // Não exponha IDs internos/UUIDs nem mensagens que revelem detalhes técnicos.
+                    const containsInternalId = /[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}|\bnode-[a-z0-9-]+|::(?:GET|POST|PUT|PATCH|DELETE)\b/i.test(progressMessage);
+                    if (progressMessage && !containsInternalId) messages.push({id:crypto.randomUUID(),type:"bot",content:progressMessage});
+                  }
                   (variables as any).__dynamicSkillDispatch={nodeId:matchedSkill._http.nodeId,endpointId:matchedSkill._http.endpointId,args:runtimeSkillCall.arguments||{},permissions:matchedSkill._http.permissions||{},isMutating:!!matchedSkill._http.isMutating};
                   activeAgentNodeId=node.id;
                   mode="agent";
@@ -1526,6 +1538,7 @@ async function runFlow(execution: any, containersIn: any[], edgesIn: any[], inpu
           let ok=false,statusCode=500,data:any={ok:false,error:"skill_execution_failed"};
           try{if(!endpoint)throw new Error("Skill endpoint não encontrado");if(dispatch.isMutating&&(variables as any).__skillExecutionGuard?.blocked){statusCode=409;data={ok:false,error:"verification_required",message:"Operação crítica bloqueada porque a verificação anterior falhou."};}else{let url=replaceVars(String(endpoint.url||"")).replace(/%3A/gi,":").replace(/%7B/gi,"{").replace(/%7D/gi,"}");const names=new Set<string>();for(const p of endpoint.argsSchema?.pathParams||[])if(p?.name)names.add(String(p.name));for(const m of url.matchAll(/\{([^}]+)\}/g))names.add(m[1]);for(const m of url.matchAll(/:([A-Za-z_][A-Za-z0-9_]*)/g))names.add(m[1]);for(const n of names){const v=valueFor(n);if(v===undefined||v===null||v==="")throw new Error(`Faltou o argumento necessário: ${n}`);const enc=encodeURIComponent(String(v));url=url.replace(new RegExp("\\{"+n+"\\}","g"),enc).replace(new RegExp(":"+n+"(?=/|$|\\?)","g"),enc);}const u=new URL(url);for(const p of endpoint.queryParams||[]){if(!p?.name)continue;const v=valueFor(String(p.name));if(v!==undefined&&v!==null&&v!=="")u.searchParams.set(String(p.name),String(v));}for(const[k,v]of Object.entries(query))if(v!=null&&!Array.from(endpoint.queryParams||[]).some((p:any)=>String(p?.name)===k))u.searchParams.set(k,String(v));const headers:Record<string,string>={Accept:"application/json, text/plain, */*"};for(const h of endpoint.headers||[])if(h?.name)headers[h.name]=replaceVars(String(h.value??""));if(endpoint.auth?.type==="bearer"&&endpoint.auth.token)headers.Authorization="Bearer "+replaceVars(String(endpoint.auth.token));else if(endpoint.auth?.type==="apiKey"&&endpoint.auth.name)headers[endpoint.auth.name]=replaceVars(String(endpoint.auth.value||""));let body:any=undefined;if(!["GET","HEAD"].includes(method)){if(dispatch.isMutating&&args.body===undefined)throw new Error("Operação crítica exige arguments.body atual.");const b=args.body!==undefined?args.body:(endpoint.body||undefined);if(b!==undefined){body=typeof b==="string"?replaceVars(b,true):JSON.stringify(b);headers["Content-Type"]="application/json";}}const attempts=method==="GET"?4:1;let res:any=null,text="";for(let a=1;a<=attempts;a++){try{res=await fetch(u.toString(),{method,headers,body});text=await res.text();}catch(e){res=null;text=String(e)}if(res?.ok||method!=="GET"||a===attempts)break;await new Promise(r=>setTimeout(r,2000));}statusCode=res?.status||500;try{data=JSON.parse(text)}catch{data=text}ok=!!res?.ok;const err=ok?null:(data?.message||data?.error||text||`HTTP ${statusCode}`);(variables as any).__lastSkillExecution={ok,status:statusCode,method,endpoint:endpoint.id,error:err};if(method==="GET"){if(ok)delete (variables as any).__skillExecutionGuard;else(variables as any).__skillExecutionGuard={blocked:true,skillId:endpoint.id,endpoint:endpoint.url,method,status:statusCode,error:err,retryExhausted:true}}variables.httpResponse=data;if(endpoint.responseVariable)variables[endpoint.responseVariable]=data;for(const m of endpoint.responseMappings||[]){if(!m?.jsonPath||!m?.variableName)continue;let v=data;for(const part of String(m.jsonPath).replace(/^data\./,"").split(".")){if(v==null)break;v=v[part]}if(v!==undefined)variables[m.variableName]=v}}}catch(e){statusCode=422;data={ok:false,error:"skill_execution_failed",message:e instanceof Error?e.message:String(e)};(variables as any).__lastSkillExecution={ok:false,status:statusCode,method,endpoint:endpoint?.id||dispatch.endpointId,error:data.message}}if(!(variables as any).__lastSkillExecution)(variables as any).__lastSkillExecution={ok,status:statusCode,method,endpoint:dispatch.endpointId,error:ok?null:data?.message||data?.error};
           if(!ok)variables.httpResponse=data;
+          console.log(\`[runtime:skill] \${method} \${String(endpoint?.url||dispatch.endpointId)} status=\${statusCode} ok=\${ok} error=\${String((variables as any).__lastSkillExecution?.error||"").slice(0,240)}\`);
           const plan=(variables as any).__runtimeSkillPlan||{intent:null,user_input:null,completed:[],next:null,blocked:[]};
           if(ok) plan.completed=[...(plan.completed||[]).filter((id:any)=>String(id)!==String(dispatch.endpointId)),String(dispatch.endpointId)];
           plan.next=null;
