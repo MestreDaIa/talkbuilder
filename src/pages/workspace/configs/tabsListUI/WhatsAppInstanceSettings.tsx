@@ -108,6 +108,24 @@ export default function WhatsAppInstanceSettings({ instanceName, isOpen, onClose
 
   const [webhookUrl, setWebhookUrl] = useState(getWebhookUrlWithBot(selectedBotId));
 
+  const getEvolutionBotUrlWithBot = (botId?: string) => {
+    const backend = import.meta.env.VITE_BACKEND_URL
+      ? import.meta.env.VITE_BACKEND_URL.replace(/\/$/, "")
+      : "https://api-flowbuilder.zailom.com";
+    return botId
+      ? backend + "/evolution-bot?bot_id=" + encodeURIComponent(botId)
+      : backend + "/evolution-bot";
+  };
+
+  const normalizeEvolutionBotUrl = (url: unknown, botId?: string) => {
+    const value = typeof url === "string" ? url.trim() : "";
+    // Migra a URL antiga, que apontava para o webhook HMAC e não
+    // implementava o contrato de resposta esperado pela Evolution Bot.
+    if (!value || value.includes("/webhook/whatsapp")) return getEvolutionBotUrlWithBot(botId);
+    return value;
+  };
+
+
   // Update webhookUrl when selectedBotId changes
   useEffect(() => {
     if (selectedBotId) {
@@ -176,7 +194,7 @@ export default function WhatsAppInstanceSettings({ instanceName, isOpen, onClose
           ...current,
           enabled: b.enabled ?? false,
           description: b.description ?? "Evolution Bot Settings",
-          apiUrl: b.apiUrl || current.apiUrl,
+          apiUrl: normalizeEvolutionBotUrl(b.apiUrl, selectedBotId || bindingResult.data?.[0]?.bot_public_id),
           apiKey: b.apiKey ?? "",
           triggerType: normalizeTriggerType(b.triggerType),
           triggerKeyword: b.triggerKeyword || b.triggerValue || "",
@@ -285,7 +303,7 @@ export default function WhatsAppInstanceSettings({ instanceName, isOpen, onClose
         setBotSettings({
           enabled: b.enabled ?? false,
           description: b.description ?? "Evolution Bot Settings",
-          apiUrl: b.apiUrl || getWebhookUrlWithBot(selectedBotId),
+          apiUrl: normalizeEvolutionBotUrl(b.apiUrl, selectedBotId || bindings?.[0]?.bot_public_id),
           apiKey: b.apiKey ?? "",
           triggerType: normalizeTriggerType(b.triggerType),
           triggerKeyword: b.triggerKeyword || b.triggerValue || "",
@@ -331,7 +349,15 @@ export default function WhatsAppInstanceSettings({ instanceName, isOpen, onClose
   const handleSaveSettings = async () => {
     setSavingSettings(true);
     try {
-      await evoApi.setSettings(instanceName, settings);
+      await evoApi.setSettings(instanceName, {
+        rejectCall: settings.reject_call,
+        msgCall: settings.msg_call,
+        groupsIgnore: settings.groups_ignore,
+        alwaysOnline: settings.always_online,
+        readMessages: settings.read_messages,
+        syncFullHistory: settings.sync_full_history,
+        readStatus: settings.read_status,
+      });
       toast({ title: "Configurações da instância atualizadas!" });
     } catch (err: any) {
       toast({ title: "Erro ao salvar configurações", description: err.message, variant: "destructive" });
@@ -357,7 +383,10 @@ export default function WhatsAppInstanceSettings({ instanceName, isOpen, onClose
     setSavingBot(true);
     try {
       // 1. Salvar no Evolution API
-      await evoApi.setEvolutionBot(instanceName, botSettings);
+      const botApiUrl = normalizeEvolutionBotUrl(botSettings.apiUrl, selectedBotId);
+      const botPayload = { ...botSettings, apiUrl: botApiUrl };
+      await evoApi.setEvolutionBot(instanceName, botPayload);
+      setBotSettings((current) => ({ ...current, apiUrl: botApiUrl }));
 
       // 2. Salvar/remover o vínculo compartilhado no Supabase do Flow.
       if (selectedBotId) {
