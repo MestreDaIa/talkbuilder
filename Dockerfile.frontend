@@ -1,10 +1,13 @@
 # Build stage
 FROM mirror.gcr.io/library/node:22-slim AS builder
 WORKDIR /app
-COPY package.json package-lock.json* ./
-# package-lock.json is stale and omits pdfjs-dist. Resolve package.json directly;
-# legacy-peer-deps avoids unrelated peer-version conflicts in the existing tree.
-RUN npm install --legacy-peer-deps --package-lock=false --no-audit --no-fund
+
+COPY package.json package-lock.json ./
+# Use the committed lockfile so Docker builds install the same dependency tree as CI.
+# legacy-peer-deps is needed for existing peer-version conflicts in the project.
+RUN npm ci --legacy-peer-deps --no-audit --no-fund \
+    && node -e "require('node:fs').accessSync('node_modules/pdfjs-dist/legacy/build/pdf.mjs')"
+
 COPY . .
 
 # Pass build args to env for Vite
