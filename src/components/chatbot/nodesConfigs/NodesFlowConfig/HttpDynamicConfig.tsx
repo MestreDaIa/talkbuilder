@@ -487,9 +487,10 @@ function ArgsSchemaEditor({
   const detectedPathParams = useMemo(() => {
     const raw = endpoint.url || "";
     // Decodifica `%3A` -> `:` (URLs colados/importados costumam vir url-encoded)
-    const url = raw.replace(/%3A([a-zA-Z0-9_]+)/gi, ":$1");
+    const url = raw.replace(/%3A([a-zA-Z0-9_]+)/gi, ":$1")
+      .replace(/\{\{\s*([A-Za-z_][A-Za-z0-9_.-]*)\s*\}\}/g, "{$1}");
     const set = new Set<string>();
-    for (const m of url.matchAll(/\{([^}]+)\}/g)) set.add(m[1]);
+    for (const m of url.matchAll(/\{([^{}]+)\}/g)) set.add(m[1].trim());
     for (const m of url.matchAll(/(?<=\/):([a-zA-Z0-9_]+)/g)) set.add(m[1]);
     // fallback: pathParams originais do parse do CURL
     (endpoint.pathParams || []).forEach((p) => set.add(p));
