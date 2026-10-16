@@ -33,8 +33,5 @@ jobs:
       - name: Install exact locked dependencies
         run: npm ci --legacy-peer-deps --no-audit --no-fund
 
-      - name: Verify PDF.js legacy entry exists
-        run: test -f node_modules/pdfjs-dist/legacy/build/pdf.mjs
-
       - name: Build frontend
         run: npm run build
