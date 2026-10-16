@@ -1,0 +1,40 @@
+name: Verify frontend build
+
+on:
+  push:
+    branches:
+      - main
+    paths:
+      - "src/**"
+      - "package.json"
+      - "package-lock.json"
+      - "tsconfig*.json"
+      - "vite.config.ts"
+      - "Dockerfile.frontend"
+      - ".github/workflows/verify-frontend-build.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  frontend-build:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Install exact locked dependencies
+        run: npm ci --legacy-peer-deps --no-audit --no-fund
+
+      - name: Verify PDF.js legacy entry exists
+        run: test -f node_modules/pdfjs-dist/legacy/build/pdf.mjs
+
+      - name: Build frontend
+        run: npm run build
