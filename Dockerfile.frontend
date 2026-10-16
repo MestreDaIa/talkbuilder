@@ -1,8 +1,8 @@
 # Build stage
-FROM mirror.gcr.io/library/node:20-slim AS builder
+FROM mirror.gcr.io/library/node:22-slim AS builder
 WORKDIR /app
 COPY package.json package-lock.json* ./
-RUN npm install
+RUN npm install --package-lock=false --no-audit --no-fund
 COPY . .
 
 # Pass build args to env for Vite
