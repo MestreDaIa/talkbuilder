@@ -439,7 +439,7 @@ function runtimeSanitizeModelData(value:any,trustedText:string,path=""):any{
       const trusted=runtimeNormalizeGrounding(trustedText,key);
       if(!normalized||!trusted.includes(normalized))continue;
     }
-    out[key]=runtimeSanitizeModelData(item,trustedText,path);
+    out[key]=runtimeSanitizeModelData(item,trustedText,path ? `${path}.${key}` : key);
   }
   return out;
 }
