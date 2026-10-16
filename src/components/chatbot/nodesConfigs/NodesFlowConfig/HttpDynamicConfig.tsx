@@ -117,13 +117,13 @@ export const HttpDynamicConfig = ({ config, setConfig }: Props) => {
     setIsAnalyzing(true);
     try {
       const backend = String(import.meta.env.VITE_BACKEND_URL || "https://api-flowbuilder.zailom.com").replace(/\/$/, "");
-      const response = await fetch(\`\${backend}/api/docs/analyze\`, {
+      const response = await fetch(`${backend}/api/docs/analyze`, {
         method: "POST",
         headers: { "Content-Type": "application/json", Accept: "application/json" },
         body: JSON.stringify({ url: apiBaseUrl.trim() }),
       });
       const result: any = await response.json().catch(() => ({}));
-      if (!response.ok) throw new Error(result.error || \`Falha HTTP \${response.status}\`);
+      if (!response.ok) throw new Error(result.error || `Falha HTTP ${response.status}`);
       if (result.format === "yaml") {
         update({ apiBaseUrl, discovered: [], openApiContext: String(result.raw || "").slice(0, 20000), apiDocumentationSourceUrl: result.sourceUrl });
         toast.warning("Documento YAML encontrado e anexado ao contexto. Para importar endpoints automaticamente, publique também a versão JSON do OpenAPI.");
@@ -138,7 +138,7 @@ export const HttpDynamicConfig = ({ config, setConfig }: Props) => {
         apiDocumentationSourceUrl: result.sourceUrl,
       });
       if (!list.length) toast.warning("O documento foi lido, mas não contém endpoints em paths.");
-      else toast.success(\`\${list.length} endpoint(s) descoberto(s). A documentação também ficará disponível ao Agente IA.\`);
+      else toast.success(`${list.length} endpoint(s) descoberto(s). A documentação também ficará disponível ao Agente IA.`);
     } catch (e: any) {
       toast.error("Falha ao analisar API: " + (e?.message || String(e)));
     } finally {
@@ -156,7 +156,7 @@ export const HttpDynamicConfig = ({ config, setConfig }: Props) => {
       const content = await file.text();
       if (!content.trim()) { toast.error("O arquivo está vazio."); return; }
       update({ documentationContent: content.slice(0, 20000), documentationFileName: file.name });
-      toast.success(\`Documento "\${file.name}" anexado ao contexto do Agente IA.\`);
+      toast.success(`Documento "${file.name}" anexado ao contexto do Agente IA.`);
     } catch (e: any) {
       toast.error("Não foi possível ler o arquivo: " + (e?.message || String(e)));
     } finally {
@@ -252,7 +252,7 @@ export const HttpDynamicConfig = ({ config, setConfig }: Props) => {
         )}
         {openApiContext && (
           <p className="text-[10px] text-emerald-600">
-            OpenAPI analisado{(config as any).apiDocumentationSourceUrl ? \`: \${(config as any).apiDocumentationSourceUrl}\` : ""}. O contrato técnico também ficará disponível ao Agente IA.
+            OpenAPI analisado{(config as any).apiDocumentationSourceUrl ? `: ${(config as any).apiDocumentationSourceUrl}` : ""}. O contrato técnico também ficará disponível ao Agente IA.
           </p>
         )}
       </div>
