@@ -160,33 +160,12 @@ export const HttpDynamicConfig = ({ config, setConfig }: Props) => {
 
   const importDocumentationFile = async (file?: File) => {
     if (!file) return;
-    const allowed = /\.(md|markdown|txt|json|ya?ml|csv|pdf)$/i.test(file.name) || /^(text\/|application\/(json|yaml|x-yaml|pdf))/.test(file.type);
-    if (!allowed) { toast.error("Formato não suportado. Envie PDF, Markdown, TXT, JSON, YAML ou CSV."); return; }
+    const allowed = /\.(md|markdown|txt|json|ya?ml|csv)$/i.test(file.name) || /^(text\/|application\/(json|yaml|x-yaml))/.test(file.type);
+    if (!allowed) { toast.error("Formato não suportado. Envie Markdown, TXT, JSON, YAML ou CSV."); return; }
     if (file.size > 1000000) { toast.error("O arquivo deve ter no máximo 1 MB."); return; }
     setIsReadingFile(true);
     try {
-      let content = "";
-      if (/\.pdf$/i.test(file.name) || file.type === "application/pdf") {
-        const pdfjs = await import("pdfjs-dist/legacy/build/pdf.mjs");
-        const data = new Uint8Array(await file.arrayBuffer());
-        const pdf = await pdfjs.getDocument({ data, useWorkerFetch: false, isEvalSupported: false }).promise;
-        const pages: string[] = [];
-        let extractedLength = 0;
-        for (let pageNo = 1; pageNo <= pdf.numPages && extractedLength < 20000; pageNo++) {
-          const page = await pdf.getPage(pageNo);
-          const textContent = await page.getTextContent();
-          const pageText = textContent.items.map((item: any) => "str" in item ? item.str : "").filter(Boolean).join(" ");
-          pages.push(pageText);
-          extractedLength += pageText.length;
-        }
-        content = pages.join("\n");
-        if (!content.trim()) {
-          toast.error("Não encontrei texto selecionável nesse PDF. PDFs digitalizados precisam de OCR antes do envio.");
-          return;
-        }
-      } else {
-        content = await file.text();
-      }
+      const content = await file.text();
       if (!content.trim()) { toast.error("O arquivo está vazio."); return; }
       update({ documentationContent: content.slice(0, 20000), documentationFileName: file.name });
       toast.success(`Documento "${file.name}" anexado ao contexto do Agente IA.`);
@@ -250,7 +229,7 @@ export const HttpDynamicConfig = ({ config, setConfig }: Props) => {
           <Label className="text-xs font-semibold">Documento de apoio para o Agente IA</Label>
         </div>
         <p className="text-xs text-muted-foreground">
-          Anexe o guia Markdown/TXT ou outro documento com regras de negócio, campos, exemplos e instruções.
+          Anexe um arquivo Markdown, TXT, JSON, YAML ou CSV com regras de negócio, campos, exemplos e instruções.
           Ele complementa a URL/OpenAPI: não cria permissões nem executa endpoints por conta própria.
         </p>
         <div className="flex flex-wrap items-center gap-2">
@@ -258,7 +237,7 @@ export const HttpDynamicConfig = ({ config, setConfig }: Props) => {
             <input
               type="file"
               className="hidden"
-              accept=".pdf,.md,.markdown,.txt,.json,.yaml,.yml,.csv,application/pdf,text/plain,text/markdown,application/json,application/yaml"
+              accept=".md,.markdown,.txt,.json,.yaml,.yml,.csv,text/plain,text/markdown,application/json,application/yaml"
               disabled={isReadingFile}
               onChange={(e) => { const file = e.target.files?.[0]; void importDocumentationFile(file); e.currentTarget.value = ""; }}
             />
