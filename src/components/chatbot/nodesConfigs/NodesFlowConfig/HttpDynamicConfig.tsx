@@ -20,7 +20,7 @@ import {
 } from "@/components/ui/collapsible";
 import {
   Plus, Trash2, Play, Loader2, ChevronDown, ChevronRight,
-  Zap, Database, Shield, ShieldOff, Sparkles,
+  Zap, Database, Shield, ShieldOff, Sparkles, Upload, FileText,
 } from "lucide-react";
 import { toast } from "sonner";
 import {
@@ -81,7 +81,11 @@ const emptyPerms = () => ({
 export const HttpDynamicConfig = ({ config, setConfig }: Props) => {
   const [apiBaseUrl, setApiBaseUrl] = useState(config.apiBaseUrl || "");
   const [isAnalyzing, setIsAnalyzing] = useState(false);
+  const [isReadingFile, setIsReadingFile] = useState(false);
   const endpoints: DynamicEndpoint[] = useMemo(() => config.endpoints ?? [], [config.endpoints]);
+  const documentationContent = String((config as any).documentationContent || "");
+  const documentationFileName = String((config as any).documentationFileName || "");
+  const openApiContext = String((config as any).openApiContext || "");
   const discovered: DiscoveredEndpoint[] = useMemo(() => config.discovered ?? [], [config.discovered]);
 
   const update = (patch: Partial<Props["config"]>) => setConfig({ ...config, ...patch });
@@ -109,36 +113,54 @@ export const HttpDynamicConfig = ({ config, setConfig }: Props) => {
   };
 
   const analyzeApi = async () => {
-    if (!apiBaseUrl) { toast.error("Informe a URL base da API"); return; }
+    if (!apiBaseUrl.trim()) { toast.error("Informe a URL da documentação da API"); return; }
     setIsAnalyzing(true);
     try {
-      const candidates = [
-        apiBaseUrl,
-        apiBaseUrl.replace(/\/$/, "") + "/openapi.json",
-        apiBaseUrl.replace(/\/$/, "") + "/swagger.json",
-        apiBaseUrl.replace(/\/docs\/?$/, "") + "/openapi.json",
-      ];
-      let doc: any = null;
-      for (const u of candidates) {
-        try {
-          const r = await fetch(u, { headers: { Accept: "application/json" } });
-          if (!r.ok) continue;
-          const j = await r.json();
-          if (j?.paths) { doc = j; break; }
-        } catch { /* try next */ }
-      }
-      if (!doc) {
-        toast.warning("Nenhum OpenAPI/Swagger encontrado. Adicione endpoints via CURL manualmente.");
-        update({ apiBaseUrl, discovered: [] });
+      const backend = String(import.meta.env.VITE_BACKEND_URL || "https://api-flowbuilder.zailom.com").replace(/\/$/, "");
+      const response = await fetch(\`\${backend}/api/docs/analyze\`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json", Accept: "application/json" },
+        body: JSON.stringify({ url: apiBaseUrl.trim() }),
+      });
+      const result: any = await response.json().catch(() => ({}));
+      if (!response.ok) throw new Error(result.error || \`Falha HTTP \${response.status}\`);
+      if (result.format === "yaml") {
+        update({ apiBaseUrl, discovered: [], openApiContext: String(result.raw || "").slice(0, 20000), apiDocumentationSourceUrl: result.sourceUrl });
+        toast.warning("Documento YAML encontrado e anexado ao contexto. Para importar endpoints automaticamente, publique também a versão JSON do OpenAPI.");
         return;
       }
+      const doc = result.spec;
       const list = discoverEndpointsFromOpenApi(doc);
-      update({ apiBaseUrl, discovered: list });
-      toast.success(`${list.length} endpoint(s) descoberto(s)`);
+      update({
+        apiBaseUrl,
+        discovered: list,
+        openApiContext: JSON.stringify(doc, null, 2).slice(0, 20000),
+        apiDocumentationSourceUrl: result.sourceUrl,
+      });
+      if (!list.length) toast.warning("O documento foi lido, mas não contém endpoints em paths.");
+      else toast.success(\`\${list.length} endpoint(s) descoberto(s). A documentação também ficará disponível ao Agente IA.\`);
     } catch (e: any) {
-      toast.error("Falha ao analisar API: " + e.message);
+      toast.error("Falha ao analisar API: " + (e?.message || String(e)));
     } finally {
       setIsAnalyzing(false);
+    }
+  };
+
+  const importDocumentationFile = async (file?: File) => {
+    if (!file) return;
+    const allowed = /\.(md|markdown|txt|json|ya?ml|csv)$/i.test(file.name) || /^(text\/|application\/(json|yaml|x-yaml))/.test(file.type);
+    if (!allowed) { toast.error("Formato não suportado. Envie Markdown, TXT, JSON, YAML ou CSV."); return; }
+    if (file.size > 1000000) { toast.error("O arquivo deve ter no máximo 1 MB."); return; }
+    setIsReadingFile(true);
+    try {
+      const content = await file.text();
+      if (!content.trim()) { toast.error("O arquivo está vazio."); return; }
+      update({ documentationContent: content.slice(0, 20000), documentationFileName: file.name });
+      toast.success(\`Documento "\${file.name}" anexado ao contexto do Agente IA.\`);
+    } catch (e: any) {
+      toast.error("Não foi possível ler o arquivo: " + (e?.message || String(e)));
+    } finally {
+      setIsReadingFile(false);
     }
   };
 
@@ -186,6 +208,53 @@ export const HttpDynamicConfig = ({ config, setConfig }: Props) => {
             {isAnalyzing ? <Loader2 className="h-4 w-4 animate-spin" /> : "Analisar API"}
           </Button>
         </div>
+      </div>
+
+      {/* DOCUMENTAÇÃO DE APOIO PARA A IA */}
+      <div className="space-y-2 rounded-md border p-3">
+        <div className="flex items-center gap-2">
+          <FileText className="h-4 w-4 text-primary" />
+          <Label className="text-xs font-semibold">Documento de apoio para o Agente IA</Label>
+        </div>
+        <p className="text-xs text-muted-foreground">
+          Anexe o guia Markdown/TXT ou outro documento com regras de negócio, campos, exemplos e instruções.
+          Ele complementa a URL/OpenAPI: não cria permissões nem executa endpoints por conta própria.
+        </p>
+        <div className="flex flex-wrap items-center gap-2">
+          <label className="inline-flex">
+            <input
+              type="file"
+              className="hidden"
+              accept=".md,.markdown,.txt,.json,.yaml,.yml,.csv,text/plain,text/markdown,application/json,application/yaml"
+              disabled={isReadingFile}
+              onChange={(e) => { const file = e.target.files?.[0]; void importDocumentationFile(file); e.currentTarget.value = ""; }}
+            />
+            <span className="inline-flex cursor-pointer items-center gap-2 rounded-md border px-3 py-2 text-xs hover:bg-muted">
+              {isReadingFile ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Upload className="h-3.5 w-3.5" />}
+              Anexar documento
+            </span>
+          </label>
+          {documentationFileName && (
+            <Badge variant="secondary" className="max-w-full gap-1">
+              <FileText className="h-3 w-3" /> {documentationFileName}
+            </Badge>
+          )}
+          {documentationContent && (
+            <Button size="sm" variant="ghost" className="h-8 text-xs" onClick={() => update({ documentationContent: "", documentationFileName: "" })}>
+              Remover documento
+            </Button>
+          )}
+        </div>
+        {documentationContent && (
+          <p className="text-[10px] text-emerald-600">
+            Documento carregado ({documentationContent.length.toLocaleString()} caracteres). O conteúdo será incluído no contexto da IA.
+          </p>
+        )}
+        {openApiContext && (
+          <p className="text-[10px] text-emerald-600">
+            OpenAPI analisado{(config as any).apiDocumentationSourceUrl ? \`: \${(config as any).apiDocumentationSourceUrl}\` : ""}. O contrato técnico também ficará disponível ao Agente IA.
+          </p>
+        )}
       </div>
 
       {/* ENDPOINTS DESCOBERTOS */}
