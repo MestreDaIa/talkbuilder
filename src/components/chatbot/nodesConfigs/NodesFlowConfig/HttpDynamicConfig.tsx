@@ -167,7 +167,6 @@ export const HttpDynamicConfig = ({ config, setConfig }: Props) => {
     try {
       let content = "";
       if (/\.pdf$/i.test(file.name) || file.type === "application/pdf") {
-        // @ts-expect-error PDF.js publica este entry point .mjs sem declaração resolvível pelo TypeScript neste deep import.
         const pdfjs = await import("pdfjs-dist/legacy/build/pdf.mjs");
         const data = new Uint8Array(await file.arrayBuffer());
         const pdf = await pdfjs.getDocument({ data, useWorkerFetch: false, isEvalSupported: false }).promise;
