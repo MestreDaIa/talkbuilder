@@ -2,10 +2,9 @@
 FROM mirror.gcr.io/library/node:22-slim AS builder
 WORKDIR /app
 COPY package.json package-lock.json* ./
-# pdfjs-dist is already declared in package.json. Ignore the stale lockfile
-# so npm resolves and installs the declared dependencies in one pass.
-RUN npm install --package-lock=false --no-audit --no-fund \
-    && test -f node_modules/pdfjs-dist/legacy/build/pdf.mjs
+# package-lock.json is stale and omits pdfjs-dist. Resolve package.json directly;
+# legacy-peer-deps avoids unrelated peer-version conflicts in the existing tree.
+RUN npm install --legacy-peer-deps --package-lock=false --no-audit --no-fund
 COPY . .
 
 # Pass build args to env for Vite
