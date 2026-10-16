@@ -1,0 +1,43 @@
+name: Repair PDF.js lockfile
+
+on:
+  push:
+    branches:
+      - main
+    paths:
+      - .github/workflows/repair-pdfjs-lock.yml
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  regenerate-lockfile:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          ref: main
+          token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Regenerate lockfile from package.json
+        run: npm install --package-lock-only --legacy-peer-deps --ignore-scripts --no-audit --no-fund
+
+      - name: Commit lockfile if changed
+        run: |
+          if git diff --quiet -- package-lock.json; then
+            echo "package-lock.json already matches package.json"
+            exit 0
+          fi
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add package-lock.json
+          git commit -m "fix: sync package lock with PDF.js dependency"
+          git push origin HEAD:main
