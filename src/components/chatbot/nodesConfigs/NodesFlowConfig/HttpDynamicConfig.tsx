@@ -41,7 +41,7 @@ export interface DynamicEndpoint {
   pathParams: string[];
   body: string | null;
   bodyContentType: "json" | "form-urlencoded" | "raw" | null;
-  auth: ParsedCurl["auth"];
+  auth: ParsedCurl["auth"] & { name?: string; value?: string };
   permissions: {
     authorization: boolean;
     headers: boolean;
@@ -178,7 +178,11 @@ export const HttpDynamicConfig = ({ config, setConfig }: Props) => {
 
   const addFromDiscovered = (d: DiscoveredEndpoint) => {
     const alreadyExists = endpoints.some(e => e.id === d.id);
-    if (alreadyExists) { toast.info("Endpoint já adicionado"); return; }
+    if (alreadyExists) {
+      update({ discovered: discovered.filter(item => item.id !== d.id) });
+      toast.info("Endpoint já configurado; removido da lista de descobertas");
+      return;
+    }
     const baseUrl = String(config.apiServerBaseUrl || apiBaseUrl.replace(/\/(api-docs(?:-json)?|docs|swagger|openapi\.json|swagger\.json|v3\/api-docs).*$/i, "")).replace(/\/$/, "");
     update({
       endpoints: [
@@ -191,8 +195,9 @@ export const HttpDynamicConfig = ({ config, setConfig }: Props) => {
           permissions: emptyPerms(), responseMappings: [], resultType: "context",
         },
       ],
+      discovered: discovered.filter(item => item.id !== d.id),
     });
-    toast.success("Endpoint adicionado");
+    toast.success("Endpoint adicionado às Skills");
   };
 
   return (
@@ -363,7 +368,9 @@ function EndpointCard({
       endpoint.queryParams.forEach(p => p.name && url.searchParams.set(p.name, p.value));
       const headers: Record<string, string> = {};
       endpoint.headers.forEach(h => h.name && (headers[h.name] = h.value));
-      if (endpoint.auth.type === "bearer" && endpoint.auth.token) headers["Authorization"] = `Bearer ${endpoint.auth.token}`;
+      if (endpoint.auth?.type === "bearer" && endpoint.auth.token) headers["Authorization"] = "Bearer " + endpoint.auth.token;
+      else if (endpoint.auth?.type === "basic" && endpoint.auth.username) headers["Authorization"] = "Basic " + btoa(endpoint.auth.username + ":" + (endpoint.auth.password || ""));
+      else if (endpoint.auth?.type === "apiKey" && (endpoint.auth.headerName || endpoint.auth.name)) headers[endpoint.auth.headerName || endpoint.auth.name || "X-API-Key"] = endpoint.auth.token || endpoint.auth.value || "";
       if (endpoint.bodyContentType === "json" && endpoint.body) headers["Content-Type"] = "application/json";
       const res = await fetch(url.toString(), {
         method: endpoint.method,
@@ -482,9 +489,86 @@ function EndpointCard({
           </Button>
         </div>
         <p className="text-[10px] text-muted-foreground">
-          Parâmetros de caminho aceitam <code>{"{{service_id}}"}</code>, <code>{"{service_id}"}</code> ou <code>{":service_id"}</code>.
-          O runtime resolve o valor a partir dos argumentos da Skill (preferencialmente <code>pathParams</code>), sem depender de uma API ou produto específico.
+          Use placeholders genéricos para parâmetros de caminho: <code>{"{{paramName}}"}</code>, <code>{"{paramName}"}</code> ou <code>{":paramName"}</code>.
+          Exemplo: <code>/v1/resources/{"{{resourceId}}"}/items</code>. O runtime resolve o valor pelos argumentos da Skill.
         </p>
+
+        {/* Autenticação */}
+        <div className="rounded-md border p-3 space-y-2">
+          <Label className="text-[10px] font-semibold">Autenticação</Label>
+          <Select
+            value={endpoint.auth?.type || "none"}
+            onValueChange={(value: "none" | "bearer" | "basic" | "apiKey") => onChange({
+              auth: { ...endpoint.auth, type: value } as DynamicEndpoint["auth"],
+            })}
+          >
+            <SelectTrigger className="h-8 text-xs"><SelectValue /></SelectTrigger>
+            <SelectContent>
+              <SelectItem value="none">Nenhuma</SelectItem>
+              <SelectItem value="bearer">Bearer Token</SelectItem>
+              <SelectItem value="basic">Basic Auth</SelectItem>
+              <SelectItem value="apiKey">API Key (Header)</SelectItem>
+            </SelectContent>
+          </Select>
+          {endpoint.auth?.type === "bearer" && (
+            <Input type="password" autoComplete="new-password" value={endpoint.auth.token || ""}
+              placeholder="Bearer token (aceita {{variavel}})"
+              className="h-8 text-xs"
+              onChange={(e) => onChange({ auth: { ...endpoint.auth, token: e.target.value } as DynamicEndpoint["auth"] })} />
+          )}
+          {endpoint.auth?.type === "basic" && (
+            <div className="grid grid-cols-2 gap-2">
+              <Input value={endpoint.auth.username || ""} placeholder="Usuário" className="h-8 text-xs"
+                onChange={(e) => onChange({ auth: { ...endpoint.auth, username: e.target.value } as DynamicEndpoint["auth"] })} />
+              <Input type="password" autoComplete="new-password" value={endpoint.auth.password || ""} placeholder="Senha"
+                className="h-8 text-xs"
+                onChange={(e) => onChange({ auth: { ...endpoint.auth, password: e.target.value } as DynamicEndpoint["auth"] })} />
+            </div>
+          )}
+          {endpoint.auth?.type === "apiKey" && (
+            <div className="grid grid-cols-2 gap-2">
+              <Input value={endpoint.auth.headerName || endpoint.auth.name || "X-API-Key"} placeholder="Nome do header (ex.: X-API-Key)"
+                className="h-8 text-xs"
+                onChange={(e) => onChange({ auth: { ...endpoint.auth, headerName: e.target.value, name: e.target.value } as DynamicEndpoint["auth"] })} />
+              <Input type="password" autoComplete="new-password" value={endpoint.auth.token || endpoint.auth.value || ""}
+                placeholder="API Key (aceita {{variavel}})" className="h-8 text-xs"
+                onChange={(e) => onChange({ auth: { ...endpoint.auth, token: e.target.value, value: e.target.value } as DynamicEndpoint["auth"] })} />
+            </div>
+          )}
+          <p className="text-[10px] text-muted-foreground">Credenciais são usadas pelo runtime da Skill. Não coloque segredos em descrições ou schemas de argumentos.</p>
+        </div>
+
+        {/* Headers customizados */}
+        <div className="rounded-md border p-3 space-y-2">
+          <div className="flex items-center justify-between">
+            <Label className="text-[10px] font-semibold">Headers da requisição</Label>
+            <Button size="sm" variant="outline" className="h-6 text-[10px]"
+              onClick={() => onChange({ headers: [...(endpoint.headers || []), { name: "", value: "" }] })}>
+              <Plus className="h-3 w-3 mr-1" /> Adicionar header
+            </Button>
+          </div>
+          {(endpoint.headers || []).map((header, index) => (
+            <div key={index} className="grid grid-cols-[1fr_1.4fr_auto] gap-1">
+              <Input value={header.name} placeholder="Nome (ex.: X-Tenant-ID)" className="h-7 text-[10px]"
+                onChange={(e) => {
+                  const headers = [...(endpoint.headers || [])];
+                  headers[index] = { ...headers[index], name: e.target.value };
+                  onChange({ headers });
+                }} />
+              <Input value={header.value} placeholder="Valor (aceita {{variavel}})" className="h-7 text-[10px]"
+                onChange={(e) => {
+                  const headers = [...(endpoint.headers || [])];
+                  headers[index] = { ...headers[index], value: e.target.value };
+                  onChange({ headers });
+                }} />
+              <Button variant="ghost" size="icon" className="h-7 w-7"
+                onClick={() => onChange({ headers: (endpoint.headers || []).filter((_, i) => i !== index) })}>
+                <Trash2 className="h-3 w-3 text-destructive" />
+              </Button>
+            </div>
+          ))}
+          <p className="text-[10px] text-muted-foreground">Use esta seção para Content-Type, Accept, tenant, versão da API e outros headers. Authorization/API Key podem ser definidos acima.</p>
+        </div>
 
         {/* Permissões */}
         <div className="rounded-md border p-2 space-y-1">
