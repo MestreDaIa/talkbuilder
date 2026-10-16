@@ -2,9 +2,10 @@
 FROM mirror.gcr.io/library/node:22-slim AS builder
 WORKDIR /app
 COPY package.json package-lock.json* ./
+# pdfjs-dist is already declared in package.json. Ignore the stale lockfile
+# so npm resolves and installs the declared dependencies in one pass.
 RUN npm install --package-lock=false --no-audit --no-fund \
-    && npm install --no-save --package-lock=false --no-audit --no-fund pdfjs-dist@4.10.38 \
-    && npm ls pdfjs-dist
+    && test -f node_modules/pdfjs-dist/legacy/build/pdf.mjs
 COPY . .
 
 # Pass build args to env for Vite
@@ -25,7 +26,6 @@ ENV VITE_EXTERNAL_SUPABASE_URL=$VITE_EXTERNAL_SUPABASE_URL
 ENV VITE_EXTERNAL_SUPABASE_ANON_KEY=$VITE_EXTERNAL_SUPABASE_ANON_KEY
 ENV VITE_RUNTIME_URL=$VITE_RUNTIME_URL
 ENV VITE_BACKEND_URL=$VITE_BACKEND_URL
-
 
 RUN npm run build
 
