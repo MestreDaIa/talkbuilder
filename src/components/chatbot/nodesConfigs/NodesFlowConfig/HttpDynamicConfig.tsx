@@ -395,11 +395,15 @@ function EndpointCard({
               {["GET","POST","PUT","PATCH","DELETE","HEAD"].map(m => <SelectItem key={m} value={m}>{m}</SelectItem>)}
             </SelectContent>
           </Select>
-          <Input value={endpoint.url} onChange={(e) => onChange({ url: e.target.value })} className="h-8 text-xs flex-1" />
+          <Input value={endpoint.url} onChange={(e) => onChange({ url: e.target.value })} placeholder="https://api.exemplo.com/v1/services/{{service_id}}/employees" className="h-8 text-xs flex-1" />
           <Button size="sm" variant="outline" className="h-8" onClick={runTest} disabled={isTesting}>
             {isTesting ? <Loader2 className="h-4 w-4 animate-spin" /> : <Play className="h-4 w-4" />}
           </Button>
         </div>
+        <p className="text-[10px] text-muted-foreground">
+          Parâmetros de caminho aceitam <code>{"{{service_id}}"}</code>, <code>{"{service_id}"}</code> ou <code>{":service_id"}</code>.
+          O runtime resolve o valor a partir dos argumentos da Skill (preferencialmente <code>pathParams</code>), sem depender de uma API ou produto específico.
+        </p>
 
         {/* Permissões */}
         <div className="rounded-md border p-2 space-y-1">
