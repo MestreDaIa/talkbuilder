@@ -189,7 +189,7 @@ export const HttpDynamicConfig = ({ config, setConfig }: Props) => {
       }
       if (!content.trim()) { toast.error("O arquivo está vazio."); return; }
       update({ documentationContent: content.slice(0, 20000), documentationFileName: file.name });
-      toast.success(\`Documento "\${file.name}" anexado ao contexto do Agente IA.\`);
+      toast.success(`Documento "${file.name}" anexado ao contexto do Agente IA.`);
     } catch (e: any) {
       toast.error("Não foi possível ler o arquivo: " + (e?.message || String(e)));
     } finally {
