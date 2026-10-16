@@ -546,6 +546,104 @@ app.use("/functions/v1", async (req: Request, res: Response) => {
   }
 });
 
+// Busca documentação OpenAPI no backend para evitar CORS do navegador.
+// A rota é restrita a hosts públicos HTTP(S), limita redirects e tamanho da resposta.
+function isPublicIpAddress(ip: string): boolean {
+  const v = ip.toLowerCase();
+  if (v.includes(":")) {
+    if (v === "::" || v === "::1" || v.startsWith("fc") || v.startsWith("fd") || v.startsWith("fe8") || v.startsWith("fe9") || v.startsWith("fea") || v.startsWith("feb")) return false;
+    const mapped = v.match(/::ffff:(\d+\.\d+\.\d+\.\d+)$/);
+    return mapped ? isPublicIpAddress(mapped[1]) : true;
+  }
+  const p = v.split(".").map(Number);
+  if (p.length !== 4 || p.some(n => !Number.isInteger(n) || n < 0 || n > 255)) return false;
+  const [a,b] = p;
+  if (a === 0 || a === 10 || a === 127 || a >= 224 || (a === 169 && b === 254) || (a === 172 && b >= 16 && b <= 31) || (a === 192 && b === 168) || (a === 100 && b >= 64 && b <= 127)) return false;
+  return true;
+}
+
+async function validatePublicDocsUrl(raw: string): Promise<URL> {
+  const u = new URL(raw);
+  if (!["http:", "https:"].includes(u.protocol) || u.username || u.password) throw new Error("Informe uma URL HTTP(S) pública válida.");
+  if (u.port && !["80", "443"].includes(u.port)) throw new Error("A URL deve usar a porta HTTP/HTTPS padrão.");
+  const host = u.hostname.toLowerCase();
+  if (host === "localhost" || host.endsWith(".localhost") || host.endsWith(".local") || host.endsWith(".internal")) throw new Error("Hosts locais/privados não são permitidos.");
+  const { isIP } = await import("node:net");
+  if (isIP(host)) { if (!isPublicIpAddress(host)) throw new Error("Endereços IP privados não são permitidos."); }
+  else {
+    const { lookup } = await import("node:dns/promises");
+    const addresses = await lookup(host, { all: true, verbatim: true });
+    if (!addresses.length || addresses.some(a => !isPublicIpAddress(a.address))) throw new Error("O domínio resolve para um endereço não público.");
+  }
+  u.hash = "";
+  return u;
+}
+
+async function fetchPublicDocsText(raw: string): Promise<{ url: string; text: string; contentType: string }> {
+  let url = await validatePublicDocsUrl(raw);
+  for (let hop = 0; hop <= 3; hop++) {
+    const response = await fetch(url, { redirect: "manual", signal: AbortSignal.timeout(12000), headers: { Accept: "application/json, application/yaml, text/yaml, text/plain, text/html;q=0.9, */*;q=0.5", "User-Agent": "Zailom-Flow-DocsAnalyzer/1.0" } });
+    if ([301,302,303,307,308].includes(response.status)) {
+      const location = response.headers.get("location");
+      if (!location || hop === 3) throw new Error("Redirecionamento da documentação inválido ou excessivo.");
+      url = await validatePublicDocsUrl(new URL(location, url).toString());
+      continue;
+    }
+    if (!response.ok) throw new Error(`A URL respondeu HTTP ${response.status}.`);
+    const len = Number(response.headers.get("content-length") || 0);
+    if (len > 3_000_000) throw new Error("O documento remoto excede 3 MB.");
+    const text = await response.text();
+    if (text.length > 3_000_000) throw new Error("O documento remoto excede 3 MB.");
+    return { url: url.toString(), text, contentType: response.headers.get("content-type") || "" };
+  }
+  throw new Error("Não foi possível acessar a documentação.");
+}
+
+app.post("/api/docs/analyze", async (req: Request, res: Response) => {
+  try {
+    const inputUrl = String(req.body?.url || "").trim();
+    if (!inputUrl) return res.status(400).json({ error: "Informe a URL da documentação." });
+    const first = await fetchPublicDocsText(inputUrl);
+    const candidates: string[] = [first.url];
+    const base = new URL(first.url);
+    const html = /html/i.test(first.contentType) || /<html|swagger-ui|redoc/i.test(first.text.slice(0, 30000));
+    if (html) {
+      const refs = [
+        ...first.text.matchAll(/(?:url|spec-url)\s*[:=]\s*["\x27]([^"\x27]+)["\x27]/gi),
+        ...first.text.matchAll(/["\x27](?:url|configUrl)["\x27]\s*:\s*["\x27]([^"\x27]+)["\x27]/gi),
+      ];
+      for (const m of refs) { try { candidates.push(new URL(m[1], base).toString()); } catch {} }
+      const path = base.pathname.replace(/\/$/, "");
+      const root = base.origin;
+      candidates.push(...[
+        path + "/openapi.json", path + "/swagger.json", path + "/v3/api-docs",
+        path + "/api-docs.json", path + "/api-docs-json", path + "/docs-json",
+        "/openapi.json", "/swagger.json", "/v3/api-docs", "/api-docs-json", "/swagger/v1/swagger.json",
+      ].map(p => new URL(p, root).toString()));
+    }
+    const seen = new Set<string>();
+    for (const candidate of candidates) {
+      let target: URL;
+      try { target = await validatePublicDocsUrl(candidate); } catch { continue; }
+      if (seen.has(target.toString())) continue;
+      seen.add(target.toString());
+      let result: { url: string; text: string; contentType: string };
+      try { result = candidate === first.url ? first : await fetchPublicDocsText(candidate); } catch { continue; }
+      let spec: any;
+      try { spec = JSON.parse(result.text); } catch {
+        const yamlText = result.text.trim();
+        if (/^(openapi|swagger)\s*:/m.test(yamlText)) return res.json({ ok: true, sourceUrl: result.url, format: "yaml", raw: yamlText });
+        continue;
+      }
+      if (spec?.paths && (spec.openapi || spec.swagger)) return res.json({ ok: true, sourceUrl: result.url, format: "json", spec });
+    }
+    return res.status(422).json({ error: "Não encontrei um documento OpenAPI/Swagger JSON ou YAML nessa URL. Se ela abrir uma interface de documentação, confira se o arquivo OpenAPI está publicado." });
+  } catch (error: any) {
+    return res.status(400).json({ error: error?.message || "Falha ao analisar documentação." });
+  }
+});
+
+
 // Rota de captura para 404 (garante que retorne JSON e não HTML)
 app.use((req: Request, res: Response) => {
   console.warn(`404 Not Found: ${req.method} ${req.url}`);
