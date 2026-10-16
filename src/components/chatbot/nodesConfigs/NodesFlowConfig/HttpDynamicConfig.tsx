@@ -66,6 +66,10 @@ interface Props {
     apiBaseUrl?: string;
     endpoints?: DynamicEndpoint[];
     discovered?: DiscoveredEndpoint[];
+    documentationContent?: string;
+    documentationFileName?: string;
+    openApiContext?: string;
+    apiDocumentationSourceUrl?: string;
   };
   setConfig: (cfg: any) => void;
 }
