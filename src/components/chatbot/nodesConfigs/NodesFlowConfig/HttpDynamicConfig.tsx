@@ -70,6 +70,7 @@ interface Props {
     documentationFileName?: string;
     openApiContext?: string;
     apiDocumentationSourceUrl?: string;
+    apiServerBaseUrl?: string;
   };
   setConfig: (cfg: any) => void;
 }
@@ -135,8 +136,15 @@ export const HttpDynamicConfig = ({ config, setConfig }: Props) => {
       }
       const doc = result.spec;
       const list = discoverEndpointsFromOpenApi(doc);
+      let apiServerBaseUrl = "";
+      try {
+        if (doc?.servers?.[0]?.url) apiServerBaseUrl = new URL(doc.servers[0].url, result.sourceUrl).toString().replace(/\/$/, "");
+        else if (doc?.host) apiServerBaseUrl = `${(doc.schemes?.[0] || new URL(result.sourceUrl).protocol.replace(":", ""))}://${doc.host}${doc.basePath || ""}`.replace(/\/$/, "");
+        else apiServerBaseUrl = new URL(result.sourceUrl).origin;
+      } catch { apiServerBaseUrl = new URL(result.sourceUrl).origin; }
       update({
         apiBaseUrl,
+        apiServerBaseUrl,
         discovered: list,
         openApiContext: JSON.stringify(doc, null, 2).slice(0, 20000),
         apiDocumentationSourceUrl: result.sourceUrl,
@@ -171,7 +179,7 @@ export const HttpDynamicConfig = ({ config, setConfig }: Props) => {
   const addFromDiscovered = (d: DiscoveredEndpoint) => {
     const alreadyExists = endpoints.some(e => e.id === d.id);
     if (alreadyExists) { toast.info("Endpoint já adicionado"); return; }
-    const baseUrl = apiBaseUrl.replace(/\/(docs|swagger|openapi\.json).*$/i, "").replace(/\/$/, "");
+    const baseUrl = String(config.apiServerBaseUrl || apiBaseUrl.replace(/\/(api-docs(?:-json)?|docs|swagger|openapi\.json|swagger\.json|v3\/api-docs).*$/i, "")).replace(/\/$/, "");
     update({
       endpoints: [
         ...endpoints,
