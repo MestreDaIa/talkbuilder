@@ -127,13 +127,18 @@ export function parseCurl(input: string): ParsedCurl {
     result.auth = { type: "apiKey", headerName: apiKeyHeader.name, token: apiKeyHeader.value };
   }
 
-  // ------ URL: separa query e detecta path params {x} ou :x ------
+  // ------ URL: transforma query params em placeholders e detecta path params ------
   if (result.url) {
     try {
       const u = new URL(result.url);
-      u.searchParams.forEach((val, key) => result.queryParams.push({ name: key, value: val }));
-      u.search = "";
-      result.url = u.toString();
+      const queryKeys: string[] = [];
+      u.searchParams.forEach((_val, key) => {
+        if (!queryKeys.includes(key)) queryKeys.push(key);
+        // Valores de exemplo do cURL nunca devem ficar fixos na Skill.
+        if (!result.queryParams.some((p) => p.name === key)) result.queryParams.push({ name: key, value: "" });
+      });
+      const queryTemplate = queryKeys.map((key) => `${encodeURIComponent(key)}={{${key}}}`).join("&");
+      result.url = `${u.origin}${u.pathname}${queryTemplate ? `?${queryTemplate}` : ""}${u.hash}`;
     } catch { /* url relativa */ }
     const paramMatches = [
       ...result.url.matchAll(/\{([a-zA-Z0-9_]+)\}/g),
