@@ -238,6 +238,14 @@ export const NodeItem = ({ node, onClick, onDelete, onDuplicate }: NodeItemProps
   const hasAgentPreview = node.type === "ai-agent" && node.config.provider;
   const hasSheetsPreview = node.type === "google-sheets" && node.config.spreadsheetId;
   const hasHandoffPreview = node.type === "human-handoff";
+  const hasHttpRequestPreview = effectiveType === "http-request";
+  const httpRequestBaseUrl = String(
+    node.config.apiServerBaseUrl ||
+    node.config.url ||
+    node.config.apiBaseUrl ||
+    node.config.endpoints?.[0]?.url ||
+    ""
+  ).trim();
 
   return (
     <div
@@ -432,6 +440,17 @@ export const NodeItem = ({ node, onClick, onDelete, onDuplicate }: NodeItemProps
               {node.config.department && (
                 <p className="text-[10px] text-orange-600 truncate mt-1">
                   Depto: {node.config.department}
+                </p>
+              )}
+            </div>
+          ) : hasHttpRequestPreview ? (
+            <div className="mt-1 overflow-hidden">
+              <p className="text-[10px] text-orange-700 font-mono truncate" title={httpRequestBaseUrl || "URL não configurada"}>
+                {httpRequestBaseUrl || "URL não configurada"}
+              </p>
+              {node.config.operationMode === "dynamic" && (
+                <p className="text-[10px] text-muted-foreground mt-0.5">
+                  {Array.isArray(node.config.endpoints) ? node.config.endpoints.length : 0} endpoint(s) configurado(s)
                 </p>
               )}
             </div>
