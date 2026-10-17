@@ -3006,6 +3006,11 @@ const runLocalFlow = async (
                     if (!p?.name) return;
                     const fromAgent = perms.queryParams === false ? undefined : agentQuery[p.name] ?? (p.name in agentArgs ? agentArgs[p.name] : undefined);
                     const candidate = fromAgent !== undefined ? fromAgent : replaceVars(String(p.value ?? ""));
+                    // Um parâmetro sem valor não deve enviar string vazia nem o placeholder literal.
+                    if (candidate === undefined || candidate === null || String(candidate).trim() === "" || /\{\{?[^}]+\}\}?/.test(String(candidate))) {
+                      usedQuery.add(p.name);
+                      return;
+                    }
                     const resolved = resolveKnownEntityId(p.name, candidate, "query");
                     if (!resolved.ok) {
                       lastOk = false;
@@ -3039,7 +3044,23 @@ const runLocalFlow = async (
                     });
                   }
                   if (shouldSkipEndpoint) continue;
-                  if (qp.length) url += (url.includes("?") ? "&" : "?") + qp.join("&");
+                  // Mescla query params com a URL importada: os valores do agente substituem
+                  // {{placeholders}} existentes, sem duplicar chaves na query string.
+                  try {
+                    const requestUrl = new URL(url);
+                    for (const [key, value] of Array.from(requestUrl.searchParams.entries())) {
+                      if (/\{\{?[^}]+\}\}?/.test(value)) requestUrl.searchParams.delete(key);
+                    }
+                    for (const pair of qp) {
+                      const separator = pair.indexOf("=");
+                      const key = decodeURIComponent(pair.slice(0, separator));
+                      const value = decodeURIComponent(pair.slice(separator + 1));
+                      requestUrl.searchParams.set(key, value);
+                    }
+                    url = requestUrl.toString();
+                  } catch {
+                    if (qp.length) url += (url.includes("?") ? "&" : "?") + qp.join("&");
+                  }
 
                   const headers: Record<string, string> = {};
                   (ep.headers || []).forEach((h: any) => {
