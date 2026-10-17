@@ -238,16 +238,20 @@ export const HttpDynamicConfig = ({ config, setConfig }: Props) => {
       };
       nextEndpoints[existingIndex] = {
         ...existing,
-        // Atualiza também a URL visível, preservando os parâmetros já configurados.
+        // Atualiza URL e corpo a partir do contrato, sem sobrescrever ajustes manuais existentes.
         url: withQueryTemplates(existing.url || discoveredUrl, queryDefinitions.map(p => p.name)),
         queryParams: [
           ...(existing.queryParams || []),
           ...queryDefinitions.filter(p => !(existing.queryParams || []).some(q => q.name === p.name)).map(p => ({ name: p.name, value: "" })),
         ],
+        body: existing.body || d.bodyTemplate || null,
+        bodyContentType: existing.bodyContentType || d.bodyContentType || null,
         argsSchema: {
           ...oldSchema,
           pathParams: mergeParams(oldSchema.pathParams, schemaPathParams),
           queryParams: mergeParams(oldSchema.queryParams, schemaQueryParams),
+          bodyDescription: oldSchema.bodyDescription || d.bodyDescription || "",
+          bodyExample: oldSchema.bodyExample || d.bodyTemplate || "",
         },
       };
       update({ endpoints: nextEndpoints, discovered: discovered.filter(item => item.id !== d.id) });
@@ -262,9 +266,16 @@ export const HttpDynamicConfig = ({ config, setConfig }: Props) => {
           method: d.method, url: discoveredUrl,
           headers: [], queryParams: queryDefinitions.map(p => ({ name: p.name, value: "" })),
           pathParams: discoveredPathParams,
-          body: null, bodyContentType: null, auth: { type: "none" },
+          body: d.bodyTemplate || null,
+          bodyContentType: d.bodyContentType || null,
+          auth: { type: "none" },
           permissions: emptyPerms(), responseMappings: [], resultType: "context",
-          argsSchema: { pathParams: schemaPathParams, queryParams: schemaQueryParams },
+          argsSchema: {
+            pathParams: schemaPathParams,
+            queryParams: schemaQueryParams,
+            bodyDescription: d.bodyDescription || "",
+            bodyExample: d.bodyTemplate || "",
+          },
         },
       ],
       discovered: discovered.filter(item => item.id !== d.id),
@@ -355,7 +366,7 @@ export const HttpDynamicConfig = ({ config, setConfig }: Props) => {
               <div key={d.id} className="flex items-center justify-between px-2 py-1.5 text-xs">
                 <div className="flex items-center gap-2 min-w-0">
                   <Badge variant="outline" className="font-mono text-[10px]">{d.method}</Badge>
-                  <span className="font-mono truncate">{d.path}</span>
+                  <span className="font-mono truncate" title={d.urlTemplate || d.path}>{d.urlTemplate || d.path}</span>
                   {d.summary && <span className="text-muted-foreground truncate">— {d.summary}</span>}
                 </div>
                 <div className="flex items-center gap-1 shrink-0">
