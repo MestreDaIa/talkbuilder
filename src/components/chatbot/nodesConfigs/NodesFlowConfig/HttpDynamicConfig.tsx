@@ -83,6 +83,28 @@ const emptyPerms = () => ({
   body: true,
 });
 
+/** Adds missing query placeholders without overwriting manually configured URL params. */
+const withQueryTemplates = (url: string, names: string[]) => {
+  if (!names.length) return url;
+  const hashIndex = url.indexOf("#");
+  const hash = hashIndex >= 0 ? url.slice(hashIndex) : "";
+  const withoutHash = hashIndex >= 0 ? url.slice(0, hashIndex) : url;
+  const queryIndex = withoutHash.indexOf("?");
+  const path = queryIndex >= 0 ? withoutHash.slice(0, queryIndex) : withoutHash;
+  const query = queryIndex >= 0 ? withoutHash.slice(queryIndex + 1) : "";
+  const existing = query ? query.split("&").filter(Boolean) : [];
+  const existingNames = new Set(existing.map((part) => {
+    const raw = part.split("=")[0];
+    try { return decodeURIComponent(raw); } catch { return raw; }
+  }));
+  for (const name of names) {
+    if (!name || existingNames.has(name)) continue;
+    existing.push(`${encodeURIComponent(name)}={{${name}}}`);
+    existingNames.add(name);
+  }
+  return `${path}${existing.length ? `?${existing.join("&")}` : ""}${hash}`;
+};
+
 export const HttpDynamicConfig = ({ config, setConfig }: Props) => {
   const [apiBaseUrl, setApiBaseUrl] = useState(config.apiBaseUrl || "");
   const [isAnalyzing, setIsAnalyzing] = useState(false);
@@ -195,6 +217,7 @@ export const HttpDynamicConfig = ({ config, setConfig }: Props) => {
       description: toSchemaDescription(p),
       example: p.example || "",
     }));
+    const discoveredUrl = withQueryTemplates(baseUrl + d.path, queryDefinitions.map(p => p.name));
     const existingIndex = endpoints.findIndex(e => e.id === d.id);
     const nextEndpoints = [...endpoints];
     if (existingIndex >= 0) {
@@ -215,6 +238,8 @@ export const HttpDynamicConfig = ({ config, setConfig }: Props) => {
       };
       nextEndpoints[existingIndex] = {
         ...existing,
+        // Atualiza também a URL visível, preservando os parâmetros já configurados.
+        url: withQueryTemplates(existing.url || discoveredUrl, queryDefinitions.map(p => p.name)),
         queryParams: [
           ...(existing.queryParams || []),
           ...queryDefinitions.filter(p => !(existing.queryParams || []).some(q => q.name === p.name)).map(p => ({ name: p.name, value: "" })),
@@ -234,7 +259,7 @@ export const HttpDynamicConfig = ({ config, setConfig }: Props) => {
         ...endpoints,
         {
           id: d.id, name: d.summary || d.id, description: d.description || d.summary,
-          method: d.method, url: baseUrl + d.path,
+          method: d.method, url: discoveredUrl,
           headers: [], queryParams: queryDefinitions.map(p => ({ name: p.name, value: "" })),
           pathParams: discoveredPathParams,
           body: null, bodyContentType: null, auth: { type: "none" },
