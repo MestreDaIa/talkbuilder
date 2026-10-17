@@ -140,9 +140,10 @@ export function parseCurl(input: string): ParsedCurl {
       const queryTemplate = queryKeys.map((key) => `${encodeURIComponent(key)}={{${key}}}`).join("&");
       result.url = `${u.origin}${u.pathname}${queryTemplate ? `?${queryTemplate}` : ""}${u.hash}`;
     } catch { /* url relativa */ }
+    const urlPathForParams = result.url.split(/[?#]/, 1)[0];
     const paramMatches = [
-      ...result.url.matchAll(/\{([a-zA-Z0-9_]+)\}/g),
-      ...result.url.matchAll(/:([a-zA-Z0-9_]+)(?=\/|$)/g),
+      ...urlPathForParams.matchAll(/\{([a-zA-Z0-9_]+)\}/g),
+      ...urlPathForParams.matchAll(/:([a-zA-Z0-9_]+)(?=\/|$)/g),
     ];
     result.pathParams = [...new Set(paramMatches.map(m => m[1]))];
   }
