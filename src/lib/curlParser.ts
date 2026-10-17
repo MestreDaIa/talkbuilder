@@ -270,7 +270,7 @@ export function discoverEndpointsFromOpenApi(doc: any): DiscoveredEndpoint[] {
 
       const rawRequestBody = resolveRef(op.requestBody);
       const bodyContent = rawRequestBody?.content || {};
-      const jsonContentType = Object.keys(bodyContent).find(type => /application\/json|application\/.+\\+json/i.test(type));
+      const jsonContentType = Object.keys(bodyContent).find(type => /application\/json|application\/.+\+json/i.test(type));
       const selectedContentType = jsonContentType || Object.keys(bodyContent)[0];
       const media = selectedContentType ? bodyContent[selectedContentType] : undefined;
       const bodySchema = resolveRef(media?.schema);
