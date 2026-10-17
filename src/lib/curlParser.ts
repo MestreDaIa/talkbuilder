@@ -280,7 +280,7 @@ export function discoverEndpointsFromOpenApi(doc: any): DiscoveredEndpoint[] {
       if (selectedContentType && media) {
         if (/json/i.test(selectedContentType)) {
           bodyContentType = "json";
-          const template = bodyExample !== undefined ? bodyExample : schemaToTemplate(bodySchema);
+          const template = bodySchema?.properties ? schemaToTemplate(bodySchema) : (bodyExample !== undefined ? bodyExample : schemaToTemplate(bodySchema));
           if (template && typeof template === "object") bodyTemplate = JSON.stringify(template, null, 2);
           else if (template !== undefined && template !== "") bodyTemplate = typeof template === "string" ? template : JSON.stringify(template, null, 2);
         } else if (/x-www-form-urlencoded/i.test(selectedContentType)) {
