@@ -2941,11 +2941,13 @@ const runLocalFlow = async (
                     .replace(/%3A([a-zA-Z0-9_]+)/gi, ":$1")
                     .replace(/%7B/gi, "{")
                     .replace(/%7D/gi, "}");
+                  // Só o pathname contém path params; {{x}} na query é query param, não path param.
+                  const urlPathForParams = url.split(/[?#]/, 1)[0];
                   const rawNames = [
                     ...(ep.pathParams || []),
                     ...(ep.argsSchema?.pathParams || []).map((p: any) => p?.name).filter(Boolean),
-                    ...[...url.matchAll(/\{([^}]+)\}/g)].map((m) => m[1]),
-                    ...[...url.matchAll(/(?<=\/):([a-zA-Z0-9_]+)/g)].map((m) => m[1]),
+                    ...[...urlPathForParams.matchAll(/\{([^}]+)\}/g)].map((m) => m[1]),
+                    ...[...urlPathForParams.matchAll(/(?<=\/):([a-zA-Z0-9_]+)/g)].map((m) => m[1]),
                   ];
                   // Filtra nomes inválidos que sobraram de configs antigas (ex.: "%3Aid").
                   const pathNames = new Set<string>(
