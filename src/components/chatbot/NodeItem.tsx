@@ -239,13 +239,14 @@ export const NodeItem = ({ node, onClick, onDelete, onDuplicate }: NodeItemProps
   const hasSheetsPreview = node.type === "google-sheets" && node.config.spreadsheetId;
   const hasHandoffPreview = node.type === "human-handoff";
   const hasHttpRequestPreview = effectiveType === "http-request";
-  const httpRequestBaseUrl = String(
-    node.config.apiServerBaseUrl ||
-    node.config.url ||
-    node.config.apiBaseUrl ||
-    node.config.endpoints?.[0]?.url ||
-    ""
-  ).trim();
+  const httpRequestBaseUrl = [
+    node.config.apiServerBaseUrl,
+    node.config.endpoints?.[0]?.url,
+    node.config.url,
+    node.config.apiBaseUrl,
+  ]
+    .map(value => String(value || "").trim())
+    .find(value => /^https?:\/\//i.test(value)) || "";
 
   return (
     <div
