@@ -168,28 +168,64 @@ export function parseCurl(input: string): ParsedCurl {
 }
 
 // Extrai lista de endpoints a partir de um documento OpenAPI/Swagger (v2 ou v3).
+export interface DiscoveredParameter {
+  name: string;
+  in: "path" | "query" | "header" | "cookie" | string;
+  required?: boolean;
+  description?: string;
+  example?: string;
+}
+
 export interface DiscoveredEndpoint {
   id: string;           // "GET /services"
   method: string;
   path: string;
   summary?: string;
   description?: string;
+  parameters?: DiscoveredParameter[];
 }
 
 export function discoverEndpointsFromOpenApi(doc: any): DiscoveredEndpoint[] {
   if (!doc?.paths) return [];
   const out: DiscoveredEndpoint[] = [];
   const methods = ["get", "post", "put", "patch", "delete", "head", "options"];
+  const resolveParameter = (parameter: any): any => {
+    if (!parameter?.$ref) return parameter;
+    const ref = String(parameter.$ref);
+    const parts = ref.replace(/^#\//, "").split("/");
+    return parts.reduce((value: any, part: string) => value?.[part.replace(/~1/g, "/").replace(/~0/g, "~")], doc) || parameter;
+  };
+  const parameterExample = (parameter: any) => {
+    const value = parameter?.example ?? parameter?.schema?.example ?? parameter?.schema?.default;
+    return value === undefined || value === null ? undefined : String(value);
+  };
   for (const [path, pathItem] of Object.entries<any>(doc.paths)) {
     for (const m of methods) {
       const op = pathItem?.[m];
       if (!op) continue;
+      const combined = [
+        ...(Array.isArray(pathItem?.parameters) ? pathItem.parameters : []),
+        ...(Array.isArray(op?.parameters) ? op.parameters : []),
+      ].map(resolveParameter);
+      const unique = new Map<string, DiscoveredParameter>();
+      for (const parameter of combined) {
+        if (!parameter?.name || !parameter?.in) continue;
+        const key = `${parameter.in}:${parameter.name}`;
+        unique.set(key, {
+          name: String(parameter.name),
+          in: String(parameter.in),
+          required: parameter.required === true || parameter.in === "path",
+          description: parameter.description || parameter.schema?.description || "",
+          example: parameterExample(parameter),
+        });
+      }
       out.push({
         id: `${m.toUpperCase()} ${path}`,
         method: m.toUpperCase(),
         path,
         summary: op.summary,
         description: op.description,
+        parameters: Array.from(unique.values()),
       });
     }
   }
