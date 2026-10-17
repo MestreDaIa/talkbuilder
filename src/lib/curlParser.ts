@@ -214,7 +214,7 @@ export function discoverEndpointsFromOpenApi(doc: any): DiscoveredEndpoint[] {
     return value === undefined || value === null ? undefined : String(value);
   };
   const schemaToTemplate = (inputSchema: any, propertyName = "", depth = 0): any => {
-    if (!inputSchema || depth > 8) return propertyName ? `{{\${propertyName}}}` : "";
+    if (!inputSchema || depth > 8) return propertyName ? `{{${propertyName}}}` : "";
     const schema = resolveRef(inputSchema);
     const placeholder = schema?.["x-template-placeholder"] || schema?.["x-business-variable"] || propertyName;
     if (schema?.example !== undefined) return schema.example;
@@ -227,22 +227,22 @@ export function discoverEndpointsFromOpenApi(doc: any): DiscoveredEndpoint[] {
       return result;
     }
     if (schema?.type === "array") return Array.isArray(schema.example) ? schema.example : [];
-    if (schema?.enum?.length) return `{{\${placeholder || propertyName}}}`;
-    return placeholder ? `{{\${placeholder}}}` : "";
+    if (schema?.enum?.length) return `{{${placeholder || propertyName}}}`;
+    return placeholder ? `{{${placeholder}}}` : "";
   };
   const schemaDescription = (inputSchema: any): string => {
     if (!inputSchema) return "";
     const schema = resolveRef(inputSchema);
     const parts = [
       schema.description || "",
-      schema.type ? `Tipo: \${schema.type}` : "",
-      Array.isArray(schema.required) && schema.required.length ? `Obrigatórios: \${schema.required.join(", ")}` : "",
+      schema.type ? `Tipo: ${schema.type}` : "",
+      Array.isArray(schema.required) && schema.required.length ? `Obrigatórios: ${schema.required.join(", ")}` : "",
     ].filter(Boolean);
     if (schema.properties) {
       const fields = Object.entries<any>(schema.properties)
-        .map(([name, property]) => `\${name}\${schema.required?.includes(name) ? " (obrigatório)" : ""}\${property.description ? `: \${property.description}` : ""}`)
+        .map(([name, property]) => `${name}${schema.required?.includes(name) ? " (obrigatório)" : ""}${property.description ? `: ${property.description}` : ""}`)
         .join("; ");
-      if (fields) parts.push(`Campos: \${fields}`);
+      if (fields) parts.push(`Campos: ${fields}`);
     }
     return parts.join(" ");
   };
@@ -258,7 +258,7 @@ export function discoverEndpointsFromOpenApi(doc: any): DiscoveredEndpoint[] {
       const unique = new Map<string, DiscoveredParameter>();
       for (const parameter of combined) {
         if (!parameter?.name || !parameter?.in) continue;
-        const key = `\${parameter.in}:\${parameter.name}`;
+        const key = `${parameter.in}:${parameter.name}`;
         unique.set(key, {
           name: String(parameter.name),
           in: String(parameter.in),
@@ -286,7 +286,7 @@ export function discoverEndpointsFromOpenApi(doc: any): DiscoveredEndpoint[] {
         } else if (/x-www-form-urlencoded/i.test(selectedContentType)) {
           bodyContentType = "form-urlencoded";
           bodyTemplate = bodySchema?.properties
-            ? Object.keys(bodySchema.properties).map(name => `\${encodeURIComponent(name)}={{\${name}}}`).join("&")
+            ? Object.keys(bodySchema.properties).map(name => `${encodeURIComponent(name)}={{${name}}}`).join("&")
             : "";
         } else {
           bodyContentType = "raw";
@@ -295,11 +295,11 @@ export function discoverEndpointsFromOpenApi(doc: any): DiscoveredEndpoint[] {
       }
       const queryParams = Array.from(unique.values()).filter(parameter => parameter.in === "query");
       const pathWithPlaceholders = path.replace(/\{([^}]+)\}/g, "{{$1}}");
-      const queryTemplate = queryParams.map(parameter => `\${encodeURIComponent(parameter.name)}={{\${parameter.name}}}`).join("&");
+      const queryTemplate = queryParams.map(parameter => `${encodeURIComponent(parameter.name)}={{${parameter.name}}}`).join("&");
       const integrationTemplate = typeof op["x-integration-template"] === "string" ? op["x-integration-template"] : "";
-      const urlTemplate = integrationTemplate || `\${pathWithPlaceholders}\${queryTemplate ? `?\${queryTemplate}` : ""}`;
+      const urlTemplate = integrationTemplate || `${pathWithPlaceholders}${queryTemplate ? `?${queryTemplate}` : ""}`;
       out.push({
-        id: `\${m.toUpperCase()} \${path}`,
+        id: `${m.toUpperCase()} ${path}`,
         method: m.toUpperCase(),
         path,
         summary: op.summary,
