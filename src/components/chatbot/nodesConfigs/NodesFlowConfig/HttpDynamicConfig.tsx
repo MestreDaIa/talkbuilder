@@ -177,27 +177,74 @@ export const HttpDynamicConfig = ({ config, setConfig }: Props) => {
   };
 
   const addFromDiscovered = (d: DiscoveredEndpoint) => {
-    const alreadyExists = endpoints.some(e => e.id === d.id);
-    if (alreadyExists) {
-      update({ discovered: discovered.filter(item => item.id !== d.id) });
-      toast.info("Endpoint já configurado; removido da lista de descobertas");
+    const baseUrl = String(config.apiServerBaseUrl || apiBaseUrl.replace(/\/(api-docs(?:-json)?|docs|swagger|openapi\.json|swagger\.json|v3\/api-docs).*$/i, "")).replace(/\/$/, "");
+    const discoveredPathParams = [...d.path.matchAll(/\{([^}]+)\}/g)].map(m => m[1]);
+    const openApiParams = Array.isArray(d.parameters) ? d.parameters : [];
+    const queryDefinitions = openApiParams.filter(p => p.in === "query");
+    const pathDefinitions = openApiParams.filter(p => p.in === "path");
+    const toSchemaDescription = (p: any) => [
+      p.required ? "[OBRIGATÓRIO]" : "[opcional]",
+      p.description || "",
+    ].filter(Boolean).join(" ");
+    const schemaPathParams = discoveredPathParams.map(name => {
+      const p = pathDefinitions.find(item => item.name === name);
+      return { name, description: p ? toSchemaDescription(p) : "Parâmetro de caminho exigido pela URL", example: p?.example || "" };
+    });
+    const schemaQueryParams = queryDefinitions.map(p => ({
+      name: p.name,
+      description: toSchemaDescription(p),
+      example: p.example || "",
+    }));
+    const existingIndex = endpoints.findIndex(e => e.id === d.id);
+    const nextEndpoints = [...endpoints];
+    if (existingIndex >= 0) {
+      const existing = nextEndpoints[existingIndex];
+      const oldSchema = existing.argsSchema || {};
+      const mergeParams = (oldItems: any[] = [], discoveredItems: any[] = []) => {
+        const byName = new Map(oldItems.filter(p => p?.name).map(p => [p.name, p]));
+        for (const item of discoveredItems) {
+          const previous = byName.get(item.name);
+          byName.set(item.name, previous ? {
+            ...item,
+            ...previous,
+            description: previous.description || item.description,
+            example: previous.example || item.example,
+          } : item);
+        }
+        return Array.from(byName.values());
+      };
+      nextEndpoints[existingIndex] = {
+        ...existing,
+        queryParams: [
+          ...(existing.queryParams || []),
+          ...queryDefinitions.filter(p => !(existing.queryParams || []).some(q => q.name === p.name)).map(p => ({ name: p.name, value: "" })),
+        ],
+        argsSchema: {
+          ...oldSchema,
+          pathParams: mergeParams(oldSchema.pathParams, schemaPathParams),
+          queryParams: mergeParams(oldSchema.queryParams, schemaQueryParams),
+        },
+      };
+      update({ endpoints: nextEndpoints, discovered: discovered.filter(item => item.id !== d.id) });
+      toast.success("Skill atualizada com os parâmetros da documentação");
       return;
     }
-    const baseUrl = String(config.apiServerBaseUrl || apiBaseUrl.replace(/\/(api-docs(?:-json)?|docs|swagger|openapi\.json|swagger\.json|v3\/api-docs).*$/i, "")).replace(/\/$/, "");
     update({
       endpoints: [
         ...endpoints,
         {
           id: d.id, name: d.summary || d.id, description: d.description || d.summary,
           method: d.method, url: baseUrl + d.path,
-          headers: [], queryParams: [], pathParams: [...d.path.matchAll(/\{([^}]+)\}/g)].map(m => m[1]),
+          headers: [], queryParams: queryDefinitions.map(p => ({ name: p.name, value: "" })),
+          pathParams: discoveredPathParams,
           body: null, bodyContentType: null, auth: { type: "none" },
           permissions: emptyPerms(), responseMappings: [], resultType: "context",
+          argsSchema: { pathParams: schemaPathParams, queryParams: schemaQueryParams },
         },
       ],
       discovered: discovered.filter(item => item.id !== d.id),
     });
-    toast.success("Endpoint adicionado às Skills");
+    toast.success("Endpoint adicionado às Skills com parâmetros importados");
   };
 
   return (
