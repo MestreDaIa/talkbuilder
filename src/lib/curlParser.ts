@@ -176,47 +176,89 @@ export function parseCurl(input: string): ParsedCurl {
 // Extrai lista de endpoints a partir de um documento OpenAPI/Swagger (v2 ou v3).
 export interface DiscoveredParameter {
   name: string;
-  in: "path" | "query" | "header" | "cookie" | string;
+  in: "path" | "query" | "header" | "cookie" | "body" | string;
   required?: boolean;
   description?: string;
   example?: string;
 }
 
 export interface DiscoveredEndpoint {
-  id: string;           // "GET /services"
+  id: string;
   method: string;
   path: string;
   summary?: string;
   description?: string;
+  operationId?: string;
+  tags?: string[];
   parameters?: DiscoveredParameter[];
+  urlTemplate?: string;
+  bodyTemplate?: string;
+  bodyContentType?: "json" | "form-urlencoded" | "raw" | null;
+  bodyDescription?: string;
 }
 
 export function discoverEndpointsFromOpenApi(doc: any): DiscoveredEndpoint[] {
   if (!doc?.paths) return [];
   const out: DiscoveredEndpoint[] = [];
   const methods = ["get", "post", "put", "patch", "delete", "head", "options"];
-  const resolveParameter = (parameter: any): any => {
-    if (!parameter?.$ref) return parameter;
-    const ref = String(parameter.$ref);
-    const parts = ref.replace(/^#\//, "").split("/");
-    return parts.reduce((value: any, part: string) => value?.[part.replace(/~1/g, "/").replace(/~0/g, "~")], doc) || parameter;
+  const decodeRefPart = (part: string) => part.replace(/~1/g, "/").replace(/~0/g, "~");
+  const resolveRef = (value: any): any => {
+    if (!value?.$ref || typeof value.$ref !== "string") return value;
+    const parts = value.$ref.replace(/^#\//, "").split("/");
+    const resolved = parts.reduce((current: any, part: string) => current?.[decodeRefPart(part)], doc);
+    return resolved ? { ...resolved, ...value, $ref: undefined } : value;
   };
   const parameterExample = (parameter: any) => {
-    const value = parameter?.example ?? parameter?.schema?.example ?? parameter?.schema?.default;
+    const resolved = resolveRef(parameter);
+    const value = resolved?.example ?? resolved?.schema?.example ?? resolved?.schema?.default;
     return value === undefined || value === null ? undefined : String(value);
   };
-  for (const [path, pathItem] of Object.entries<any>(doc.paths)) {
+  const schemaToTemplate = (inputSchema: any, propertyName = "", depth = 0): any => {
+    if (!inputSchema || depth > 8) return propertyName ? \`{{\${propertyName}}}\` : "";
+    const schema = resolveRef(inputSchema);
+    const placeholder = schema?.["x-template-placeholder"] || schema?.["x-business-variable"] || propertyName;
+    if (schema?.example !== undefined) return schema.example;
+    if (schema?.default !== undefined) return schema.default;
+    if (schema?.type === "object" || schema?.properties) {
+      const result: Record<string, any> = {};
+      for (const [key, propertySchema] of Object.entries<any>(schema.properties || {})) {
+        result[key] = schemaToTemplate(propertySchema, key, depth + 1);
+      }
+      return result;
+    }
+    if (schema?.type === "array") return Array.isArray(schema.example) ? schema.example : [];
+    if (schema?.enum?.length) return \`{{\${placeholder || propertyName}}}\`;
+    return placeholder ? \`{{\${placeholder}}}\` : "";
+  };
+  const schemaDescription = (inputSchema: any): string => {
+    if (!inputSchema) return "";
+    const schema = resolveRef(inputSchema);
+    const parts = [
+      schema.description || "",
+      schema.type ? \`Tipo: \${schema.type}\` : "",
+      Array.isArray(schema.required) && schema.required.length ? \`Obrigatórios: \${schema.required.join(", ")}\` : "",
+    ].filter(Boolean);
+    if (schema.properties) {
+      const fields = Object.entries<any>(schema.properties)
+        .map(([name, property]) => \`\${name}\${schema.required?.includes(name) ? " (obrigatório)" : ""}\${property.description ? \`: \${property.description}\` : ""}\`)
+        .join("; ");
+      if (fields) parts.push(\`Campos: \${fields}\`);
+    }
+    return parts.join(" ");
+  };
+  for (const [path, rawPathItem] of Object.entries<any>(doc.paths)) {
+    const pathItem = resolveRef(rawPathItem);
     for (const m of methods) {
       const op = pathItem?.[m];
       if (!op) continue;
       const combined = [
         ...(Array.isArray(pathItem?.parameters) ? pathItem.parameters : []),
         ...(Array.isArray(op?.parameters) ? op.parameters : []),
-      ].map(resolveParameter);
+      ].map(resolveRef);
       const unique = new Map<string, DiscoveredParameter>();
       for (const parameter of combined) {
         if (!parameter?.name || !parameter?.in) continue;
-        const key = `${parameter.in}:${parameter.name}`;
+        const key = \`\${parameter.in}:\${parameter.name}\`;
         unique.set(key, {
           name: String(parameter.name),
           in: String(parameter.in),
@@ -225,13 +267,50 @@ export function discoverEndpointsFromOpenApi(doc: any): DiscoveredEndpoint[] {
           example: parameterExample(parameter),
         });
       }
+
+      const rawRequestBody = resolveRef(op.requestBody);
+      const bodyContent = rawRequestBody?.content || {};
+      const jsonContentType = Object.keys(bodyContent).find(type => /application\\/json|application\\/.+\\+json/i.test(type));
+      const selectedContentType = jsonContentType || Object.keys(bodyContent)[0];
+      const media = selectedContentType ? bodyContent[selectedContentType] : undefined;
+      const bodySchema = resolveRef(media?.schema);
+      const bodyExample = media?.example ?? bodySchema?.example;
+      let bodyTemplate: string | undefined;
+      let bodyContentType: DiscoveredEndpoint["bodyContentType"] = null;
+      if (selectedContentType && media) {
+        if (/json/i.test(selectedContentType)) {
+          bodyContentType = "json";
+          const template = bodyExample !== undefined ? bodyExample : schemaToTemplate(bodySchema);
+          if (template && typeof template === "object") bodyTemplate = JSON.stringify(template, null, 2);
+          else if (template !== undefined && template !== "") bodyTemplate = typeof template === "string" ? template : JSON.stringify(template, null, 2);
+        } else if (/x-www-form-urlencoded/i.test(selectedContentType)) {
+          bodyContentType = "form-urlencoded";
+          bodyTemplate = bodySchema?.properties
+            ? Object.keys(bodySchema.properties).map(name => \`\${encodeURIComponent(name)}={{\${name}}}\`).join("&")
+            : "";
+        } else {
+          bodyContentType = "raw";
+          bodyTemplate = media?.example === undefined ? "" : String(media.example);
+        }
+      }
+      const queryParams = Array.from(unique.values()).filter(parameter => parameter.in === "query");
+      const pathWithPlaceholders = path.replace(/\\{([^}]+)\\}/g, "{{$1}}");
+      const queryTemplate = queryParams.map(parameter => \`\${encodeURIComponent(parameter.name)}={{\${parameter.name}}}\`).join("&");
+      const integrationTemplate = typeof op["x-integration-template"] === "string" ? op["x-integration-template"] : "";
+      const urlTemplate = integrationTemplate || \`\${pathWithPlaceholders}\${queryTemplate ? \`?\${queryTemplate}\` : ""}\`;
       out.push({
-        id: `${m.toUpperCase()} ${path}`,
+        id: \`\${m.toUpperCase()} \${path}\`,
         method: m.toUpperCase(),
         path,
         summary: op.summary,
         description: op.description,
+        operationId: op.operationId,
+        tags: Array.isArray(op.tags) ? op.tags : [],
         parameters: Array.from(unique.values()),
+        urlTemplate,
+        bodyTemplate,
+        bodyContentType,
+        bodyDescription: schemaDescription(bodySchema),
       });
     }
   }
