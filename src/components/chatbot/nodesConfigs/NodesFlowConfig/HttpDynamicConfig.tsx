@@ -358,9 +358,21 @@ export const HttpDynamicConfig = ({ config, setConfig }: Props) => {
                   <span className="font-mono truncate">{d.path}</span>
                   {d.summary && <span className="text-muted-foreground truncate">— {d.summary}</span>}
                 </div>
-                <Button size="sm" variant="ghost" className="h-6" onClick={() => addFromDiscovered(d)}>
-                  <Plus className="h-3 w-3 mr-1" /> Adicionar
-                </Button>
+                <div className="flex items-center gap-1 shrink-0">
+                  <Button size="sm" variant="ghost" className="h-6" onClick={() => addFromDiscovered(d)}>
+                    <Plus className="h-3 w-3 mr-1" /> Adicionar
+                  </Button>
+                  <Button
+                    size="icon"
+                    variant="ghost"
+                    className="h-6 w-6 text-destructive hover:text-destructive"
+                    title="Excluir endpoint descoberto"
+                    aria-label={`Excluir endpoint descoberto ${d.method} ${d.path}`}
+                    onClick={() => update({ discovered: discovered.filter(item => item.id !== d.id) })}
+                  >
+                    <Trash2 className="h-3.5 w-3.5" />
+                  </Button>
+                </div>
               </div>
             ))}
           </div>
