@@ -1590,10 +1590,17 @@ const runLocalFlow = async (
           console.log("[node:ai_generating] Agent", node.id);
           const objective = cfg.objective || "assistente conversacional";
           const instructions = cfg.instructions || "Ajude o usuário de forma natural.";
-          const skills = cfg.toolCallingEnabled === false ? [] : collectAgentSkills(containers, node.id);
-          // Depois que uma skill já foi executada, este turno serve apenas para
-          // transformar o resultado em resposta ao usuário. Não ofereça a mesma
-          // ferramenta novamente, evitando o ciclo skill -> IA -> mesma skill -> erro.
+          const allSkills = cfg.toolCallingEnabled === false ? [] : collectAgentSkills(containers, node.id);
+          // Se uma assinatura idêntica foi repetida, retire somente aquela Skill
+          // da próxima decisão. O agente ainda pode usar outra Skill para continuar
+          // a solicitação original (por exemplo, avançar da consulta para a criação).
+          const excludedSkillIds = new Set(
+            Array.isArray((variables as any).__excludeSkillsForNextAgentTurn)
+              ? (variables as any).__excludeSkillsForNextAgentTurn.map((id: unknown) => String(id))
+              : []
+          );
+          delete (variables as any).__excludeSkillsForNextAgentTurn;
+          const skills = allSkills.filter((skill) => !excludedSkillIds.has(String(skill.id)));
           const isSkillResultTurn = Boolean((input as any)?.__fromSkill);
           const useSkillTool = buildUseSkillTool(skills);
           
@@ -1608,7 +1615,7 @@ const runLocalFlow = async (
           }
 
           const { system, messages: contextMessages } = buildAgentContext({
-            systemPrompt: `Objetivo: ${objective}\nInstruções: ${instructions}${bookingStatePrompt()}${buildSkillSystemPrompt(skills)}\n\n[REGRA DE EXECUÇÃO]\nNunca diga que uma cobrança, pagamento ou agendamento foi criado, confirmado ou enviado apenas porque você decidiu fazê-lo. Só afirme sucesso quando o resultado da skill indicar execução bem-sucedida. Se a execução falhar, informe a falha e não invente que a operação ocorreu.`,
+            systemPrompt: `Objetivo: ${objective}\nInstruções: ${instructions}${bookingStatePrompt()}${buildSkillSystemPrompt(skills)}\n\n[REGRA DE EXECUÇÃO]\nNunca diga que uma cobrança, pagamento ou agendamento foi criado, confirmado ou enviado apenas porque você decidiu fazê-lo. Só afirme sucesso quando o resultado da skill indicar execução bem-sucedida. Se a execução falhar, informe a falha e não invente que a operação ocorreu. Após uma consulta bem-sucedida, reutilize os campos e IDs reais retornados nas etapas seguintes; não solicite novamente ao usuário dados já presentes no resultado. Ao mapear IDs, respeite o tipo do parâmetro e o recurso que o retornou: nunca use o ID de um recurso como ID de outro. Se uma consulta já encontrou um registro existente, reutilize esse registro em vez de tentar criá-lo novamente.`,
             history: getAgentHistory(!!(input as any)?.__fromSkill),
             persistentMemory,
             variables,
@@ -1811,10 +1818,20 @@ const runLocalFlow = async (
               // erro artificial. O resultado anterior já está no contexto; force
               // a próxima chamada do Agent a ser apenas textual para ele continuar
               // dali, sem reexecutar a mesma operação.
-              console.log("[agent-node] mesma skill já executada com os mesmos argumentos; reutilizando o último resultado");
-              (variables as any).__forceTextOnlyAgentTurn = true;
+              console.log("[agent-node] mesma skill já executada com os mesmos argumentos; reutilizando o último resultado e bloqueando só essa Skill no próximo planejamento");
+              const excluded = new Set(
+                Array.isArray((variables as any).__excludeSkillsForNextAgentTurn)
+                  ? (variables as any).__excludeSkillsForNextAgentTurn.map((id: unknown) => String(id))
+                  : []
+              );
+              excluded.add(String(skillCall.skill_id));
+              (variables as any).__excludeSkillsForNextAgentTurn = Array.from(excluded);
               skillCall = null;
-              input = { message: "[CONTROLE] Esta mesma skill já foi executada com esses argumentos e seu resultado está no contexto. Não execute nenhuma skill agora. Use o resultado disponível para responder ao usuário ou peça somente uma escolha/informação que realmente esteja faltando.", __fromSkill: true, __internalAgentTurn: true } as any;
+              input = {
+                message: "[CONTROLE] Esta Skill com esses mesmos argumentos já foi executada; o resultado real está no contexto. Não repita essa mesma Skill/assinatura. Continue a solicitação original usando o resultado, executando outra Skill disponível se necessário. Não peça novamente dados que já constem no resultado. Se nenhuma etapa adicional for necessária, responda ao usuário; pergunte apenas o que realmente estiver ausente.",
+                __fromSkill: true,
+                __internalAgentTurn: true
+              } as any;
               continue;
             }
 
