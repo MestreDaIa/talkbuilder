@@ -2339,7 +2339,32 @@ const runLocalFlow = async (
 
                   const rememberKnownEntities = (responseData: any, sourceParts: unknown[]) => {
                     const source = sourceParts.map((part) => String(part || "")).filter(Boolean).join(" ");
-                    const sourceHints = splitNameTerms(source).map(singularize).filter((term) => term.length >= 3);
+                    // Não classifique uma entidade usando todas as palavras da URL:
+                    // /services/{service_id}/employees retorna profissionais, não serviços.
+                    // Use o recurso terminal do endpoint e os campos do próprio payload.
+                    const endpointUrl = sourceParts.map((part) => String(part || "").trim()).find((part) => /^https?:\/\//i.test(part));
+                    const endpointResourceHints = (() => {
+                      if (!endpointUrl) return [];
+                      try {
+                        const segments = new URL(endpointUrl).pathname.split("/").filter(Boolean);
+                        let resource = segments[segments.length - 1] || "";
+                        if (/^(?:\{[^}]+\}|:[a-zA-Z_][a-zA-Z0-9_]*|%7B[^%]+%7D)$/i.test(resource)) {
+                          segments.pop();
+                          resource = segments[segments.length - 1] || "";
+                        }
+                        if (/^(details?|lookup|search|by[-_]?id)$/i.test(resource) && segments.length > 1) {
+                          segments.pop();
+                          resource = segments[segments.length - 1] || "";
+                        }
+                        return splitNameTerms(resource).map(singularize).filter((term) => term.length >= 3);
+                      } catch {
+                        return [];
+                      }
+                    })();
+                    const descriptiveHints = endpointUrl
+                      ? []
+                      : sourceParts.flatMap((part) => splitNameTerms(part)).map(singularize).filter((term) => term.length >= 3);
+                    const sourceHints = Array.from(new Set([...endpointResourceHints, ...descriptiveHints]));
                     const existing = getKnownEntities();
                     const byKey = new Map(existing.map((entity) => [`${entity.id}|${entity.source}`, entity]));
                     const labelFields = ["name", "title", "label", "description", "full_name", "display_name", "email", "phone", "telefone"];
@@ -2426,8 +2451,12 @@ const runLocalFlow = async (
                   const entityMatchesType = (entity: KnownEntity, hints: string[]) => {
                     if (!hints.length) return true;
                     const entityHints = new Set((entity.typeHints || []).map(singularize));
+                    // Uma URL pode citar recursos pais (services) e retornar filhos
+                    // (employees). Se o payload já tem hints tipados, não use a URL inteira
+                    // como fallback: isso mistura seleções de entidades diferentes.
+                    if (entityHints.size) return hints.some((hint) => entityHints.has(hint));
                     const source = normalizeLookupText(entity.source);
-                    return hints.some((hint) => entityHints.has(hint) || source.includes(hint));
+                    return hints.some((hint) => source.includes(hint));
                   };
 
                   const getVerifiedEntitySelections = (): Record<string, VerifiedEntitySelection> => {
@@ -2933,7 +2962,18 @@ const runLocalFlow = async (
                     return undefined;
                   };
 
-                  let url = replaceVars(String(ep.url || ""));
+                  // Preserve placeholders até resolver os argumentos da chamada. Se
+                  // replaceVars() rodar primeiro, variáveis globais antigas podem preencher
+                  // {{employee_id}} e {{service_id}} com o mesmo ID.
+                  const protectedParamNames: string[] = [];
+                  const protectedUrl = String(ep.url || "").replace(
+                    /\{\{\s*([A-Za-z_][A-Za-z0-9_.-]*)\s*\}\}/g,
+                    (_match, name) => `__FLOW_PARAM_${protectedParamNames.push(name) - 1}__`
+                  );
+                  let url = replaceVars(protectedUrl).replace(
+                    /__FLOW_PARAM_(\d+)__/g,
+                    (_match, index) => `{${protectedParamNames[Number(index)]}}`
+                  );
 
                   // Path params: substitui {name} e :name pelos valores do agente (se permitido) ou variáveis do fluxo.
                   // Decodifica `%3A` / `%7B` / `%7D` que podem ter vindo de new URL().toString()
@@ -3004,28 +3044,72 @@ const runLocalFlow = async (
 
                   const qp: string[] = [];
                   const usedQuery = new Set<string>();
-                  (ep.queryParams || []).forEach((p: any) => {
-                    if (!p?.name) return;
-                    const fromAgent = perms.queryParams === false ? undefined : agentQuery[p.name] ?? (p.name in agentArgs ? agentArgs[p.name] : undefined);
-                    const candidate = fromAgent !== undefined ? fromAgent : replaceVars(String(p.value ?? ""));
-                    // Um parâmetro sem valor não deve enviar string vazia nem o placeholder literal.
+                  const queryDefinitions = [
+                    ...(Array.isArray(ep.queryParams) ? ep.queryParams : []),
+                    ...(Array.isArray(ep.argsSchema?.queryParams) ? ep.argsSchema.queryParams : []),
+                  ];
+                  // Também reconhece placeholders que já estão na URL, mesmo quando
+                  // não existe uma entrada separada no editor de query params.
+                  try {
+                    const templateUrl = new URL(url);
+                    for (const [name, value] of templateUrl.searchParams.entries()) {
+                      const match = value.match(/^\{([A-Za-z_][A-Za-z0-9_.-]*)\}$/);
+                      if (match && !queryDefinitions.some((p: any) => String(p?.name || p?.key || "") === name)) {
+                        queryDefinitions.push({ name, value: `{{${match[1]}}}`, _urlPlaceholder: true });
+                      }
+                    }
+                  } catch {}
+                  queryDefinitions.forEach((p: any) => {
+                    const name = String(p?.name || p?.key || "").trim();
+                    if (!name || usedQuery.has(name)) return;
+                    const urlParamValue = (() => {
+                      try { return new URL(url).searchParams.get(name); } catch { return null; }
+                    })();
+                    const urlPlaceholder = String(urlParamValue || "").match(/^\{([A-Za-z_][A-Za-z0-9_.-]*)\}$/);
+                    const fromAgent = perms.queryParams === false
+                      ? undefined
+                      : agentQuery[name] ?? (name in agentArgs ? agentArgs[name] : deepFindValue(agentArgs.queryParams, name));
+                    // Um placeholder da URL nunca pode ser preenchido por uma variável global
+                    // possivelmente antiga; usa argumento explícito ou seleção tipada da sessão.
+                    const configuredValue = p._urlPlaceholder || urlPlaceholder
+                      ? undefined
+                      : replaceVars(String(p.value ?? ""));
+                    const candidate = fromAgent !== undefined ? fromAgent : configuredValue;
                     if (candidate === undefined || candidate === null || String(candidate).trim() === "" || /\{\{?[^}]+\}\}?/.test(String(candidate))) {
-                      usedQuery.add(p.name);
+                      if (urlPlaceholder) {
+                        const resolved = resolveKnownEntityId(name, undefined, "query");
+                        if (!resolved.ok || resolved.value === undefined || resolved.value === null || String(resolved.value).trim() === "") {
+                          lastOk = false;
+                          lastData = {
+                            ok: false,
+                            error: "missing_query_param",
+                            message: `Faltou um valor válido para o parâmetro de consulta "${name}".`,
+                            param: name,
+                            id_audit: idAuditTrail,
+                          };
+                          variables.httpResponse = lastData;
+                          shouldSkipEndpoint = true;
+                          return;
+                        }
+                        qp.push(`${encodeURIComponent(name)}=${encodeURIComponent(String(resolved.value))}`);
+                      }
+                      usedQuery.add(name);
                       return;
                     }
-                    const resolved = resolveKnownEntityId(p.name, candidate, "query");
+                    const resolved = resolveKnownEntityId(name, candidate, "query");
                     if (!resolved.ok) {
                       lastOk = false;
                       lastData = { ...resolved, ok: false, id_audit: idAuditTrail };
                       variables.httpResponse = lastData;
                       shouldSkipEndpoint = true;
-                      console.warn(`[node:http-request][dynamic] ID inválido em query param "${p.name}" — chamada abortada`, resolved);
+                      console.warn(`[node:http-request][dynamic] ID inválido em query param "${name}" — chamada abortada`, resolved);
                       console.table(idAuditTrail);
                       return;
                     }
-                    const val = resolved.value;
-                    qp.push(`${encodeURIComponent(p.name)}=${encodeURIComponent(val)}`);
-                    usedQuery.add(p.name);
+                    if (resolved.value !== undefined && resolved.value !== null && String(resolved.value).trim() !== "") {
+                      qp.push(`${encodeURIComponent(name)}=${encodeURIComponent(String(resolved.value))}`);
+                    }
+                    usedQuery.add(name);
                   });
                   if (shouldSkipEndpoint) continue;
                   // Query params extras do agente (declarados no argsSchema mas ausentes na config).
