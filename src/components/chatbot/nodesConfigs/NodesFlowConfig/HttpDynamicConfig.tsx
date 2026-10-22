@@ -460,7 +460,13 @@ function EndpointCard({
     setIsTesting(true); setTestResult(null);
     try {
       const url = new URL(endpoint.url);
-      endpoint.queryParams.forEach(p => p.name && url.searchParams.set(p.name, p.value));
+      // Campos de query vazios não devem apagar parâmetros que já vieram na URL.
+      // Isso permite testar URLs importadas de CURL/OpenAPI que já contêm query string.
+      endpoint.queryParams.forEach(p => {
+        const name = String(p.name || "").trim();
+        const value = String(p.value ?? "").trim();
+        if (name && value) url.searchParams.set(name, value);
+      });
       const headers: Record<string, string> = {};
       endpoint.headers.forEach(h => h.name && (headers[h.name] = h.value));
       if (endpoint.auth?.type === "bearer" && endpoint.auth.token) headers["Authorization"] = "Bearer " + endpoint.auth.token;
