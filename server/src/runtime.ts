@@ -1615,13 +1615,17 @@ async function runFlow(execution: any, containersIn: any[], edgesIn: any[], inpu
                       console.warn("[ai-agent] interrompendo repetição de Skill após falha anterior", {skill_id:matchedSkill._http.endpointId,status:previousResult.status});
                       return {messages,waiting_for:"text",variables,next_node_id:node.id,active_agent_node_id:node.id,mode:"agent",steps,status:"waiting_input"};
                     }
-                    if(sameSuccessfulSkill && repeatedMessage){
-                      const containsInternalId=/[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}|\bnode-[a-z0-9-]+|::(?:GET|POST|PUT|PATCH|DELETE)\b/i.test(repeatedMessage);
-                      if(!containsInternalId){
+                    if(sameSuccessfulSkill){
+                      const containsInternalId=/[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}|\\bnode-[a-z0-9-]+|::(?:GET|POST|PUT|PATCH|DELETE)\\b/i.test(repeatedMessage);
+                      if(repeatedMessage && !containsInternalId){
                         messages.push({id:crypto.randomUUID(),type:"bot",content:repeatedMessage});
-                        console.log("[ai-agent] encerrando chamada repetida com resposta baseada em Skill já concluída");
-                        return {messages,waiting_for:"text",variables,next_node_id:node.id,active_agent_node_id:node.id,mode:"agent",steps,status:"waiting_input"};
+                      } else {
+                        // Não faça outra chamada à IA para contornar a proteção: isso pode
+                        // repetir o ciclo até estourar o timeout do provedor.
+                        messages.push({id:crypto.randomUUID(),type:"bot",content:"Já consultei essa informação e não vou repetir a mesma chamada. Pode me dizer como deseja prosseguir?"});
                       }
+                      console.log("[ai-agent] encerrando imediatamente a repetição de Skill já concluída", {skill_id:matchedSkill._http.endpointId,callCount});
+                      return {messages,waiting_for:"text",variables,next_node_id:node.id,active_agent_node_id:node.id,mode:"agent",steps,status:"waiting_input"};
                     }
 
                     if(callCount>=3){
