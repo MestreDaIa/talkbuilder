@@ -1006,6 +1006,7 @@ class FlowEngine {
     conversation.push({ role: "user", content: userText || "Inicie a conversa conforme o objetivo configurado." });
     const attempted = new Set<string>();
     const recentResults: string[] = [];
+    const skillHistory: any[] = [];
     let finalReply = "";
     let forceTextOnly = false;
 
@@ -1255,12 +1256,26 @@ class FlowEngine {
         recentResults.push("A Skill " + selected.label + " com estes mesmos argumentos já foi tentada nesta rodada. Não a execute novamente. Explique a falha ou peça somente o dado que falta.");
         continue;
       }
+      // Operações que alteram dados exigem confirmação explícita do usuário
+      // após o agente apresentar os detalhes; intenção genérica não basta.
+      if (selected.isMutating) {
+        const lastAssistant = [...history].reverse().find((m: any) => m.role === "assistant");
+        const askedForConfirmation = /\\b(confirm|confirma|posso prosseguir|posso finalizar|deseja que eu|quer que eu|posso agendar|confirma os dados)\\b/i.test(String(lastAssistant?.content || ""));
+        const explicitYes = /^(sim|s|pode|confirmo|confirmar|ok|okay|isso mesmo|correto|pode seguir|pode finalizar|pode agendar|vai em frente)[.!\\s]*$/i.test(userText);
+        if (!askedForConfirmation || !explicitYes) {
+          forceTextOnly = true;
+          recentResults.push("A operação crítica " + selected.label + " NÃO foi executada. É obrigatório apresentar os dados e pedir confirmação explícita ao usuário. Aguarde uma resposta afirmativa após essa confirmação.");
+          continue;
+        }
+      }
       attempted.add(signature);
-      if (result.call.message && !/[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}|::(?:GET|POST|PUT|PATCH|DELETE)\b/i.test(String(result.call.message))) {
+      if (result.call.message && !/[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}|::(?:GET|POST|PUT|PATCH|DELETE)\\b/i.test(String(result.call.message))) {
         this.messages.push({ id: crypto.randomUUID(), type: "bot", content: String(result.call.message).trim() });
       }
       const skillResult = await executeSkill(selected, args);
-      recentResults.push("Skill: " + selected.label + "\nResultado real: " + JSON.stringify(skillResult).slice(0, 8000));
+      const serializedSkillResult = JSON.stringify(skillResult).slice(0, 8000);
+      recentResults.push("Skill: " + selected.label + "\\nResultado real: " + serializedSkillResult);
+      skillHistory.push({ role: "assistant", content: "[Resultado real da Skill " + selected.label + "] " + serializedSkillResult });
       if (!skillResult.ok) {
         forceTextOnly = true;
         recentResults.push("A chamada falhou. Não repita esta Skill com os mesmos argumentos; não afirme sucesso.");
@@ -1277,7 +1292,7 @@ class FlowEngine {
       this.messages.push({ id: crypto.randomUUID(), type: "bot", content: finalReply });
       const saveVar = normalizeVariableName(cfg.saveVariable);
       if (saveVar) this.variables[saveVar] = finalReply;
-      const nextHistory = [...history, { role: "user", content: userText }, { role: "assistant", content: finalReply }].filter((m: any) => String(m.content || "").trim()).slice(-12);
+      const nextHistory = [...history, { role: "user", content: userText }, ...skillHistory, { role: "assistant", content: finalReply }].filter((m: any) => String(m.content || "").trim()).slice(-12);
       this.variables.__agentHistory = nextHistory;
     }
     this.waitingFor = "text";
