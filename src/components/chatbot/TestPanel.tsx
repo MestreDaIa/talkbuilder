@@ -957,20 +957,6 @@ const runLocalFlow = async (
       const bookingState: Record<string, any> = {
         ...(((variables as any).__bookingState && typeof (variables as any).__bookingState === "object") ? (variables as any).__bookingState : {}),
       };
-      // Um pedido explícito para iniciar outro agendamento começa uma nova operação.
-      // Não herde serviço, profissional, data, horário ou pagamento do atendimento anterior.
-      const currentTurnText = String((input as any)?.message || variables.last_message || "");
-      const normalizedCurrentTurn = currentTurnText.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "");
-      const startsNewAppointment =
-        !(input as any)?.__fromSkill &&
-        !(input as any)?.__internalAgentTurn &&
-        /\b(?:quero|gostaria de|preciso|vamos|pode)\b.{0,45}\b(?:agendar|marcar|reservar)\b|\b(?:agendar|marcar|reservar)\s+(?:um|uma|outro|outra|novo|nova)\b/.test(normalizedCurrentTurn);
-      if (startsNewAppointment) {
-        for (const key of ["service", "professional", "date", "time", "bookingId", "paymentId", "paymentMethod"]) {
-          delete bookingState[key];
-        }
-        delete (variables as any).__verifiedEntitySelections;
-      }
       (variables as any).__bookingState = bookingState;
 
       const normalizeBookingKey = (key: unknown) =>
