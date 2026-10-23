@@ -1765,8 +1765,11 @@ const runLocalFlow = async (
 
                 const execution = skillResult?.runtime_state?.variables?.__lastSkillExecution;
                 const isFailedRead = execution?.ok === false && String(execution?.method || "").toUpperCase() === "GET";
+                const retryableReadFailure = !execution?.status || [408, 425, 429, 500, 502, 503, 504].includes(Number(execution.status));
 
-                if (!isFailedRead || attempt === maxDelayedReadRetries) break;
+                // 4xx (incluindo 404) é erro definitivo dos argumentos/rota, não instabilidade.
+                // Não repita a Skill inteira: devolva o erro ao Agent com o estado preservado.
+                if (!isFailedRead || !retryableReadFailure || attempt === maxDelayedReadRetries) break;
 
                 console.warn(
                   `[skill:read-retry] GET ${execution.endpoint || targetNodeId} falhou após retry imediato; ` +
