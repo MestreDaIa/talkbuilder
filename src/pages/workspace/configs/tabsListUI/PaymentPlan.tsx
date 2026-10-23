@@ -1,10 +1,8 @@
-import { useState } from 'react'
 import {
   CheckCircle2,
   CreditCard,
   Crown,
   Download,
-  Link2,
   Receipt,
   Sparkles,
   TrendingUp,
@@ -85,10 +83,8 @@ const invoices = [
 ]
 
 export default function PaymentPlan() {
-  // Simula a detecção da integração com flow-appoint
-  const [managedByAppoint] = useState(false)
   const { currentPlan, setCurrentPlan, botsUsed, limits } = usePlan()
-  const { profile, currentWorkspace } = useAuth()
+  const { currentWorkspace } = useAuth()
 
   // ===== Cenário: Usuário convidado ou sem permissão de proprietário =====
   if (currentWorkspace?.role && currentWorkspace.role !== 'owner') {
@@ -134,40 +130,6 @@ export default function PaymentPlan() {
   const botsProgress = Number.isFinite(usage.botsLimit)
     ? Math.min(100, (usage.botsUsed / usage.botsLimit) * 100)
     : 0
-
-  // ===== Cenário: Gestão externa via flow-appoint =====
-  if (managedByAppoint) {
-    return (
-      <Card className="p-4">
-        <CardHeader>
-          <div className="flex items-center gap-3">
-            <div className="w-12 h-12 rounded-xl bg-gradient-to-br from-cyan-500 to-blue-600 flex items-center justify-center text-white">
-              <Link2 className="w-6 h-6" />
-            </div>
-            <div>
-              <CardTitle className="text-2xl">Gerenciado pelo Flow Appoint</CardTitle>
-              <CardDescription>
-                Sua assinatura é controlada pelo sistema de agendamento
-              </CardDescription>
-            </div>
-          </div>
-        </CardHeader>
-        <CardContent className="flex flex-col gap-4">
-          <div className="bg-cyan-50 border border-cyan-200 rounded-lg p-4 flex gap-3">
-            <AlertCircle className="w-5 h-5 text-cyan-600 flex-shrink-0 mt-0.5" />
-            <div className="text-sm text-cyan-900 text-left">
-              Como o <strong>Flow Appoint</strong> está conectado, os pagamentos
-              do construtor de fluxos estão inclusos no plano principal. Acesse
-              o painel de agendamento para gerenciar cobranças, planos e faturas.
-            </div>
-          </div>
-          <Button className="w-fit bg-gradient-to-r from-cyan-500 to-blue-600 text-white">
-            Abrir Flow Appoint
-          </Button>
-        </CardContent>
-      </Card>
-    )
-  }
 
   // ===== Cenário: Gestão própria =====
   return (
