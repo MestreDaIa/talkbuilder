@@ -3047,6 +3047,7 @@ const runLocalFlow = async (
                     }
                   }
                   console.log(`[node:http-request][dynamic] ${ep.id} → status ${res.status}`);
+                  if (!res.ok) console.warn(`[node:http-request][dynamic] resposta de erro HTTP ${res.status}: ${String(data?.message || data?.error || (typeof data === "string" ? data : "") || "sem detalhe no corpo").slice(0, 240)}`);
                   rememberKnownEntities(data, [ep.name, ep.id, ep.url]);
                   // salva resposta completa em variável baseada no nome/id da skill
                   const varBase = String(ep.name || ep.id || "endpoint")
