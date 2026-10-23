@@ -1106,8 +1106,8 @@ class FlowEngine {
       }
     };
 
-    const findArg = (args: any, name: string) => {
-      const sources = [args?.pathParams, args?.queryParams, args?.body, args, this.variables];
+    const findArg = (args: any, name: string, includeVariables = true) => {
+      const sources = [args?.pathParams, args?.queryParams, args?.body, args, ...(includeVariables ? [this.variables] : [])];
       for (const source of sources) {
         if (!source || typeof source !== "object") continue;
         if (source[name] !== undefined && source[name] !== null && source[name] !== "") return source[name];
@@ -1116,11 +1116,11 @@ class FlowEngine {
       }
       return undefined;
     };
-    const deepResolve = (value: any, args: any): any => {
+    const deepResolve = (value: any, args: any, allowFlowFallback = true): any => {
       if (typeof value === "string") {
         const exact = value.match(/^\{\{\s*([A-Za-z_][A-Za-z0-9_.-]*)\s*\}\}$/);
         if (exact) {
-          const found = findArg(args, exact[1]);
+          const found = findArg(args, exact[1], allowFlowFallback);
           return found === undefined ? value : found;
         }
         return this.replaceVars(value, true).replace(/\{\{\s*([A-Za-z_][A-Za-z0-9_.-]*)\s*\}\}/g, (_m: string, k: string) => {
@@ -1144,7 +1144,7 @@ class FlowEngine {
       for (const match of pathPart.matchAll(/\{\{?\s*([A-Za-z_][A-Za-z0-9_.-]*)\s*\}?\}/g)) pathNames.add(match[1]);
       for (const match of pathPart.matchAll(/:([A-Za-z_][A-Za-z0-9_]*)/g)) pathNames.add(match[1]);
       for (const name of pathNames) {
-        const value = findArg(args, name);
+        const value = findArg(args, name, !skill.isMutating);
         if (value === undefined) return { ok: false, status: 422, error: "Faltou o argumento obrigatório de caminho: " + name };
         const encodedValue = encodeURIComponent(String(value));
         url = url.split("{{" + name + "}}").join(encodedValue);
@@ -1161,7 +1161,7 @@ class FlowEngine {
       for (const p of querySchema) {
         const name = String(p?.name || p?.key || "");
         if (!name) continue;
-        const value = findArg(args, name);
+        const value = findArg(args, name, !skill.isMutating);
         if (value !== undefined && value !== null && value !== "") parsedUrl.searchParams.set(name, String(value));
         else if (/^\{[^}]+\}$/.test(parsedUrl.searchParams.get(name) || "")) return { ok: false, status: 422, error: "Faltou o argumento obrigatório de consulta: " + name };
       }
@@ -1169,7 +1169,7 @@ class FlowEngine {
       for (const [name, value] of parsedUrl.searchParams.entries()) {
         const m = value.match(/^\{\{?\s*([A-Za-z_][A-Za-z0-9_.-]*)\s*\}?\}$/);
         if (m) {
-          const found = findArg(args, m[1]);
+          const found = findArg(args, m[1], !skill.isMutating);
           if (found === undefined) return { ok: false, status: 422, error: "Faltou o argumento obrigatório de consulta: " + m[1] };
           parsedUrl.searchParams.set(name, String(found));
         }
@@ -1195,7 +1195,7 @@ class FlowEngine {
           return { ok: false, status: 422, error: "A operação exige arguments.body atual." };
         }
         if (bodyValue !== undefined) {
-          const resolvedBody = deepResolve(bodyValue, args);
+          const resolvedBody = deepResolve(bodyValue, args, !skill.isMutating);
           if (typeof resolvedBody === "string" && ep.bodyContentType !== "raw") {
             try { body = JSON.stringify(JSON.parse(resolvedBody)); headers["Content-Type"] = "application/json"; }
             catch { body = resolvedBody; }
