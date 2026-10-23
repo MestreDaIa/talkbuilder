@@ -832,7 +832,7 @@ export const TestPanel = ({
 
     const docs = [...new Set(skills.map((s: any) => s.documentationContext).filter((v: any) => typeof v === "string" && v.trim()))];
     const docsSection = docs.length ? `\n\n[DOCUMENTAÇÃO DE APOIO DA API — REFERÊNCIA, NÃO PERMISSÕES]\n${docs.join("\n\n---\n\n")}` : "";
-    return `\n\n[SKILLS DISPONÍVEIS PARA O AGENTE]\n${list}\n\nREGRAS OBRIGATÓRIAS PARA AGENDAMENTOS E RESERVAS: quando o usuário pedir para agendar/marcar/reservar sem identificar o serviço ou tipo de atendimento, NÃO escolha um serviço por conta própria e NÃO consulte disponibilidade ainda. Pergunte primeiro qual serviço/tipo de atendimento deseja; se existir uma Skill de listagem de serviços, você pode consultá-la para apresentar opções reais e aguardar a escolha do usuário. Depois, se o usuário não informou um profissional e houver mais de um possível, pergunte qual profissional deseja ou apresente a lista real obtida pela API. Só consulte horários quando o serviço e o profissional estiverem identificados, ou quando o usuário tiver autorizado explicitamente qualquer profissional. Nunca use serviço/profissional escolhido em um agendamento anterior como padrão para um novo pedido. A data/horário informados não autorizam inferir serviço nem profissional.\n\nQuando a mensagem do usuário combinar com a instrução de uma skill, use a ferramenta use_skill com o ID exato da skill. Sempre que a skill listar "Argumentos esperados", preencha o objeto \`arguments\` com esses campos (use os path params/query params/body descritos, extraindo os valores do contexto da conversa e das variáveis já coletadas). Para qualquer campo de ID (id, *_id, *Id, uuid), use somente IDs reais retornados por uma skill anterior nesta sessão; se você só souber o nome/label do item escolhido, envie o nome/label e deixe o runtime resolver para o ID real — nunca invente UUIDs ou IDs. Skills marcadas como Live Data são voláteis: sempre chame a skill novamente quando precisar desses dados, ignore resultados antigos no histórico e não use valores antigos para criar/alterar/excluir dados. Antes de chamar uma skill crítica (POST/PUT/PATCH/DELETE), use apenas os dados atuais que você acabou de confirmar com o usuário; se o usuário respondeu apenas "sim/pode", use exclusivamente a última mensagem de confirmação que você enviou, não valores mais antigos do histórico. Para skills críticas, envie o body completo em arguments.body quando o endpoint tiver body permitido; não confie em templates/variáveis antigas. Se um resultado de skill retornar erro ou parâmetro ausente, não chame a mesma skill de novo com os mesmos argumentos; responda ao usuário ou peça a informação faltante. Se a chamada de ferramenta não estiver disponível, responda apenas com JSON: {"skill_id":"ID","arguments":{...},"message":"opcional"}. Nunca invente perguntas antes de usar uma skill claramente solicitada. Ao interpretar o resultado de uma skill de consulta/disponibilidade, trate a resposta retornada pela skill como fonte de verdade: se ela listar opções disponíveis e a opção escolhida pelo usuário estiver presente, considere-a disponível. Nunca diga que um horário foi "reservado", "ocupado" ou "ficou indisponível" sem evidência explícita no resultado da skill. Nunca invente nomes, IDs, horários ou estados de disponibilidade. Antes de responder, planeje o objetivo inteiro como uma sequência de etapas: olhe para a Skill atual e também para a próxima Skill e os dados que ela exige. Se a próxima Skill puder ser executada com dados já disponíveis, execute-a automaticamente após o resultado atual, sem esperar nova mensagem do usuário. Só peça informação quando ela realmente faltar e nenhuma Skill/contexto puder obtê-la. Se houver várias opções cuja escolha pertence ao usuário, mostre as opções e aguarde somente essa escolha. Nunca pergunte "quer que eu liste..." quando a próxima ação já é determinada pelo objetivo e pelas Skills.${docsSection}`;
+    return `\n\n[SKILLS DISPONÍVEIS PARA O AGENTE]\n${list}\n\nQuando a mensagem do usuário combinar com a instrução de uma skill, use a ferramenta use_skill com o ID exato da skill. Sempre que a skill listar "Argumentos esperados", preencha o objeto \`arguments\` com esses campos (use os path params/query params/body descritos, extraindo os valores do contexto da conversa e das variáveis já coletadas). Para qualquer campo de ID (id, *_id, *Id, uuid), use somente IDs reais retornados por uma skill anterior nesta sessão; se você só souber o nome/label do item escolhido, envie o nome/label e deixe o runtime resolver para o ID real — nunca invente UUIDs ou IDs. Skills marcadas como Live Data são voláteis: sempre chame a skill novamente quando precisar desses dados, ignore resultados antigos no histórico e não use valores antigos para criar/alterar/excluir dados. Antes de chamar uma skill crítica (POST/PUT/PATCH/DELETE), use apenas os dados atuais que você acabou de confirmar com o usuário; se o usuário respondeu apenas "sim/pode", use exclusivamente a última mensagem de confirmação que você enviou, não valores mais antigos do histórico. Para skills críticas, envie o body completo em arguments.body quando o endpoint tiver body permitido; não confie em templates/variáveis antigas. Se um resultado de skill retornar erro ou parâmetro ausente, não chame a mesma skill de novo com os mesmos argumentos; responda ao usuário ou peça a informação faltante. Se a chamada de ferramenta não estiver disponível, responda apenas com JSON: {"skill_id":"ID","arguments":{...},"message":"opcional"}. Nunca invente perguntas antes de usar uma skill claramente solicitada. Ao interpretar o resultado de uma skill de consulta/disponibilidade, trate a resposta retornada pela skill como fonte de verdade: se ela listar opções disponíveis e a opção escolhida pelo usuário estiver presente, considere-a disponível. Nunca diga que um horário foi "reservado", "ocupado" ou "ficou indisponível" sem evidência explícita no resultado da skill. Nunca invente nomes, IDs, horários ou estados de disponibilidade. Antes de responder, planeje o objetivo inteiro como uma sequência de etapas: olhe para a Skill atual e também para a próxima Skill e os dados que ela exige. Se a próxima Skill puder ser executada com dados já disponíveis, execute-a automaticamente após o resultado atual, sem esperar nova mensagem do usuário. Só peça informação quando ela realmente faltar e nenhuma Skill/contexto puder obtê-la. Se houver várias opções cuja escolha pertence ao usuário, mostre as opções e aguarde somente essa escolha. Nunca pergunte "quer que eu liste..." quando a próxima ação já é determinada pelo objetivo e pelas Skills.${docsSection}`;
   };
 
   const buildUseSkillTool = (skills: ReturnType<typeof collectAgentSkills>) => {
@@ -952,66 +952,6 @@ const runLocalFlow = async (
       let status: NodeExecutionStatus = "running";
       const skillCallsThisRun: Record<string, number> = {};
 
-      // Estado transacional do agendamento: fatos já confirmados pelo usuário
-      // permanecem disponíveis entre turnos, sem depender apenas do histórico.
-      const bookingState: Record<string, any> = {
-        ...(((variables as any).__bookingState && typeof (variables as any).__bookingState === "object") ? (variables as any).__bookingState : {}),
-      };
-      (variables as any).__bookingState = bookingState;
-
-      const normalizeBookingKey = (key: unknown) =>
-        String(key || "").toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "").replace(/[^a-z0-9]/g, "");
-
-      const bookingAliases: Record<string, string[]> = {
-        service: ["service", "servico", "servicename", "servicelabel", "serviceid", "servicoid"],
-        professional: ["professional", "profissional", "employee", "funcionario", "professionalid", "employeeid", "funcionarioid"],
-        date: ["date", "data", "dia", "appointmentdate", "scheduleddate", "startdate"],
-        time: ["time", "hora", "horario", "appointmenttime", "scheduledtime", "starttime"],
-        client: ["client", "cliente", "customer", "contato", "clientid", "customerid", "clienteid"],
-        phone: ["phone", "telefone", "celular", "clientphone", "customerphone"],
-        email: ["email", "emailaddress", "clientemail", "customeremail"],
-        paymentMethod: ["paymentmethod", "metodopagamento", "formapagamento", "payment", "pagamento"],
-        bookingId: ["bookingid", "appointmentid", "agendamentoid"],
-        paymentId: ["paymentid", "cobrancaid"],
-      };
-
-      const updateBookingState = (source: any) => {
-        if (!source || typeof source !== "object" || Array.isArray(source)) return;
-        const flat: Record<string, any> = {};        const walk = (value: any, depth = 0) => {
-          if (value == null || typeof value !== "object" || Array.isArray(value) || depth > 5) return;
-          Object.entries(value).forEach(([key, child]) => {
-            if (child != null && typeof child === "object" && !Array.isArray(child)) walk(child, depth + 1);
-            else if (child != null && String(child).trim()) flat[normalizeBookingKey(key)] = child;
-          });
-        };
-        walk(source);
-        Object.entries(bookingAliases).forEach(([field, aliases]) => {
-          const hit = Object.entries(flat).find(([key]) => aliases.some((alias) => normalizeBookingKey(alias) === key));
-          if (hit?.[1] !== undefined && hit?.[1] !== null && String(hit[1]).trim()) bookingState[field] = hit[1];
-        });
-        const selections = (variables as any).__verifiedEntitySelections;
-        if (selections && typeof selections === "object") {
-          const find = (terms: string[]) => Object.values(selections).find((s: any) =>
-            s?.id && terms.some((term) => normalizeBookingKey(s.paramName).includes(term))
-          ) as any;
-          const professional = find(["professional", "employee", "profissional", "funcionario"]);
-          const service = find(["service", "servico"]);
-          const client = find(["client", "customer", "cliente"]);
-          if (professional) bookingState.professional = { id: professional.id, name: professional.label };
-          if (service) bookingState.service = { id: service.id, name: service.label };
-          if (client) bookingState.client = { id: client.id, name: client.label };
-        }
-        (variables as any).__bookingState = { ...bookingState, updatedAt: new Date().toISOString() };
-      };
-
-      const bookingStatePrompt = () => {
-        const entries = Object.entries(bookingState).filter(([key, value]) => key !== "updatedAt" && value != null && value !== "");
-        if (!entries.length) return "";
-        return "\n\n[ESTADO ATUAL DO AGENDAMENTO]\n" +
-          entries.map(([key, value]) => "- " + key + ": " + (typeof value === "object" ? JSON.stringify(value) : String(value))).join("\n") +
-          "\nUse estes dados já confirmados. NÃO pergunte novamente por algo que já esteja preenchido, salvo se o usuário pedir para alterar.";
-      };
-
       const firstText = (...values: any[]) => String(values.find((v) => typeof v === "string" && v.trim()) || "");
       const cleanText = (text: string) => richToPlainText(text);
       const replaceVars = (text: string) => cleanText(text).replace(/{{(.*?)}}/g, (_, key) => {
@@ -1068,63 +1008,16 @@ const runLocalFlow = async (
 
       const normalizeKeyName = (key: string) => String(key || "").toLowerCase().replace(/[^a-z0-9]/g, "");
 
-      // Completa apenas argumentos ausentes com fatos já conhecidos da conversa.
-      // Isso também vale para GET/Live Data, evitando consultas com contexto incompleto.
-      const deriveCurrentSkillArgs = (skill: ReturnType<typeof collectAgentSkills>[number] | undefined, fallbackArgs: Record<string, any> = {}) => {
-        if (!skill?._http) return fallbackArgs;
-        const nextArgs: Record<string, any> = JSON.parse(JSON.stringify(fallbackArgs || {}));
-        const state: Record<string, any> = ((variables as any).__bookingState && typeof (variables as any).__bookingState === "object") ? (variables as any).__bookingState : {};
-        const pick = (value: any) => value && typeof value === "object" ? (value.id ?? value.uuid ?? value.value ?? value.name ?? value.label) : value;
-        const userText = String(variables.last_message || "").toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "");
-        const timeMatch = userText.match(/\b(?:as|a|para|no)?\s*(\d{1,2})(?::(\d{2}))?\s*(?:h|hrs?|horas?)?\b/);
-        const currentTime = timeMatch ? `${timeMatch[1].padStart(2, "0")}:${(timeMatch[2] || "00").padStart(2, "0")}` : undefined;
-        const valueForKey = (key: string) => {
-          const normalized = normalizeKeyName(key);
-          if (normalized.includes("time") || normalized.includes("hora") || normalized.includes("horario")) return currentTime ?? pick(state.time);
-          if (normalized.includes("date") || normalized.includes("data") || normalized.includes("dia")) return pick(state.date);
-          if (normalized.includes("service") || normalized.includes("servico")) return pick(state.service);
-          if (normalized.includes("professional") || normalized.includes("profissional") || normalized.includes("employee") || normalized.includes("funcionario")) return pick(state.professional);
-          if (normalized.includes("client") || normalized.includes("cliente") || normalized.includes("customer")) return pick(state.client);
-          if (normalized.includes("phone") || normalized.includes("telefone") || normalized.includes("celular")) return pick(state.phone);
-          if (normalized.includes("email")) return pick(state.email);
-          return undefined;
-        };
-        const fillObject = (obj: any) => {
-          if (!obj || typeof obj !== "object" || Array.isArray(obj)) return;
-          Object.keys(obj).forEach((key) => {
-            const current = obj[key];
-            const empty = current === undefined || current === null || String(current).trim() === "";
-            if (empty) {
-              const value = valueForKey(key);
-              if (value !== undefined && value !== null && String(value).trim() !== "") obj[key] = value;
-            }
-          });
-        };
-        fillObject(nextArgs.pathParams);
-        fillObject(nextArgs.queryParams);
-        fillObject(nextArgs.body);
-        Object.keys(nextArgs).forEach((key) => {
-          if (key === "pathParams" || key === "queryParams" || key === "body") return;
-          const current = nextArgs[key];
-          const empty = current === undefined || current === null || String(current).trim() === "";
-          if (empty) {
-            const value = valueForKey(key);
-            if (value !== undefined && value !== null && String(value).trim() !== "") nextArgs[key] = value;
-          }
-        });
-        return nextArgs;
-      };
+      // Para operações de escrita, reutiliza somente campos com nomes exatos
+      // presentes na confirmação mais recente do agente; não infere entidades nem IDs.
       const deriveLatestConfirmedArgs = (skill: ReturnType<typeof collectAgentSkills>[number] | undefined, fallbackArgs: Record<string, any> = {}) => {
         if (!skill?._http?.isMutating) return fallbackArgs;
         const latestAssistantConfirmation = [...messageHistory]
           .reverse()
           .find((msg) => msg.role === "assistant" && /confirm/i.test(String(msg.content || "")) && !isSkillResultHistoryMessage(msg));
-        const confirmationText = latestAssistantConfirmation?.content || "";
+        const confirmationText = String(latestAssistantConfirmation?.content || "");
         const parsed = extractJsonFromText(confirmationText);
-        const confirmedValues: Record<string, any> = {
-          ...flattenObject(parsed || {}),
-        };
-
+        const confirmedValues: Record<string, any> = { ...flattenObject(parsed || {}) };
         const linePattern = /^\s*[-*•]?\s*([^:\n]{2,80})\s*:\s*(.+?)\s*$/gm;
         let match: RegExpExecArray | null;
         while ((match = linePattern.exec(confirmationText)) !== null) {
@@ -1133,105 +1026,15 @@ const runLocalFlow = async (
           if (key && value) confirmedValues[key] = value;
         }
 
-        const getConfirmedByAliases = (aliases: string[]) => {
-          const wanted = new Set(aliases.map(normalizeKeyName));
-          for (const [key, value] of Object.entries(confirmedValues)) {
-            const normalizedKey = normalizeKeyName(key.split(".").pop() || key);
-            if (wanted.has(normalizedKey)) return value;
-          }
-          return undefined;
-        };
-
-        const confirmedDate = getConfirmedByAliases(["data", "dia", "date"]);
-        const confirmedTime = getConfirmedByAliases(["horário", "horario", "hora", "time"]);
-
-        const toIsoDate = (value: unknown) => {
-          const raw = String(value ?? "")
-            .replace(/^[\s*_`~•-]+/, "")
-            .replace(/[\s*_`~]+$/, "")
-            .trim();
-          const br = raw.match(/(\d{1,2})\/(\d{1,2})\/(\d{4})/);
-          if (br) return `${br[3]}-${br[2].padStart(2, "0")}-${br[1].padStart(2, "0")}`;
-          const iso = raw.match(/(\d{4}-\d{2}-\d{2})/);
-          return iso?.[1] || raw;
-        };
-
-        const toTime = (value: unknown) => {
-          const raw = String(value ?? "").trim();
-          const m = raw.match(/(\d{1,2}):(\d{2})/);
-          return m ? `${m[1].padStart(2, "0")}:${m[2]}` : raw;
-        };
-
-        const resolveConfirmedValue = (targetKey: string) => {
-          const normalizedTarget = normalizeKeyName(targetKey);
-          if (/(^id$|id$|uuid$)/i.test(normalizedTarget)) return undefined;
-          const aliases: Record<string, string[]> = {
-            date: ["data", "dia"],
-            appointmentdate: ["data", "dia"],
-            scheduleddate: ["data", "dia"],
-            startdate: ["data", "dia"],
-            enddate: ["data", "dia"],
-            time: ["horario", "hora"],
-            appointmenttime: ["horario", "hora"],
-            scheduledtime: ["horario", "hora"],
-            starttime: ["horario", "hora"],
-            endtime: ["horario", "hora"],
-            hour: ["horario", "hora"],
-            service: ["servico"],
-            employee: ["profissional", "funcionario"],
-            customer: ["cliente", "contato"],
-            phone: ["telefone", "celular"],
-          };
-          const inferredAliases = normalizedTarget.includes("date") || normalizedTarget.includes("data")
-            ? ["data", "dia"]
-              : normalizedTarget.includes("time") || normalizedTarget.includes("hour") || normalizedTarget.includes("hora") || normalizedTarget.includes("horario")
-              ? ["horario", "hora"]
-              : [];
-          const wanted = new Set([normalizedTarget, ...(aliases[normalizedTarget] || []), ...inferredAliases]);
-          for (const [key, value] of Object.entries(confirmedValues)) {
-            const normalizedKey = normalizeKeyName(key.split(".").pop() || key);
-            if (wanted.has(normalizedKey)) return value;
-          }
-          return undefined;
-        };
-
+        const normalize = (value: string) => normalizeKeyName(value.split(".").pop() || value);
         const nextArgs = JSON.parse(JSON.stringify(fallbackArgs || {}));
-
-        const confirmedStateValue = (targetKey: string) => {
-          const normalized = normalizeKeyName(targetKey);
-          const state: any = bookingState || {};
-          const pick = (value: any) => value && typeof value === "object" ? (value.id ?? value.uuid ?? value.value ?? value.name ?? value.label) : value;
-          let candidates: string[] = [];
-          if (normalized.includes("client") || normalized.includes("customer") || normalized.includes("cliente")) candidates = ["client"];
-          else if (normalized.includes("employee") || normalized.includes("professional") || normalized.includes("funcionario") || normalized.includes("profissional")) candidates = ["professional"];
-          else if (normalized.includes("service") || normalized.includes("servico")) candidates = ["service"];
-          else if (normalized.includes("payment") || normalized.includes("pagamento") || normalized.includes("method")) candidates = ["paymentMethod"];
-          else if (normalized.includes("phone") || normalized.includes("telefone") || normalized.includes("celular")) candidates = ["phone"];
-          else if (normalized.includes("email")) candidates = ["email"];
-          else if (normalized.includes("booking") && normalized.endsWith("id")) candidates = ["bookingId"];
-          else if (normalized.includes("date") || normalized.includes("data") || normalized.includes("dia")) candidates = ["date"];
-          else if (normalized.includes("time") || normalized.includes("hora") || normalized.includes("horario")) candidates = ["time"];
-          for (const key of candidates) {
-            const value = pick(state[key]);
-            if (value != null && String(value).trim()) {
-              if (key === "paymentMethod" && String(value).trim().toLowerCase() === "pix") return "PIX";
-              return value;
-            }
-          }
-          return undefined;
-        };
         if (typeof nextArgs.body === "string") {
           const parsedBody = extractJsonFromText(nextArgs.body);
           if (parsedBody && typeof parsedBody === "object" && !Array.isArray(parsedBody)) nextArgs.body = parsedBody;
         }
-
-        // Se o modelo não enviou body, usa o exemplo configurado da própria
-        // skill como molde e preenche os campos confirmados pela sessão.
         if ((!nextArgs.body || typeof nextArgs.body !== "object" || Array.isArray(nextArgs.body)) && skill?.argsSchema?.bodyExample) {
           const exampleBody = extractJsonFromText(String(skill.argsSchema.bodyExample));
-          if (exampleBody && typeof exampleBody === "object" && !Array.isArray(exampleBody)) {
-            nextArgs.body = exampleBody;
-          }
+          if (exampleBody && typeof exampleBody === "object" && !Array.isArray(exampleBody)) nextArgs.body = exampleBody;
         }
         if ((!nextArgs.body || typeof nextArgs.body !== "object" || Array.isArray(nextArgs.body)) && nextArgs.body !== "") {
           const flatBody = Object.fromEntries(
@@ -1239,38 +1042,14 @@ const runLocalFlow = async (
           );
           if (Object.keys(flatBody).length) nextArgs.body = flatBody;
         }
-        if (nextArgs.body && typeof nextArgs.body === "object") {
-          Object.keys(nextArgs.body).forEach((key) => {
-            const confirmed = resolveConfirmedValue(key);
-            const normalizedKey = normalizeKeyName(key);
-            if (confirmed !== undefined) {
-              nextArgs.body[key] = confirmed;
-            } else if (confirmedDate !== undefined && confirmedTime !== undefined && /(schedule|appointment|booking|start|end|slot).*(at|date|time)|^(datetime|date_time|starts_at|ends_at|scheduled_at)$/i.test(key)) {
-              const date = toIsoDate(confirmedDate);
-              const time = toTime(confirmedTime);
-              if (/time|hora|horario/i.test(key) && !/date|data|at/i.test(key)) nextArgs.body[key] = time;
-              else if (/date|data/i.test(key) && !/time|hora|horario/i.test(key)) nextArgs.body[key] = date;
-              else nextArgs.body[key] = `${date} ${time}`;
-            } else if (confirmedDate !== undefined && (normalizedKey.includes("date") || normalizedKey.includes("data"))) {
-              nextArgs.body[key] = toIsoDate(confirmedDate);
-            } else if (confirmedTime !== undefined && (normalizedKey.includes("time") || normalizedKey.includes("hora") || normalizedKey.includes("horario"))) {
-              nextArgs.body[key] = toTime(confirmedTime);
-            }
-          });
-        }
         if (nextArgs.body && typeof nextArgs.body === "object" && !Array.isArray(nextArgs.body)) {
           Object.keys(nextArgs.body).forEach((key) => {
-            const stateValue = confirmedStateValue(key);
+            const normalizedKey = normalize(key);
+            if (!normalizedKey || /(^id$|id$|uuid$)/i.test(normalizedKey)) return;
+            const confirmed = Object.entries(confirmedValues).find(([confirmedKey]) => normalize(confirmedKey) === normalizedKey)?.[1];
             const current = nextArgs.body[key];
-            const normalizedKey = normalizeKeyName(key);
-            const isEntityIdField = /(client|customer|cliente|employee|professional|profissional|funcionario|service|servico|payment|booking|appointment).*(id|uuid)$/i.test(normalizedKey);
-            if (stateValue !== undefined && (
-              isEntityIdField ||
-              current == null ||
-              String(current).trim() === "" ||
-              /^(undefined|null|\{\{.*\}\}|<[^>]+>)$/i.test(String(current).trim())
-            )) {
-              nextArgs.body[key] = stateValue;
+            if (confirmed !== undefined && (current == null || String(current).trim() === "" || /^(undefined|null|\{\{.*\}\}|<[^>]+>)$/i.test(String(current).trim()))) {
+              nextArgs.body[key] = confirmed;
             }
           });
         }
@@ -1615,7 +1394,7 @@ const runLocalFlow = async (
           }
 
           const { system, messages: contextMessages } = buildAgentContext({
-            systemPrompt: `Objetivo: ${objective}\nInstruções: ${instructions}${bookingStatePrompt()}${buildSkillSystemPrompt(skills)}\n\n[REGRA DE EXECUÇÃO]\nNunca diga que uma cobrança, pagamento ou agendamento foi criado, confirmado ou enviado apenas porque você decidiu fazê-lo. Só afirme sucesso quando o resultado da skill indicar execução bem-sucedida. Se a execução falhar, informe a falha e não invente que a operação ocorreu. Após uma consulta bem-sucedida, reutilize os campos e IDs reais retornados nas etapas seguintes; não solicite novamente ao usuário dados já presentes no resultado. Ao mapear IDs, respeite o tipo do parâmetro e o recurso que o retornou: nunca use o ID de um recurso como ID de outro. Se uma consulta já encontrou um registro existente, reutilize esse registro em vez de tentar criá-lo novamente.`,
+            systemPrompt: `Objetivo: ${objective}\nInstruções: ${instructions}${buildSkillSystemPrompt(skills)}\n\n[REGRA DE EXECUÇÃO]\nNunca diga que uma operação ou pagamento foi criado, confirmado ou enviado apenas porque você decidiu fazê-lo. Só afirme sucesso quando o resultado da skill indicar execução bem-sucedida. Se a execução falhar, informe a falha e não invente que a operação ocorreu. Após uma consulta bem-sucedida, reutilize os campos e IDs reais retornados nas etapas seguintes; não solicite novamente ao usuário dados já presentes no resultado. Ao mapear IDs, respeite o tipo do parâmetro e o recurso que o retornou: nunca use o ID de um recurso como ID de outro. Se uma consulta já encontrou um registro existente, reutilize esse registro em vez de tentar criá-lo novamente.`,
             history: getAgentHistory(!!(input as any)?.__fromSkill),
             persistentMemory,
             variables,
@@ -1862,7 +1641,7 @@ const runLocalFlow = async (
             // como diretiva efêmera consumida pelo executor do node.
             let targetNodeId = skillCall.skill_id;
             if (matchedSkill._http) {
-              const currentArgs = deriveCurrentSkillArgs(matchedSkill, skillCall.arguments || {});
+              const currentArgs = skillCall.arguments || {};
               const sanitizedArgs = matchedSkill._http.isMutating
                 ? deriveLatestConfirmedArgs(matchedSkill, currentArgs)
                 : currentArgs;
@@ -1875,8 +1654,6 @@ const runLocalFlow = async (
                 isMutating: matchedSkill._http.isMutating,
               };
             }
-
-            updateBookingState(skillCall.arguments || {});
             const varsBefore = JSON.parse(JSON.stringify(variables));
             const skillGuard = (variables as any).__skillExecutionGuard;
             const blockedMutation = Boolean(matchedSkill._http?.isMutating && skillGuard?.blocked);
@@ -3258,8 +3035,6 @@ const runLocalFlow = async (
                   }
                   console.log(`[node:http-request][dynamic] ${ep.id} → status ${res.status}`);
                   rememberKnownEntities(data, [ep.name, ep.id, ep.url]);
-                  updateBookingState(data);
-
                   // salva resposta completa em variável baseada no nome/id da skill
                   const varBase = String(ep.name || ep.id || "endpoint")
                     .replace(/[^a-zA-Z0-9_]/g, "_")
@@ -3370,7 +3145,6 @@ const runLocalFlow = async (
                   };
                 }
               }
-              updateBookingState(responseData);
               applyMappings(responseData, cfg.responseMappings || []);
 
               const handle = res.ok ? "success" : "error";
