@@ -1262,7 +1262,7 @@ class FlowEngine {
       if (selected.isMutating) {
         const lastAssistant = [...history].reverse().find((m: any) => m.role === "assistant");
         const askedForConfirmation = /\\b(confirm|confirma|posso prosseguir|posso finalizar|deseja que eu|quer que eu|posso agendar|confirma os dados)\\b/i.test(String(lastAssistant?.content || ""));
-        const explicitYes = /^(sim|s|pode|confirmo|confirmar|ok|okay|isso mesmo|correto|pode seguir|pode finalizar|pode agendar|vai em frente)[.!\\s]*$/i.test(userText);
+        const explicitYes = /^(sim|s|pode|confirmo|confirmar|ok|okay|isso mesmo|correto|pode seguir|pode finalizar|pode agendar|vai em frente)(?:[,.!\\s]|$)/i.test(userText) && !/\\b(não|nao|cancelar|cancela|desisti|pare)\\b/i.test(userText);
         if (!askedForConfirmation || !explicitYes) {
           forceTextOnly = true;
           recentResults.push("A operação crítica " + selected.label + " NÃO foi executada. É obrigatório apresentar os dados e pedir confirmação explícita ao usuário. Aguarde uma resposta afirmativa após essa confirmação.");
@@ -1284,11 +1284,13 @@ class FlowEngine {
       if (turn === 3) forceTextOnly = true;
     }
 
-    if (!finalReply) {
+    if (!finalReply && attempted.size > 0) {
+      forceTextOnly = true;
       const result = await callModel();
       finalReply = String(result.reply || "").trim();
       if (result.call?.skill_id) finalReply = "Não consegui concluir esta etapa sem repetir uma chamada já tentada. Confira os dados informados e tente novamente.";
     }
+    if (!finalReply) finalReply = "Não consegui gerar uma resposta agora. Tente novamente em instantes.";
     if (finalReply) {
       this.messages.push({ id: crypto.randomUUID(), type: "bot", content: finalReply });
       const saveVar = normalizeVariableName(cfg.saveVariable);
