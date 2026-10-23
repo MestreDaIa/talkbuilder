@@ -1599,6 +1599,7 @@ Deno.serve(async (req: Request) => {
       p_flow_id: flow.id,
       p_contact_id: String(contact_id),
       p_channel_id: String(channel),
+      p_action: String(action),
     });
 
     if (analyticsError) {
