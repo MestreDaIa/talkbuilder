@@ -3508,29 +3508,9 @@ const runLocalFlow = async (
     return scheduleRuntimeContinue(data.wait_ms);
   };
 
-  const persistFlowExecution = async (runtimeData: any) => {
-    if (!flowId) return;
-
-    try {
-      const supabase = getSupabase();
-      const runtimeState = runtimeData?.runtime_state ?? runtimeStateRef.current;
-      await supabase.from("flow_executions").upsert(
-        {
-          flow_id: flowId,
-          contact_id: contactIdRef.current,
-          channel_id: "webchat",
-          current_node_id: runtimeState?.current_node_id ?? null,
-          variables: runtimeState?.variables ?? {},
-          waiting_for_input: Boolean(runtimeState?.waiting_for_input),
-          updated_at: new Date().toISOString(),
-        },
-        { onConflict: "flow_id,contact_id,channel_id" }
-      );
-    } catch (error) {
-      // Métrica não pode interromper a execução do bot.
-      console.warn("[TestPanel] não foi possível registrar a execução:", error);
-    }
-  };
+  // O TestPanel executa um fluxo local de teste e não deve gravar estado em
+  // flow_executions, que pertence às sessões do runtime real e tem RLS próprio.
+  const persistFlowExecution = async (_runtimeData: any) => Promise.resolve();
 
   const startRuntimeSession = async () => {
     setIsLoading(true);
