@@ -1369,16 +1369,17 @@ const runLocalFlow = async (
           console.log("[node:ai_generating] Agent", node.id);
           const objective = cfg.objective || "assistente conversacional";
           const instructions = cfg.instructions || "Ajude o usuário de forma natural.";
+          // A lista de Skills bloqueadas persiste durante a cadeia interna de execução.
+          // Só limpamos ao receber uma nova mensagem real do usuário; assim uma Skill
+          // repetida não reaparece dois turnos depois e causa um loop de chamadas.
+          const isInternalAgentTurn = Boolean((input as any)?.__internalAgentTurn || (input as any)?.__fromSkill);
+          if (!isInternalAgentTurn) delete (variables as any).__excludeSkillsForNextAgentTurn;
           const allSkills = cfg.toolCallingEnabled === false ? [] : collectAgentSkills(containers, node.id);
-          // Se uma assinatura idêntica foi repetida, retire somente aquela Skill
-          // da próxima decisão. O agente ainda pode usar outra Skill para continuar
-          // a solicitação original (por exemplo, avançar da consulta para a criação).
           const excludedSkillIds = new Set(
             Array.isArray((variables as any).__excludeSkillsForNextAgentTurn)
               ? (variables as any).__excludeSkillsForNextAgentTurn.map((id: unknown) => String(id))
               : []
           );
-          delete (variables as any).__excludeSkillsForNextAgentTurn;
           const skills = allSkills.filter((skill) => !excludedSkillIds.has(String(skill.id)));
           const isSkillResultTurn = Boolean((input as any)?.__fromSkill);
           const useSkillTool = buildUseSkillTool(skills);
@@ -1521,10 +1522,25 @@ const runLocalFlow = async (
             }
           }
 
-          // A resposta normal do Agent pode selecionar uma skill. Quando estamos
-          // numa continuação interna, o resultado da skill já é tratado pelo
-          // dispatcher e não deve virar uma nova chamada por parsing textual.
-          skillCall = skillCall || parseSkillFromText(aiReply);
+          // Não interprete JSON textual como chamada de Skill no turno forçado a texto:
+          // esse turno existe para o agente responder sem reabrir o ciclo de execução.
+          // Skills excluídas continuam bloqueadas durante toda a cadeia interna.
+          if (!forceTextOnlyAgentTurn) {
+            skillCall = skillCall || parseSkillFromText(aiReply);
+          }
+          if (skillCall && excludedSkillIds.has(String(skillCall.skill_id))) {
+            console.warn("[agent-node] Skill bloqueada reapareceu no planejamento; descartando chamada repetida", skillCall.skill_id);
+            skillCall = null;
+            if (!String(aiReply || "").trim()) {
+              (variables as any).__forceTextOnlyAgentTurn = true;
+              input = {
+                message: "[CONTROLE] A operação selecionada já foi executada e não deve ser repetida. Responda ao usuário com base nos resultados reais já disponíveis. Não emita chamadas de Skill nem JSON de chamada nesta resposta.",
+                __fromSkill: true,
+                __internalAgentTurn: true
+              } as any;
+              continue;
+            }
+          }
 
           // The Agent already had access to its skills in this model turn. Do not
           // spend a second full AI request just to re-check whether a skill is needed.
