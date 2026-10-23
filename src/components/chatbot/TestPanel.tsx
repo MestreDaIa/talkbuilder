@@ -1834,9 +1834,10 @@ const runLocalFlow = async (
             });
             const payload = {
               execution: skillVars.__lastSkillExecution || { ok: true, status: 200 },
-              ...(Object.keys(diff).length
-                ? diff
-                : { httpResponse: skillVars.httpResponse ?? { message: "Consulta executada sem novas variáveis." } })
+              ...diff,
+              // Sempre entrega o corpo da resposta da Skill, mesmo quando outras variáveis também mudaram.
+              // O agente precisa dos dados reais da API, não apenas de um diff do estado do Flow.
+              httpResponse: skillVars.httpResponse ?? { message: "A Skill não disponibilizou httpResponse." }
             };
             const compactForAgent = (value: any, depth = 0): any => {
               if (value == null || typeof value === "boolean" || typeof value === "number") return value;
