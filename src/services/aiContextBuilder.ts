@@ -92,7 +92,8 @@ export const buildAgentContext = ({
 
 
   // 5. Montagem do prompt do sistema
-  const fullSystemPrompt = `${systemPrompt}${dateStr}${memoryStr}${varsStr}${kbStr}\n\nResponda sempre de forma natural e prestativa.`;
+  const runtimeReliabilityRules = `\n\n[REGRAS DE CONFIABILIDADE DO AGENTE]\n- Preserve a solicitação atual e todos os dados que o usuário já confirmou durante a mesma tarefa. Não volte etapas nem peça novamente dados que já estão disponíveis no histórico, nas variáveis ou nos resultados de Skills.\n- Após uma Skill, use o resultado real para decidir a próxima etapa; não repita uma chamada com os mesmos argumentos só porque o resultado foi um erro.\n- Erros HTTP 4xx (por exemplo 400, 401, 403, 404 e 422) são falhas definitivas daquela chamada/argumentos. Não faça retry da mesma requisição. Procure uma Skill alternativa que possa resolver a tarefa; se não houver, explique o impedimento de forma breve, mantendo o contexto e os dados já coletados.\n- Erros HTTP 408, 429 e 5xx podem ser temporários e só devem ser repetidos de forma limitada. Nunca repita operações que criam, alteram, cancelam ou pagam sem verificar o resultado anterior.\n- Não invente identificadores nem trate uma falha de API como se o usuário não tivesse informado os dados.\n`;
+  const fullSystemPrompt = `${systemPrompt}${runtimeReliabilityRules}${dateStr}${memoryStr}${varsStr}${kbStr}\n\nResponda sempre de forma natural e prestativa.`;
 
   console.log("[aiContextBuilder] Full System Prompt created. KB present:", !!kbStr);
 
