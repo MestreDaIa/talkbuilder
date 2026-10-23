@@ -102,7 +102,7 @@ async function fetchReadWithRetry(
   const method = String(init.method || "GET").toUpperCase();
   if (method !== "GET") return fetch(input, init);
 
-  const retryableStatus = new Set([408, 425, 429, 500, 502, 503, 504]);
+  const retryableStatus = new Set([408, 425, 500, 502, 503, 504]);
   let lastResponse: Response | null = null;
   let lastError: unknown = null;
 
@@ -849,9 +849,9 @@ class FlowEngine {
         }
 
         contents.push({ role: "user", parts: userParts });
-        const res = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${activeKey}`, {
+        const res = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent`, {
           method: "POST",
-          headers: { "Content-Type": "application/json" },
+          headers: { "Content-Type": "application/json", "x-goog-api-key": activeKey },
           body: JSON.stringify({
             system_instruction: { parts: [{ text: systemPrompt }] },
             contents,
@@ -905,6 +905,250 @@ class FlowEngine {
     this.mode = "agent";
     this.activeAgentNodeId = node.id;
     const cfg = node.config || {};
+    const hasInput = !!input && (input.message !== undefined || input.button_id !== undefined);
+    const userText = String(input?.message ?? input?.button_id ?? this.variables.last_message ?? "").trim();
+
+    if (!hasInput) {
+      if (cfg.welcomeMessage && this.messages.length === 0) {
+        this.messages.push({ id: crypto.randomUUID(), type: "bot", content: this.replaceVars(cfg.welcomeMessage) });
+      }
+      this.waitingFor = "text";
+      this.status = "waiting_input";
+      return;
+    }
+
+    const providerRaw = String(cfg.provider || "openai").toLowerCase();
+    const provider = providerRaw === "gemini" ? "google" : providerRaw;
+    const apiKeys = this.flow?.settings?.aiKeys || {};
+    const apiKey = String(apiKeys[providerRaw + "Key"] || apiKeys[provider + "Key"] || cfg.apiKey || "").trim();
+    if (!apiKey) {
+      const info = classifyAIError(provider, 401, "missing api key");
+      await this.recordRuntimeError(node, info, provider, 401);
+      this.messages.push({ id: crypto.randomUUID(), type: "bot", content: "Não consigo acessar o agente agora. Verifique a chave do provedor de IA nas configurações do fluxo." });
+      this.waitingFor = "text";
+      this.status = "waiting_input";
+      return;
+    }
+
+    const skills: any[] = [];
+    if (cfg.toolCallingEnabled !== false) {
+      for (const c of this.containers) {
+        for (const skillNode of c.nodes || []) {
+          const sc = skillNode.config || {};
+          if (skillNode.id === node.id || !sc.isSkill || skillNode.type !== "http-request") continue;
+          const containerName = c.nameContainer || "Bloco";
+          if (sc.operationMode === "dynamic" && Array.isArray(sc.endpoints)) {
+            for (const ep of sc.endpoints) {
+              const endpointId = String(ep.id || (String(ep.method || "GET") + " " + String(ep.url || "")));
+              skills.push({
+                id: String(skillNode.id) + "::" + endpointId,
+                nodeId: String(skillNode.id),
+                endpointId,
+                node: skillNode,
+                endpoint: ep,
+                label: String(ep.name || endpointId),
+                method: String(ep.method || "GET").toUpperCase(),
+                url: String(ep.url || ""),
+                description: String(ep.description || ep.name || "Executa este endpoint quando necessário."),
+                resultType: ep.resultType === "live" ? "live" : "context",
+                argsSchema: ep.argsSchema || {},
+                docs: String(sc.documentationContent || sc.openApiContext || "").slice(0, 12000),
+                isMutating: ["POST", "PUT", "PATCH", "DELETE"].includes(String(ep.method || "GET").toUpperCase())
+              });
+            }
+          } else {
+            skills.push({
+              id: String(skillNode.id),
+              nodeId: String(skillNode.id),
+              endpointId: String(skillNode.id),
+              node: skillNode,
+              endpoint: sc,
+              label: String(sc.name || sc.label || skillNode.type),
+              method: String(sc.method || "GET").toUpperCase(),
+              url: String(sc.url || ""),
+              description: String(sc.skillDescription || "Executa esta requisição HTTP quando necessária."),
+              resultType: sc.resultType === "live" ? "live" : "context",
+              argsSchema: sc.argsSchema || {},
+              docs: String(sc.documentationContent || sc.openApiContext || "").slice(0, 12000),
+              isMutating: ["POST", "PUT", "PATCH", "DELETE"].includes(String(sc.method || "GET").toUpperCase())
+            });
+          }
+        }
+      }
+    }
+
+    const describeArgs = (schema: any) => {
+      const out: string[] = [];
+      for (const kind of ["pathParams", "queryParams"]) {
+        if (Array.isArray(schema?.[kind])) {
+          for (const p of schema[kind]) if (p?.name) out.push(kind + ": " + p.name + (p.description ? " — " + p.description : ""));
+        }
+      }
+      if (schema?.bodyDescription) out.push("body: " + schema.bodyDescription);
+      if (schema?.bodyExample) out.push("body example: " + String(schema.bodyExample).slice(0, 300));
+      return out.join("; ");
+    };
+    const skillCatalog = skills.map((sk) =>
+      "- ID: " + sk.id + "\n  Nome: " + sk.label + "\n  Método: " + sk.method +
+      "\n  Descrição para o agente: " + sk.description +
+      "\n  Tipo de resultado: " + (sk.resultType === "live" ? "Live Data (reconsultar quando precisar de dados atuais)" : "Context Data") +
+      (describeArgs(sk.argsSchema) ? "\n  Argumentos: " + describeArgs(sk.argsSchema) : "") +
+      (sk.docs ? "\n  Documentação de apoio: " + sk.docs : "")
+    ).join("\n\n");
+    const systemPrompt =
+      "Você é o agente conversacional deste fluxo. Objetivo: " + String(cfg.objective || "ajudar o usuário") +
+      "\nInstruções: " + String(cfg.instructions || "Responda de forma natural, objetiva e útil.") +
+      "\n\n[SKILLS DISPONÍVEIS]\n" + (skillCatalog || "Nenhuma Skill HTTP foi habilitada.") +
+      "\n\nUse a ferramenta use_skill com o ID exato quando uma Skill for necessária. Preencha arguments.pathParams e arguments.queryParams quando aplicável e arguments.body para operações com corpo. Não invente IDs; reutilize IDs reais retornados por consultas. Para Live Data, faça uma nova consulta quando precisar de informação atual. Nunca diga que uma operação teve sucesso se execution.ok for false. Se uma Skill falhar ou faltar parâmetro, não repita a mesma Skill com os mesmos argumentos: peça a informação faltante ou explique o erro. Preserve os dados já informados pelo usuário e os resultados anteriores; não pergunte de novo o que já está disponível.";
+
+    const history = Array.isArray(this.variables.__agentHistory) ? this.variables.__agentHistory.slice(-12) : [];
+    const conversation: any[] = history.map((m: any) => ({ role: m.role === "assistant" ? "assistant" : "user", content: String(m.content || "") }));
+    conversation.push({ role: "user", content: userText || "Inicie a conversa conforme o objetivo configurado." });
+    const attempted = new Set<string>();
+    const recentResults: string[] = [];
+    let finalReply = "";
+    let forceTextOnly = false;
+
+    const callModel = async (): Promise<{ reply: string; call: any }> => {
+      const tool = skills.length && !forceTextOnly ? [{
+        type: "function",
+        function: {
+          name: "use_skill",
+          description: "Executa uma Skill HTTP configurada neste fluxo.",
+          parameters: {
+            type: "object",
+            properties: {
+              skill_id: { type: "string", enum: skills.map((sk) => sk.id) },
+              arguments: { type: "object", additionalProperties: true, description: "Use pathParams, queryParams e body conforme o contrato da Skill." },
+              message: { type: "string", description: "Mensagem curta opcional para o usuário." }
+            },
+            required: ["skill_id"]
+          }
+        }
+      }] : undefined;
+      const timeout = new AbortController();
+      const timer = setTimeout(() => timeout.abort(), 20000);
+      try {
+        if (provider === "openai") {
+          const msgs = [{ role: "system", content: systemPrompt }, ...conversation];
+          if (recentResults.length) msgs.push({ role: "system", content: "[Resultados reais das Skills nesta rodada]\n" + recentResults.join("\n\n") });
+          const res = await fetch("https://api.openai.com/v1/chat/completions", {
+            method: "POST",
+            headers: { Authorization: "Bearer " + apiKey, "Content-Type": "application/json" },
+            body: JSON.stringify({ model: cfg.model || "gpt-4o-mini", messages: msgs, temperature: cfg.temperature ?? 0.3, max_tokens: cfg.maxTokens ?? 700, ...(tool ? { tools: tool, tool_choice: "auto" } : {}) }),
+            signal: timeout.signal
+          });
+          const body = await res.text();
+          if (!res.ok) {
+            const info = classifyAIError(provider, res.status, body);
+            await this.recordRuntimeError(node, info, provider, res.status);
+            if (res.status === 429) return { reply: "O provedor de IA atingiu o limite de requisições. Aguarde um pouco e tente novamente; não repeti a chamada para evitar ampliar o limite.", call: null };
+            return { reply: "Não consegui processar sua mensagem agora. Verifique as configurações do provedor de IA e tente novamente.", call: null };
+          }
+          const data = JSON.parse(body);
+          const msg = data.choices?.[0]?.message || {};
+          const toolCall = (msg.tool_calls || []).find((tc: any) => tc?.function?.name === "use_skill");
+          let call = null;
+          if (toolCall?.function?.arguments) {
+            try { call = JSON.parse(toolCall.function.arguments); } catch { call = null; }
+          }
+          return { reply: String(msg.content || ""), call };
+        }
+        if (provider === "google") {
+          const contents = conversation.map((m: any) => ({ role: m.role === "assistant" ? "model" : "user", parts: [{ text: m.content }] }));
+          if (recentResults.length) contents.push({ role: "user", parts: [{ text: "[Resultados reais das Skills nesta rodada]\n" + recentResults.join("\n\n") }] });
+          const functionTools = tool ? [{
+            function_declarations: [{
+              name: "use_skill",
+              description: "Executa uma Skill HTTP configurada neste fluxo.",
+              parameters: {
+                type: "OBJECT",
+                properties: {
+                  skill_id: { type: "STRING", enum: skills.map((sk) => sk.id) },
+                  arguments_json: { type: "STRING", description: "JSON com pathParams, queryParams e body." },
+                  message: { type: "STRING" }
+                },
+                required: ["skill_id"]
+              }
+            }]
+          }] : undefined;
+          const model = String(cfg.model || "gemini-2.0-flash").trim();
+          const res = await fetch("https://generativelanguage.googleapis.com/v1beta/models/" + encodeURIComponent(model) + ":generateContent", {
+            method: "POST",
+            headers: { "Content-Type": "application/json", "x-goog-api-key": apiKey },
+            body: JSON.stringify({ system_instruction: { parts: [{ text: systemPrompt }] }, contents, generationConfig: { temperature: cfg.temperature ?? 0.3, maxOutputTokens: cfg.maxTokens ?? 700 }, ...(functionTools ? { tools: functionTools, tool_config: { function_calling_config: { mode: "AUTO" } } } : {}) }),
+            signal: timeout.signal
+          });
+          const body = await res.text();
+          if (!res.ok) {
+            const info = classifyAIError(provider, res.status, body);
+            await this.recordRuntimeError(node, info, provider, res.status);
+            if (res.status === 429) return { reply: "O provedor de IA atingiu o limite de requisições. Aguarde um pouco e tente novamente; não repeti a chamada para evitar ampliar o limite.", call: null };
+            return { reply: "Não consegui processar sua mensagem agora. Verifique as configurações do provedor de IA e tente novamente.", call: null };
+          }
+          const data = JSON.parse(body);
+          const parts = data.candidates?.[0]?.content?.parts || [];
+          const fn = parts.find((p: any) => p.functionCall?.name === "use_skill")?.functionCall;
+          let call = null;
+          if (fn?.args?.skill_id) {
+            let args = fn.args.arguments;
+            if ((!args || typeof args !== "object") && typeof fn.args.arguments_json === "string") {
+              try { args = JSON.parse(fn.args.arguments_json); } catch { args = {}; }
+            }
+            call = { skill_id: String(fn.args.skill_id), arguments: args && typeof args === "object" ? args : {}, message: fn.args.message || "" };
+          }
+          return { reply: parts.map((p: any) => p.text).filter(Boolean).join("\n").trim(), call };
+        }
+        return { reply: "O provedor configurado não é compatível com o agente público. Selecione OpenAI ou Google Gemini.", call: null };
+      } finally {
+        clearTimeout(timer);
+      }
+    };
+
+    const findArg = (args: any, name: string) => {
+      const sources = [args?.pathParams, args?.queryParams, args?.body, args, this.variables];
+      for (const source of sources) {
+        if (!source || typeof source !== "object") continue;
+        if (source[name] !== undefined && source[name] !== null && source[name] !== "") return source[name];
+        const found = Object.keys(source).find((k) => k.toLowerCase() === String(name).toLowerCase());
+        if (found && source[found] !== undefined && source[found] !== null && source[found] !== "") return source[found];
+      }
+      return undefined;
+    };
+    const deepResolve = (value: any, args: any): any => {
+      if (typeof value === "string") {
+        const exact = value.match(/^\{\{\s*([A-Za-z_][A-Za-z0-9_.-]*)\s*\}\}$/);
+        if (exact) {
+          const found = findArg(args, exact[1]);
+          return found === undefined ? value : found;
+        }
+        return this.replaceVars(value, true).replace(/\{\{\s*([A-Za-z_][A-Za-z0-9_.-]*)\s*\}\}/g, (_m: string, k: string) => {
+          const found = findArg(args, k);
+          return found === undefined ? "{{" + k + "}}" : String(found);
+        });
+      }
+      if (Array.isArray(value)) return value.map((v) => deepResolve(v, args));
+      if (value && typeof value === "object") return Object.fromEntries(Object.entries(value).map(([k, v]) => [k, deepResolve(v, args)]));
+      return value;
+    };
+
+    const executeSkill = async (skill: any, args: any) => {
+      const ep = skill.endpoint || {};
+      const method = String(ep.method || skill.method || "GET").toUpperCase();
+      let url = String(ep.url || skill.url || "");
+      if (!url) return { ok: false, status: 422, error: "A Skill não possui URL configurada." };
+      const pathPart = url.split(/[?#]/, 1)[0];
+      const pathNames = new Set<string>();
+      for (const p of ep.argsSchema?.pathParams || []) if (p?.name) pathNames.add(String(p.name));
+      for (const match of pathPart.matchAll(/\{\{?\s*([A-Za-z_][A-Za-z0-9_.-]*)\s*\}?\}/g)) pathNames.add(match[1]);
+      for (const match of pathPart.matchAll(/:([A-Za-z_][A-Za-z0-9_]*)/g)) pathNames.add(match[1]);
+      for (const name of pathNames) {
+        const value = findArg(args, name);
+        if (value === undefined) return { ok: false, status: 422, error: "Faltou o argumento obrigatório de caminho: " + name };
+        url = url.replace(new RegExp("\\{\\{?\\s*" + name.replace(/[.*+?^$()|[\\]\\\\]/g, "\\  private async executeAgentNode(node: any, container: any, input: any) {
+    this.mode = "agent";
+    this.activeAgentNodeId = node.id;
+    const cfg = node.config || {};
 
     if (!input || (input.message === undefined && input.button_id === undefined)) {
       if (cfg.welcomeMessage && this.messages.length === 0) {
@@ -917,6 +1161,131 @@ class FlowEngine {
 
     // Agent Logic... (Truncated for brevity, but same logic as before, just classified)
     // For now let's just mark waiting if we get here sequentially
+    this.waitingFor = "text";
+    this.status = "waiting_input";
+  }") + "\\s*\\}?\\}", "g"), encodeURIComponent(String(value)));
+        url = url.replace(new RegExp(":" + name + "(?=/|$|\\?)", "g"), encodeURIComponent(String(value)));
+      }
+      url = url.replace(/%7B/gi, "{").replace(/%7D/gi, "}");
+      if (url.split(/[?#]/, 1)[0].includes("{") || /\/:([A-Za-z_][A-Za-z0-9_]*)/.test(url.split(/[?#]/, 1)[0])) {
+        return { ok: false, status: 422, error: "A URL da Skill ainda contém parâmetros de caminho sem resolução." };
+      }
+      let parsedUrl: URL;
+      try { parsedUrl = new URL(url); } catch { return { ok: false, status: 422, error: "A URL da Skill é inválida." }; }
+      const querySchema = [...(Array.isArray(ep.queryParams) ? ep.queryParams : []), ...(Array.isArray(ep.argsSchema?.queryParams) ? ep.argsSchema.queryParams : [])];
+      for (const p of querySchema) {
+        const name = String(p?.name || p?.key || "");
+        if (!name) continue;
+        const value = findArg(args, name);
+        if (value !== undefined && value !== null && value !== "") parsedUrl.searchParams.set(name, String(value));
+        else if (/^\{[^}]+\}$/.test(parsedUrl.searchParams.get(name) || "")) return { ok: false, status: 422, error: "Faltou o argumento obrigatório de consulta: " + name };
+      }
+      for (const [name, value] of Object.entries(args?.queryParams || {})) if (value != null && value !== "") parsedUrl.searchParams.set(name, String(value));
+      for (const [name, value] of parsedUrl.searchParams.entries()) {
+        const m = value.match(/^\{\{?\s*([A-Za-z_][A-Za-z0-9_.-]*)\s*\}?\}$/);
+        if (m) {
+          const found = findArg(args, m[1]);
+          if (found === undefined) return { ok: false, status: 422, error: "Faltou o argumento obrigatório de consulta: " + m[1] };
+          parsedUrl.searchParams.set(name, String(found));
+        }
+      }
+      const headers: Record<string, string> = { Accept: "application/json, text/plain, */*" };
+      const headerConfig = ep.headers || [];
+      if (Array.isArray(headerConfig)) for (const h of headerConfig) if (h?.name || h?.key) headers[String(h.name || h.key)] = String(deepResolve(h.value || "", args));
+      else if (headerConfig && typeof headerConfig === "object") for (const [k, v] of Object.entries(headerConfig)) headers[k] = String(deepResolve(v, args));
+      const auth = ep.auth || ep.authentication;
+      if (auth?.type === "bearer" && auth.token) headers.Authorization = "Bearer " + String(this.replaceVars(auth.token, true));
+      else if (auth?.type === "apiKey" && (auth.headerName || auth.name)) headers[String(auth.headerName || auth.name)] = String(this.replaceVars(auth.token || auth.value || "", true));
+      else if (auth?.type === "basic" && auth.username) headers.Authorization = "Basic " + btoa(String(auth.username) + ":" + String(auth.password || ""));
+      if (ep.authentication === "header" && ep.authCredentials?.headerName) headers[ep.authCredentials.headerName] = String(this.replaceVars(ep.authCredentials.headerValue || "", true));
+      let body: any = undefined;
+      if (!["GET", "HEAD"].includes(method)) {
+        const bodyValue = args?.body !== undefined ? args.body : ep.bodyJson ?? ep.body;
+        if (skill.isMutating && (bodyValue === undefined || bodyValue === null || bodyValue === "") && (ep.argsSchema?.bodyExample || ep.argsSchema?.bodyDescription || ep.body)) {
+          return { ok: false, status: 422, error: "A operação exige arguments.body atual." };
+        }
+        if (bodyValue !== undefined) {
+          const resolvedBody = deepResolve(bodyValue, args);
+          if (typeof resolvedBody === "string" && ep.bodyContentType !== "raw") {
+            try { body = JSON.stringify(JSON.parse(resolvedBody)); headers["Content-Type"] = "application/json"; }
+            catch { body = resolvedBody; }
+          } else {
+            body = typeof resolvedBody === "string" ? resolvedBody : JSON.stringify(resolvedBody);
+            if (ep.bodyContentType !== "raw") headers["Content-Type"] = "application/json";
+          }
+        }
+      }
+      try {
+        const controller = new AbortController();
+        const timeoutId = setTimeout(() => controller.abort(), 15000);
+        let res: Response;
+        try { res = await fetch(parsedUrl.toString(), { method, headers, body, signal: controller.signal }); }
+        finally { clearTimeout(timeoutId); }
+        const text = await res.text();
+        let data: any;
+        try { data = JSON.parse(text); } catch { data = text; }
+        const error = res.ok ? null : (data?.message || data?.error || "HTTP " + res.status);
+        this.variables.httpResponse = data;
+        this.variables.__lastSkillExecution = { ok: res.ok, status: res.status, method, endpoint: skill.id, error };
+        if (ep.responseVariable) this.variables[normalizeVariableName(ep.responseVariable)] = data;
+        for (const mapping of ep.responseMappings || []) {
+          if (!mapping?.jsonPath || !mapping?.variableName) continue;
+          const value = this.getNestedValue(data, String(mapping.jsonPath).replace(/^data\./, ""));
+          if (value !== undefined) this.variables[normalizeVariableName(mapping.variableName)] = value;
+        }
+        return { ok: res.ok, status: res.status, method, endpoint: skill.id, error, data };
+      } catch (error) {
+        const message = error instanceof Error ? error.message : String(error);
+        const result = { ok: false, status: 599, method, endpoint: skill.id, error: message };
+        this.variables.httpResponse = result;
+        this.variables.__lastSkillExecution = result;
+        return result;
+      }
+    };
+
+    for (let turn = 0; turn < 4; turn++) {
+      const result = await callModel();
+      if (!result.call?.skill_id) {
+        finalReply = String(result.reply || "").trim();
+        break;
+      }
+      const selected = skills.find((sk) => sk.id === String(result.call.skill_id));
+      if (!selected) {
+        finalReply = "Não consegui identificar a Skill selecionada. Pode reformular o que precisa?";
+        break;
+      }
+      const args = result.call.arguments && typeof result.call.arguments === "object" ? result.call.arguments : {};
+      const signature = selected.id + ":" + JSON.stringify(args, Object.keys(args).sort());
+      if (attempted.has(signature)) {
+        forceTextOnly = true;
+        recentResults.push("A Skill " + selected.label + " com estes mesmos argumentos já foi tentada nesta rodada. Não a execute novamente. Explique a falha ou peça somente o dado que falta.");
+        continue;
+      }
+      attempted.add(signature);
+      if (result.call.message && !/[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}|::(?:GET|POST|PUT|PATCH|DELETE)\b/i.test(String(result.call.message))) {
+        this.messages.push({ id: crypto.randomUUID(), type: "bot", content: String(result.call.message).trim() });
+      }
+      const skillResult = await executeSkill(selected, args);
+      recentResults.push("Skill: " + selected.label + "\nResultado real: " + JSON.stringify(skillResult).slice(0, 8000));
+      if (!skillResult.ok) {
+        forceTextOnly = true;
+        recentResults.push("A chamada falhou. Não repita esta Skill com os mesmos argumentos; não afirme sucesso.");
+      }
+      if (turn === 3) forceTextOnly = true;
+    }
+
+    if (!finalReply) {
+      const result = await callModel();
+      finalReply = String(result.reply || "").trim();
+      if (result.call?.skill_id) finalReply = "Não consegui concluir esta etapa sem repetir uma chamada já tentada. Confira os dados informados e tente novamente.";
+    }
+    if (finalReply) {
+      this.messages.push({ id: crypto.randomUUID(), type: "bot", content: finalReply });
+      const saveVar = normalizeVariableName(cfg.saveVariable);
+      if (saveVar) this.variables[saveVar] = finalReply;
+      const nextHistory = [...history, { role: "user", content: userText }, { role: "assistant", content: finalReply }].filter((m: any) => String(m.content || "").trim()).slice(-12);
+      this.variables.__agentHistory = nextHistory;
+    }
     this.waitingFor = "text";
     this.status = "waiting_input";
   }
@@ -1232,18 +1601,16 @@ Deno.serve(async (req: Request) => {
 
     // Analytics: cada chamada real do runtime representa uma execução.
     // O TestPanel local não passa por esta função, portanto não entra na métrica.
-    const { error: analyticsError } = await supabase
-      .from("flow_execution_events")
-      .insert({
-        workspace_id: flow.workspace_id,
-        flow_id: flow.id,
-        contact_id,
-        channel_id: channel,
-        action,
-      });
+    const { error: analyticsError } = await supabase.rpc("record_public_flow_execution", {
+      p_flow_id: flow.id,
+      p_contact_id: String(contact_id),
+      p_channel_id: String(channel),
+    });
 
     if (analyticsError) {
-      console.warn("[runtime] não foi possível registrar métrica:", analyticsError);
+      // Métricas nunca devem impedir o fluxo de conversar; o RPC SECURITY DEFINER
+      // evita depender de uma policy INSERT pública na tabela de eventos.
+      console.warn("[runtime] não foi possível registrar métrica:", analyticsError.message || analyticsError.code || "erro desconhecido");
     }
 
     // 2. Manage Session
