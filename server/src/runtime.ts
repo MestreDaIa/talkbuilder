@@ -1715,7 +1715,8 @@ async function runFlow(execution: any, containersIn: any[], edgesIn: any[], inpu
           delete (variables as any).__dynamicSkillDispatch;
           currentNodeId=activeAgentNodeId||node.id;
           const originalRequest = plan.user_input || plan.intent || variables["__runtimeUserRequest"] || "";
-          input={message:"[RESULTADO DA SKILL]\nSolicitação original: "+String(originalRequest)+"\nSkill executada: "+String(dispatch.endpointId)+"\nResultado: "+JSON.stringify(data)+"\n\nContinue a solicitação original usando este resultado. Não repita a Skill já executada com os mesmos argumentos.",__internalAgentTurn:true};
+          const executionResult={ok,status:statusCode,method,endpoint:String(dispatch.endpointId),error:ok?null:((variables as any).__lastSkillExecution?.error||data?.message||data?.error||String(data||"Falha na execução"))};
+          input={message:"[RESULTADO DA SKILL]\\nSolicitação original: "+String(originalRequest)+"\\nSkill executada: "+String(dispatch.endpointId)+"\\nResultado da execução: "+JSON.stringify({execution:executionResult,httpResponse:data})+"\\n\\nContinue a solicitação original usando o resultado real. Se execution.ok for false, não declare a operação concluída. Não repita a mesma Skill com os mesmos argumentos.",__internalAgentTurn:true};
           continue;
         }
         let url = replaceVars(cfg.url || "", true);
