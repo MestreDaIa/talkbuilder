@@ -1145,25 +1145,9 @@ class FlowEngine {
       for (const name of pathNames) {
         const value = findArg(args, name);
         if (value === undefined) return { ok: false, status: 422, error: "Faltou o argumento obrigatório de caminho: " + name };
-        url = url.replace(new RegExp("\\{\\{?\\s*" + name.replace(/[.*+?^$()|[\\]\\\\]/g, "\\  private async executeAgentNode(node: any, container: any, input: any) {
-    this.mode = "agent";
-    this.activeAgentNodeId = node.id;
-    const cfg = node.config || {};
-
-    if (!input || (input.message === undefined && input.button_id === undefined)) {
-      if (cfg.welcomeMessage && this.messages.length === 0) {
-        this.messages.push({ id: crypto.randomUUID(), type: "bot", content: this.replaceVars(cfg.welcomeMessage) });
-      }
-      this.waitingFor = "text";
-      this.status = "waiting_input";
-      return;
-    }
-
-    // Agent Logic... (Truncated for brevity, but same logic as before, just classified)
-    // For now let's just mark waiting if we get here sequentially
-    this.waitingFor = "text";
-    this.status = "waiting_input";
-  }") + "\\s*\\}?\\}", "g"), encodeURIComponent(String(value)));
+        const encodedValue = encodeURIComponent(String(value));
+        url = url.split("{{" + name + "}}").join(encodedValue);
+        url = url.split("{" + name + "}").join(encodedValue);
         url = url.replace(new RegExp(":" + name + "(?=/|$|\\?)", "g"), encodeURIComponent(String(value)));
       }
       url = url.replace(/%7B/gi, "{").replace(/%7D/gi, "}");
@@ -1191,8 +1175,13 @@ class FlowEngine {
       }
       const headers: Record<string, string> = { Accept: "application/json, text/plain, */*" };
       const headerConfig = ep.headers || [];
-      if (Array.isArray(headerConfig)) for (const h of headerConfig) if (h?.name || h?.key) headers[String(h.name || h.key)] = String(deepResolve(h.value || "", args));
-      else if (headerConfig && typeof headerConfig === "object") for (const [k, v] of Object.entries(headerConfig)) headers[k] = String(deepResolve(v, args));
+      if (Array.isArray(headerConfig)) {
+        for (const h of headerConfig) {
+          if (h?.name || h?.key) headers[String(h.name || h.key)] = String(deepResolve(h.value || "", args));
+        }
+      } else if (headerConfig && typeof headerConfig === "object") {
+        for (const [k, v] of Object.entries(headerConfig)) headers[k] = String(deepResolve(v, args));
+      }
       const auth = ep.auth || ep.authentication;
       if (auth?.type === "bearer" && auth.token) headers.Authorization = "Bearer " + String(this.replaceVars(auth.token, true));
       else if (auth?.type === "apiKey" && (auth.headerName || auth.name)) headers[String(auth.headerName || auth.name)] = String(this.replaceVars(auth.token || auth.value || "", true));
@@ -1255,7 +1244,12 @@ class FlowEngine {
         break;
       }
       const args = result.call.arguments && typeof result.call.arguments === "object" ? result.call.arguments : {};
-      const signature = selected.id + ":" + JSON.stringify(args, Object.keys(args).sort());
+      const stableStringify = (value: any): string => {
+        if (Array.isArray(value)) return "[" + value.map(stableStringify).join(",") + "]";
+        if (value && typeof value === "object") return "{" + Object.keys(value).sort().map((key) => JSON.stringify(key) + ":" + stableStringify(value[key])).join(",") + "}";
+        return JSON.stringify(value);
+      };
+      const signature = selected.id + ":" + stableStringify(args);
       if (attempted.has(signature)) {
         forceTextOnly = true;
         recentResults.push("A Skill " + selected.label + " com estes mesmos argumentos já foi tentada nesta rodada. Não a execute novamente. Explique a falha ou peça somente o dado que falta.");
