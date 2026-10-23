@@ -2133,9 +2133,7 @@ const runLocalFlow = async (
 
                   const rememberKnownEntities = (responseData: any, sourceParts: unknown[]) => {
                     const source = sourceParts.map((part) => String(part || "")).filter(Boolean).join(" ");
-                    // Não classifique uma entidade usando todas as palavras da URL:
-                    // /services/{service_id}/employees retorna profissionais, não serviços.
-                    // Use o recurso terminal do endpoint e os campos do próprio payload.
+                    // Classifique entidades usando o recurso terminal do endpoint e os campos do próprio payload, evitando misturar recursos pais e filhos.
                     const endpointUrl = sourceParts.map((part) => String(part || "").trim()).find((part) => /^https?:\/\//i.test(part));
                     const endpointResourceHints = (() => {
                       if (!endpointUrl) return [];
@@ -2245,9 +2243,7 @@ const runLocalFlow = async (
                   const entityMatchesType = (entity: KnownEntity, hints: string[]) => {
                     if (!hints.length) return true;
                     const entityHints = new Set((entity.typeHints || []).map(singularize));
-                    // Uma URL pode citar recursos pais (services) e retornar filhos
-                    // (employees). Se o payload já tem hints tipados, não use a URL inteira
-                    // como fallback: isso mistura seleções de entidades diferentes.
+                    // Se o payload já tem dicas de tipo, não use a URL inteira como fallback, pois ela pode mencionar recursos relacionados diferentes.
                     if (entityHints.size) return hints.some((hint) => entityHints.has(hint));
                     const source = normalizeLookupText(entity.source);
                     return hints.some((hint) => source.includes(hint));
@@ -2756,9 +2752,7 @@ const runLocalFlow = async (
                     return undefined;
                   };
 
-                  // Preserve placeholders até resolver os argumentos da chamada. Se
-                  // replaceVars() rodar primeiro, variáveis globais antigas podem preencher
-                  // {{employee_id}} e {{service_id}} com o mesmo ID.
+                  // Preserve placeholders até resolver os argumentos da chamada. Se replaceVars() rodar primeiro, variáveis globais antigas podem preencher parâmetros diferentes com o mesmo valor.
                   const protectedParamNames: string[] = [];
                   const protectedUrl = String(ep.url || "").replace(
                     /\{\{\s*([A-Za-z_][A-Za-z0-9_.-]*)\s*\}\}/g,
