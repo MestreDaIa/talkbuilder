@@ -1251,9 +1251,9 @@ const runLocalFlow = async (
                 }
               } else if (selectedProvider === "google") {
                 const model = (cfg.model || "gemini-2.0-flash").trim();
-                const res = await fetchWithTimeout(`https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${activeKey}`, {
+                const res = await fetchWithTimeout(`https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent`, {
                   method: "POST",
-                  headers: { "Content-Type": "application/json" },
+                  headers: { "Content-Type": "application/json", "x-goog-api-key": activeKey },
                   body: JSON.stringify({
                     system_instruction: { parts: [{ text: system }] },
                     contents: [{ parts: [{ text: variables["last_message"] || "Olá" }] }]
@@ -1454,9 +1454,9 @@ const runLocalFlow = async (
                 }
               } else if (selectedProvider === "google") {
                 const model = (cfg.model || "gemini-2.0-flash").trim();
-                const res = await fetchWithTimeout(`https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${activeKey}`, {
+                const res = await fetchWithTimeout(`https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent`, {
                   method: "POST",
-                  headers: { "Content-Type": "application/json" },
+                  headers: { "Content-Type": "application/json", "x-goog-api-key": activeKey },
                   body: JSON.stringify({
                     system_instruction: { parts: [{ text: system }] },
                     contents: contextMessages.map(m => ({
