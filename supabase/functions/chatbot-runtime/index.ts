@@ -1118,12 +1118,12 @@ class FlowEngine {
     };
     const deepResolve = (value: any, args: any, allowFlowFallback = true): any => {
       if (typeof value === "string") {
-        const exact = value.match(/^\\{\\{\\s*([A-Za-z_][A-Za-z0-9_.-]*)\\s*\\}\\}$/);
+        const exact = value.match(/^\\{\\{\s*([A-Za-z_][A-Za-z0-9_.-]*)\s*\\}\\}$/);
         if (exact) {
           const found = findArg(args, exact[1], allowFlowFallback);
           return found === undefined ? value : found;
         }
-        const withArguments = value.replace(/\\{\\{\\s*([A-Za-z_][A-Za-z0-9_.-]*)\\s*\\}\\}/g, (_m: string, key: string) => {
+        const withArguments = value.replace(/\\{\\{\s*([A-Za-z_][A-Za-z0-9_.-]*)\s*\\}\\}/g, (_m: string, key: string) => {
           const found = findArg(args, key, allowFlowFallback);
           return found === undefined ? "{{" + key + "}}" : String(found);
         });
@@ -1261,8 +1261,8 @@ class FlowEngine {
       // após o agente apresentar os detalhes; intenção genérica não basta.
       if (selected.isMutating) {
         const lastAssistant = [...history].reverse().find((m: any) => m.role === "assistant");
-        const askedForConfirmation = /\\b(confirm|confirma|posso prosseguir|posso finalizar|deseja que eu|quer que eu|posso agendar|confirma os dados)\\b/i.test(String(lastAssistant?.content || ""));
-        const explicitYes = /^(sim|s|pode|confirmo|confirmar|ok|okay|isso mesmo|correto|pode seguir|pode finalizar|pode agendar|vai em frente)(?:[,.!\\s]|$)/i.test(userText) && !/\\b(não|nao|cancelar|cancela|desisti|pare)\\b/i.test(userText);
+        const askedForConfirmation = /\b(confirm|confirma|posso prosseguir|posso finalizar|deseja que eu|quer que eu|posso agendar|confirma os dados)\b/i.test(String(lastAssistant?.content || ""));
+        const explicitYes = /^(sim|s|pode|confirmo|confirmar|ok|okay|isso mesmo|correto|pode seguir|pode finalizar|pode agendar|vai em frente)(?:[,.!\s]|$)/i.test(userText) && !/\b(não|nao|cancelar|cancela|desisti|pare)\b/i.test(userText);
         if (!askedForConfirmation || !explicitYes) {
           forceTextOnly = true;
           recentResults.push("A operação crítica " + selected.label + " NÃO foi executada. É obrigatório apresentar os dados e pedir confirmação explícita ao usuário. Aguarde uma resposta afirmativa após essa confirmação.");
@@ -1270,12 +1270,12 @@ class FlowEngine {
         }
       }
       attempted.add(signature);
-      if (result.call.message && !/[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}|::(?:GET|POST|PUT|PATCH|DELETE)\\b/i.test(String(result.call.message))) {
+      if (result.call.message && !/[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}|::(?:GET|POST|PUT|PATCH|DELETE)\b/i.test(String(result.call.message))) {
         this.messages.push({ id: crypto.randomUUID(), type: "bot", content: String(result.call.message).trim() });
       }
       const skillResult = await executeSkill(selected, args);
       const serializedSkillResult = JSON.stringify(skillResult).slice(0, 8000);
-      recentResults.push("Skill: " + selected.label + "\\nResultado real: " + serializedSkillResult);
+      recentResults.push("Skill: " + selected.label + "\nResultado real: " + serializedSkillResult);
       skillHistory.push({ role: "assistant", content: "[Resultado real da Skill " + selected.label + "] " + serializedSkillResult });
       if (!skillResult.ok) {
         forceTextOnly = true;
