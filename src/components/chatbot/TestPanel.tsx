@@ -832,7 +832,7 @@ export const TestPanel = ({
 
     const docs = [...new Set(skills.map((s: any) => s.documentationContext).filter((v: any) => typeof v === "string" && v.trim()))];
     const docsSection = docs.length ? `\n\n[DOCUMENTAÇÃO DE APOIO DA API — REFERÊNCIA, NÃO PERMISSÕES]\n${docs.join("\n\n---\n\n")}` : "";
-    return `\n\n[SKILLS DISPONÍVEIS PARA O AGENTE]\n${list}\n\nQuando a mensagem do usuário combinar com a instrução de uma skill, use a ferramenta use_skill com o ID exato da skill. Sempre que a skill listar "Argumentos esperados", preencha o objeto \`arguments\` com esses campos (use os path params/query params/body descritos, extraindo os valores do contexto da conversa e das variáveis já coletadas). Para qualquer campo de ID (id, *_id, *Id, uuid), use somente IDs reais retornados por uma skill anterior nesta sessão; se você só souber o nome/label do item escolhido, envie o nome/label e deixe o runtime resolver para o ID real — nunca invente UUIDs ou IDs. Skills marcadas como Live Data são voláteis: sempre chame a skill novamente quando precisar desses dados, ignore resultados antigos no histórico e não use valores antigos para criar/alterar/excluir dados. Antes de chamar uma skill crítica (POST/PUT/PATCH/DELETE), use apenas os dados atuais que você acabou de confirmar com o usuário; se o usuário respondeu apenas "sim/pode", use exclusivamente a última mensagem de confirmação que você enviou, não valores mais antigos do histórico. Para skills críticas, envie o body completo em arguments.body quando o endpoint tiver body permitido; não confie em templates/variáveis antigas. Se um resultado de skill retornar erro ou parâmetro ausente, não chame a mesma skill de novo com os mesmos argumentos; responda ao usuário ou peça a informação faltante. Se a chamada de ferramenta não estiver disponível, responda apenas com JSON: {"skill_id":"ID","arguments":{...},"message":"opcional"}. Nunca invente perguntas antes de usar uma skill claramente solicitada. Antes de responder, planeje o objetivo inteiro como uma sequência de etapas: olhe para a Skill atual e também para a próxima Skill e os dados que ela exige. Se a próxima Skill puder ser executada com dados já disponíveis, execute-a automaticamente após o resultado atual, sem esperar nova mensagem do usuário. Só peça informação quando ela realmente faltar e nenhuma Skill/contexto puder obtê-la. Se houver várias opções cuja escolha pertence ao usuário, mostre as opções e aguarde somente essa escolha. Nunca pergunte "quer que eu liste..." quando a próxima ação já é determinada pelo objetivo e pelas Skills. Antes de chamar uma Skill, confira os resultados já obtidos nesta solicitação e reutilize os campos que já respondem à necessidade; não chame endpoints de detalhe apenas para repetir dados já disponíveis. Execute somente uma Skill que esteja cadastrada no catálogo, usando seu ID exato; não invente ou reescreva rotas com base em nomes parecidos.${docsSection}`;
+    return `\n\n[SKILLS DISPONÍVEIS PARA O AGENTE]\n${list}\n\nQuando a mensagem do usuário combinar com a instrução de uma skill, use a ferramenta use_skill com o ID exato da skill. Sempre que a skill listar "Argumentos esperados", preencha o objeto \`arguments\` com esses campos (use os path params/query params/body descritos, extraindo os valores do contexto da conversa e das variáveis já coletadas). Para qualquer campo de ID (id, *_id, *Id, uuid), use somente IDs reais retornados por uma skill anterior nesta sessão; se você só souber o nome/label do item escolhido, envie o nome/label e deixe o runtime resolver para o ID real — nunca invente UUIDs ou IDs. Skills marcadas como Live Data são voláteis: sempre chame a skill novamente quando precisar desses dados, ignore resultados antigos no histórico e não use valores antigos para criar/alterar/excluir dados. Antes de chamar uma skill crítica (POST/PUT/PATCH/DELETE), use apenas os dados atuais que você acabou de confirmar com o usuário; se o usuário respondeu apenas "sim/pode", use exclusivamente a última mensagem de confirmação que você enviou, não valores mais antigos do histórico. Para skills críticas, envie o body completo em arguments.body quando o endpoint tiver body permitido; não confie em templates/variáveis antigas. Se uma operação crítica retornar erro de campo obrigatório ausente, não repita a mutação com os mesmos argumentos e não peça ao usuário dados que ele já informou. Primeiro identifique qual campo falta e tente obtê-lo usando outra Skill registrada para consultar ou criar o recurso necessário e obter um ID real. Só peça informação ao usuário quando ela realmente não estiver no histórico/contexto e nenhuma Skill disponível puder obtê-la; se a integração não tiver uma Skill capaz de produzir um ID obrigatório, explique que a integração está incompleta e não simule a operação. Se a chamada de ferramenta não estiver disponível, responda apenas com JSON: {"skill_id":"ID","arguments":{...},"message":"opcional"}. Nunca invente perguntas antes de usar uma skill claramente solicitada. Antes de responder, planeje o objetivo inteiro como uma sequência de etapas: olhe para a Skill atual e também para a próxima Skill e os dados que ela exige. Se a próxima Skill puder ser executada com dados já disponíveis, execute-a automaticamente após o resultado atual, sem esperar nova mensagem do usuário. Só peça informação quando ela realmente faltar e nenhuma Skill/contexto puder obtê-la. Se houver várias opções cuja escolha pertence ao usuário, mostre as opções e aguarde somente essa escolha. Nunca pergunte "quer que eu liste..." quando a próxima ação já é determinada pelo objetivo e pelas Skills. Antes de chamar uma Skill, confira os resultados já obtidos nesta solicitação e reutilize os campos que já respondem à necessidade; não chame endpoints de detalhe apenas para repetir dados já disponíveis. Execute somente uma Skill que esteja cadastrada no catálogo, usando seu ID exato; não invente ou reescreva rotas com base em nomes parecidos.${docsSection}`;
   };
 
   const buildUseSkillTool = (skills: ReturnType<typeof collectAgentSkills>) => {
@@ -1028,11 +1028,20 @@ const runLocalFlow = async (
         const parsed = extractJsonFromText(confirmationText);
         const confirmedValues: Record<string, any> = { ...flattenObject(parsed || {}) };
         const linePattern = /^\s*[-*•]?\s*([^:\n]{2,80})\s*:\s*(.+?)\s*$/gm;
-        let match: RegExpExecArray | null;
-        while ((match = linePattern.exec(confirmationText)) !== null) {
-          const key = match[1].trim();
-          const value = match[2].trim();
-          if (key && value) confirmedValues[key] = value;
+        const collectKeyValueLines = (sourceText: string) => {
+          let match: RegExpExecArray | null;
+          while ((match = linePattern.exec(sourceText)) !== null) {
+            const key = match[1].trim();
+            const value = match[2].trim();
+            if (key && value) confirmedValues[key] = value;
+          }
+          linePattern.lastIndex = 0;
+        };
+        collectKeyValueLines(confirmationText);
+        // Keep structured values explicitly supplied in earlier user turns available
+        // to later mutation skills; the latest assistant message need not say "confirm".
+        for (const userMessage of messageHistory.filter((msg) => msg.role === "user")) {
+          collectKeyValueLines(String(userMessage.content || ""));
         }
 
         const normalize = (value: string) => normalizeKeyName(value.split(".").pop() || value);
@@ -1041,9 +1050,37 @@ const runLocalFlow = async (
           const parsedBody = extractJsonFromText(nextArgs.body);
           if (parsedBody && typeof parsedBody === "object" && !Array.isArray(parsedBody)) nextArgs.body = parsedBody;
         }
-        if ((!nextArgs.body || typeof nextArgs.body !== "object" || Array.isArray(nextArgs.body)) && skill?.argsSchema?.bodyExample) {
-          const exampleBody = extractJsonFromText(String(skill.argsSchema.bodyExample));
-          if (exampleBody && typeof exampleBody === "object" && !Array.isArray(exampleBody)) nextArgs.body = exampleBody;
+        const exampleBody = skill?.argsSchema?.bodyExample
+          ? extractJsonFromText(String(skill.argsSchema.bodyExample))
+          : null;
+        const hasObjectBody = nextArgs.body && typeof nextArgs.body === "object" && !Array.isArray(nextArgs.body);
+        if (exampleBody && typeof exampleBody === "object" && !Array.isArray(exampleBody)) {
+          // Use the configured example only as a schema/template for missing keys.
+          // Never copy sample values into a real mutation request.
+          const emptyShape = (value: any): any => {
+            if (Array.isArray(value)) return [];
+            if (value && typeof value === "object") {
+              return Object.fromEntries(Object.entries(value).map(([key, child]) => [key, emptyShape(child)]));
+            }
+            return "";
+          };
+          const shape = emptyShape(exampleBody);
+          const currentBody = hasObjectBody ? nextArgs.body : {};
+          const mergeMissing = (template: any, current: any): any => {
+            if (template && typeof template === "object" && !Array.isArray(template)) {
+              const result: Record<string, any> = { ...(current && typeof current === "object" && !Array.isArray(current) ? current : {}) };
+              for (const [key, child] of Object.entries(template)) {
+                const existing = result[key];
+                const missing = existing === undefined || existing === null || String(existing).trim() === "" ||
+                  (typeof existing === "string" && /^(undefined|null|\{\{.*\}\}|<[^>]+>)$/i.test(existing.trim()));
+                if (missing) result[key] = emptyShape(child);
+                else if (child && typeof child === "object" && !Array.isArray(child)) result[key] = mergeMissing(child, existing);
+              }
+              return result;
+            }
+            return current;
+          };
+          nextArgs.body = mergeMissing(shape, currentBody);
         }
         if ((!nextArgs.body || typeof nextArgs.body !== "object" || Array.isArray(nextArgs.body)) && nextArgs.body !== "") {
           const flatBody = Object.fromEntries(
