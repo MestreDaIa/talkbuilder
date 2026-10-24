@@ -1088,15 +1088,43 @@ const runLocalFlow = async (
           );
           if (Object.keys(flatBody).length) nextArgs.body = flatBody;
         }
+        const fieldKind = (key: string) => {
+          const normalized = normalize(key).replace(/_/g, "");
+          if (/(date|data|dia|scheduledday|appointmentday)/i.test(normalized)) return "date";
+          if (/(time|hora|horario|starttime|appointmenttime)/i.test(normalized)) return "time";
+          if (/(phone|telefone|celular|mobile|whatsapp|numero|contactnumber)/i.test(normalized)) return "phone";
+          if (/(fullname|clientname|customername|nome|name)/i.test(normalized)) return "name";
+          if (/(payment|pagamento|forma)/i.test(normalized)) return "payment";
+          return "";
+        };
+        const userTexts = messageHistory.filter((msg) => msg.role === "user").map((msg) => String(msg.content || ""));
+        const valueForField = (key: string) => {
+          const normalizedKey = normalize(key);
+          const exact = Object.entries(confirmedValues).find(([confirmedKey]) => normalize(confirmedKey) === normalizedKey)?.[1];
+          if (exact !== undefined) return exact;
+          const kind = fieldKind(key);
+          if (!kind) return undefined;
+          const keyed = Object.entries(confirmedValues).reverse().find(([confirmedKey]) => fieldKind(confirmedKey) === kind)?.[1];
+          if (keyed !== undefined) return keyed;
+          if (kind === "date") {
+            const dates = userTexts.flatMap((text) => [...text.matchAll(/\b(\d{1,2}\/\d{1,2}\/\d{4}|\d{4}-\d{2}-\d{2})\b/g)].map((match) => match[1]));
+            return dates.at(-1);
+          }
+          if (kind === "time") {
+            const times = userTexts.flatMap((text) => [...text.matchAll(/\b([01]?\d|2[0-3]):([0-5]\d)\b/g)].map((match) => `${match[1].padStart(2, "0")}:${match[2]}`));
+            return times.at(-1);
+          }
+          return undefined;
+        };
         if (nextArgs.body && typeof nextArgs.body === "object" && !Array.isArray(nextArgs.body)) {
           Object.keys(nextArgs.body).forEach((key) => {
             const normalizedKey = normalize(key);
             if (!normalizedKey || /(^id$|id$|uuid$)/i.test(normalizedKey)) return;
-            const confirmed = Object.entries(confirmedValues).find(([confirmedKey]) => normalize(confirmedKey) === normalizedKey)?.[1];
             const current = nextArgs.body[key];
-            if (confirmed !== undefined && (current == null || String(current).trim() === "" || /^(undefined|null|\{\{.*\}\}|<[^>]+>)$/i.test(String(current).trim()))) {
-              nextArgs.body[key] = confirmed;
-            }
+            const missing = current == null || String(current).trim() === "" || /^(undefined|null|\{\{.*\}\}|<[^>]+>)$/i.test(String(current).trim());
+            if (!missing) return;
+            const confirmed = valueForField(key);
+            if (confirmed !== undefined && String(confirmed).trim()) nextArgs.body[key] = confirmed;
           });
         }
         return nextArgs;
