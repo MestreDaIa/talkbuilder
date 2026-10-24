@@ -1373,7 +1373,7 @@ async function runFlow(execution: any, containersIn: any[], edgesIn: any[], inpu
                 }
               }
 
-              if (provider === "openai") {
+              if (OPENAI_COMPATIBLE_PROVIDERS[provider]) {
                 const apiMessages:any[]=[{role:"system",content:instructions+runtimeSkillPrompt+"\n\n[PLANO ATUAL]\n"+JSON.stringify(runtimePlan)}];
                 
                 // Adiciona histórico se houver
@@ -1397,7 +1397,7 @@ async function runFlow(execution: any, containersIn: any[], edgesIn: any[], inpu
 
                 apiMessages.push({ role: "user", content: userContent });
 
-                const res = await fetch("https://api.openai.com/v1/chat/completions", {
+                const res = await fetch(OPENAI_COMPATIBLE_PROVIDERS[provider], {
                   method: "POST",
                   headers: { "Authorization": `Bearer ${activeKey}`, "Content-Type": "application/json" },
                   body: JSON.stringify({
@@ -1730,7 +1730,7 @@ async function runFlow(execution: any, containersIn: any[], edgesIn: any[], inpu
                 
                 // Atualiza o histórico se a memória estiver habilitada
                 if (useMemory) {
-                  if (provider === "openai") {
+                  if (OPENAI_COMPATIBLE_PROVIDERS[provider]) {
                     history.push({ role: "user", content: userPrompt || "Enviou mídia" });
                     history.push({ role: "assistant", content: aiReply });
                   } else if (provider === "gemini") {
