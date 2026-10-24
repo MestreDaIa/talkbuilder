@@ -972,10 +972,19 @@ const runLocalFlow = async (
           }
           return -1;
         })();
+        // Keep recent API results available across turns so the agent can continue
+        // with validated IDs instead of repeating unrelated queries.
+        const recentSkillResultIndexes = new Set(
+          messageHistory
+            .map((msg, index) => ({ msg, index }))
+            .filter(({ msg }) => isSkillResultHistoryMessage(msg))
+            .slice(-8)
+            .map(({ index }) => index)
+        );
         return messageHistory.filter((msg, index) => {
           if (latestConfirmationIndex >= 0 && index !== latestConfirmationIndex && msg.role === "assistant" && /confirm/i.test(String(msg.content || ""))) return false;
           if (!isSkillResultHistoryMessage(msg)) return true;
-          return includeLatestSkillResult && index === lastIndex;
+          return (includeLatestSkillResult && index === lastIndex) || recentSkillResultIndexes.has(index);
         });
       };
 
@@ -1395,7 +1404,7 @@ const runLocalFlow = async (
           }
 
           const { system, messages: contextMessages } = buildAgentContext({
-            systemPrompt: `Objetivo: ${objective}\nInstruções: ${instructions}${buildSkillSystemPrompt(skills)}\n\n[REGRA DE EXECUÇÃO]\nNunca diga que uma operação ou pagamento foi criado, confirmado ou enviado apenas porque você decidiu fazê-lo. Só afirme sucesso quando o resultado da skill indicar execução bem-sucedida. Se a execução falhar, informe a falha e não invente que a operação ocorreu. Após uma consulta bem-sucedida, reutilize os campos e IDs reais retornados nas etapas seguintes; não solicite novamente ao usuário dados já presentes no resultado. Ao mapear IDs, respeite o tipo do parâmetro e o recurso que o retornou: nunca use o ID de um recurso como ID de outro. Se uma consulta já encontrou um registro existente, reutilize esse registro em vez de tentar criá-lo novamente. Use somente Skills/URLs realmente registradas no catálogo; nunca invente rotas, caminhos ou nomes de endpoints. Se um GET falhar com erro 4xx, não repita a mesma Skill com os mesmos argumentos e não trate o erro como se os dados tivessem sido obtidos. Continue com outra Skill registrada quando os dados já disponíveis forem suficientes. Uma falha em consulta auxiliar não deve reiniciar a conversa nem fazer você pedir novamente serviço, data, horário, telefone, cliente ou pagamento já confirmados. Se não existir uma Skill registrada capaz de executar a próxima ação necessária, diga claramente que a ação ainda não pode ser concluída pela integração configurada; nunca simule uma reserva, cobrança ou confirmação.`,
+            systemPrompt: `Objetivo: ${objective}\nInstruções: ${instructions}${buildSkillSystemPrompt(skills)}\n\n[REGRA DE EXECUÇÃO]\nNunca diga que uma operação ou pagamento foi criado, confirmado ou enviado apenas porque você decidiu fazê-lo. Só afirme sucesso quando o resultado da skill indicar execução bem-sucedida. Se a execução falhar, informe a falha e não invente que a operação ocorreu. Após uma consulta bem-sucedida, reutilize os campos e IDs reais retornados nas etapas seguintes; não solicite novamente ao usuário dados já presentes no resultado. Ao mapear IDs, respeite o tipo do parâmetro e o recurso que o retornou: nunca use o ID de um recurso como ID de outro. Se uma consulta já encontrou um registro existente, reutilize esse registro em vez de tentar criá-lo novamente. Trate os resultados recentes de Skills presentes no histórico como contexto válido e fonte de verdade; quando a mensagem mais recente do usuário responder a uma pergunta ou escolher uma opção, avance para a próxima etapa necessária usando os dados já obtidos. Não reinicie o fluxo nem repita listagens ou consultas anteriores sem motivo concreto; refaça uma consulta somente se seus argumentos relevantes mudaram, se o resultado anterior falhou ou se a verificação atual for indispensável. Use somente Skills/URLs realmente registradas no catálogo; nunca invente rotas, caminhos ou nomes de endpoints. Se um GET falhar com erro 4xx, não repita a mesma Skill com os mesmos argumentos e não trate o erro como se os dados tivessem sido obtidos. Continue com outra Skill registrada quando os dados já disponíveis forem suficientes. Uma falha em consulta auxiliar não deve reiniciar a conversa nem fazer você pedir novamente serviço, data, horário, telefone, cliente ou pagamento já confirmados. Se não existir uma Skill registrada capaz de executar a próxima ação necessária, diga claramente que a ação ainda não pode ser concluída pela integração configurada; nunca simule uma reserva, cobrança ou confirmação.`,
             history: getAgentHistory(!!(input as any)?.__fromSkill),
             persistentMemory,
             variables,
