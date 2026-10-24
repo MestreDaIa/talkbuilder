@@ -929,7 +929,7 @@ class FlowEngine {
         const res = await fetch(OPENAI_COMPATIBLE_PROVIDERS[provider], {
           method: "POST",
           headers: { "Authorization": "Bearer " + activeKey, "Content-Type": "application/json" },
-          body: JSON.stringify({ model: cfg.model || "gpt-4o-mini", messages: [{ role: "system", content: systemPrompt + context }, { role: "user", content: userMessage }], temperature: cfg.temperature ?? 0.7, max_tokens: cfg.maxTokens ?? 1000 }),
+          body: JSON.stringify({ model: cfg.model || "gpt-4o-mini", messages: [{ role: "system", content: systemPrompt }, { role: "user", content: userMessage }], temperature: cfg.temperature ?? 0.7, max_tokens: cfg.maxTokens ?? 1000 }),
         });
         const body = await res.text();
         if (!res.ok) {
