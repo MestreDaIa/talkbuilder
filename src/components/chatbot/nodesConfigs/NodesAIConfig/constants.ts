@@ -12,6 +12,8 @@ export const AI_PROVIDERS = [
   { id: "perplexity", name: "Perplexity", needsApiKey: true },
   { id: "cerebras", name: "Cerebras", needsApiKey: true },
   { id: "nvidia", name: "NVIDIA NIM", needsApiKey: true },
+  { id: "cohere", name: "Cohere", needsApiKey: true },
+  { id: "huggingface", name: "Hugging Face", needsApiKey: true },
 ];
 
 export const MODELS_BY_PROVIDER: Record<string, string[]> = {
@@ -28,6 +30,8 @@ export const MODELS_BY_PROVIDER: Record<string, string[]> = {
   perplexity: ["sonar", "sonar-pro"],
   cerebras: ["llama-3.3-70b", "gpt-oss-120b"],
   nvidia: ["meta/llama-3.3-70b-instruct"],
+  cohere: ["command-a-03-2025", "command-r-plus-08-2024", "command-r-08-2024"],
+  huggingface: ["Qwen/Qwen3-30B-A3B:fast", "meta-llama/Llama-3.3-70B-Instruct:fast"],
 };
 
 export const API_KEY_PLACEHOLDERS_BY_PROVIDER: Record<string, string> = {
@@ -45,4 +49,6 @@ export const API_KEY_PLACEHOLDERS_BY_PROVIDER: Record<string, string> = {
   perplexity: "pplx-...",
   cerebras: "csk-...",
   nvidia: "nvapi-...",
+  cohere: "...",
+  huggingface: "hf_...",
 };
