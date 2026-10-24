@@ -4,6 +4,34 @@ import * as crypto from "node:crypto";
 const runtimeMemory = new Map<string, { state: any; expiresAt: number }>();
 const MEMORY_TTL_MS = 1000 * 60 * 60 * 6;
 
+const OPENAI_COMPATIBLE_PROVIDERS: Record<string, string> = {
+  openai: "https://api.openai.com/v1/chat/completions",
+  groq: "https://api.groq.com/openai/v1/chat/completions",
+  openrouter: "https://openrouter.ai/api/v1/chat/completions",
+  deepseek: "https://api.deepseek.com/chat/completions",
+  mistral: "https://api.mistral.ai/v1/chat/completions",
+  xai: "https://api.x.ai/v1/chat/completions",
+  together: "https://api.together.xyz/v1/chat/completions",
+  fireworks: "https://api.fireworks.ai/inference/v1/chat/completions",
+  perplexity: "https://api.perplexity.ai/chat/completions",
+  cerebras: "https://api.cerebras.ai/v1/chat/completions",
+  nvidia: "https://integrate.api.nvidia.com/v1/chat/completions",
+};
+
+function resolveProviderKey(provider: string, keys: Record<string, any>, fallback = ""): string {
+  const aliases: Record<string, string[]> = {
+    gemini: ["geminiKey", "googleKey"],
+    google: ["googleKey", "geminiKey"],
+    xai: ["xaiKey", "grokKey"],
+  };
+  for (const key of aliases[provider] || [provider + "Key"]) {
+    const value = keys?.[key];
+    if (typeof value === "string" && value.trim()) return value.trim();
+  }
+  return String(fallback || "").trim();
+}
+
+
 const DEFAULT_MEDIA_MIME_BY_TYPE: Record<string, string> = {
   audio: "audio/ogg",
   audiomessage: "audio/ogg",
@@ -1109,7 +1137,7 @@ async function runFlow(execution: any, containersIn: any[], edgesIn: any[], inpu
       }
       case "ai-node": {
         const provider = (cfg.provider || "openai").toLowerCase();
-        const activeKey = flow?.settings?.aiKeys?.[`${provider}Key`] || flow?.settings?.[`${provider}_key`] || cfg.apiKey;
+        const activeKey = resolveProviderKey(provider, flow?.settings?.aiKeys || {}, flow?.settings?.[`${provider}_key`] || cfg.apiKey);
         const userPrompt = replaceVars(cfg.userMessage || variables["last_message"] || "").trim();
         const systemPrompt = replaceVars(cfg.systemPrompt || cfg.instructions || "Você é um assistente útil.").trim();
         
@@ -1121,7 +1149,7 @@ async function runFlow(execution: any, containersIn: any[], edgesIn: any[], inpu
         if (activeKey && userPrompt) {
           try {
             let aiReply = "";
-            if (provider === "openai") {
+            if (OPENAI_COMPATIBLE_PROVIDERS[provider]) {
               const messages: any[] = [{ role: "system", content: systemPrompt + context }];
               
               if (cfg.visionEnabled) {
@@ -1146,7 +1174,7 @@ async function runFlow(execution: any, containersIn: any[], edgesIn: any[], inpu
                 messages.push({ role: "user", content: userPrompt });
               }
 
-              const res = await fetch("https://api.openai.com/v1/chat/completions", {
+              const res = await fetch(OPENAI_COMPATIBLE_PROVIDERS[provider], {
                 method: "POST",
                 headers: { "Authorization": `Bearer ${activeKey}`, "Content-Type": "application/json" },
                 body: JSON.stringify({
@@ -1159,6 +1187,18 @@ async function runFlow(execution: any, containersIn: any[], edgesIn: any[], inpu
               if (res.ok) {
                 const data: any = await res.json();
                 aiReply=data.choices?.[0]?.message?.content||"";
+              }
+            } else if (provider === "anthropic") {
+              const res = await fetch("https://api.anthropic.com/v1/messages", {
+                method: "POST",
+                headers: { "x-api-key": activeKey, "anthropic-version": "2023-06-01", "content-type": "application/json" },
+                body: JSON.stringify({ model: cfg.model || "claude-sonnet-4-5", max_tokens: cfg.maxTokens ?? 1000, system: systemPrompt + context, messages: [{ role: "user", content: userPrompt }], temperature: cfg.temperature ?? 0.7 }),
+              });
+              if (res.ok) {
+                const data: any = await res.json();
+                aiReply = (data.content || []).filter((part: any) => part.type === "text").map((part: any) => part.text).join("\\n");
+              } else {
+                console.error(`[ai-node:anthropic] HTTP ${res.status}: ${(await res.text().catch(() => "")).slice(0, 500)}`);
               }
             } else if (provider === "gemini") {
               const model = cfg.model || "gemini-2.0-flash";
@@ -1380,6 +1420,29 @@ async function runFlow(execution: any, containersIn: any[], edgesIn: any[], inpu
                 } else {
                   const errText = await res.text().catch(() => "");
                   console.error(`[ai-agent:openai] HTTP ${res.status}: ${errText.slice(0, 500)}`);
+                }
+              } else if (provider === "anthropic") {
+                const tool = runtimeSkillTool ? [{ name: "use_skill", description: runtimeSkillTool.function.description, input_schema: runtimeSkillTool.function.parameters }] : undefined;
+                const historyMessages = useMemory && history.length ? history.slice(-historyLimit).map((m: any) => ({ role: m.role === "assistant" ? "assistant" : "user", content: String(m.content || "") })) : [];
+                const anthropicMessages = [...historyMessages, { role: "user", content: userPrompt || "Inicie a conversa conforme o objetivo configurado." }];
+                const res = await fetch("https://api.anthropic.com/v1/messages", {
+                  method: "POST",
+                  headers: { "x-api-key": activeKey, "anthropic-version": "2023-06-01", "content-type": "application/json" },
+                  body: JSON.stringify({ model: cfg.model || "claude-sonnet-4-5", max_tokens: cfg.maxTokens ?? 1000, system: instructions + runtimeSkillPrompt + "\\n\\n[PLANO ATUAL]\\n" + JSON.stringify(runtimePlan), messages: anthropicMessages, ...(tool ? { tools: tool, tool_choice: { type: "auto" } } : {}) }),
+                });
+                if (res.ok) {
+                  const data: any = await res.json();
+                  const blocks = data.content || [];
+                  const toolUse = blocks.find((b: any) => b.type === "tool_use" && b.name === "use_skill");
+                  if (toolUse?.input?.skill_id) (variables as any).__runtimeSkillCall = { skill_id: String(toolUse.input.skill_id), arguments: runtimeToolObject(toolUse.input.arguments), parameters: runtimeToolObject(toolUse.input.parameters), intent: toolUse.input.intent ? String(toolUse.input.intent) : "", message: toolUse.input.message ? String(toolUse.input.message) : "" };
+                  aiReply = blocks.filter((b: any) => b.type === "text").map((b: any) => b.text).join("\\n").trim();
+                  if (!(variables as any).__runtimeSkillCall) {
+                    const parsed = parseRuntimeSkillCall(aiReply);
+                    if (parsed) (variables as any).__runtimeSkillCall = parsed;
+                  }
+                } else {
+                  const errText = await res.text().catch(() => "");
+                  console.error(`[ai-agent:anthropic] HTTP ${res.status}: ${errText.slice(0, 500)}`);
                 }
               } else if (provider === "gemini") {
                 const model = cfg.model || "gemini-2.0-flash";
