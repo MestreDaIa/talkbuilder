@@ -2047,8 +2047,11 @@ const runLocalFlow = async (
             } as Message);
           }
         } else if (nodeType === "http-request") {
-          // Helper: navega em objeto JSON por dot-path. Aceita "data.foo" e "foo" indistintamente
-          // se a resposta tiver ou não wrapper "data".
+          // Helper: navega em JSON por dot-path. Índices numéricos acessam
+          // diretamente o item do array; nomes de propriedades continuam podendo
+          // ser mapeados sobre arrays (ex.: data.name -> lista de nomes).
+          // Também aceita paths com um "data." extra quando a resposta já contém
+          // o wrapper { data: ... }.
           const getByPath = (obj: any, path: string): any => {
             if (!path) return obj;
             const parts = path.split(".").filter(Boolean);
@@ -2056,8 +2059,13 @@ const runLocalFlow = async (
               let cur = start;
               for (const p of keys) {
                 if (Array.isArray(cur)) {
-                  // mapeia sobre arrays automaticamente
-                  cur = cur.map((it) => (it && typeof it === "object" ? it[p] : undefined));
+                  if (/^(0|[1-9]\\d*)$/.test(p)) {
+                    cur = cur[Number(p)];
+                  } else {
+                    const mapped = cur.map((it) => (it && typeof it === "object" ? it[p] : undefined));
+                    if (mapped.every((value) => value === undefined)) return undefined;
+                    cur = mapped;
+                  }
                 } else if (cur != null && typeof cur === "object") {
                   cur = cur[p];
                 } else {
@@ -2068,8 +2076,13 @@ const runLocalFlow = async (
             };
             const first = tryPath(obj, parts);
             if (first !== undefined) return first;
-            if (parts[0] === "data") return tryPath(obj, parts.slice(1));
-            if (obj && typeof obj === "object" && "data" in obj) return tryPath((obj as any).data, parts);
+            if (parts[0] === "data") {
+              const withoutWrapper = tryPath(obj, parts.slice(1));
+              if (withoutWrapper !== undefined) return withoutWrapper;
+            }
+            if (obj && typeof obj === "object" && "data" in obj) {
+              return tryPath((obj as any).data, parts);
+            }
             return undefined;
           };
 
