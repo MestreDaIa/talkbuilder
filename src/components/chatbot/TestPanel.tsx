@@ -2059,7 +2059,7 @@ const runLocalFlow = async (
               let cur = start;
               for (const p of keys) {
                 if (Array.isArray(cur)) {
-                  if (/^(0|[1-9]\\d*)$/.test(p)) {
+                  if (/^(0|[1-9]\d*)$/.test(p)) {
                     cur = cur[Number(p)];
                   } else {
                     const mapped = cur.map((it) => (it && typeof it === "object" ? it[p] : undefined));
