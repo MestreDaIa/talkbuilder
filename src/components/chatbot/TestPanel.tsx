@@ -2585,7 +2585,10 @@ const runLocalFlow = async (
                     const hints = paramTypeHints(paramName);
                     const allEntities = getKnownEntities();
                     const typedEntities = allEntities.filter((entity) => entityMatchesType(entity, hints));
-                    const candidates = typedEntities.length ? typedEntities : allEntities;
+                    // Never fall back to unrelated entities for a typed ID such as hold_id,
+                    // payment_id, service_id or employee_id. If no entity of that type exists,
+                    // the runtime must report the missing ID instead of guessing from user text.
+                    const candidates = hints.length ? typedEntities : allEntities;
                     const rawValue = proposedValue && typeof proposedValue === "object"
                       ? (proposedValue.id ?? proposedValue.uuid ?? proposedValue._id ?? proposedValue.name ?? proposedValue.label ?? proposedValue.title)
                       : proposedValue;
