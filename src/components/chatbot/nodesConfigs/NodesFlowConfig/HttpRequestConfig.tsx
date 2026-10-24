@@ -122,22 +122,31 @@ export const HttpRequestConfig = ({
   const availableVariables = useMemo(() => getAllVariableNames(), [getAllVariableNames]);
 
   const jsonPaths = useMemo(() => {
-    if (!lastJsonResponse) return [];
+    if (lastJsonResponse == null) return [];
     const paths: string[] = [];
-    const traverse = (obj: any, path: string = "data") => {
-      if (obj === null || typeof obj !== "object") {
-        paths.push(path);
+    const addPath = (path: string) => {
+      if (path && !paths.includes(path)) paths.push(path);
+    };
+    // Sugere os campos do primeiro item do array usando o caminho da coleção
+    // (ex.: data.name), em vez de obrigar o usuário a escolher data.0.name.
+    // Os índices continuam aceitos se digitados manualmente para casos específicos.
+    const traverse = (obj: any, path = "", depth = 0) => {
+      if (depth > 12) return;
+      if (path) addPath(path);
+      if (obj === null || typeof obj !== "object") return;
+
+      if (Array.isArray(obj)) {
+        if (obj.length > 0) traverse(obj[0], path, depth + 1);
         return;
       }
-      paths.push(path);
-      if (Array.isArray(obj)) {
-        obj.forEach((item, index) => traverse(item, `${path}.${index}`));
-      } else {
-        Object.keys(obj).forEach((key) => traverse(obj[key], `${path}.${key}`));
-      }
+
+      Object.keys(obj).forEach((key) => {
+        const childPath = path ? `${path}.${key}` : key;
+        traverse(obj[key], childPath, depth + 1);
+      });
     };
     traverse(lastJsonResponse);
-    return [...new Set(paths)];
+    return paths;
   }, [lastJsonResponse]);
 
   const handleAddKeyValue = (list: KeyValuePair[], setList: any, field: string) => {
