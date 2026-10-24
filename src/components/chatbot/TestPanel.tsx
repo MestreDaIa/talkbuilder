@@ -957,7 +957,11 @@ const runLocalFlow = async (
       const replaceVars = (text: string) => cleanText(text).replace(/{{(.*?)}}/g, (_, key) => {
         const val = getVariableValue(variables, key.trim());
         if (val === undefined) return `{{${key}}}`;
-        return typeof val === 'object' ? JSON.stringify(val) : String(val);
+        // Exibe arrays simples como texto legível no Bubble, sem colchetes/aspas de JSON.
+        if (Array.isArray(val) && val.every((item) => item == null || ["string", "number", "boolean"].includes(typeof item))) {
+          return val.filter((item) => item != null).map(String).join(", ");
+        }
+        return typeof val === "object" ? JSON.stringify(val) : String(val);
       });
       const isSkillResultHistoryMessage = (msg: RuntimeMessage) => {
         const meta = (msg as any).metadata || {};
