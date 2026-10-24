@@ -1258,7 +1258,7 @@ async function runFlow(execution: any, containersIn: any[], edgesIn: any[], inpu
       case "ai-agent":
       case "agent": {
         const provider = (cfg.provider || "openai").toLowerCase();
-        const activeKey = flow?.settings?.aiKeys?.[`${provider}Key`] || flow?.settings?.[`${provider}_key`] || cfg.apiKey;
+        const activeKey = resolveProviderKey(provider, flow?.settings?.aiKeys || {}, flow?.settings?.[`${provider}_key`] || cfg.apiKey);
         const isFirstTime = execution.active_agent_node_id !== node.id || mode !== "agent";
         
         if (activeKey) {
