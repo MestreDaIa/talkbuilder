@@ -11,6 +11,36 @@ const corsHeaders = {
 const runtimeMemory = new Map<string, { state: any; expiresAt: number }>();
 const MEMORY_TTL_MS = 1000 * 60 * 60 * 6; // 6 hours
 
+// Providers that expose the OpenAI Chat Completions-compatible API.
+const OPENAI_COMPATIBLE_PROVIDERS: Record<string, string> = {
+  openai: "https://api.openai.com/v1/chat/completions",
+  groq: "https://api.groq.com/openai/v1/chat/completions",
+  openrouter: "https://openrouter.ai/api/v1/chat/completions",
+  deepseek: "https://api.deepseek.com/chat/completions",
+  mistral: "https://api.mistral.ai/v1/chat/completions",
+  xai: "https://api.x.ai/v1/chat/completions",
+  together: "https://api.together.xyz/v1/chat/completions",
+  fireworks: "https://api.fireworks.ai/inference/v1/chat/completions",
+  perplexity: "https://api.perplexity.ai/chat/completions",
+  cerebras: "https://api.cerebras.ai/v1/chat/completions",
+  nvidia: "https://integrate.api.nvidia.com/v1/chat/completions",
+};
+
+function resolveProviderKey(provider: string, keys: Record<string, any>, fallback = ""): string {
+  const aliases: Record<string, string[]> = {
+    gemini: ["geminiKey", "googleKey"],
+    google: ["googleKey", "geminiKey"],
+    xai: ["xaiKey", "grokKey"],
+  };
+  const candidates = aliases[provider] || [provider + "Key"];
+  for (const key of candidates) {
+    const value = keys?.[key];
+    if (typeof value === "string" && value.trim()) return value.trim();
+  }
+  return String(fallback || "").trim();
+}
+
+
 function evaluateSetVariableValue(cfg: any, variables: Record<string, any>, replaceVars: (s: string) => string): any {
   const valueType = cfg.valueType || "expression";
   const raw = String(cfg.value ?? "");
@@ -755,7 +785,7 @@ class FlowEngine {
     }
 
     const provider = (cfg.provider || "openai").toLowerCase();
-    const activeKey = (this.flow?.settings?.aiKeys || {})[`${provider}Key`] || cfg.apiKey;
+    const activeKey = resolveProviderKey(provider, this.flow?.settings?.aiKeys || {}, cfg.apiKey);
 
     if (!activeKey) {
       const info = classifyAIError(provider, 401, "missing api key");
@@ -880,6 +910,36 @@ class FlowEngine {
             await this.recordRuntimeError(node, info, provider, 200);
           }
         }
+      } else if (provider === "anthropic") {
+        const res = await fetch("https://api.anthropic.com/v1/messages", {
+          method: "POST",
+          headers: { "x-api-key": activeKey, "anthropic-version": "2023-06-01", "content-type": "application/json" },
+          body: JSON.stringify({ model: cfg.model || "claude-sonnet-4-5", max_tokens: cfg.maxTokens ?? 1000, system: systemPrompt, messages: [{ role: "user", content: userMessage }], temperature: cfg.temperature ?? 0.7 }),
+        });
+        const body = await res.text();
+        if (!res.ok) {
+          const info = classifyAIError(provider, res.status, body);
+          await this.recordRuntimeError(node, info, provider, res.status);
+          this.messages.push({ id: crypto.randomUUID(), type: "bot", content: "Não foi possível processar sua solicitação no momento. Verifique a chave, o modelo e os créditos do provedor." });
+        } else {
+          const data = JSON.parse(body);
+          aiReply = (data.content || []).filter((part: any) => part.type === "text").map((part: any) => part.text).join("\n");
+        }
+      } else if (OPENAI_COMPATIBLE_PROVIDERS[provider]) {
+        const res = await fetch(OPENAI_COMPATIBLE_PROVIDERS[provider], {
+          method: "POST",
+          headers: { "Authorization": "Bearer " + activeKey, "Content-Type": "application/json" },
+          body: JSON.stringify({ model: cfg.model || "gpt-4o-mini", messages: [{ role: "system", content: systemPrompt + context }, { role: "user", content: userMessage }], temperature: cfg.temperature ?? 0.7, max_tokens: cfg.maxTokens ?? 1000 }),
+        });
+        const body = await res.text();
+        if (!res.ok) {
+          const info = classifyAIError(provider, res.status, body);
+          await this.recordRuntimeError(node, info, provider, res.status);
+          this.messages.push({ id: crypto.randomUUID(), type: "bot", content: "Não foi possível processar sua solicitação no momento. Verifique a chave, o modelo e os créditos do provedor." });
+        } else {
+          const data = JSON.parse(body);
+          aiReply = data.choices?.[0]?.message?.content || "";
+        }
       }
 
       if (aiReply) {
@@ -920,7 +980,7 @@ class FlowEngine {
     const providerRaw = String(cfg.provider || "openai").toLowerCase();
     const provider = providerRaw === "gemini" ? "google" : providerRaw;
     const apiKeys = this.flow?.settings?.aiKeys || {};
-    const apiKey = String(apiKeys[providerRaw + "Key"] || apiKeys[provider + "Key"] || cfg.apiKey || "").trim();
+    const apiKey = resolveProviderKey(providerRaw, apiKeys, cfg.apiKey);
     if (!apiKey) {
       const info = classifyAIError(provider, 401, "missing api key");
       await this.recordRuntimeError(node, info, provider, 401);
@@ -1053,6 +1113,49 @@ class FlowEngine {
           if (toolCall?.function?.arguments) {
             try { call = JSON.parse(toolCall.function.arguments); } catch { call = null; }
           }
+          return { reply: String(msg.content || ""), call };
+        }
+        if (provider === "anthropic") {
+          const msgs = conversation.map((m: any) => ({ role: m.role, content: m.content }));
+          const tools = tool ? [{ name: "use_skill", description: "Executa uma Skill HTTP configurada neste fluxo.", input_schema: { type: "object", properties: { skill_id: { type: "string", enum: skills.map((sk) => sk.id) }, arguments: { type: "object", additionalProperties: true }, message: { type: "string" } }, required: ["skill_id"] } }] : undefined;
+          const res = await fetch("https://api.anthropic.com/v1/messages", {
+            method: "POST",
+            headers: { "x-api-key": apiKey, "anthropic-version": "2023-06-01", "content-type": "application/json" },
+            body: JSON.stringify({ model: cfg.model || "claude-sonnet-4-5", max_tokens: cfg.maxTokens ?? 1000, system: systemPrompt + (recentResults.length ? "\n\n[Resultados reais das Skills nesta rodada]\n" + recentResults.join("\n\n") : ""), messages: msgs, ...(tools ? { tools, tool_choice: { type: "auto" } } : {}) }),
+            signal: timeout.signal
+          });
+          const body = await res.text();
+          if (!res.ok) {
+            const info = classifyAIError(provider, res.status, body);
+            await this.recordRuntimeError(node, info, provider, res.status);
+            return { reply: "Não consegui processar sua mensagem agora. Verifique as configurações do provedor de IA e tente novamente.", call: null };
+          }
+          const data = JSON.parse(body);
+          const blocks = data.content || [];
+          const toolUse = blocks.find((b: any) => b.type === "tool_use" && b.name === "use_skill");
+          return { reply: blocks.filter((b: any) => b.type === "text").map((b: any) => b.text).join("\n").trim(), call: toolUse ? toolUse.input : null };
+        }
+        if (OPENAI_COMPATIBLE_PROVIDERS[provider]) {
+          const msgs: any[] = [{ role: "system", content: systemPrompt }, ...conversation];
+          if (recentResults.length) msgs.push({ role: "system", content: "[Resultados reais das Skills nesta rodada]\n" + recentResults.join("\n\n") });
+          const res = await fetch(OPENAI_COMPATIBLE_PROVIDERS[provider], {
+            method: "POST",
+            headers: { Authorization: "Bearer " + apiKey, "Content-Type": "application/json" },
+            body: JSON.stringify({ model: cfg.model || "gpt-4o-mini", messages: msgs, temperature: cfg.temperature ?? 0.3, max_tokens: cfg.maxTokens ?? 700, ...(tool ? { tools: tool, tool_choice: "auto" } : {}) }),
+            signal: timeout.signal
+          });
+          const body = await res.text();
+          if (!res.ok) {
+            const info = classifyAIError(provider, res.status, body);
+            await this.recordRuntimeError(node, info, provider, res.status);
+            if (res.status === 429) return { reply: "O provedor de IA atingiu o limite de requisições. Aguarde um pouco e tente novamente; não repeti a chamada para evitar ampliar o limite.", call: null };
+            return { reply: "Não consegui processar sua mensagem agora. Verifique as configurações do provedor de IA e tente novamente.", call: null };
+          }
+          const data = JSON.parse(body);
+          const msg = data.choices?.[0]?.message || {};
+          let call = null;
+          const toolCall = (msg.tool_calls || []).find((tc: any) => tc?.function?.name === "use_skill");
+          if (toolCall?.function?.arguments) { try { call = JSON.parse(toolCall.function.arguments); } catch { call = null; } }
           return { reply: String(msg.content || ""), call };
         }
         if (provider === "google") {
