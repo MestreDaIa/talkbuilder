@@ -832,7 +832,7 @@ export const TestPanel = ({
 
     const docs = [...new Set(skills.map((s: any) => s.documentationContext).filter((v: any) => typeof v === "string" && v.trim()))];
     const docsSection = docs.length ? `\n\n[DOCUMENTAÇÃO DE APOIO DA API — REFERÊNCIA, NÃO PERMISSÕES]\n${docs.join("\n\n---\n\n")}` : "";
-    return `\n\n[SKILLS DISPONÍVEIS PARA O AGENTE]\n${list}\n\nQuando a mensagem do usuário combinar com a instrução de uma skill, use a ferramenta use_skill com o ID exato da skill. Sempre que a skill listar "Argumentos esperados", preencha o objeto \`arguments\` com esses campos (use os path params/query params/body descritos, extraindo os valores do contexto da conversa e das variáveis já coletadas). Para qualquer campo de ID (id, *_id, *Id, uuid), use somente IDs reais retornados por uma skill anterior nesta sessão; se você só souber o nome/label do item escolhido, envie o nome/label e deixe o runtime resolver para o ID real — nunca invente UUIDs ou IDs. Skills marcadas como Live Data são voláteis: sempre chame a skill novamente quando precisar desses dados, ignore resultados antigos no histórico e não use valores antigos para criar/alterar/excluir dados. Antes de chamar uma skill crítica (POST/PUT/PATCH/DELETE), use apenas os dados atuais que você acabou de confirmar com o usuário; se o usuário respondeu apenas "sim/pode", use exclusivamente a última mensagem de confirmação que você enviou, não valores mais antigos do histórico. Para skills críticas, envie o body completo em arguments.body quando o endpoint tiver body permitido; não confie em templates/variáveis antigas. Se um resultado de skill retornar erro ou parâmetro ausente, não chame a mesma skill de novo com os mesmos argumentos; responda ao usuário ou peça a informação faltante. Se a chamada de ferramenta não estiver disponível, responda apenas com JSON: {"skill_id":"ID","arguments":{...},"message":"opcional"}. Nunca invente perguntas antes de usar uma skill claramente solicitada. Antes de responder, planeje o objetivo inteiro como uma sequência de etapas: olhe para a Skill atual e também para a próxima Skill e os dados que ela exige. Se a próxima Skill puder ser executada com dados já disponíveis, execute-a automaticamente após o resultado atual, sem esperar nova mensagem do usuário. Só peça informação quando ela realmente faltar e nenhuma Skill/contexto puder obtê-la. Se houver várias opções cuja escolha pertence ao usuário, mostre as opções e aguarde somente essa escolha. Nunca pergunte "quer que eu liste..." quando a próxima ação já é determinada pelo objetivo e pelas Skills.${docsSection}`;
+    return `\n\n[SKILLS DISPONÍVEIS PARA O AGENTE]\n${list}\n\nQuando a mensagem do usuário combinar com a instrução de uma skill, use a ferramenta use_skill com o ID exato da skill. Sempre que a skill listar "Argumentos esperados", preencha o objeto \`arguments\` com esses campos (use os path params/query params/body descritos, extraindo os valores do contexto da conversa e das variáveis já coletadas). Para qualquer campo de ID (id, *_id, *Id, uuid), use somente IDs reais retornados por uma skill anterior nesta sessão; se você só souber o nome/label do item escolhido, envie o nome/label e deixe o runtime resolver para o ID real — nunca invente UUIDs ou IDs. Skills marcadas como Live Data são voláteis: sempre chame a skill novamente quando precisar desses dados, ignore resultados antigos no histórico e não use valores antigos para criar/alterar/excluir dados. Antes de chamar uma skill crítica (POST/PUT/PATCH/DELETE), use apenas os dados atuais que você acabou de confirmar com o usuário; se o usuário respondeu apenas "sim/pode", use exclusivamente a última mensagem de confirmação que você enviou, não valores mais antigos do histórico. Para skills críticas, envie o body completo em arguments.body quando o endpoint tiver body permitido; não confie em templates/variáveis antigas. Se um resultado de skill retornar erro ou parâmetro ausente, não chame a mesma skill de novo com os mesmos argumentos; responda ao usuário ou peça a informação faltante. Se a chamada de ferramenta não estiver disponível, responda apenas com JSON: {"skill_id":"ID","arguments":{...},"message":"opcional"}. Nunca invente perguntas antes de usar uma skill claramente solicitada. Antes de responder, planeje o objetivo inteiro como uma sequência de etapas: olhe para a Skill atual e também para a próxima Skill e os dados que ela exige. Se a próxima Skill puder ser executada com dados já disponíveis, execute-a automaticamente após o resultado atual, sem esperar nova mensagem do usuário. Só peça informação quando ela realmente faltar e nenhuma Skill/contexto puder obtê-la. Se houver várias opções cuja escolha pertence ao usuário, mostre as opções e aguarde somente essa escolha. Nunca pergunte "quer que eu liste..." quando a próxima ação já é determinada pelo objetivo e pelas Skills. Antes de chamar uma Skill, confira os resultados já obtidos nesta solicitação e reutilize os campos que já respondem à necessidade; não chame endpoints de detalhe apenas para repetir dados já disponíveis. Execute somente uma Skill que esteja cadastrada no catálogo, usando seu ID exato; não invente ou reescreva rotas com base em nomes parecidos.${docsSection}`;
   };
 
   const buildUseSkillTool = (skills: ReturnType<typeof collectAgentSkills>) => {
@@ -2026,8 +2026,12 @@ const runLocalFlow = async (
               // pelo modelo — respeitando as permissões configuradas.
               const dispatch = (variables as any).__dynamicSkillDispatch;
               const isDispatched = dispatch && dispatch.nodeId === node.id;
+              // Use a mesma chave efetiva de collectAgentSkills: endpoints antigos podem
+              // não ter id próprio e, nesse caso, a skill é identificada por "METHOD URL".
+              const endpointKey = (endpoint: any) =>
+                String(endpoint?.id || `${endpoint?.method || "GET"} ${endpoint?.url || ""}`);
               const endpoints: any[] = isDispatched
-                ? allEndpoints.filter((e) => e.id === dispatch.endpointId)
+                ? allEndpoints.filter((endpoint) => endpointKey(endpoint) === String(dispatch.endpointId))
                 : allEndpoints;
 
               if (isDispatched && !endpoints.length) {
@@ -2724,52 +2728,39 @@ const runLocalFlow = async (
 
                   const inferIdFromKnownLists = (paramName: string) => {
                     if (!/(^id$|_id$)/i.test(paramName)) return undefined;
-                    // IDs só podem ser resolvidos automaticamente quando o rótulo foi
-                    // informado pelo usuário na mensagem atual. Resultados/confirmations
-                    // do próprio Agent não podem virar seleção implícita.
-                    const terms = new Set<string>();
-                    const addExplicit = (value: unknown) => {
-                      const normalized = normalizeLookupText(value);
-                      if (!normalized) return;
-                      terms.add(normalized);
-                      normalized.split(" ").filter((part) => part.length >= 3).forEach((part) => terms.add(part));
-                    };
-                    addExplicit(variables.last_message);
-                    if (!terms.size) return undefined;
-                    const seen = new WeakSet<object>();
-                    let best: { id: string | number; score: number; label: string } | null = null;
-                    const scoreLabel = (label: string) => {
-                      const normalized = normalizeLookupText(label);
-                      if (!normalized) return 0;
-                      let score = 0;
-                      for (const term of terms) {
-                        if (normalized === term) score = Math.max(score, 100);
-                        else if (term.includes(normalized) || normalized.includes(term)) score = Math.max(score, Math.min(normalized.length, term.length));
-                      }
-                      return score;
-                    };
-                    const inspect = (obj: any, depth = 0, keyHint?: string) => {
-                      if (obj == null || depth > 7) return;
-                      if (Array.isArray(obj)) { obj.forEach((item) => inspect(item, depth + 1)); return; }
-                      if (typeof obj !== "object") return;
-                      if (seen.has(obj)) return;
-                      seen.add(obj);
 
-                      const id = obj.id ?? obj.uuid ?? obj._id ?? Object.entries(obj).find(([key, value]) => /(?:^|_)id$/i.test(key) && (typeof value === "string" || typeof value === "number"))?.[1];
-                      const label = obj.name ?? obj.title ?? obj.label ?? obj.description;
-                      if ((typeof id === "string" || typeof id === "number") && typeof label === "string") {
-                        const score = scoreLabel(label);
-                        if (score > (best?.score || 0)) best = { id, score, label };
-                      }
-                      Object.entries(obj).forEach(([childKey, value]) => inspect(value, depth + 1, childKey));
-                    };
-                    inspect(variables);
-                    const match = best as { id: string | number; score: number; label: string } | null;
-                    if (match && match.score >= 3) {
-                      console.log(`[node:http-request][dynamic] path param "${paramName}" resolvido por seleção explícita do usuário: ${match.label}`);
-                      return match.id;
+                    // Resolva nomes apenas contra entidades conhecidas do tipo esperado.
+                    // Não varra recursivamente todas as variáveis: isso misturava recursos e IDs.
+                    const explicitText = normalizeLookupText(variables.last_message);
+                    const hints = paramTypeHints(paramName);
+                    if (!explicitText || !hints.length) return undefined;
+
+                    const terms = [explicitText, ...explicitText.split(" ").filter((part) => part.length >= 3)];
+                    const candidates = getKnownEntities()
+                      .filter((entity) => entityMatchesType(entity, hints))
+                      .map((entity) => ({ entity, score: scoreEntity(entity, terms) }))
+                      .filter((candidate) => candidate.score >= 3);
+
+                    if (!candidates.length) return undefined;
+                    const bestScore = Math.max(...candidates.map((candidate) => candidate.score));
+                    const bestById = new Map<string, typeof candidates[number]>();
+                    for (const candidate of candidates) {
+                      if (candidate.score !== bestScore) continue;
+                      const key = String(candidate.entity.id);
+                      if (!bestById.has(key)) bestById.set(key, candidate);
                     }
-                    return undefined;
+
+                    // Se duas entidades diferentes combinarem igualmente com a mensagem,
+                    // não adivinhe: deixe o resolver pedir esclarecimento/recusar o ID.
+                    if (bestById.size !== 1) {
+                      console.warn(`[node:http-request][dynamic] resolução ambígua para "${paramName}"; nenhum ID foi inferido`);
+                      return undefined;
+                    }
+
+                    const match = Array.from(bestById.values())[0].entity;
+                    if (!userExplicitlyMentionedEntity(match)) return undefined;
+                    console.log(`[node:http-request][dynamic] path param "${paramName}" resolvido por entidade tipada explicitamente mencionada: ${match.label}`);
+                    return match.id;
                   };
 
                   // Preserve placeholders até resolver os argumentos da chamada. Se replaceVars() rodar primeiro, variáveis globais antigas podem preencher parâmetros diferentes com o mesmo valor.
