@@ -24,6 +24,8 @@ const OPENAI_COMPATIBLE_PROVIDERS: Record<string, string> = {
   perplexity: "https://api.perplexity.ai/chat/completions",
   cerebras: "https://api.cerebras.ai/v1/chat/completions",
   nvidia: "https://integrate.api.nvidia.com/v1/chat/completions",
+  cohere: "https://api.cohere.com/compatibility/v1/chat/completions",
+  huggingface: "https://router.huggingface.co/v1/chat/completions",
 };
 
 function resolveProviderKey(provider: string, keys: Record<string, any>, fallback = ""): string {
