@@ -2616,11 +2616,28 @@ const runLocalFlow = async (
                     }
                     const lookupTerms = Array.from(terms);
                     let best: { entity: KnownEntity; score: number } | null = null;
+                    let bestIds = new Set<string>();
                     for (const entity of candidates) {
                       const score = scoreEntity(entity, lookupTerms);
-                      if (score > (best?.score || 0)) best = { entity, score };
+                      if (score > (best?.score || 0)) {
+                        best = { entity, score };
+                        bestIds = new Set([String(entity.id)]);
+                      } else if (best && score === best.score) {
+                        bestIds.add(String(entity.id));
+                      }
                     }
                     if (best && best.score >= 3) {
+                      // Não selecione arbitrariamente entre entidades diferentes com a mesma pontuação.
+                      if (bestIds.size > 1) {
+                        audit({ resolved: rawText || undefined, action: "ambiguous", reason: "multiple_entities_match_user_text" });
+                        return {
+                          ok: false,
+                          error: "ambiguous_entity_match",
+                          message: `Encontrei mais de uma opção compatível com "${rawText || paramName}". Peça ao usuário para escolher uma opção antes de continuar.`,
+                          param: paramName,
+                          value: rawText,
+                        };
+                      }
                       if (hasValue && valueLooksLikeIdentifier(rawText) && String(best.entity.id) !== rawText) {
                         // Mesmo em modo estrito: se há entidade verificada da sessão que casa com o
                         // rótulo/termos do usuário, substituímos silenciosamente em vez de rejeitar.
