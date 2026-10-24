@@ -127,16 +127,24 @@ export const HttpRequestConfig = ({
     const addPath = (path: string) => {
       if (path && !paths.includes(path)) paths.push(path);
     };
-    // Sugere os campos do primeiro item do array usando o caminho da coleção
-    // (ex.: data.name), em vez de obrigar o usuário a escolher data.0.name.
-    // Os índices continuam aceitos se digitados manualmente para casos específicos.
+    // Percorre a resposta inteira em cascata. Para arrays, examina todos os
+    // elementos usando o caminho da coleção (ex.: data.carros.name), sem
+    // obrigar o usuário a selecionar um índice. Caminhos com índice explícito
+    // continuam aceitos manualmente para acessar um item específico.
+    const visited = new WeakMap<object, Set<string>>();
     const traverse = (obj: any, path = "", depth = 0) => {
       if (depth > 12) return;
       if (path) addPath(path);
       if (obj === null || typeof obj !== "object") return;
 
+      // Evita ciclos e revisitas redundantes ao mesmo objeto pelo mesmo caminho.
+      const priorPaths = visited.get(obj) ?? new Set<string>();
+      if (priorPaths.has(path)) return;
+      priorPaths.add(path);
+      visited.set(obj, priorPaths);
+
       if (Array.isArray(obj)) {
-        if (obj.length > 0) traverse(obj[0], path, depth + 1);
+        obj.forEach((item) => traverse(item, path, depth + 1));
         return;
       }
 
