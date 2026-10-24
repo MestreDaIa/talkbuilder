@@ -19,6 +19,24 @@ import { supabaseClient } from '@/lib/supabaseClient';
 import { evoApi } from '@/services/evolutionApi';
 import { toast } from 'sonner';
 
+const AI_API_KEY_PROVIDERS = [
+  { id: "openaiKey", label: "OpenAI", url: "https://platform.openai.com/api-keys", placeholder: "sk-..." },
+  { id: "anthropicKey", label: "Anthropic Claude", url: "https://console.anthropic.com/settings/keys", placeholder: "sk-ant-..." },
+  { id: "googleKey", label: "Google Gemini", url: "https://aistudio.google.com/app/apikey", placeholder: "AIza..." },
+  { id: "xaiKey", label: "Grok (xAI)", url: "https://console.x.ai/", placeholder: "xai-..." },
+  { id: "groqKey", label: "Groq", url: "https://console.groq.com/keys", placeholder: "gsk_..." },
+  { id: "openrouterKey", label: "OpenRouter", url: "https://openrouter.ai/keys", placeholder: "sk-or-..." },
+  { id: "deepseekKey", label: "DeepSeek", url: "https://platform.deepseek.com/api_keys", placeholder: "sk-..." },
+  { id: "mistralKey", label: "Mistral AI", url: "https://console.mistral.ai/api-keys/", placeholder: "..." },
+  { id: "cohereKey", label: "Cohere", url: "https://dashboard.cohere.com/api-keys", placeholder: "..." },
+  { id: "togetherKey", label: "Together AI", url: "https://api.together.ai/settings/api-keys", placeholder: "..." },
+  { id: "fireworksKey", label: "Fireworks AI", url: "https://fireworks.ai/account/api-keys", placeholder: "fw_..." },
+  { id: "perplexityKey", label: "Perplexity", url: "https://www.perplexity.ai/settings/api", placeholder: "pplx-..." },
+  { id: "cerebrasKey", label: "Cerebras", url: "https://cloud.cerebras.ai/", placeholder: "csk-..." },
+  { id: "nvidiaKey", label: "NVIDIA NIM", url: "https://build.nvidia.com/", placeholder: "nvapi-..." },
+  { id: "huggingfaceKey", label: "Hugging Face", url: "https://huggingface.co/settings/tokens", placeholder: "hf_..." },
+] as const;
+
 interface BotSettingsDialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
@@ -61,11 +79,9 @@ export function BotSettingsDialog({
     description: settings.metadata?.description || '',
     favicon: settings.metadata?.favicon || '',
   });
-  const [aiKeys, setAiKeys] = useState({
-    openaiKey: settings.aiKeys?.openaiKey || '',
-    anthropicKey: settings.aiKeys?.anthropicKey || '',
-    googleKey: settings.aiKeys?.googleKey || '',
-  });
+  const [aiKeys, setAiKeys] = useState<Record<string, string>>(() => Object.fromEntries(
+    AI_API_KEY_PROVIDERS.map(({ id }) => [id, settings.aiKeys?.[id] || ""])
+  ));
 
   const [isSaving, setIsSaving] = useState(false);
   const [isUploading, setIsUploading] = useState(false);
@@ -124,11 +140,9 @@ export function BotSettingsDialog({
       description: settings.metadata?.description || '',
       favicon: settings.metadata?.favicon || '',
     });
-    setAiKeys({
-      openaiKey: settings.aiKeys?.openaiKey || '',
-      anthropicKey: settings.aiKeys?.anthropicKey || '',
-      googleKey: settings.aiKeys?.googleKey || '',
-    });
+    setAiKeys(Object.fromEntries(
+      AI_API_KEY_PROVIDERS.map(({ id }) => [id, settings.aiKeys?.[id] || ""])
+    ));
   }, [flowName, flowDescription, settings, open]);
 
 
@@ -472,52 +486,27 @@ export function BotSettingsDialog({
             <div className="space-y-4">
               <div className="p-3 bg-primary/5 border border-primary/10 rounded-lg">
                 <p className="text-xs text-muted-foreground leading-relaxed">
-                  Configure as chaves de API para habilitar os recursos de Inteligência Artificial e o Agente Autônomo. Suas chaves são armazenadas de forma segura.
+                  Configure as chaves de API dos provedores que deseja utilizar. As chaves são salvas nas configurações deste bot; cada provedor exige uma conta e pode cobrar pelo uso.
                 </p>
               </div>
 
-              <div className="space-y-4">
-                <div className="space-y-2">
-                  <div className="flex items-center justify-between">
-                    <Label htmlFor="openaiKey">OpenAI API Key</Label>
-                    <a href="https://platform.openai.com/api-keys" target="_blank" rel="noreferrer" className="text-[10px] text-primary hover:underline">Obter chave</a>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                {AI_API_KEY_PROVIDERS.map((provider) => (
+                  <div key={provider.id} className="space-y-2">
+                    <div className="flex items-center justify-between gap-2">
+                      <Label htmlFor={provider.id}>{provider.label} API Key</Label>
+                      <a href={provider.url} target="_blank" rel="noreferrer" className="shrink-0 text-[10px] text-primary hover:underline">Obter chave</a>
+                    </div>
+                    <Input
+                      id={provider.id}
+                      type="password"
+                      autoComplete="off"
+                      value={aiKeys[provider.id] || ""}
+                      onChange={(e) => setAiKeys((previous) => ({ ...previous, [provider.id]: e.target.value }))}
+                      placeholder={provider.placeholder}
+                    />
                   </div>
-                  <Input
-                    id="openaiKey"
-                    type="password"
-                    value={aiKeys.openaiKey}
-                    onChange={(e) => setAiKeys({ ...aiKeys, openaiKey: e.target.value })}
-                    placeholder="sk-..."
-                  />
-                </div>
-
-                <div className="space-y-2">
-                  <div className="flex items-center justify-between">
-                    <Label htmlFor="anthropicKey">Anthropic API Key</Label>
-                    <a href="https://console.anthropic.com/" target="_blank" rel="noreferrer" className="text-[10px] text-primary hover:underline">Obter chave</a>
-                  </div>
-                  <Input
-                    id="anthropicKey"
-                    type="password"
-                    value={aiKeys.anthropicKey}
-                    onChange={(e) => setAiKeys({ ...aiKeys, anthropicKey: e.target.value })}
-                    placeholder="sk-ant-..."
-                  />
-                </div>
-
-                <div className="space-y-2">
-                  <div className="flex items-center justify-between">
-                    <Label htmlFor="googleKey">Google Gemini API Key</Label>
-                    <a href="https://aistudio.google.com/app/apikey" target="_blank" rel="noreferrer" className="text-[10px] text-primary hover:underline">Obter chave</a>
-                  </div>
-                  <Input
-                    id="googleKey"
-                    type="password"
-                    value={aiKeys.googleKey}
-                    onChange={(e) => setAiKeys({ ...aiKeys, googleKey: e.target.value })}
-                    placeholder="AIza..."
-                  />
-                </div>
+                ))}
               </div>
             </div>
           </TabsContent>
