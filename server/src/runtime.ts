@@ -1474,8 +1474,7 @@ async function runFlow(execution: any, containersIn: any[], edgesIn: any[], inpu
                   console.error(`[ai-agent:anthropic] HTTP ${res.status}: ${errText.slice(0, 500)}`);
                 }
               } else if (provider === "gemini") {
-                const model = cfg.model || "gemini-2.0-flash";
-                const url = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${activeKey}`;
+                let model = cfg.model || "gemini-3.8-flash";
 
                 const geminiContents: any[] = [];
                 
@@ -1511,10 +1510,7 @@ async function runFlow(execution: any, containersIn: any[], edgesIn: any[], inpu
                 geminiContents.push({ role: "user", parts: userParts });
 
                 console.log(`[ai-agent:gemini] calling model=${model} parts=${userParts.length} history=${history.length} inlineData=${userParts.some(p => p.inline_data)}`);
-                const res = await fetch(url, {
-                  method: "POST",
-                  headers: { "Content-Type": "application/json" },
-                  body: JSON.stringify({
+                const geminiResult = await fetchGeminiGenerateContentWithFallback(model, activeKey, {
                     system_instruction:{parts:[{text:instructions+runtimeSkillPrompt+"\n\n[PLANO ATUAL]\n"+JSON.stringify(runtimePlan)}]},
                     contents:geminiContents,
                     ...(runtimeSkillTool?{tools:[{function_declarations:[{name:runtimeSkillTool.function.name,description:runtimeSkillTool.function.description,parameters:runtimeSkillTool.function.parameters}]}],tool_config:{function_calling_config:{mode:"AUTO"}}}:{}),
@@ -1522,8 +1518,9 @@ async function runFlow(execution: any, containersIn: any[], edgesIn: any[], inpu
                       temperature: cfg.temperature ?? 0.2,
                       maxOutputTokens: cfg.maxTokens ?? 1000,
                     }
-                  }),
-                });
+                  }),);
+                const res = geminiResult.response;
+                model = geminiResult.model;
                 if (res.ok) {
                   const data: any = await res.json();
                   const parts=data.candidates?.[0]?.content?.parts||[];
