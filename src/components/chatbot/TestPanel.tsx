@@ -1105,7 +1105,7 @@ const runLocalFlow = async (
         const taskStartIndex = (() => {
           for (let i = messageHistory.length - 1; i >= 0; i--) {
             const msg = messageHistory[i];
-            if (msg.role === "user" && /\b(agend|reserv|marcar|booking|appointment)\b/i.test(String(msg.content || ""))) return i;
+            if (msg.role === "user" && /(?:agend|reserv|marcar|booking|appointment)/i.test(String(msg.content || ""))) return i;
           }
           return 0;
         })();
@@ -1146,7 +1146,28 @@ const runLocalFlow = async (
           : [];
         if (inferredRequiredFields.length) {
           if (!nextArgs.body || typeof nextArgs.body !== "object" || Array.isArray(nextArgs.body)) nextArgs.body = {};
-          for (const field of inferredRequiredFields) if (!(field in nextArgs.body)) nextArgs.body[field] = "";
+
+          // API field names may be snake_case while the model supplied camelCase
+          // (or vice versa). Copy matching values into the exact names required by
+          // the API instead of leaving a required canonical field empty.
+          const sourceEntries = [
+            ...Object.entries(nextArgs.body),
+            ...Object.entries(nextArgs).filter(([key]) => !["pathParams", "queryParams", "body"].includes(key)),
+          ];
+          const isMissingValue = (value: any) =>
+            value == null || String(value).trim() === "" ||
+            /^(undefined|null|\{\{.*\}\}|<[^>]+>)$/i.test(String(value).trim());
+
+          for (const field of inferredRequiredFields) {
+            const existing = nextArgs.body[field];
+            if (!isMissingValue(existing)) continue;
+            const canonical = normalize(field);
+            const alias = sourceEntries.find(([sourceKey, sourceValue]) =>
+              normalize(sourceKey) === canonical && !isMissingValue(sourceValue) && sourceKey !== field
+            );
+            if (alias) nextArgs.body[field] = alias[1];
+            else if (!(field in nextArgs.body)) nextArgs.body[field] = "";
+          }
         }
 
         if (nextArgs.body && typeof nextArgs.body === "object" && !Array.isArray(nextArgs.body)) {
@@ -1154,10 +1175,27 @@ const runLocalFlow = async (
             const normalizedKey = normalize(key);
             if (!normalizedKey) return;
             const current = nextArgs.body[key];
-            const missing = current == null || String(current).trim() === "" || /^(undefined|null|\{\{.*\}\}|<[^>]+>)$/i.test(String(current).trim());
-            if (!missing) return;
+            const currentMissing = current == null || String(current).trim() === "" || /^(undefined|null|\{\{.*\}\}|<[^>]+>)$/i.test(String(current).trim());
+            if (!currentMissing) return;
             const confirmed = valueForField(key);
-            if (confirmed !== undefined && String(confirmed).trim()) nextArgs.body[key] = confirmed;
+            if (confirmed !== undefined && String(confirmed).trim()) {
+              nextArgs.body[key] = confirmed;
+              return;
+            }
+            // Resolve common relative dates only when the current task explicitly
+            // says today/tomorrow and no absolute date was available in its history.
+            if (fieldKind(key) === "date") {
+              const taskText = taskTexts.join("\\n");
+              const relative = /\\b(hoje|today|amanh[aã]|tomorrow)\\b/i.exec(taskText)?.[1]?.toLowerCase();
+              if (relative) {
+                const date = new Date();
+                if (/amanh|tomorrow/.test(relative)) date.setDate(date.getDate() + 1);
+                const year = date.getFullYear();
+                const month = String(date.getMonth() + 1).padStart(2, "0");
+                const day = String(date.getDate()).padStart(2, "0");
+                nextArgs.body[key] = `${year}-${month}-${day}`;
+              }
+            }
           });
         }
         return nextArgs;
@@ -3155,7 +3193,7 @@ const runLocalFlow = async (
                     console.table(idAuditTrail);
                     console.groupEnd();
                   }
-                  console.log(`[node:http-request][dynamic] ${method} ${url}`, { dispatched: isDispatched, strictIds, agentArgs, effectiveBody, id_audit: idAuditTrail });
+                  console.log(`[node:http-request][dynamic] ${method} ${url}`, { dispatched: isDispatched, strictIds, agentArgs, effectiveBody, effectiveBodyJson: effectiveBody && typeof effectiveBody === "object" ? JSON.stringify(effectiveBody) : effectiveBody, id_audit: idAuditTrail });
                   const res = await fetchReadWithRetry(url, { method, headers, body }, FLOW_HTTP_TIMEOUT_MS);
                   const text = await res.text();
                   let data: any; try { data = JSON.parse(text); } catch { data = text; }
