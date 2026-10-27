@@ -1101,6 +1101,15 @@ const runLocalFlow = async (
           if (/(payment|pagamento|forma)/i.test(normalized)) return "payment";
           return "";
         };
+        // Limita a recuperação de datas/horários à tarefa atual.
+        const taskStartIndex = (() => {
+          for (let i = messageHistory.length - 1; i >= 0; i--) {
+            const msg = messageHistory[i];
+            if (msg.role === "user" && /\\b(agend|reserv|marcar|booking|appointment)\\b/i.test(String(msg.content || ""))) return i;
+          }
+          return 0;
+        })();
+        const taskTexts = messageHistory.slice(taskStartIndex).map((msg) => String(msg.content || ""));
         const userTexts = messageHistory.filter((msg) => msg.role === "user").map((msg) => String(msg.content || ""));
         const valueForField = (key: string) => {
           const normalizedKey = normalize(key);
@@ -1111,19 +1120,39 @@ const runLocalFlow = async (
           const keyed = Object.entries(confirmedValues).reverse().find(([confirmedKey]) => fieldKind(confirmedKey) === kind)?.[1];
           if (keyed !== undefined) return keyed;
           if (kind === "date") {
-            const dates = userTexts.flatMap((text) => [...text.matchAll(/\b(\d{1,2}\/\d{1,2}\/\d{4}|\d{4}-\d{2}-\d{2})\b/g)].map((match) => match[1]));
+            const dates = taskTexts.flatMap((text) => [...text.matchAll(/\b(\d{1,2}\/\d{1,2}\/\d{4}|\d{4}-\d{2}-\d{2})\b/g)].map((match) => match[1]));
             return dates.at(-1);
           }
           if (kind === "time") {
-            const times = userTexts.flatMap((text) => [...text.matchAll(/\b([01]?\d|2[0-3]):([0-5]\d)\b/g)].map((match) => `${match[1].padStart(2, "0")}:${match[2]}`));
+            const times = taskTexts.flatMap((text) => [...text.matchAll(/\b([01]?\d|2[0-3]):([0-5]\d)\b/g)].map((match) => `${match[1].padStart(2, "0")}:${match[2]}`));
             return times.at(-1);
           }
           return undefined;
         };
+        // Reaproveita os nomes dos campos obrigatórios revelados pela validação anterior da API.
+        const previousApiError = String(
+          (variables as any).httpResponse?.message ||
+          (variables as any).httpResponse?.error_description ||
+          (variables as any).httpResponse?.error ||
+          ""
+        );
+        const requiredFieldsMatch = previousApiError.match(
+          /([a-zA-Z_][a-zA-Z0-9_]*(?:\\/[a-zA-Z_][a-zA-Z0-9_]*)?(?:\\s*,\\s*[a-zA-Z_][a-zA-Z0-9_]*(?:\\/[a-zA-Z_][a-zA-Z0-9_]*)?)*(?:\\s+e\\s+[a-zA-Z_][a-zA-Z0-9_]*(?:\\/[a-zA-Z_][a-zA-Z0-9_]*)?)?)\\s+(?:são|sao)\\s+obrigat[oó]rios?/i
+        );
+        const inferredRequiredFields = requiredFieldsMatch?.[1]
+          ? requiredFieldsMatch[1].split(/\\s*,\\s*|\\s+e\\s+/i)
+              .map((field) => field.trim().split("/")[0].replace(/\\s*\\([^)]*\\)\\s*/g, "").trim())
+              .filter((field) => /^[a-zA-Z_][a-zA-Z0-9_]*$/.test(field))
+          : [];
+        if (inferredRequiredFields.length) {
+          if (!nextArgs.body || typeof nextArgs.body !== "object" || Array.isArray(nextArgs.body)) nextArgs.body = {};
+          for (const field of inferredRequiredFields) if (!(field in nextArgs.body)) nextArgs.body[field] = "";
+        }
+
         if (nextArgs.body && typeof nextArgs.body === "object" && !Array.isArray(nextArgs.body)) {
           Object.keys(nextArgs.body).forEach((key) => {
             const normalizedKey = normalize(key);
-            if (!normalizedKey || /(^id$|id$|uuid$)/i.test(normalizedKey)) return;
+            if (!normalizedKey) return;
             const current = nextArgs.body[key];
             const missing = current == null || String(current).trim() === "" || /^(undefined|null|\{\{.*\}\}|<[^>]+>)$/i.test(String(current).trim());
             if (!missing) return;
