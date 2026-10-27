@@ -1185,8 +1185,8 @@ const runLocalFlow = async (
             // Resolve common relative dates only when the current task explicitly
             // says today/tomorrow and no absolute date was available in its history.
             if (fieldKind(key) === "date") {
-              const taskText = taskTexts.join("\\n");
-              const relative = /\\b(hoje|today|amanh[aã]|tomorrow)\\b/i.exec(taskText)?.[1]?.toLowerCase();
+              const taskText = taskTexts.join("\n");
+              const relative = /\b(hoje|today|amanh[aã]|tomorrow)\b/i.exec(taskText)?.[1]?.toLowerCase();
               if (relative) {
                 const date = new Date();
                 if (/amanh|tomorrow/.test(relative)) date.setDate(date.getDate() + 1);
