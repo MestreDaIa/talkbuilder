@@ -1137,7 +1137,7 @@ const runLocalFlow = async (
           ""
         );
         const requiredFieldsMatch = previousApiError.match(
-          /([a-zA-Z_][a-zA-Z0-9_]*(?:\/[a-zA-Z_][a-zA-Z0-9_]*)?(?:\s*,\s*[a-zA-Z_][a-zA-Z0-9_]*(?:\/[a-zA-Z_][a-zA-Z0-9_]*)?)*(?:\s+e\s+[a-zA-Z_][a-zA-Z0-9_]*(?:\/[a-zA-Z_][a-zA-Z0-9_]*)?)?)\s+(?:são|sao)\s+obrigat[oó]rios?/i
+          /((?:[a-zA-Z_][a-zA-Z0-9_]*(?:\/[a-zA-Z_][a-zA-Z0-9_]*)*(?:\s*\([^)]*\))?)(?:\s*,\s*(?:[a-zA-Z_][a-zA-Z0-9_]*(?:\/[a-zA-Z_][a-zA-Z0-9_]*)*(?:\s*\([^)]*\))?))*(?:\s+e\s+(?:[a-zA-Z_][a-zA-Z0-9_]*(?:\/[a-zA-Z_][a-zA-Z0-9_]*)*(?:\s*\([^)]*\))?))?)\s+(?:são|sao)\s+obrigat[oó]rios?/i
         );
         const inferredRequiredFields = requiredFieldsMatch?.[1]
           ? requiredFieldsMatch[1].split(/\s*,\s*|\s+e\s+/i)
