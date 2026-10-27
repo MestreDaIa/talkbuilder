@@ -1,7 +1,7 @@
 import { supabase } from "./supabase.js";
 import * as crypto from "node:crypto";
 
-async function fetchGeminiGenerateContentWithFallback(model: string, apiKey: string, requestBody: any): Promise<{ response: Response; model: string }> {
+async function fetchGeminiGenerateContentWithFallback(model: string, apiKey: string, requestBody: any): Promise<{ response: any; model: string }> {
   const call = (modelId: string) => fetch(`https://generativelanguage.googleapis.com/v1beta/models/${encodeURIComponent(modelId)}:generateContent`, {
     method: "POST",
     headers: { "Content-Type": "application/json", "x-goog-api-key": apiKey },
