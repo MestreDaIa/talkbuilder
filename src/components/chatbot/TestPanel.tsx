@@ -1115,6 +1115,15 @@ const runLocalFlow = async (
         const latestUserSelectedTime = taskUserTexts
           .flatMap((text) => [...text.matchAll(/\b([01]?\d|2[0-3]):([0-5]\d)\b/g)].map((match) => `${match[1].padStart(2, "0")}:${match[2]}`))
           .at(-1);
+        // Não usar \b depois de "amanhã": em JavaScript, o caractere "ã"
+        // não é tratado como \w e a fronteira falha em português.
+        const relativeDateMatch = /hoje|today|amanh(?:a|ã)|tomorrow/i.exec(taskUserTexts.join("\n"))?.[0]?.toLowerCase();
+        const latestUserSelectedDate = (() => {
+          if (!relativeDateMatch) return undefined;
+          const date = new Date();
+          if (/amanh|tomorrow/.test(relativeDateMatch)) date.setDate(date.getDate() + 1);
+          return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, "0")}-${String(date.getDate()).padStart(2, "0")}`;
+        })();
         const valueForField = (key: string) => {
           const normalizedKey = normalize(key);
           const kind = fieldKind(key);
@@ -1188,8 +1197,15 @@ const runLocalFlow = async (
             // Valores escolhidos explicitamente pelo usuário nesta tarefa prevalecem
             // sobre placeholders, exemplos ou valores antigos inventados pelo modelo.
             // Isso evita enviar 00:00 ou uma data/objeto serializado no lugar da escolha.
-            if ((kind === "time" && latestUserSelectedTime) ||
-                (kind === "date" && confirmed !== undefined && String(confirmed).trim())) {
+            if (kind === "time" && latestUserSelectedTime) {
+              nextArgs.body[key] = latestUserSelectedTime;
+              return;
+            }
+            if (kind === "date" && latestUserSelectedDate) {
+              nextArgs.body[key] = latestUserSelectedDate;
+              return;
+            }
+            if (kind === "date" && confirmed !== undefined && String(confirmed).trim()) {
               nextArgs.body[key] = confirmed;
               return;
             }
