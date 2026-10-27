@@ -21,7 +21,7 @@ async function fetchGeminiGenerateContentWithFallback(model: string, apiKey: str
       .map((item: any) => String(item.name || "").replace(/^models\//, ""))
       .filter((name: string) => /^gemini-/i.test(name));
     const preferred = ["gemini-3.8-flash", "gemini-3.6-flash", "gemini-3.5-flash-lite", "gemini-3.1-flash-lite"];
-    const fallback = preferred.find((name) => available.includes(name)) || available.find((name) => !/image|tts|transcribe|embedding|robotics|live/i.test(name));
+    const fallback = preferred.find((name) => available.includes(name)) || available.find((name: string) => !/image|tts|transcribe|embedding|robotics|live/i.test(name));
     if (!fallback || fallback === model) return { response: first, model };
     console.warn("[Gemini] Modelo", model, "retornou 404; tentando modelo compatível disponível:", fallback);
     return { response: await call(fallback), model: fallback };
