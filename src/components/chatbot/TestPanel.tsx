@@ -1105,7 +1105,7 @@ const runLocalFlow = async (
         const taskStartIndex = (() => {
           for (let i = messageHistory.length - 1; i >= 0; i--) {
             const msg = messageHistory[i];
-            if (msg.role === "user" && /\\b(agend|reserv|marcar|booking|appointment)\\b/i.test(String(msg.content || ""))) return i;
+            if (msg.role === "user" && /\b(agend|reserv|marcar|booking|appointment)\b/i.test(String(msg.content || ""))) return i;
           }
           return 0;
         })();
@@ -1137,11 +1137,11 @@ const runLocalFlow = async (
           ""
         );
         const requiredFieldsMatch = previousApiError.match(
-          /([a-zA-Z_][a-zA-Z0-9_]*(?:\\/[a-zA-Z_][a-zA-Z0-9_]*)?(?:\\s*,\\s*[a-zA-Z_][a-zA-Z0-9_]*(?:\\/[a-zA-Z_][a-zA-Z0-9_]*)?)*(?:\\s+e\\s+[a-zA-Z_][a-zA-Z0-9_]*(?:\\/[a-zA-Z_][a-zA-Z0-9_]*)?)?)\\s+(?:são|sao)\\s+obrigat[oó]rios?/i
+          /([a-zA-Z_][a-zA-Z0-9_]*(?:\/[a-zA-Z_][a-zA-Z0-9_]*)?(?:\s*,\s*[a-zA-Z_][a-zA-Z0-9_]*(?:\/[a-zA-Z_][a-zA-Z0-9_]*)?)*(?:\s+e\s+[a-zA-Z_][a-zA-Z0-9_]*(?:\/[a-zA-Z_][a-zA-Z0-9_]*)?)?)\s+(?:são|sao)\s+obrigat[oó]rios?/i
         );
         const inferredRequiredFields = requiredFieldsMatch?.[1]
-          ? requiredFieldsMatch[1].split(/\\s*,\\s*|\\s+e\\s+/i)
-              .map((field) => field.trim().split("/")[0].replace(/\\s*\\([^)]*\\)\\s*/g, "").trim())
+          ? requiredFieldsMatch[1].split(/\s*,\s*|\s+e\s+/i)
+              .map((field) => field.trim().split("/")[0].replace(/\s*\([^)]*\)\s*/g, "").trim())
               .filter((field) => /^[a-zA-Z_][a-zA-Z0-9_]*$/.test(field))
           : [];
         if (inferredRequiredFields.length) {
