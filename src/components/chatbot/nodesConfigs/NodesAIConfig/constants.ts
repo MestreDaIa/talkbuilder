@@ -18,10 +18,10 @@ export const AI_PROVIDERS = [
 
 export const MODELS_BY_PROVIDER: Record<string, string[]> = {
   openai: ["gpt-4o", "gpt-4o-mini", "gpt-4.1-mini", "gpt-4.1"],
-  gemini: ["gemini-2.5-flash", "gemini-2.5-pro", "gemini-2.0-flash", "gemini-2.0-flash-lite"],
+  gemini: ["gemini-3.8-flash", "gemini-3.6-flash", "gemini-3.5-flash-lite", "gemini-3.1-flash-lite", "gemini-2.5-flash", "gemini-2.5-pro"],
   anthropic: ["claude-sonnet-4-5", "claude-haiku-4-5", "claude-opus-4-1"],
   groq: ["llama-3.3-70b-versatile", "openai/gpt-oss-120b", "llama-3.1-8b-instant"],
-  openrouter: ["openai/gpt-4o-mini", "anthropic/claude-sonnet-4", "google/gemini-2.5-flash"],
+  openrouter: ["openai/gpt-4o-mini", "anthropic/claude-sonnet-4", "google/gemini-3.8-flash"],
   deepseek: ["deepseek-chat", "deepseek-reasoner"],
   mistral: ["mistral-large-latest", "mistral-small-latest", "ministral-8b-latest"],
   xai: ["grok-3-mini", "grok-3", "grok-4"],
