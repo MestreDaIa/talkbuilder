@@ -1205,13 +1205,15 @@ class FlowEngine {
               }
             }]
           }] : undefined;
-          const model = String(cfg.model || "gemini-2.0-flash").trim();
-          const res = await fetch("https://generativelanguage.googleapis.com/v1beta/models/" + encodeURIComponent(model) + ":generateContent", {
-            method: "POST",
-            headers: { "Content-Type": "application/json", "x-goog-api-key": apiKey },
-            body: JSON.stringify({ system_instruction: { parts: [{ text: systemPrompt }] }, contents, generationConfig: { temperature: cfg.temperature ?? 0.3, maxOutputTokens: cfg.maxTokens ?? 700 }, ...(functionTools ? { tools: functionTools, tool_config: { function_calling_config: { mode: "AUTO" } } } : {}) }),
-            signal: timeout.signal
+          let model = String(cfg.model || "gemini-3.8-flash").trim();
+          const geminiResult = await fetchGeminiGenerateContentWithFallback(model, apiKey, {
+            system_instruction: { parts: [{ text: systemPrompt }] },
+            contents,
+            generationConfig: { temperature: cfg.temperature ?? 0.3, maxOutputTokens: cfg.maxTokens ?? 700 },
+            ...(functionTools ? { tools: functionTools, tool_config: { function_calling_config: { mode: "AUTO" } } } : {})
           });
+          const res = geminiResult.response;
+          model = geminiResult.model;
           const body = await res.text();
           if (!res.ok) {
             const info = classifyAIError(provider, res.status, body);
