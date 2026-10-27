@@ -1181,16 +1181,27 @@ const runLocalFlow = async (
             if (!normalizedKey) return;
             const current = nextArgs.body[key];
             const currentMissing = current == null || String(current).trim() === "" || /^(undefined|null|\{\{.*\}\}|<[^>]+>)$/i.test(String(current).trim());
+            const kind = fieldKind(key);
             const confirmed = valueForField(key);
-            const selectedTimeMustWin = fieldKind(key) === "time" && !!latestUserSelectedTime && String(current ?? "").trim() !== latestUserSelectedTime;
+            const selectedTimeMustWin = kind === "time" && !!latestUserSelectedTime && String(current ?? "").trim() !== latestUserSelectedTime;
+
+            // Valores escolhidos explicitamente pelo usuário nesta tarefa prevalecem
+            // sobre placeholders, exemplos ou valores antigos inventados pelo modelo.
+            // Isso evita enviar 00:00 ou uma data/objeto serializado no lugar da escolha.
+            if ((kind === "time" && latestUserSelectedTime) ||
+                (kind === "date" && confirmed !== undefined && String(confirmed).trim())) {
+              nextArgs.body[key] = confirmed;
+              return;
+            }
+
             if (!currentMissing && !selectedTimeMustWin) return;
             if (confirmed !== undefined && String(confirmed).trim()) {
               nextArgs.body[key] = confirmed;
               return;
             }
-            // Resolve common relative dates only when the current task explicitly
-            // says today/tomorrow and no absolute date was available in its history.
-            if (fieldKind(key) === "date") {
+            // Resolve datas relativas a partir da mensagem do usuário, sem confiar
+            // em valores de exemplo ou em datas mencionadas apenas pela API.
+            if (kind === "date") {
               const taskText = taskUserTexts.join("\n");
               const relative = /\b(hoje|today|amanh[aã]|tomorrow)\b/i.exec(taskText)?.[1]?.toLowerCase();
               if (relative) {
