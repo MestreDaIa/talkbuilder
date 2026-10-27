@@ -1518,7 +1518,7 @@ async function runFlow(execution: any, containersIn: any[], edgesIn: any[], inpu
                       temperature: cfg.temperature ?? 0.2,
                       maxOutputTokens: cfg.maxTokens ?? 1000,
                     }
-                  }),);
+                });
                 const res = geminiResult.response;
                 model = geminiResult.model;
                 if (res.ok) {
