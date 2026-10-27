@@ -1110,12 +1110,17 @@ const runLocalFlow = async (
           return 0;
         })();
         const taskTexts = messageHistory.slice(taskStartIndex).map((msg) => String(msg.content || ""));
+        const taskUserTexts = messageHistory.slice(taskStartIndex).filter((msg) => msg.role === "user").map((msg) => String(msg.content || ""));
         const userTexts = messageHistory.filter((msg) => msg.role === "user").map((msg) => String(msg.content || ""));
+        const latestUserSelectedTime = taskUserTexts
+          .flatMap((text) => [...text.matchAll(/\b([01]?\d|2[0-3]):([0-5]\d)\b/g)].map((match) => `${match[1].padStart(2, "0")}:${match[2]}`))
+          .at(-1);
         const valueForField = (key: string) => {
           const normalizedKey = normalize(key);
+          const kind = fieldKind(key);
+          if (kind === "time" && latestUserSelectedTime) return latestUserSelectedTime;
           const exact = Object.entries(confirmedValues).find(([confirmedKey]) => normalize(confirmedKey) === normalizedKey)?.[1];
           if (exact !== undefined) return exact;
-          const kind = fieldKind(key);
           if (!kind) return undefined;
           const keyed = Object.entries(confirmedValues).reverse().find(([confirmedKey]) => fieldKind(confirmedKey) === kind)?.[1];
           if (keyed !== undefined) return keyed;
@@ -1135,9 +1140,9 @@ const runLocalFlow = async (
           (variables as any).httpResponse?.error_description ||
           (variables as any).httpResponse?.error ||
           ""
-        );
+        ).replace(/\s+and\s+/i, " e ");
         const requiredFieldsMatch = previousApiError.match(
-          /((?:[a-zA-Z_][a-zA-Z0-9_]*(?:\/[a-zA-Z_][a-zA-Z0-9_]*)*(?:\s*\([^)]*\))?)(?:\s*,\s*(?:[a-zA-Z_][a-zA-Z0-9_]*(?:\/[a-zA-Z_][a-zA-Z0-9_]*)*(?:\s*\([^)]*\))?))*(?:\s+e\s+(?:[a-zA-Z_][a-zA-Z0-9_]*(?:\/[a-zA-Z_][a-zA-Z0-9_]*)*(?:\s*\([^)]*\))?))?)\s+(?:são|sao)\s+obrigat[oó]rios?/i
+          /((?:[a-zA-Z_][a-zA-Z0-9_]*(?:\/[a-zA-Z_][a-zA-Z0-9_]*)*(?:\s*\([^)]*\))?)(?:\s*,\s*(?:[a-zA-Z_][a-zA-Z0-9_]*(?:\/[a-zA-Z_][a-zA-Z0-9_]*)*(?:\s*\([^)]*\))?))*(?:\s+e\s+(?:[a-zA-Z_][a-zA-Z0-9_]*(?:\/[a-zA-Z_][a-zA-Z0-9_]*)*(?:\s*\([^)]*\))?))?)\s+(?:(?:são|sao)\s+obrigat[oó]rios?|are\s+required)\b/i
         );
         const inferredRequiredFields = requiredFieldsMatch?.[1]
           ? requiredFieldsMatch[1].split(/\s*,\s*|\s+e\s+/i)
@@ -1176,8 +1181,9 @@ const runLocalFlow = async (
             if (!normalizedKey) return;
             const current = nextArgs.body[key];
             const currentMissing = current == null || String(current).trim() === "" || /^(undefined|null|\{\{.*\}\}|<[^>]+>)$/i.test(String(current).trim());
-            if (!currentMissing) return;
             const confirmed = valueForField(key);
+            const selectedTimeMustWin = fieldKind(key) === "time" && !!latestUserSelectedTime && String(current ?? "").trim() !== latestUserSelectedTime;
+            if (!currentMissing && !selectedTimeMustWin) return;
             if (confirmed !== undefined && String(confirmed).trim()) {
               nextArgs.body[key] = confirmed;
               return;
@@ -1185,7 +1191,7 @@ const runLocalFlow = async (
             // Resolve common relative dates only when the current task explicitly
             // says today/tomorrow and no absolute date was available in its history.
             if (fieldKind(key) === "date") {
-              const taskText = taskTexts.join("\n");
+              const taskText = taskUserTexts.join("\n");
               const relative = /\b(hoje|today|amanh[aã]|tomorrow)\b/i.exec(taskText)?.[1]?.toLowerCase();
               if (relative) {
                 const date = new Date();
@@ -2049,15 +2055,24 @@ const runLocalFlow = async (
               break;
             }
 
+            const userFacingReply = String(aiReply)
+              .replace(/\s*\(\s*(?:ID|UUID)\s*[:#=]\s*[^)]{8,}\)\s*/gi, " ")
+              .replace(/\b(?:ID|UUID)\s*[:#=]\s*[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}\b/gi, "")
+              .replace(/\b[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}\b/gi, "")
+              .replace(/\(\s*\)/g, "")
+              .replace(/[ \t]{2,}/g, " ")
+              .replace(/\s+([,.;!?])/g, "$1")
+              .replace(/\n{3,}/g, "\n\n")
+              .trim();
             const botMsg: RuntimeMessage = {
               id: crypto.randomUUID(),
               conversation_id: conversationId || "temp",              role: "assistant",
-              content: aiReply,
+              content: userFacingReply,
               created_at: new Date().toISOString()
             };
             messageHistory.push(botMsg);
             if (conversationId) conversationService.saveMessage(botMsg);
-            nextMessages.push({ ...botMsg, type: "bot", content: aiReply, isHtml: false } as Message);
+            nextMessages.push({ ...botMsg, type: "bot", content: userFacingReply, isHtml: false } as Message);
           }
 
           waitingFor = "input-text";
