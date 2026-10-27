@@ -1,6 +1,36 @@
 import { supabase } from "./supabase.js";
 import * as crypto from "node:crypto";
 
+async function fetchGeminiGenerateContentWithFallback(model: string, apiKey: string, requestBody: any): Promise<{ response: Response; model: string }> {
+  const call = (modelId: string) => fetch(`https://generativelanguage.googleapis.com/v1beta/models/${encodeURIComponent(modelId)}:generateContent`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json", "x-goog-api-key": apiKey },
+    body: JSON.stringify(requestBody),
+  });
+  const first = await call(model);
+  if (first.status !== 404) return { response: first, model };
+  // Model IDs change over time. Ask the API which generateContent models this key can actually use.
+  try {
+    const listing = await fetch("https://generativelanguage.googleapis.com/v1beta/models?pageSize=1000", {
+      headers: { "x-goog-api-key": apiKey },
+    });
+    if (!listing.ok) return { response: first, model };
+    const payload: any = await listing.json();
+    const available = (Array.isArray(payload.models) ? payload.models : [])
+      .filter((item: any) => Array.isArray(item.supportedGenerationMethods) && item.supportedGenerationMethods.includes("generateContent"))
+      .map((item: any) => String(item.name || "").replace(/^models\//, ""))
+      .filter((name: string) => /^gemini-/i.test(name));
+    const preferred = ["gemini-3.8-flash", "gemini-3.6-flash", "gemini-3.5-flash-lite", "gemini-3.1-flash-lite"];
+    const fallback = preferred.find((name) => available.includes(name)) || available.find((name) => !/image|tts|transcribe|embedding|robotics|live/i.test(name));
+    if (!fallback || fallback === model) return { response: first, model };
+    console.warn("[Gemini] Modelo", model, "retornou 404; tentando modelo compatível disponível:", fallback);
+    return { response: await call(fallback), model: fallback };
+  } catch (error) {
+    console.warn("[Gemini] Não foi possível descobrir modelos disponíveis após 404:", error);
+    return { response: first, model };
+  }
+}
+
 const runtimeMemory = new Map<string, { state: any; expiresAt: number }>();
 const MEMORY_TTL_MS = 1000 * 60 * 60 * 6;
 
@@ -1203,8 +1233,7 @@ async function runFlow(execution: any, containersIn: any[], edgesIn: any[], inpu
                 console.error(`[ai-node:anthropic] HTTP ${res.status}: ${(await res.text().catch(() => "")).slice(0, 500)}`);
               }
             } else if (provider === "gemini") {
-              const model = cfg.model || "gemini-2.0-flash";
-              const url = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${activeKey}`;
+              let model = cfg.model || "gemini-3.8-flash";
               
               const userParts: any[] = [{ text: userPrompt }];
               if (cfg.visionEnabled) {
@@ -1231,18 +1260,16 @@ async function runFlow(execution: any, containersIn: any[], edgesIn: any[], inpu
                 }
               }
 
-              const res = await fetch(url, {
-                method: "POST",
-                headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({
-                  system_instruction: { parts: [{ text: systemPrompt + context }] },
-                  contents: [{ role: "user", parts: userParts }],
-                  generationConfig: {
-                    temperature: cfg.temperature ?? 0.7,
-                    maxOutputTokens: cfg.maxTokens ?? 1000,
-                  }
-                }),
+              const geminiResult = await fetchGeminiGenerateContentWithFallback(model, activeKey, {
+                system_instruction: { parts: [{ text: systemPrompt + context }] },
+                contents: [{ role: "user", parts: userParts }],
+                generationConfig: {
+                  temperature: cfg.temperature ?? 0.7,
+                  maxOutputTokens: cfg.maxTokens ?? 1000,
+                }
               });
+              const res = geminiResult.response;
+              model = geminiResult.model;
               if (res.ok) {
                 const data: any = await res.json();
                 aiReply=data.candidates?.[0]?.content?.parts?.[0]?.text||"";
