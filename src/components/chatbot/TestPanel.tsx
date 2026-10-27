@@ -2802,6 +2802,31 @@ const runLocalFlow = async (
                         bestIds.add(String(entity.id));
                       }
                     }
+
+                    // Se a API retornou uma única entidade do tipo exigido e o
+                    // próprio assistente já apresentou esse nome como disponível,
+                    // não reinicie a conversa pedindo uma escolha impossível entre opções inexistentes.
+                    if (!best && !hasValue && candidates.length === 1) {
+                      const onlyCandidate = candidates[0];
+                      const candidateLabel = normalizeLookupText(onlyCandidate.label);
+                      const namedByAssistant = !!candidateLabel && messageHistory.some((msg) =>
+                        msg.role === "assistant" &&
+                        !isSkillResultHistoryMessage(msg) &&
+                        normalizeLookupText(msg.content).includes(candidateLabel)
+                      );
+                      if (namedByAssistant) {
+                        rememberVerifiedEntitySelection(paramName, onlyCandidate.id);
+                        audit({
+                          resolved: onlyCandidate.id,
+                          action: "resolved_by_context",
+                          reason: "single_typed_candidate_named_by_assistant",
+                          source: onlyCandidate.source,
+                          sourceEntityLabel: onlyCandidate.label,
+                        });
+                        return { ok: true, value: onlyCandidate.id };
+                      }
+                    }
+
                     if (best && best.score >= 3) {
                       // Não selecione arbitrariamente entre entidades diferentes com a mesma pontuação.
                       if (bestIds.size > 1) {
