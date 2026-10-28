@@ -2635,12 +2635,20 @@ const runLocalFlow = async (
                   };
 
                   const userExplicitlyMentionedEntity = (entity: KnownEntity) => {
-                    const text = normalizeLookupText(variables.last_message);
+                    // variables.last_message pode permanecer com o primeiro turno da tarefa.
+                    // Para decidir se o usuário está trocando uma seleção, use a mensagem
+                    // mais recente do usuário no histórico, nunca uma menção antiga.
+                    const latestUserMessage = [...messageHistory]
+                      .reverse()
+                      .find((msg) => msg.role === "user");
+                    const currentUserText = String(latestUserMessage?.content ?? variables.last_user_message ?? variables.last_message ?? "");
+                    const text = normalizeLookupText(currentUserText);
                     if (!text) return false;
                     const labels = [entity.label, ...(entity.aliases || [])]
                       .map((value) => normalizeLookupText(value))
                       .filter(Boolean);
-                    return labels.some((label) => text === label || text.includes(label));
+                    const paddedText = " " + text + " ";
+                    return labels.some((label) => paddedText.includes(" " + label + " "));
                   };
 
                   // Reaproveita somente entidades que o USUÁRIO mencionou explicitamente
