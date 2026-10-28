@@ -2419,9 +2419,21 @@ const runLocalFlow = async (
                       // generic session context: IDs such as `hold_id`, `payment_id`,
                       // `token_id`, etc. must remain reusable by later skills.
                       if (rawId !== undefined) {
+                        // A classificação deve priorizar o recurso mais específico do caminho do payload.
+                        // Um endpoint /services pode retornar coleções aninhadas de combos; herdar
+                        // "service" junto com "combo" faria um combo passar indevidamente por service_id.
+                        const genericPathTerms = new Set([
+                          "data", "result", "results", "response", "items", "item", "list",
+                          "records", "record", "payload", "json", "id", "uuid", "name",
+                          "title", "label", "description", "price", "duration", "active",
+                        ]);
+                        const specificPathHints = Array.from(new Set(
+                          pathHints.map(singularize)
+                            .filter((term) => term.length >= 3 && !genericPathTerms.has(term))
+                            .filter((term) => !sourceHints.includes(term))
+                        ));
                         const typeHints = Array.from(new Set([
-                          ...sourceHints,
-                          ...pathHints.map(singularize),
+                          ...(specificPathHints.length ? specificPathHints : sourceHints),
                           ...(idKey ? splitNameTerms(idKey).map(singularize) : []),
                         ].filter((term) => term.length >= 3)));
                         const entity: KnownEntity = {
