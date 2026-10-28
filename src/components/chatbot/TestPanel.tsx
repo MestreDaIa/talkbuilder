@@ -2323,8 +2323,11 @@ const runLocalFlow = async (
                   const valueLooksLikeIdentifier = (value: unknown) => {
                     const raw = String(value ?? "").trim();
                     if (!raw) return false;
+                    // IDs de APIs podem ter prefixos de recurso (ex.: combo:<id>).
+                    // Trate-os como identificadores, nunca como texto de busca/label.
                     return /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(raw)
-                      || /^[a-zA-Z0-9_-]{12,}$/.test(raw);
+                      || /^[a-zA-Z0-9_-]{12,}$/.test(raw)
+                      || /^[a-z][a-z0-9_-]*:[a-zA-Z0-9_-]{6,}$/i.test(raw);
                   };
 
                   const paramTypeHints = (paramName: string) => splitNameTerms(paramName)
@@ -2660,7 +2663,16 @@ const runLocalFlow = async (
 
                     for (const [messageIndex, userText] of userMessages.entries()) {
                       for (const entity of entities) {
-                        const score = scoreEntity(entity, [userText, ...userText.split(/\\s+/).filter((part) => part.length >= 3)]);
+                        const normalizedLabels = [entity.label, ...(entity.aliases || [])]
+                          .map(normalizeLookupText)
+                          .filter((label) => label.length >= 3);
+                        // Uma menção exata ao nome completo vence coincidências parciais.
+                        // Ex.: "barba" deve selecionar "Barba", não "Combo Corte + Barba".
+                        const exactPhrase = normalizedLabels
+                          .filter((label) => userText.includes(label))
+                          .reduce((best, label) => Math.max(best, 100 + label.length), 0);
+                        const partialScore = scoreEntity(entity, userText.split(/\\s+/).filter((part) => part.length >= 3));
+                        const score = exactPhrase || partialScore;
                         if (score < 3) continue;
 
                         for (const hint of entity.typeHints || []) {
@@ -2814,7 +2826,9 @@ const runLocalFlow = async (
                     // Só reutilizamos uma entidade quando houve seleção explícita nesta conversa.
                     // Isso evita transformar "lista retornada pela API" em escolha automática.
                     const terms = new Set<string>(collectLookupTerms());
-                    if (hasValue) {
+                    // Não use um ID não validado como pista para encontrar a própria entidade:
+                    // isso permitia que "combo:<uuid>" validasse a si mesmo por coincidência.
+                    if (hasValue && !valueLooksLikeIdentifier(rawText)) {
                       const normalized = normalizeLookupText(rawText);
                       if (normalized) {
                         terms.add(normalized);
