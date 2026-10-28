@@ -3274,10 +3274,6 @@ const runLocalFlow = async (
                               console.warn("[node:http-request][dynamic] horário da mutação recuperado da escolha do usuário", { field: key, previous: current, selectedTime });
                               bodyValue[key] = selectedTime;
                             }
-                          } else if (normalized === "holdminutes" && missing) {
-                            // Parâmetro operacional opcional ao usuário: usa uma duração curta padrão
-                            // quando a API exige explicitamente um inteiro e o agente omite o valor.
-                            bodyValue[key] = 5;
                           }
                         }
                       }
