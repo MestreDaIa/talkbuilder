@@ -1526,7 +1526,7 @@ async function runFlow(execution: any, containersIn: any[], edgesIn: any[], inpu
                   const data: any = await res.json();
                   const parts=data.candidates?.[0]?.content?.parts||[];
                   const fn=parts.find((p:any)=>p?.functionCall?.name==="use_skill")?.functionCall;
-                  if(fn?.args?.skill_id)(variables as any).__runtimeSkillCall={skill_id:String(fn.args.skill_id),arguments:runtimeToolObject(fn.args.arguments),parameters:runtimeToolObject(fn.args.parameters),intent:fn.args.intent?String(fn.args.intent):"",message:fn.args.message?String(fn.args.message):""};
+                  if(fn?.args?.skill_id){let parsedArguments=fn.args.arguments; if((!parsedArguments||typeof parsedArguments!=="object")&&typeof fn.args.arguments_json==="string"){try{parsedArguments=JSON.parse(fn.args.arguments_json);}catch{parsedArguments={};}} (variables as any).__runtimeSkillCall={skill_id:String(fn.args.skill_id),arguments:runtimeToolObject(parsedArguments),parameters:runtimeToolObject(fn.args.parameters),intent:fn.args.intent?String(fn.args.intent):"",message:fn.args.message?String(fn.args.message):""};}
                   aiReply=parts.map((p:any)=>p.text).filter(Boolean).join("\n").trim()||"";
                   if(!(variables as any).__runtimeSkillCall){
                     const parsed=parseRuntimeSkillCall(aiReply);
