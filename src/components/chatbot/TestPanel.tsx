@@ -1044,7 +1044,7 @@ const runLocalFlow = async (
         collectKeyValueLines(confirmationText);
         // Keep structured values explicitly supplied in earlier user turns available
         // to later mutation skills; the latest assistant message need not say "confirm".
-        for (const userMessage of messageHistory.filter((msg) => msg.role === "user")) {
+        for (const userMessage of messageHistory.filter((msg) => msg.role === "user" && !isSkillResultHistoryMessage(msg))) {
           collectKeyValueLines(String(userMessage.content || ""));
         }
 
