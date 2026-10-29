@@ -3274,7 +3274,7 @@ const runLocalFlow = async (
                       // Skill dentro de booking_date ou esquecer booking_time ao montar o body.
                       if (isMutatingDispatch && bodyValue && typeof bodyValue === "object" && !Array.isArray(bodyValue)) {
                         const userMessages = messageHistory
-                          .filter((msg) => msg.role === "user")
+                          .filter((msg) => msg.role === "user" && !isSkillResultHistoryMessage(msg))
                           .map((msg) => String(msg.content || ""));
                         let taskStart = 0;
                         for (let i = userMessages.length - 1; i >= 0; i--) {
