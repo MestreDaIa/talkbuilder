@@ -3269,65 +3269,9 @@ const runLocalFlow = async (
                     if (canAgentBody && agentBody !== undefined && agentBody !== null && agentBody !== "") {
                       let bodyValue = typeof agentBody === "string" ? extractJsonFromText(replaceVars(agentBody)) ?? replaceVars(agentBody) : agentBody;
 
-                      // Recupera escolhas explícitas do usuário no ponto final de execução.
-                      // Isso protege o payload mesmo se o modelo serializar o resultado de uma
-                      // Skill dentro de booking_date ou esquecer booking_time ao montar o body.
-                      if (isMutatingDispatch && bodyValue && typeof bodyValue === "object" && !Array.isArray(bodyValue)) {
-                        const userMessages = messageHistory
-                          .filter((msg) => msg.role === "user" && !isSkillResultHistoryMessage(msg))
-                          .map((msg) => String(msg.content || ""));
-                        let taskStart = 0;
-                        for (let i = userMessages.length - 1; i >= 0; i--) {
-                          if (/(?:agend|reserv|marcar|booking|appointment)/i.test(userMessages[i])) {
-                            taskStart = i;
-                            break;
-                          }
-                        }
-                        const taskUserMessages = userMessages.slice(taskStart);
-                        const taskUserText = taskUserMessages.join("\n");
-                        const selectedTimes = taskUserMessages.flatMap((message) =>
-                          [...message.matchAll(/\b([01]?\d|2[0-3]):([0-5]\d)\b/g)]
-                            .map((match) => `${match[1].padStart(2, "0")}:${match[2]}`)
-                        );
-                        const selectedTime = selectedTimes.at(-1);
-                        const explicitDateMatches = [...taskUserText.matchAll(/\b(\d{1,2})[/.\-](\d{1,2})(?:[/.\-](\d{4}))?\b/g)];
-                        const explicitDate = explicitDateMatches.at(-1);
-                        const relativeDateMatches = [...taskUserText.matchAll(/hoje|today|amanh(?:a|ã)|tomorrow/gi)];
-                        const relativeDate = relativeDateMatches.at(-1)?.[0]?.toLowerCase();
-                        let selectedDate: string | undefined;
-                        if (explicitDate) {
-                          const now = new Date();
-                          const day = Number(explicitDate[1]);
-                          const month = Number(explicitDate[2]);
-                          const year = explicitDate[3] ? Number(explicitDate[3]) : now.getFullYear();
-                          const candidate = new Date(year, month - 1, day);
-                          if (candidate.getFullYear() === year && candidate.getMonth() === month - 1 && candidate.getDate() === day) {
-                            selectedDate = `${year}-${String(month).padStart(2, "0")}-${String(day).padStart(2, "0")}`;
-                          }
-                        }
-                        if (relativeDate && !explicitDate?.[3]) {
-                          const date = new Date();
-                          if (/amanh|tomorrow/.test(relativeDate)) date.setDate(date.getDate() + 1);
-                          selectedDate = `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, "0")}-${String(date.getDate()).padStart(2, "0")}`;
-                        }
-
-                        for (const [key, current] of Object.entries(bodyValue)) {
-                          const normalized = normalizeKeyName(key);
-                          const missing = current == null || String(current).trim() === "" ||
-                            /^(undefined|null|\{\{.*\}\}|<[^>]+>)$/i.test(String(current).trim());
-                          if (/(date|data|dia|scheduledday|appointmentday)/i.test(normalized) && selectedDate) {
-                            if (String(current ?? "") !== selectedDate) {
-                              console.warn("[node:http-request][dynamic] data da mutação recuperada da escolha do usuário", { field: key, previous: current, selectedDate });
-                              bodyValue[key] = selectedDate;
-                            }
-                          } else if (/(time|hora|horario|starttime|appointmenttime)/i.test(normalized) && selectedTime) {
-                            if (String(current ?? "").trim() !== selectedTime) {
-                              console.warn("[node:http-request][dynamic] horário da mutação recuperado da escolha do usuário", { field: key, previous: current, selectedTime });
-                              bodyValue[key] = selectedTime;
-                            }
-                          }
-                        }
-                      }
+                      // O runtime não interpreta texto livre para reconstruir campos de domínio (data, hora, preço etc.).
+                      // O body deve vir dos argumentos/variáveis e do contrato da Skill configurada,
+                      // mantendo o executor independente da API e do caso de uso.
 
                       const sanitizedBody = sanitizeIdLikeValues(bodyValue, "body");
                       if (!sanitizedBody.ok) {
