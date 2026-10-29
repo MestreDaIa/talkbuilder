@@ -2432,10 +2432,14 @@ const runLocalFlow = async (
                             .filter((term) => term.length >= 3 && !genericPathTerms.has(term))
                             .filter((term) => !sourceHints.includes(term))
                         ));
-                        const typeHints = Array.from(new Set([
-                          ...(specificPathHints.length ? specificPathHints : sourceHints),
-                          ...(idKey ? splitNameTerms(idKey).map(singularize) : []),
-                        ].filter((term) => term.length >= 3)));
+                        // Não inferir o tipo do recurso pelo nome da coluna que contém o ID.
+                        // Campos como service_id dentro de um combo são referências a outro recurso,
+                        // não prova de que o próprio combo seja um service. Isso contaminava a seleção
+                        // de service_id e permitia que o ID "combo:<uuid>" substituísse o serviço escolhido.
+                        const typeHints = Array.from(new Set(
+                          (specificPathHints.length ? specificPathHints : sourceHints)
+                            .filter((term) => term.length >= 3)
+                        ));
                         const entity: KnownEntity = {
                           id: String(rawId),
                           label: label || aliases[0] || String(idKey || "id"),
