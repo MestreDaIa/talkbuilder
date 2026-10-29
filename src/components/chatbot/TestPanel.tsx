@@ -1044,7 +1044,7 @@ const runLocalFlow = async (
         collectKeyValueLines(confirmationText);
         // Keep structured values explicitly supplied in earlier user turns available
         // to later mutation skills; the latest assistant message need not say "confirm".
-        for (const userMessage of messageHistory.filter((msg) => msg.role === "user")) {
+        for (const userMessage of messageHistory.filter((msg) => msg.role === "user" && !isSkillResultHistoryMessage(msg))) {
           collectKeyValueLines(String(userMessage.content || ""));
         }
 
@@ -1105,13 +1105,13 @@ const runLocalFlow = async (
         const taskStartIndex = (() => {
           for (let i = messageHistory.length - 1; i >= 0; i--) {
             const msg = messageHistory[i];
-            if (msg.role === "user" && /(?:agend|reserv|marcar|booking|appointment)/i.test(String(msg.content || ""))) return i;
+            if (msg.role === "user" && !isSkillResultHistoryMessage(msg) && /(?:agend|reserv|marcar|booking|appointment)/i.test(String(msg.content || ""))) return i;
           }
           return 0;
         })();
-        const taskTexts = messageHistory.slice(taskStartIndex).map((msg) => String(msg.content || ""));
-        const taskUserTexts = messageHistory.slice(taskStartIndex).filter((msg) => msg.role === "user").map((msg) => String(msg.content || ""));
-        const userTexts = messageHistory.filter((msg) => msg.role === "user").map((msg) => String(msg.content || ""));
+        const taskTexts = messageHistory.slice(taskStartIndex).filter((msg) => !isSkillResultHistoryMessage(msg)).map((msg) => String(msg.content || ""));
+        const taskUserTexts = messageHistory.slice(taskStartIndex).filter((msg) => msg.role === "user" && !isSkillResultHistoryMessage(msg)).map((msg) => String(msg.content || ""));
+        const userTexts = messageHistory.filter((msg) => msg.role === "user" && !isSkillResultHistoryMessage(msg)).map((msg) => String(msg.content || ""));
         const latestUserSelectedTime = taskUserTexts
           .flatMap((text) => [...text.matchAll(/\b([01]?\d|2[0-3]):([0-5]\d)\b/g)].map((match) => `${match[1].padStart(2, "0")}:${match[2]}`))
           .at(-1);
@@ -2669,7 +2669,7 @@ const runLocalFlow = async (
                     // mais recente do usuário no histórico, nunca uma menção antiga.
                     const latestUserMessage = [...messageHistory]
                       .reverse()
-                      .find((msg) => msg.role === "user");
+                      .find((msg) => msg.role === "user" && !isSkillResultHistoryMessage(msg));
                     const currentUserText = String(latestUserMessage?.content ?? variables.last_user_message ?? variables.last_message ?? "");
                     const text = normalizeLookupText(currentUserText);
                     if (!text) return false;
@@ -2686,7 +2686,7 @@ const runLocalFlow = async (
                   // melhor candidata por tipo, evitando auto-seleção por contexto.
                   const rememberExplicitUserEntityMentions = () => {
                     const userMessages = messageHistory
-                      .filter((msg) => msg.role === "user")
+                      .filter((msg) => msg.role === "user" && !isSkillResultHistoryMessage(msg))
                       .map((msg) => normalizeLookupText(msg.content))
                       .filter(Boolean);
                     if (!userMessages.length) return;
