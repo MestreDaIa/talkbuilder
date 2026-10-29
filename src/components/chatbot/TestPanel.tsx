@@ -1058,33 +1058,24 @@ const runLocalFlow = async (
           ? extractJsonFromText(String(skill.argsSchema.bodyExample))
           : null;
         const hasObjectBody = nextArgs.body && typeof nextArgs.body === "object" && !Array.isArray(nextArgs.body);
-        if (exampleBody && typeof exampleBody === "object" && !Array.isArray(exampleBody)) {
-          // Use the configured example only as a schema/template for missing keys.
-          // Never copy sample values into a real mutation request.
-          const emptyShape = (value: any): any => {
-            if (Array.isArray(value)) return [];
-            if (value && typeof value === "object") {
-              return Object.fromEntries(Object.entries(value).map(([key, child]) => [key, emptyShape(child)]));
-            }
-            return "";
-          };
-          const shape = emptyShape(exampleBody);
-          const currentBody = hasObjectBody ? nextArgs.body : {};
-          const mergeMissing = (template: any, current: any): any => {
-            if (template && typeof template === "object" && !Array.isArray(template)) {
-              const result: Record<string, any> = { ...(current && typeof current === "object" && !Array.isArray(current) ? current : {}) };
+        if (hasObjectBody && exampleBody && typeof exampleBody === "object" && !Array.isArray(exampleBody)) {
+          // O exemplo descreve a estrutura esperada, mas não fornece valores reais.
+          // Nunca invente campos ausentes com strings vazias: APIs podem rejeitá-los
+          // ou interpretá-los como valores explícitos inválidos.
+          const preserveConfiguredShape = (template: any, current: any): any => {
+            if (template && typeof template === "object" && !Array.isArray(template) &&
+                current && typeof current === "object" && !Array.isArray(current)) {
+              const result: Record<string, any> = { ...current };
               for (const [key, child] of Object.entries(template)) {
-                const existing = result[key];
-                const missing = existing === undefined || existing === null || String(existing).trim() === "" ||
-                  (typeof existing === "string" && /^(undefined|null|\{\{.*\}\}|<[^>]+>)$/i.test(existing.trim()));
-                if (missing) result[key] = emptyShape(child);
-                else if (child && typeof child === "object" && !Array.isArray(child)) result[key] = mergeMissing(child, existing);
+                if (result[key] !== undefined && child && typeof child === "object" && !Array.isArray(child)) {
+                  result[key] = preserveConfiguredShape(child, result[key]);
+                }
               }
               return result;
             }
             return current;
           };
-          nextArgs.body = mergeMissing(shape, currentBody);
+          nextArgs.body = preserveConfiguredShape(exampleBody, nextArgs.body);
         }
         if ((!nextArgs.body || typeof nextArgs.body !== "object" || Array.isArray(nextArgs.body)) && nextArgs.body !== "") {
           const flatBody = Object.fromEntries(
