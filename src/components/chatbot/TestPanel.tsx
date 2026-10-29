@@ -2436,10 +2436,16 @@ const runLocalFlow = async (
                         // Campos como service_id dentro de um combo são referências a outro recurso,
                         // não prova de que o próprio combo seja um service. Isso contaminava a seleção
                         // de service_id e permitia que o ID "combo:<uuid>" substituísse o serviço escolhido.
-                        const typeHints = Array.from(new Set(
-                          (specificPathHints.length ? specificPathHints : sourceHints)
-                            .filter((term) => term.length >= 3)
-                        ));
+                        // Alguns serviços identificam recursos com IDs namespaced (tipo:uuid).
+                        // O prefixo é a indicação mais específica do tipo e deve prevalecer
+                        // sobre o endpoint pai, por exemplo "combo:<uuid>" não é um service_id UUID.
+                        const idPrefix = typeof rawId === "string"
+                          ? rawId.trim().match(/^([a-z][a-z0-9_-]*):/i)?.[1]
+                          : undefined;
+                        const typeHints = Array.from(new Set([
+                          ...(specificPathHints.length ? specificPathHints : sourceHints),
+                          ...(idPrefix ? [singularize(idPrefix)] : []),
+                        ].filter((term) => term.length >= 3)));
                         const entity: KnownEntity = {
                           id: String(rawId),
                           label: label || aliases[0] || String(idKey || "id"),
@@ -2489,6 +2495,13 @@ const runLocalFlow = async (
 
                   const entityMatchesType = (entity: KnownEntity, hints: string[]) => {
                     if (!hints.length) return true;
+                    // Prefixos explícitos de IDs namespaced têm precedência sobre pistas
+                    // herdadas do endpoint. "combo:<uuid>" nunca pode validar service_id,
+                    // mesmo que o combo tenha vindo de /services.
+                    const idPrefix = String(entity.id || "").trim().match(/^([a-z][a-z0-9_-]*):/i)?.[1];
+                    if (idPrefix) {
+                      return hints.some((hint) => singularize(hint) === singularize(idPrefix));
+                    }
                     const entityHints = new Set((entity.typeHints || []).map(singularize));
                     // Se o payload já tem dicas de tipo, não use a URL inteira como fallback, pois ela pode mencionar recursos relacionados diferentes.
                     if (entityHints.size) return hints.some((hint) => entityHints.has(hint));
