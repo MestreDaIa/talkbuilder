@@ -2265,7 +2265,7 @@ const runLocalFlow = async (
                     )
                   );
                   const agentBody = agentArgs.body ?? (isDispatched && isMutatingDispatch && Object.keys(flatAgentBody).length ? flatAgentBody : undefined);
-                  const strictIds = typeof ep.strictIds === "boolean" ? ep.strictIds : isMutatingDispatch;
+                  // Modo estrito só fica ativo quando foi habilitado explicitamente na configuração da Skill.\n                  // Operações de escrita, por si só, não significam que o usuário ativou esse modo.\n                  const strictIds = ep.strictIds === true;
                   // Auditoria de substituições/rejeições de IDs feitas nesta chamada.
                   const idAuditTrail: Array<{
                     location: "path" | "query" | "body";
@@ -2343,6 +2343,19 @@ const runLocalFlow = async (
                   const paramTypeHints = (paramName: string) => splitNameTerms(paramName)
                     .map(singularize)
                     .filter((term) => term.length >= 3 && !["param", "query", "body", "code", "value"].includes(term));
+
+                  // IDs de entidades que representam escolhas do usuário exigem seleção explícita.
+                  // IDs operacionais emitidos por uma API (hold_id, payment_id, token_id etc.)
+                  // podem ser reutilizados por Skills seguintes quando vieram de uma resposta
+                  // desta sessão; não faz sentido pedir ao usuário para "escolher" um UUID técnico.
+                  const requiresExplicitUserSelection = (paramName: string) => {
+                    const selectableTypes = new Set([
+                      "service", "professional", "employee", "client", "customer",
+                      "product", "item", "category", "provider", "staff",
+                      "booking", "appointment", "reservation",
+                    ]);
+                    return paramTypeHints(paramName).some((hint) => selectableTypes.has(hint));
+                  };
 
                   type KnownEntity = {
                     id: string;
@@ -2832,7 +2845,8 @@ const runLocalFlow = async (
                         }
                       }
                       if (exact) {
-                        if (!userExplicitlyMentionedEntity(exact) && !getVerifiedSelectionForParam(paramName, candidates)) {
+                        const requiresSelection = requiresExplicitUserSelection(paramName);
+                        if (requiresSelection && !userExplicitlyMentionedEntity(exact) && !getVerifiedSelectionForParam(paramName, candidates)) {
                           audit({ resolved: rawText, action: strictIds ? "rejected_strict" : "unverified", reason: "candidate_not_explicitly_selected", source: exact.source, sourceEntityLabel: exact.label });
                           return {
                             ok: false,
@@ -2842,8 +2856,16 @@ const runLocalFlow = async (
                             value: rawText,
                           };
                         }
+                        // Para IDs operacionais, a própria resposta anterior da API é a
+                        // autorização de proveniência necessária; não exigir confirmação humana.
                         rememberVerifiedEntitySelection(paramName, rawText);
-                        audit({ resolved: rawText, action: "kept", source: exact.source, sourceEntityLabel: exact.label });
+                        audit({
+                          resolved: rawText,
+                          action: requiresSelection ? "kept" : "resolved_by_context",
+                          reason: requiresSelection ? undefined : "api_generated_id_reused",
+                          source: exact.source,
+                          sourceEntityLabel: exact.label,
+                        });
                         return { ok: true, value: rawText };
                       }
                       if (verifiedSelection) {
@@ -2941,7 +2963,7 @@ const runLocalFlow = async (
                         console.log(`[node:http-request][dynamic] ${paramName} resolvido por entidade da sessão: ${best.entity.label}`);
                         audit({ resolved: best.entity.id, action: "resolved_by_context", source: best.entity.source, sourceEntityLabel: best.entity.label });
                       }
-                      if (userExplicitlyMentionedEntity(best.entity)) {
+                      if (userExplicitlyMentionedEntity(best.entity) || !requiresExplicitUserSelection(paramName)) {
                         rememberVerifiedEntitySelection(paramName, best.entity.id);
                         return { ok: true, value: best.entity.id };
                       }
