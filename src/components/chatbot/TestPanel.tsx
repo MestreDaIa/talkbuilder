@@ -2244,8 +2244,17 @@ const runLocalFlow = async (
                   const perms = isDispatched ? (dispatch.permissions || ep.permissions || {}) : (ep.permissions || {});
                   const agentPath: Record<string, any> = (agentArgs.pathParams && typeof agentArgs.pathParams === "object") ? agentArgs.pathParams : {};
                   const agentQuery: Record<string, any> = (agentArgs.queryParams && typeof agentArgs.queryParams === "object") ? agentArgs.queryParams : {};
-                  const agentBody = agentArgs.body;
                   const isMutatingDispatch = !!dispatch?.isMutating || ["POST", "PUT", "PATCH", "DELETE"].includes(method);
+                  // Gemini pode enviar os campos do body diretamente em arguments_json
+                  // (ex.: { hold_id, method }) em vez de agrupá-los em arguments.body.
+                  // Para operações HTTP de escrita, normalize esse formato para body.
+                  const flatAgentBody = Object.fromEntries(
+                    Object.entries(agentArgs).filter(([key, value]) =>
+                      !["pathParams", "queryParams", "body", "arguments", "parameters"].includes(key) &&
+                      value !== undefined
+                    )
+                  );
+                  const agentBody = agentArgs.body ?? (isDispatched && isMutatingDispatch && Object.keys(flatAgentBody).length ? flatAgentBody : undefined);
                   const strictIds = typeof ep.strictIds === "boolean" ? ep.strictIds : isMutatingDispatch;
                   // Auditoria de substituições/rejeições de IDs feitas nesta chamada.
                   const idAuditTrail: Array<{
