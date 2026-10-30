@@ -1077,11 +1077,21 @@ const runLocalFlow = async (
           };
           nextArgs.body = preserveConfiguredShape(exampleBody, nextArgs.body);
         }
-        if ((!nextArgs.body || typeof nextArgs.body !== "object" || Array.isArray(nextArgs.body)) && nextArgs.body !== "") {
-          const flatBody = Object.fromEntries(
-            Object.entries(nextArgs).filter(([key]) => !["pathParams", "queryParams", "body"].includes(key))
-          );
-          if (Object.keys(flatBody).length) nextArgs.body = flatBody;
+        // O modelo pode misturar campos do body em dois níveis:
+        // { hold_id, body: { method } }. Não descarte os campos de nível superior
+        // quando já existir um body parcial. Os valores explícitos de body têm
+        // precedência em caso de chave repetida.
+        const flatBody = Object.fromEntries(
+          Object.entries(nextArgs).filter(([key, value]) =>
+            !["pathParams", "queryParams", "body", "arguments", "parameters"].includes(key) &&
+            value !== undefined
+          )
+        );
+        if (Object.keys(flatBody).length) {
+          const existingBody = nextArgs.body && typeof nextArgs.body === "object" && !Array.isArray(nextArgs.body)
+            ? nextArgs.body
+            : {};
+          nextArgs.body = { ...flatBody, ...existingBody };
         }
         const fieldKind = (key: string) => {
           const normalized = normalize(key).replace(/_/g, "");
