@@ -2265,7 +2265,9 @@ const runLocalFlow = async (
                     )
                   );
                   const agentBody = agentArgs.body ?? (isDispatched && isMutatingDispatch && Object.keys(flatAgentBody).length ? flatAgentBody : undefined);
-                  // Modo estrito só fica ativo quando foi habilitado explicitamente na configuração da Skill.\n                  // Operações de escrita, por si só, não significam que o usuário ativou esse modo.\n                  const strictIds = ep.strictIds === true;
+                  // Modo estrito só fica ativo quando foi habilitado explicitamente na configuração da Skill.
+                  // Operações de escrita, por si só, não significam que o usuário ativou esse modo.
+                  const strictIds = ep.strictIds === true;
                   // Auditoria de substituições/rejeições de IDs feitas nesta chamada.
                   const idAuditTrail: Array<{
                     location: "path" | "query" | "body";
