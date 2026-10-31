@@ -2590,7 +2590,7 @@ const runLocalFlow = async (
 
                     const confirmation = [...messageHistory]
                       .reverse()
-                      .find((msg) => msg.role === "assistant" && !isSkillResultHistoryMessage(msg) && /\b(confirm|confirma|confirmar|escolh|selecion|prosseguir|continuar)\b/i.test(String(msg.content || "")));
+                      .find((msg) => msg.role === "assistant" && !isSkillResultHistoryMessage(msg) && /\b(confirm|confirma|confirmar|escolh|selecion|prosseguir|continuar|gostaria|deseja|prefere|quer)\b/i.test(String(msg.content || "")));
                     if (!confirmation) return;
 
                     const confirmationText = normalizeLookupText(confirmation.content);
