@@ -88,17 +88,24 @@ export default function LoginPage() {
 
 			console.log("[Login] Auth sucesso, user ID:", data.user?.id);
 
-			// Resolve o workspace pela membership; um usuário pode pertencer a várias empresas.
+			// Prioriza o workspace explicitamente solicitado pelo link.
+			// Se houver várias memberships, não escolhe uma empresa arbitrariamente.
 			let target = redirectTo;
 			if (target === "/" && data.user) {
 				const { data: workspaces, error: workspaceError } = await supabase.rpc("get_my_workspaces");
-				if (workspaceError) {
-					console.error("[Login] Falha ao carregar workspaces:", workspaceError);
+				if (workspaceError) throw workspaceError;
+				const list = Array.isArray(workspaces) ? workspaces as Array<{ id?: string; slug?: string }> : [];
+				const requestedSlug = query.get("workspace_slug") || query.get("workspace") || query.get("company_slug") || query.get("slug");
+				const requestedId = query.get("workspace_id");
+				const selected = list.find(item =>
+					(Boolean(requestedSlug) && item.slug === requestedSlug) ||
+					(Boolean(requestedId) && item.id === requestedId)
+				) || (list.length === 1 ? list[0] : undefined);
+				if (selected?.slug) target = `/${selected.slug}/workspace`;
+				else if (list.length > 1) {
+					toast({ title: "Selecione uma empresa", description: "Esta conta possui acesso a várias empresas. Entre pelo endereço da empresa desejada." });
+					target = "/login";
 				}
-				const list = Array.isArray(workspaces) ? workspaces : [];
-				const first = list[0] as { slug?: string; workspace_slug?: string } | undefined;
-				const workspaceSlug = first?.slug || first?.workspace_slug;
-				if (workspaceSlug) target = `/${workspaceSlug}/workspace`;
 			}
 
 			console.log("[Login] Redirecionando para:", target);
