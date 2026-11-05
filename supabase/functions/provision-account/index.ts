@@ -1,306 +1,151 @@
-// =============================================================================
-// provision-account — Edge Function (Deno) do builder-flow-api (Zailom Flow)
-// -----------------------------------------------------------------------------
-// Recebe do Zailom Booking os dados de um usuário recém-cadastrado lá e cria
-// (ou reaproveita) a conta correspondente aqui no builder.
-//
-// Auth: JWT HS256 assinado com EMBED_SHARED_SECRET.
-// =============================================================================
-
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.45.4";
 
-const ALLOWED_ORIGINS = [
-  "https://booking.zailom.com",
-  "https://zailom-booking.lovable.app",
-];
-
+const ALLOWED_ORIGINS = ["https://booking.zailom.com", "https://zailom-booking.lovable.app"];
 function corsHeaders(origin: string | null): HeadersInit {
-  const allow = origin && (ALLOWED_ORIGINS.includes(origin) || origin.endsWith(".lovable.app"))
-    ? origin
-    : ALLOWED_ORIGINS[0];
-  return {
-    "Access-Control-Allow-Origin": allow,
-    "Access-Control-Allow-Methods": "POST, OPTIONS",
-    "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
-    "Access-Control-Max-Age": "86400",
-    Vary: "Origin",
-  };
+  const allow = origin && (ALLOWED_ORIGINS.includes(origin) || origin.endsWith(".lovable.app")) ? origin : ALLOWED_ORIGINS[0];
+  return { "Access-Control-Allow-Origin": allow, "Access-Control-Allow-Methods": "POST, OPTIONS", "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type", "Access-Control-Max-Age": "86400", Vary: "Origin" };
 }
-
 function json(status: number, body: unknown, origin: string | null) {
-  return new Response(JSON.stringify(body), {
-    status,
-    headers: {
-      "Content-Type": "application/json",
-      ...corsHeaders(origin),
-    },
-  });
+  return new Response(JSON.stringify(body), { status, headers: { "Content-Type": "application/json", ...corsHeaders(origin) } });
 }
-
-// -------- JWT HS256 verify --------
-function b64urlToBytes(input: string): Uint8Array {
-  const pad = "=".repeat((4 - (input.length % 4)) % 4);
-  const b64 = (input + pad).replace(/-/g, "+").replace(/_/g, "/");
-  const bin = atob(b64);
-  const out = new Uint8Array(bin.length);
-  for (let i = 0; i < bin.length; i++) out[i] = bin.charCodeAt(i);
-  return out;
+function decode(input: string): Uint8Array {
+  const padded = input + "=".repeat((4 - input.length % 4) % 4);
+  const binary = atob(padded.replace(/-/g, "+").replace(/_/g, "/"));
+  return Uint8Array.from(binary, c => c.charCodeAt(0));
 }
-
-async function verifyHs256Jwt(token: string, secret: string) {
+async function verify(token: string, secret: string) {
   const parts = token.split(".");
-  if (parts.length !== 3) return { ok: false, reason: "Formato JWT inválido" };
-  const [headerB64, payloadB64, sigB64] = parts;
-
+  if (parts.length !== 3) return { ok: false as const, reason: "Formato JWT inválido" };
   try {
-    const key = await crypto.subtle.importKey(
-      "raw",
-      new TextEncoder().encode(secret),
-      { name: "HMAC", hash: "SHA-256" },
-      false,
-      ["sign", "verify"],
-    );
-    const expectedSig = new Uint8Array(
-      await crypto.subtle.sign("HMAC", key, new TextEncoder().encode(`${headerB64}.${payloadB64}`))
-    );
-    const providedSig = b64urlToBytes(sigB64);
-    
-    let diff = 0;
-    if (expectedSig.length !== providedSig.length) return { ok: false, reason: "Assinatura inválida" };
-    for (let i = 0; i < expectedSig.length; i++) diff |= expectedSig[i] ^ providedSig[i];
-    if (diff !== 0) return { ok: false, reason: "Assinatura inválida" };
-
-    const payload = JSON.parse(new TextDecoder().decode(b64urlToBytes(payloadB64)));
-    const now = Math.floor(Date.now() / 1000);
-    if (payload.exp && payload.exp < now) return { ok: false, reason: "Token expirado" };
-    
-    return { ok: true, payload };
-  } catch (e) {
-    return { ok: false, reason: "Erro ao validar token" };
-  }
+    const key = await crypto.subtle.importKey("raw", new TextEncoder().encode(secret), { name: "HMAC", hash: "SHA-256" }, false, ["verify"]);
+    if (!await crypto.subtle.verify("HMAC", key, decode(parts[2]), new TextEncoder().encode(parts[0] + "." + parts[1]))) return { ok: false as const, reason: "Assinatura inválida" };
+    const payload = JSON.parse(new TextDecoder().decode(decode(parts[1])));
+    if (payload.exp && payload.exp < Math.floor(Date.now() / 1000)) return { ok: false as const, reason: "Token expirado" };
+    return { ok: true as const };
+  } catch { return { ok: false as const, reason: "Erro ao validar token" }; }
+}
+function cleanSlug(value: unknown) {
+  return String(value ?? "").toLowerCase().replace(/[^a-z0-9-]+/g, "-").replace(/^-+|-+$/g, "");
 }
 
-function sanitizeSlug(input: unknown): string {
-  return String(input ?? "")
-    .toLowerCase()
-    .replace(/[^a-z0-9-]+/g, "-")
-    .replace(/^-+|-+$/g, "");
-}
-
-Deno.serve(async (req) => {
+Deno.serve(async req => {
   const origin = req.headers.get("origin");
   if (req.method === "OPTIONS") return new Response(null, { status: 204, headers: corsHeaders(origin) });
-  if (req.method !== "POST") return json(405, { ok: false, error: "Method not allowed" }, origin);
+  if (req.method !== "POST") return json(405, { success: false, error: "Method not allowed" }, origin);
+  const secret = Deno.env.get("EMBED_SHARED_SECRET");
+  if (!secret) return json(500, { success: false, error: "EMBED_SHARED_SECRET não configurado" }, origin);
+  const auth = (req.headers.get("authorization") ?? "").replace(/^Bearer\\s+/i, "").trim();
+  const verified = await verify(auth, secret);
+  if (!verified.ok) return json(401, { success: false, error: verified.reason }, origin);
 
-  const sharedSecret = Deno.env.get("EMBED_SHARED_SECRET");
-  if (!sharedSecret) return json(500, { ok: false, error: "EMBED_SHARED_SECRET não configurado" }, origin);
-
-  const authHeader = req.headers.get("authorization") ?? "";
-  const token = authHeader.replace("Bearer ", "").trim();
-  const verified = await verifyHs256Jwt(token, sharedSecret);
-  if (!verified.ok) return json(401, { ok: false, error: verified.reason }, origin);
-
-  let body;
-  try {
-    body = await req.json();
-  } catch {
-    return json(400, { ok: false, error: "JSON inválido" }, origin);
-  }
+  let body: any;
+  try { body = await req.json(); } catch { return json(400, { success: false, error: "JSON inválido" }, origin); }
+  const email = String(body.email ?? "").trim().toLowerCase();
+  const slug = cleanSlug(body.slug);
+  const password = body.password;
+  const source = String(body.embed_source || "booking").trim().toLowerCase();
+  const isBooking = source === "booking";
+  if (!email || !slug) return json(400, { success: false, error: "email e slug são obrigatórios" }, origin);
+  if (isBooking && !body.company_id) return json(400, { success: false, error: "company_id é obrigatório para Booking" }, origin);
+  if (password !== undefined && (typeof password !== "string" || password.length < 6)) return json(400, { success: false, error: "Senha inválida" }, origin);
 
   const supabaseUrl = Deno.env.get("SUPABASE_URL");
-  const serviceRoleKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY");
-  const admin = createClient(supabaseUrl!, serviceRoleKey!, {
-    auth: { autoRefreshToken: false, persistSession: false },
-  });
+  const serviceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY");
+  if (!supabaseUrl || !serviceKey) return json(500, { success: false, error: "Configuração Supabase incompleta" }, origin);
+  const admin = createClient(supabaseUrl, serviceKey, { auth: { autoRefreshToken: false, persistSession: false } });
 
-  const { email, password, slug, display_name, company_id, embed_source, embed_plan_tier, limits } = body;
-  const sanitizedSlug = sanitizeSlug(slug);
-  if (!sanitizedSlug) return json(400, { ok: false, error: "slug é obrigatório" }, origin);
+  let userId: string | null = null;
+  const { data: profile, error: profileLookupError } = await admin.from("profiles").select("id").ilike("email", email).maybeSingle();
+  if (profileLookupError) return json(500, { success: false, error: "Falha ao consultar perfil", details: profileLookupError.message }, origin);
+  userId = profile?.id ?? null;
 
-  // 1. Criar ou obter usuário (Lógica de Upsert)
-  let userId;
-  
-  // Primeiro tentamos ver se já existe um perfil com esse e-mail (mais rápido)
-  const { data: existingProfile } = await admin
-    .from("profiles")
-    .select("id")
-    .eq("email", email)
-    .maybeSingle();
+  if (!userId) {
+    const { data: users, error } = await admin.auth.admin.listUsers({ page: 1, perPage: 1000 });
+    if (error) return json(500, { success: false, error: "Falha ao consultar Auth", details: error.message }, origin);
+    userId = users.users.find(u => u.email?.toLowerCase() === email)?.id ?? null;
+  }
 
-  if (existingProfile) {
-    console.log(`Usuário encontrado no profiles: ${email} (${existingProfile.id})`);
-    userId = existingProfile.id;
-  } else {
-    // Tenta criar o usuário no Auth
-    const { data: newUser, error: createError } = await admin.auth.admin.createUser({
-      email,
-      password,
-      email_confirm: true,
-      user_metadata: { full_name: display_name, slug: sanitizedSlug }
+  if (!userId) {
+    if (!password) return json(400, { success: false, error: "password é obrigatório para criar usuário" }, origin);
+    const { data, error } = await admin.auth.admin.createUser({
+      email, password, email_confirm: true,
+      user_metadata: { full_name: body.display_name, display_name: body.display_name, slug },
     });
+    if (error || !data.user) return json(500, { success: false, error: error?.message || "Falha ao criar usuário" }, origin);
+    userId = data.user.id;
+  } else if (password) {
+    const { error } = await admin.auth.admin.updateUserById(userId, { email, password });
+    if (error) return json(500, { success: false, error: "Falha ao sincronizar senha no Flow", details: error.message }, origin);
+  }
 
-    if (createError) {
-      if (createError.message.includes("already registered") || createError.message.includes("already exists")) {
-        console.log(`Usuário já registrado no Auth, buscando ID: ${email}`);
-        // Se já existe no Auth mas não no profiles, buscamos no Auth
-        const { data: usersData } = await admin.auth.admin.listUsers();
-        const existingUser = usersData?.users?.find(u => u.email === email);
-        
-        if (!existingUser) {
-          return json(500, { ok: false, error: "Usuário reportado como existente, mas não localizado no Auth." }, origin);
-        }
-        userId = existingUser.id;
-      } else {
-        console.error("Erro ao criar usuário:", createError);
-        return json(500, { ok: false, error: createError.message }, origin);
+  // Atualiza apenas dados pessoais; empresa/workspace é uma relação N:N e não
+  // pode ser gravada em campos globais do perfil.
+  const profileData: Record<string, unknown> = { display_name: body.display_name || undefined };
+  const { error: profileUpdateError } = await admin.from("profiles").update(profileData).eq("id", userId);
+  if (profileUpdateError) return json(500, { success: false, error: "Falha ao atualizar perfil", details: profileUpdateError.message }, origin);
+
+  let workspaceId: string | null = null;
+  if (isBooking) {
+    const companyId = String(body.company_id);
+    const { data: mapping, error } = await admin.from("booking_workspace_links").select("workspace_id")
+      .eq("source", source).eq("external_company_id", companyId).maybeSingle();
+    if (error) return json(500, { success: false, error: "Falha ao consultar vínculo da empresa", details: error.message }, origin);
+    workspaceId = mapping?.workspace_id ?? null;
+
+    if (!workspaceId) {
+      const { data: bySlug, error: slugError } = await admin.from("workspaces").select("id").eq("slug", slug).maybeSingle();
+      if (slugError) return json(500, { success: false, error: "Falha ao consultar workspace", details: slugError.message }, origin);
+      if (bySlug?.id) workspaceId = bySlug.id;
+      else {
+        const { data: created, error: createError } = await admin.from("workspaces")
+          .insert({ name: `${body.display_name || email} Workspace`, slug, owner_id: userId }).select("id").single();
+        if (createError || !created) return json(500, { success: false, error: "Falha ao criar workspace", details: createError?.message }, origin);
+        workspaceId = created.id;
       }
-    } else {
-      console.log(`Novo usuário criado: ${email} (${newUser.user.id})`);
-      userId = newUser.user.id;
-    }
-  }
-
-  // 2. Atualizar Profile (Garantir que limites e dados de embed estejam sincronizados)
-  // Usamos um objeto de update dinâmico para evitar sobrescrever com defaults indesejados
-  const updateData: any = {
-    id: userId,
-    email: email,
-    embed_source: embed_source || "booking",
-    embed_company_id: company_id,
-    embed_plan_synced_at: new Date().toISOString(),
-  };
-
-  if (display_name) updateData.display_name = display_name;
-  updateData.slug = sanitizedSlug;
-  if (embed_plan_tier) updateData.embed_plan_tier = embed_plan_tier;
-  
-  // Só atualiza limites se eles forem explicitamente enviados no payload
-  if (limits) {
-    if (limits.max_chatbots !== undefined) updateData.embed_max_chatbots = limits.max_chatbots;
-    if (limits.max_messages !== undefined) updateData.embed_max_messages = limits.max_messages;
-    if (limits.max_integrations !== undefined) updateData.embed_max_integrations = limits.max_integrations;
-  }
-
-  const { error: profileError } = await admin
-    .from("profiles")
-    .upsert(updateData);
-
-  if (profileError) {
-    console.error("Erro ao atualizar profile:", profileError);
-    // Não paramos aqui pois o usuário/workspace já existem, mas é um sinal de alerta
-  }
-
-  // 3. Obter o workspace_id (Trigger handle_new_user já deve ter criado o workspace)
-  const { data: membership, error: memberError } = await admin
-    .from("workspace_members")
-    .select("workspace_id")
-    .eq("user_id", userId)
-    .maybeSingle();
-
-  if (memberError) {
-    console.error("Erro ao buscar workspace_members:", memberError);
-    return json(500, { ok: false, error: "Erro ao localizar workspace" }, origin);
-  }
-
-  let workspaceId;
-
-  if (!membership) {
-    console.log(`Membership ausente para ${userId}. Verificando workspace por slug=${sanitizedSlug}...`);
-
-    // Idempotência: se já existir um workspace com esse slug (criado por trigger
-    // ou execução anterior), reutiliza em vez de tentar inserir e bater no unique.
-    const { data: existingWorkspace, error: existingWsError } = await admin
-      .from("workspaces")
-      .select("id, owner_id")
-      .eq("slug", sanitizedSlug)
-      .maybeSingle();
-
-    if (existingWsError) {
-      console.error("Erro ao buscar workspace por slug:", existingWsError);
-    }
-
-    if (existingWorkspace) {
-      console.log(`Workspace reutilizado (slug=${sanitizedSlug}, id=${existingWorkspace.id})`);
-      workspaceId = existingWorkspace.id;
-    } else {
-      console.log(`Criando workspace fallback para ${userId}...`);
-      const { data: newWorkspace, error: wsError } = await admin
-        .from("workspaces")
-        .insert({
-          name: `${display_name || email} Workspace`,
-          slug: sanitizedSlug,
-          owner_id: userId,
-        })
-        .select("id")
-        .single();
-
-      if (wsError || !newWorkspace) {
-        console.error("Erro no fallback de workspace:", wsError);
-        return json(500, { ok: false, error: "Falha ao criar workspace de contingência" }, origin);
+      const { error: insertMappingError } = await admin.from("booking_workspace_links")
+        .insert({ source, external_company_id: companyId, workspace_id: workspaceId });
+      if (insertMappingError) {
+        const { data: concurrent } = await admin.from("booking_workspace_links").select("workspace_id")
+          .eq("source", source).eq("external_company_id", companyId).maybeSingle();
+        if (!concurrent?.workspace_id) return json(500, { success: false, error: "Falha ao persistir vínculo Booking/Flow", details: insertMappingError.message }, origin);
+        workspaceId = concurrent.workspace_id;
       }
-      workspaceId = newWorkspace.id;
     }
-
-    // Garante a membership (idempotente via unique workspace_id+user_id).
-    const { error: memberInsertError } = await admin
-      .from("workspace_members")
-      .upsert(
-        { workspace_id: workspaceId, user_id: userId, role: "owner" },
-        { onConflict: "workspace_id,user_id", ignoreDuplicates: true },
-      );
-    if (memberInsertError) {
-      console.error("Erro ao garantir workspace_member:", memberInsertError);
-    }
+    const metadata: Record<string, unknown> = { synced_at: new Date().toISOString() };
+    if (body.embed_plan_tier) metadata.plan_tier = body.embed_plan_tier;
+    if (body.limits !== undefined) metadata.limits = body.limits;
+    const { error: syncError } = await admin.from("booking_workspace_links").update(metadata)
+      .eq("source", source).eq("external_company_id", companyId);
+    if (syncError) return json(500, { success: false, error: "Falha ao sincronizar plano", details: syncError.message }, origin);
   } else {
-    workspaceId = membership.workspace_id;
-  }
-
-  // 4. Obter ou Gerar API Key
-  // Buscamos se já existe uma chave ativa para este workspace
-  const { data: existingKey } = await admin
-    .from("api_keys")
-    .select("key_value")
-    .eq("workspace_id", workspaceId)
-    .eq("is_active", true)
-    .order("created_at", { ascending: false })
-    .limit(1)
-    .maybeSingle();
-
-  let apiKeyRaw;
-  if (existingKey) {
-    console.log(`Reutilizando API Key existente para workspace ${workspaceId}`);
-    apiKeyRaw = existingKey.key_value;
-  } else {
-    console.log(`Gerando nova API Key para workspace ${workspaceId}`);
-    const { data: newKeyRaw, error: rpcError } = await admin.rpc('generate_api_key');
-    if (rpcError) {
-      console.error("Erro RPC generate_api_key:", rpcError);
-      // Fallback se o RPC não existir no banco externo
-      apiKeyRaw = crypto.randomUUID().replace(/-/g, ''); 
-    } else {
-      apiKeyRaw = newKeyRaw;
-    }
-
-    const { error: keyInsertError } = await admin
-      .from("api_keys")
-      .insert({
-        name: "Zailom Booking Auto-Provisioned",
-        workspace_id: workspaceId,
-        key_value: apiKeyRaw,
-        created_by: userId,
-        is_active: true
-      });
-
-    if (keyInsertError) {
-      console.error("Erro ao salvar nova API Key:", keyInsertError);
-      // Se a tabela api_keys não tiver created_by ou workspace_id, o erro aparecerá aqui
+    const { data: existing } = await admin.from("workspaces").select("id").eq("slug", slug).maybeSingle();
+    workspaceId = existing?.id ?? null;
+    if (!workspaceId) {
+      const { data: created, error } = await admin.from("workspaces")
+        .insert({ name: `${body.display_name || email} Workspace`, slug, owner_id: userId }).select("id").single();
+      if (error || !created) return json(500, { success: false, error: "Falha ao criar workspace standalone", details: error?.message }, origin);
+      workspaceId = created.id;
     }
   }
+  if (!workspaceId) return json(500, { success: false, error: "Workspace não resolvido" }, origin);
 
-  return json(200, {
-    success: true,
-    workspace_id: workspaceId,
-    api_key: apiKeyRaw,
-    user_id: userId
-  }, origin);
+  const { error: memberError } = await admin.from("workspace_members")
+    .upsert({ workspace_id: workspaceId, user_id: userId, role: "owner" }, { onConflict: "workspace_id,user_id", ignoreDuplicates: true });
+  if (memberError) return json(500, { success: false, error: "Falha ao associar usuário ao workspace", details: memberError.message }, origin);
+
+  const { data: key, error: keyError } = await admin.from("api_keys").select("key_value")
+    .eq("workspace_id", workspaceId).eq("is_active", true).order("created_at", { ascending: false }).limit(1).maybeSingle();
+  if (keyError) return json(500, { success: false, error: "Falha ao consultar API Key", details: keyError.message }, origin);
+  let apiKey = key?.key_value;
+  if (!apiKey) {
+    const { data: generated, error } = await admin.rpc("generate_api_key");
+    if (error || !generated) return json(500, { success: false, error: "Falha ao gerar API Key", details: error?.message }, origin);
+    apiKey = generated;
+    const { error: saveError } = await admin.from("api_keys").insert({
+      name: "Zailom Booking Auto-Provisioned", workspace_id: workspaceId,
+      key_value: apiKey, created_by: userId, is_active: true,
+    });
+    if (saveError) return json(500, { success: false, error: "Falha ao salvar API Key", details: saveError.message }, origin);
+  }
+  return json(200, { success: true, workspace_id: workspaceId, api_key: apiKey, user_id: userId }, origin);
 });
