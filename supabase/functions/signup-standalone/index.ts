@@ -16,6 +16,9 @@ Deno.serve(async req=>{
  const {data:existingWorkspace,error:slugError}=await admin.from("workspaces").select("id").eq("slug",slug).maybeSingle();
  if(slugError)return reply({success:false,error:"Falha ao validar identificador."},500);
  if(existingWorkspace)return reply({success:false,error:"Este identificador já está em uso."},409);
+ const flowHostname=`flow-${slug}.zailom.com`;
+ try { await ensureFlowDnsRecord(flowHostname); }
+ catch(error) { return reply({success:false,error:"Não foi possível configurar o subdomínio do Flow no Cloudflare.",details:error instanceof Error?error.message:String(error)},502); }
  let userId:string|null=null;
  const {data:users,error:userError}=await admin.auth.admin.listUsers({page:1,perPage:1000});
  if(userError)return reply({success:false,error:"Falha ao consultar identidade."},500);
@@ -34,9 +37,6 @@ Deno.serve(async req=>{
   if(workspaceError||!workspace)return reply({success:false,error:"Não foi possível criar workspace.",details:workspaceError?.message},500);
   workspaceId=workspace.id;
  }
- const flowHostname=`flow-${slug}.zailom.com`;
- try { await ensureFlowDnsRecord(flowHostname); }
- catch(error) { return reply({success:false,error:"Não foi possível configurar o subdomínio do Flow no Cloudflare.",details:error instanceof Error?error.message:String(error)},502); }
  const {error:domainError}=await admin.from("flow_workspace_domains").insert({workspace_id:workspaceId,source:"standalone",hostname:flowHostname,domain_type:"standalone",is_primary:true,is_verified:true});
  if(domainError)return reply({success:false,error:"Não foi possível registrar o domínio do workspace.",details:domainError.message},409);
  const {error:memberError}=await admin.from("workspace_members").upsert({workspace_id:workspaceId,user_id:userId,role:"owner"},{onConflict:"workspace_id,user_id"});
