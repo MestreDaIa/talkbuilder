@@ -91,6 +91,9 @@ function SlugGuard({ children }: { children: React.ReactNode }) {
     }
     return <>{children}</>;
   }
+  const hostname = window.location.hostname.toLowerCase();
+  const isTenantHost = hostname !== "flow-builder.zailom.com" && hostname !== "localhost" && hostname !== "127.0.0.1";
+  if (isTenantHost && currentWorkspace?.slug && slug && slug !== currentWorkspace.slug) return <Navigate to={workspaceRoot(currentWorkspace.slug)} replace />;
   const allowedSlug = slug && workspaces.some((workspace) => workspace.slug === slug);
   if (allowedSlug) return <>{children}</>;
 
