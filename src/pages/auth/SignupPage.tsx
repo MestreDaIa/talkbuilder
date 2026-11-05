@@ -23,7 +23,7 @@ const slugRegex = /^[a-z0-9](?:[a-z0-9-]{1,30}[a-z0-9])?$/;
 const schema = z.object({
 	display_name: z.string().trim().min(1, "Nome obrigatório").max(100),
 	email: z.string().trim().email("Email inválido").max(255),
-	password: z.string().min(6, "Senha deve ter ao menos 6 caracteres").max(72),
+	password: z.string().min(8, "Senha deve ter ao menos 8 caracteres").max(72),
 	slug: z
 		.string()
 		.trim()
@@ -92,69 +92,22 @@ export default function SignupPage() {
 	}
 
 	async function handleSubmit(e: React.FormEvent) {
-		e.preventDefault();
-		const parsed = schema.safeParse({
-			display_name: displayName,
-			email,
-			password,
-			slug,
-			plan,
-		});
-		if (!parsed.success) {
-			toast({
-				title: "Confira os campos",
-				description: parsed.error.issues[0].message,
-				variant: "destructive",
-			});
-			return;
-		}
-		if (slugStatus !== "available") {
-			toast({
-				title: "Escolha um @ disponível",
-				description: "O identificador precisa estar livre.",
-				variant: "destructive",
-			});
-			return;
-		}
-
-		setSubmitting(true);
-		const supabase = getSupabase()!;
-		const { data, error } = await supabase.auth.signUp({
-			email: parsed.data.email,
-			password: parsed.data.password,
-			options: {
-				emailRedirectTo: `${window.location.origin}/`,
-				data: {
-					display_name: parsed.data.display_name,
-					slug: parsed.data.slug,
-					plan: parsed.data.plan,
-				},
-			},
-		});
-		setSubmitting(false);
-
-		if (error) {
-			toast({
-				title: "Falha no cadastro",
-				description: error.message,
-				variant: "destructive",
-			});
-			return;
-		}
-
-		// Se confirmação de email estiver desativada, já vem com session
-		if (data.session) {
-			toast({ title: "Conta criada!", description: "Bem-vindo ao ZailomFlow." });
-			navigate(redirectUrl, { replace: true });
-		} else {
-			toast({
-				title: "Confira seu email",
-				description: `Mandamos um link de confirmação pra ${parsed.data.email}.`,
-			});
-			navigate(`/login${location.search}`, { replace: true });
-		}
-	}
-
+    e.preventDefault();
+    const parsed = schema.safeParse({ display_name: displayName, email, password, slug, plan });
+    if (!parsed.success) { toast({ title: "Confira os campos", description: parsed.error.issues[0].message, variant: "destructive" }); return; }
+    if (slugStatus !== "available") { toast({ title: "Escolha um @ disponível", description: "O identificador precisa estar livre.", variant: "destructive" }); return; }
+    setSubmitting(true);
+    try {
+      const supabase = getSupabase();
+      if (!supabase) throw new Error("Supabase não configurado.");
+      const { data, error } = await supabase.functions.invoke("signup-standalone", { body: parsed.data });
+      if (error || !data?.success) throw new Error(data?.error || error?.message || "Falha ao criar conta.");
+      toast({ title: "Confira seu e-mail", description: data.message || `Enviamos a confirmação para ${parsed.data.email}.` });
+      navigate(`/login`, { replace: true });
+    } catch (err: any) {
+      toast({ title: "Falha no cadastro", description: err?.message || "Não foi possível criar a conta.", variant: "destructive" });
+    } finally { setSubmitting(false); }
+  }
 	return (
 		<div className="min-h-svh flex items-center justify-center p-6 bg-gradient-to-br from-background to-muted">
 			<Card className="max-w-lg w-full">
