@@ -10,7 +10,7 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "../..
 import { useToast } from "../../hooks/use-toast";
 
 const schema=z.object({email:z.string().trim().email("Email inválido").max(255),password:z.string().min(8,"Senha deve ter ao menos 8 caracteres").max(72)});
-type Tenant={workspace_id:string;workspace_slug:string;workspace_name:string;hostname:string|null};
+type Tenant={workspace_id:string;workspace_slug:string;workspace_name:string;hostname:string|null;workspace_source:string};
 const ROOT_HOST="flow-builder.zailom.com";
 
 export default function LoginPage(){
@@ -75,7 +75,7 @@ export default function LoginPage(){
       <div><Label htmlFor="email">E-mail</Label><Input id="email" type="email" placeholder="voce@empresa.com" value={email} onChange={e=>setEmail(e.target.value)} required autoComplete="email" autoFocus/></div>
       <div><div className="flex items-center justify-between gap-3"><Label htmlFor="password">Senha</Label><Link to={"/forgot-password"+location.search} className="text-xs text-primary underline underline-offset-4">Esqueceu a senha?</Link></div><Input id="password" type="password" placeholder="••••••••" value={password} onChange={e=>setPassword(e.target.value)} required autoComplete="current-password"/></div>
       <Button type="submit" className="w-full" disabled={submitting}>{submitting?"Entrando...":"Entrar"}</Button>
-      <p className="text-sm text-muted-foreground text-center">Flow independente? <Link to={"/signup"+location.search} className="text-primary underline">Criar conta</Link></p>
+      {tenant?.workspace_source === "standalone" && <p className="text-sm text-muted-foreground text-center">Ainda não tem conta? <Link to={"/signup"+location.search} className="text-primary underline">Criar conta</Link></p>}
      </form>}
    </CardContent>
   </Card>
