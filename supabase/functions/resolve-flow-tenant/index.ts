@@ -1,0 +1,19 @@
+import { createClient } from "https://esm.sh/@supabase/supabase-js@2.45.4";
+const cors = {"Access-Control-Allow-Origin":"*","Access-Control-Allow-Headers":"authorization, apikey, content-type","Access-Control-Allow-Methods":"POST, OPTIONS"};
+const reply=(body:unknown,status=200)=>new Response(JSON.stringify(body),{status,headers:{...cors,"Content-Type":"application/json"}});
+Deno.serve(async req=>{
+  if(req.method==="OPTIONS") return new Response(null,{status:204,headers:cors});
+  if(req.method!=="POST") return reply({success:false,error:"Método não permitido."},405);
+  const url=Deno.env.get("SUPABASE_URL")||"", key=Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")||"";
+  if(!url||!key) return reply({success:false,error:"Configuração do servidor ausente."},500);
+  const admin=createClient(url,key,{auth:{persistSession:false,autoRefreshToken:false}});
+  const body=await req.json().catch(()=>({}));
+  const hostHeader=(req.headers.get("x-forwarded-host")||req.headers.get("host")||"").split(",")[0].trim().toLowerCase().split(":")[0];
+  const identifier=String(body.identifier||hostHeader||"").trim().toLowerCase().replace(/^https?:\/\//,"").replace(/\/$/,"");
+  if(!identifier) return reply({success:false,error:"Informe o identificador da empresa."},400);
+  const {data,error}=await admin.rpc("resolve_flow_workspace",{p_identifier:identifier});
+  if(error) return reply({success:false,error:"Falha ao localizar a empresa.",details:error.message},500);
+  const row=Array.isArray(data)?data[0]:data;
+  if(!row?.workspace_id) return reply({success:false,error:"Empresa/ambiente não encontrado. Confira o endereço informado."},404);
+  return reply({success:true,workspace_id:row.workspace_id,workspace_slug:row.workspace_slug,workspace_name:row.workspace_name,hostname:row.hostname});
+});
