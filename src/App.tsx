@@ -51,17 +51,14 @@ import { workspaceRoot } from './lib/workspaceRoutes';
  * - Logado → redireciona para /{slug}/workspace.
  */
 function HomeRoute() {
-  const { user, loading, isConfigured, profile, currentWorkspace } = useAuth();
+  const { user, loading, isConfigured, profile, currentWorkspace, workspaces } = useAuth();
   const { mode, session } = useEmbed();
-
   if (loading) return null;
-  if (mode === "embedded" && session?.workspaceSlug) {
-    return <Navigate to={workspaceRoot(session.workspaceSlug)} replace />;
-  }
+  if (mode === "embedded" && session?.workspaceSlug) return <Navigate to={workspaceRoot(session.workspaceSlug)} replace />;
   if (!isConfigured || !user) return <LandingPage />;
+  if (workspaces.length > 1 && !currentWorkspace) return <Navigate to="/login" replace />;
   return <Navigate to={workspaceRoot(currentWorkspace?.slug ?? profile?.slug)} replace />;
 }
-
 /**
  * Login/Signup: se já estiver logado, manda direto pro workspace.
  */
