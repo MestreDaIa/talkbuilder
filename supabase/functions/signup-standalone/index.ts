@@ -25,9 +25,14 @@ Deno.serve(async req=>{
   userId=data.user.id;
  }
  let workspaceId:string|null=null;
- const {data:workspace,error:workspaceError}=await admin.from("workspaces").insert({name:displayName+" Workspace",slug}).select("id").single();
- if(workspaceError||!workspace)return reply({success:false,error:"Não foi possível criar workspace.",details:workspaceError?.message},500);
- workspaceId=workspace.id;
+ const {data:triggerWorkspace,error:triggerWorkspaceError}=await admin.from("workspaces").select("id").eq("slug",slug).maybeSingle();
+ if(triggerWorkspaceError)return reply({success:false,error:"Falha ao localizar workspace recém-criado."},500);
+ if(triggerWorkspace?.id) workspaceId=triggerWorkspace.id;
+ else {
+  const {data:workspace,error:workspaceError}=await admin.from("workspaces").insert({name:displayName+" Workspace",slug}).select("id").single();
+  if(workspaceError||!workspace)return reply({success:false,error:"Não foi possível criar workspace.",details:workspaceError?.message},500);
+  workspaceId=workspace.id;
+ }
  const {error:memberError}=await admin.from("workspace_members").upsert({workspace_id:workspaceId,user_id:userId,role:"owner"},{onConflict:"workspace_id,user_id"});
  if(memberError)return reply({success:false,error:"Não foi possível vincular o proprietário.",details:memberError.message},500);
  await admin.from("profiles").update({display_name:displayName,plan}).eq("id",userId);
