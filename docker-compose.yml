@@ -118,12 +118,12 @@ services:
       # Router HTTPS
       - "traefik.http.routers.chatbot-frontend.rule=Host(`${FRONTEND_DOMAIN}`)"
       # Booking-provisioned tenant domains: flow-<booking-subdomain>.zailom.com
-      - "traefik.http.routers.chatbot-frontend-tenant.rule=HostRegexp(`^flow-[a-z0-9-]+\\.zailom\\.com$`)
+      - "traefik.http.routers.chatbot-frontend-tenant.rule=HostRegexp(`^flow-[a-z0-9-]+\\.zailom\\.com$`)"
       - "traefik.http.routers.chatbot-frontend-tenant.priority=1000"
       - "traefik.http.routers.chatbot-frontend-tenant.entrypoints=websecure"
       - "traefik.http.routers.chatbot-frontend-tenant.tls=true"
       - "traefik.http.routers.chatbot-frontend-tenant.service=chatbot-frontend"
-      - "traefik.http.routers.chatbot-frontend-tenant-http.rule=HostRegexp(`^flow-[a-z0-9-]+\\.zailom\\.com$`)
+      - "traefik.http.routers.chatbot-frontend-tenant-http.rule=HostRegexp(`^flow-[a-z0-9-]+\\.zailom\\.com$`)"
       - "traefik.http.routers.chatbot-frontend-tenant-http.priority=1000"
       - "traefik.http.routers.chatbot-frontend-tenant-http.entrypoints=web"
       - "traefik.http.routers.chatbot-frontend-tenant-http.middlewares=https-redirect"
