@@ -42,3 +42,6 @@ verify_jwt = false
 
 [functions.reset-workspace-password]
 verify_jwt = false
+
+[functions.signup-standalone]
+verify_jwt = false
