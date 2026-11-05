@@ -26,14 +26,18 @@ export async function ensureFlowDnsRecord(input: string): Promise<{ hostname: st
   }
 
   const headers = { Authorization: `Bearer ${token}`, "Content-Type": "application/json" };
-  const query = new URLSearchParams({ type: "CNAME", name: hostname });
+  const query = new URLSearchParams({ name: hostname });
   const listResponse = await fetch(`${API}/zones/${encodeURIComponent(zoneId)}/dns_records?${query}`, { headers });
   const list = await listResponse.json().catch(() => null);
   if (!listResponse.ok || !list?.success) {
     throw new Error(`Cloudflare: não foi possível consultar o DNS (${list?.errors?.[0]?.message || listResponse.status}).`);
   }
 
-  const existing = Array.isArray(list.result) ? list.result[0] : null;
+  const records = Array.isArray(list.result) ? list.result : [];
+  const existing = records.find((record: { type?: string }) => record.type === "CNAME") || null;
+  if (records.some((record: { type?: string }) => record.type !== "CNAME")) {
+    throw new Error(`Cloudflare: já existe um registro DNS que não é CNAME para ${hostname}; remova ou ajuste esse registro antes do provisionamento.`);
+  }
   const payload = { type: "CNAME", name: hostname, content: target, ttl: 1, proxied: true };
   const url = existing
     ? `${API}/zones/${encodeURIComponent(zoneId)}/dns_records/${encodeURIComponent(existing.id)}`
