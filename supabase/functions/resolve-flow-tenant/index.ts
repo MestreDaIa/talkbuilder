@@ -36,7 +36,7 @@ Deno.serve(async req=>{
     catch(error) { return reply({success:false,error:"Não foi possível configurar o domínio dedicado do Flow.",details:error instanceof Error?error.message:String(error)},502); }
 
     const source=String(row.workspace_source||"standalone").toLowerCase();
-    const domainRecord={workspace_id:row.workspace_id,source:source==="booking"?"booking":"standalone",external_company_id:null,hostname:identifier,domain_type:"subdomain",is_primary:true,is_verified:true,updated_at:new Date().toISOString()};
+    const domainRecord: Record<string, unknown>={workspace_id:row.workspace_id,source:source==="booking"?"booking":"standalone",external_company_id:null,hostname:identifier,domain_type:"subdomain",is_primary:true,is_verified:true,updated_at:new Date().toISOString()};
     if(source==="booking"){
       const {data:link,error:linkError}=await admin.from("booking_workspace_links").select("external_company_id").eq("workspace_id",row.workspace_id).eq("source","booking").maybeSingle();
       if(linkError||!link?.external_company_id) return reply({success:false,error:"Não foi possível localizar o vínculo Booking/Flow para atualizar o domínio.",details:linkError?.message},500);
