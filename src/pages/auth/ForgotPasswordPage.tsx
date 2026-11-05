@@ -9,7 +9,7 @@ import {useToast} from "../../hooks/use-toast";
 import {getSupabase} from "../../lib/supabaseClient";
 export default function ForgotPasswordPage(){
  const {toast}=useToast();
- const [identifier,setIdentifier]=useState(window.location.hostname==="flow-builder.zailom.com"?"":"");
+ const [identifier,setIdentifier]=useState(window.location.hostname==="flow-builder.zailom.com"?"":window.location.hostname);
  const [email,setEmail]=useState("");
  const [submitting,setSubmitting]=useState(false);
  async function submit(e:React.FormEvent){
