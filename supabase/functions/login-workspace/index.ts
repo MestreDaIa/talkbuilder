@@ -24,7 +24,7 @@ Deno.serve(async req=>{
   if(origin){
     try{
       const parsed=new URL(origin);
-      const allowed=parsed.protocol==="https:"&&parsed.hostname.toLowerCase()===String(tenant.hostname||"").toLowerCase();
+      const allowed=parsed.protocol==="https:"&&parsed.hostname.toLowerCase()===String(tenant.hostname||"").toLowerCase()&&parsed.hostname.toLowerCase().endsWith(".zailom.com");
       if(allowed) redirectOrigin=parsed.origin;
     }catch{/* use canonical Flow origin */}
   }
