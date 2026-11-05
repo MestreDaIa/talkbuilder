@@ -118,11 +118,378 @@ services:
       # Router HTTPS
       - "traefik.http.routers.chatbot-frontend.rule=Host(`${FRONTEND_DOMAIN}`)"
       # Booking-provisioned tenant domains: flow-<booking-subdomain>.zailom.com
-      - "traefik.http.routers.chatbot-frontend-tenant.rule=HostRegexp(`flow-{tenant:[a-z0-9-]+}.zailom.com`)"
+      - "traefik.http.routers.chatbot-frontend-tenant.rule=HostRegexp(`^flow-[a-z0-9-]+\\.zailom\\.comservices:
+  server:
+    image: talkbuilder-server:latest
+    build:
+      context: ./server
+      dockerfile: Dockerfile
+    container_name: chatbot-server
+    restart: always
+    environment:
+      - SUPABASE_URL=${SUPABASE_URL}
+      - SUPABASE_ANON_KEY=${SUPABASE_ANON_KEY}
+      - SUPABASE_SERVICE_ROLE_KEY=${SUPABASE_SERVICE_ROLE_KEY}
+      - EVO_BASE_URL=${EVO_BASE_URL}
+      - EVO_GLOBAL_KEY=${EVO_GLOBAL_KEY}
+      - WA_SERVICE_URL=${WA_SERVICE_URL}
+      - WA_SERVICE_ADMIN_TOKEN=${WA_SERVICE_ADMIN_TOKEN}
+      - WA_WEBHOOK_SIGNING_SECRET=${WA_WEBHOOK_SIGNING_SECRET}
+      - BOOKING_API_URL=${BOOKING_API_URL}
+      - BOOKING_API_KEY=${BOOKING_API_KEY}
+      - BOOKING_ROUTE_PATH=${BOOKING_ROUTE_PATH}
+      - CHANNEL_ROUTE_TTL_MS=${CHANNEL_ROUTE_TTL_MS}
+      - STRICT_CHANNEL_ROUTE=${STRICT_CHANNEL_ROUTE}
+      - PORT=3000
+
+    networks:
+      - builderchat_net
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.chatbot-server.rule=Host(`${SERVER_DOMAIN}`)"
+      - "traefik.http.routers.chatbot-server.entrypoints=websecure"
+      - "traefik.http.routers.chatbot-server.tls=true"
+      - "traefik.http.routers.chatbot-server.priority=1"
+      # - "traefik.http.routers.chatbot-server.tls.certresolver=letsencrypt"
+      - "traefik.http.services.chatbot-server.loadbalancer.server.port=3000"
+      - "traefik.docker.network=builderchat_net"
+
+  booking-proxy:
+    image: mirror.gcr.io/library/nginx:1.27-alpine
+    container_name: chatbot-booking-proxy
+    restart: always
+    command:
+      - /bin/sh
+      - -c
+      - |
+        cat > /etc/nginx/nginx.conf <<NGINX_CONF
+        worker_processes 1;
+        events { worker_connections 1024; }
+
+        http {
+          resolver 1.1.1.1 8.8.8.8 valid=300s ipv6=off;
+          resolver_timeout 5s;
+
+          server {
+            listen 80;
+            server_name _;
+
+            location = /booking-api/health {
+              add_header Content-Type application/json;
+              return 200 '{"ok":true,"service":"booking-api","timestamp":"$${time_iso8601}"}';
+            }
+
+            location = /booking-api/health/ {
+              add_header Content-Type application/json;
+              return 200 '{"ok":true,"service":"booking-api","timestamp":"$${time_iso8601}"}';
+            }
+
+            location /booking-api/ {
+              proxy_http_version 1.1;
+              proxy_set_header Host              fwoescubnnagdvwasbjl.supabase.co;
+              proxy_set_header X-Real-IP         \$$remote_addr;
+              proxy_set_header X-Forwarded-For   \$$proxy_add_x_forwarded_for;
+              proxy_set_header X-Forwarded-Proto \$$scheme;
+              proxy_ssl_server_name on;
+              proxy_ssl_name        fwoescubnnagdvwasbjl.supabase.co;
+              proxy_pass https://fwoescubnnagdvwasbjl.supabase.co/functions/v1/booking-api/;
+            }
+
+            location = / {
+              add_header Content-Type application/json;
+              return 200 '{"status":"ok","service":"booking-api-proxy"}';
+            }
+          }
+        }
+        NGINX_CONF
+        nginx -g 'daemon off;'
+    networks:
+      - builderchat_net
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.booking-proxy.rule=Host(`${SERVER_DOMAIN}`) && PathPrefix(`/booking-api`)"
+      - "traefik.http.routers.booking-proxy.entrypoints=websecure"
+      - "traefik.http.routers.booking-proxy.tls=true"
+      - "traefik.http.routers.booking-proxy.priority=100"
+      - "traefik.http.services.booking-proxy.loadbalancer.server.port=80"
+      - "traefik.docker.network=builderchat_net"
+
+  frontend:
+    image: talkbuilder-frontend:latest
+    build:
+      context: .
+      dockerfile: Dockerfile.frontend
+      args:
+        - VITE_SUPABASE_URL=${VITE_SUPABASE_URL}
+        - VITE_SUPABASE_ANON_KEY=${VITE_SUPABASE_ANON_KEY}
+        - VITE_SUPABASE_PUBLISHABLE_KEY=${VITE_SUPABASE_PUBLISHABLE_KEY}
+        - VITE_SUPABASE_PROJECT_ID=${VITE_SUPABASE_PROJECT_ID}
+        - VITE_EXTERNAL_SUPABASE_URL=${VITE_EXTERNAL_SUPABASE_URL}
+        - VITE_EXTERNAL_SUPABASE_ANON_KEY=${VITE_EXTERNAL_SUPABASE_ANON_KEY}
+        - VITE_RUNTIME_URL=${VITE_RUNTIME_URL}
+        - VITE_BACKEND_URL=${VITE_BACKEND_URL}
+
+    container_name: chatbot-frontend
+    restart: always
+    networks:
+      - builderchat_net
+    labels:
+      - "traefik.enable=true"
+      # Router HTTPS
+      - "traefik.http.routers.chatbot-frontend.rule=Host(`${FRONTEND_DOMAIN}`)"
+      # Booking-provisioned tenant domains: flow-<booking-subdomain>.zailom.com
+)"
+      - "traefik.http.routers.chatbot-frontend-tenant.priority=1000"
       - "traefik.http.routers.chatbot-frontend-tenant.entrypoints=websecure"
       - "traefik.http.routers.chatbot-frontend-tenant.tls=true"
       - "traefik.http.routers.chatbot-frontend-tenant.service=chatbot-frontend"
-      - "traefik.http.routers.chatbot-frontend-tenant-http.rule=HostRegexp(`flow-{tenant:[a-z0-9-]+}.zailom.com`)"
+      - "traefik.http.routers.chatbot-frontend-tenant-http.rule=HostRegexp(`^flow-[a-z0-9-]+\\.zailom\\.comservices:
+  server:
+    image: talkbuilder-server:latest
+    build:
+      context: ./server
+      dockerfile: Dockerfile
+    container_name: chatbot-server
+    restart: always
+    environment:
+      - SUPABASE_URL=${SUPABASE_URL}
+      - SUPABASE_ANON_KEY=${SUPABASE_ANON_KEY}
+      - SUPABASE_SERVICE_ROLE_KEY=${SUPABASE_SERVICE_ROLE_KEY}
+      - EVO_BASE_URL=${EVO_BASE_URL}
+      - EVO_GLOBAL_KEY=${EVO_GLOBAL_KEY}
+      - WA_SERVICE_URL=${WA_SERVICE_URL}
+      - WA_SERVICE_ADMIN_TOKEN=${WA_SERVICE_ADMIN_TOKEN}
+      - WA_WEBHOOK_SIGNING_SECRET=${WA_WEBHOOK_SIGNING_SECRET}
+      - BOOKING_API_URL=${BOOKING_API_URL}
+      - BOOKING_API_KEY=${BOOKING_API_KEY}
+      - BOOKING_ROUTE_PATH=${BOOKING_ROUTE_PATH}
+      - CHANNEL_ROUTE_TTL_MS=${CHANNEL_ROUTE_TTL_MS}
+      - STRICT_CHANNEL_ROUTE=${STRICT_CHANNEL_ROUTE}
+      - PORT=3000
+
+    networks:
+      - builderchat_net
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.chatbot-server.rule=Host(`${SERVER_DOMAIN}`)"
+      - "traefik.http.routers.chatbot-server.entrypoints=websecure"
+      - "traefik.http.routers.chatbot-server.tls=true"
+      - "traefik.http.routers.chatbot-server.priority=1"
+      # - "traefik.http.routers.chatbot-server.tls.certresolver=letsencrypt"
+      - "traefik.http.services.chatbot-server.loadbalancer.server.port=3000"
+      - "traefik.docker.network=builderchat_net"
+
+  booking-proxy:
+    image: mirror.gcr.io/library/nginx:1.27-alpine
+    container_name: chatbot-booking-proxy
+    restart: always
+    command:
+      - /bin/sh
+      - -c
+      - |
+        cat > /etc/nginx/nginx.conf <<NGINX_CONF
+        worker_processes 1;
+        events { worker_connections 1024; }
+
+        http {
+          resolver 1.1.1.1 8.8.8.8 valid=300s ipv6=off;
+          resolver_timeout 5s;
+
+          server {
+            listen 80;
+            server_name _;
+
+            location = /booking-api/health {
+              add_header Content-Type application/json;
+              return 200 '{"ok":true,"service":"booking-api","timestamp":"$${time_iso8601}"}';
+            }
+
+            location = /booking-api/health/ {
+              add_header Content-Type application/json;
+              return 200 '{"ok":true,"service":"booking-api","timestamp":"$${time_iso8601}"}';
+            }
+
+            location /booking-api/ {
+              proxy_http_version 1.1;
+              proxy_set_header Host              fwoescubnnagdvwasbjl.supabase.co;
+              proxy_set_header X-Real-IP         \$$remote_addr;
+              proxy_set_header X-Forwarded-For   \$$proxy_add_x_forwarded_for;
+              proxy_set_header X-Forwarded-Proto \$$scheme;
+              proxy_ssl_server_name on;
+              proxy_ssl_name        fwoescubnnagdvwasbjl.supabase.co;
+              proxy_pass https://fwoescubnnagdvwasbjl.supabase.co/functions/v1/booking-api/;
+            }
+
+            location = / {
+              add_header Content-Type application/json;
+              return 200 '{"status":"ok","service":"booking-api-proxy"}';
+            }
+          }
+        }
+        NGINX_CONF
+        nginx -g 'daemon off;'
+    networks:
+      - builderchat_net
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.booking-proxy.rule=Host(`${SERVER_DOMAIN}`) && PathPrefix(`/booking-api`)"
+      - "traefik.http.routers.booking-proxy.entrypoints=websecure"
+      - "traefik.http.routers.booking-proxy.tls=true"
+      - "traefik.http.routers.booking-proxy.priority=100"
+      - "traefik.http.services.booking-proxy.loadbalancer.server.port=80"
+      - "traefik.docker.network=builderchat_net"
+
+  frontend:
+    image: talkbuilder-frontend:latest
+    build:
+      context: .
+      dockerfile: Dockerfile.frontend
+      args:
+        - VITE_SUPABASE_URL=${VITE_SUPABASE_URL}
+        - VITE_SUPABASE_ANON_KEY=${VITE_SUPABASE_ANON_KEY}
+        - VITE_SUPABASE_PUBLISHABLE_KEY=${VITE_SUPABASE_PUBLISHABLE_KEY}
+        - VITE_SUPABASE_PROJECT_ID=${VITE_SUPABASE_PROJECT_ID}
+        - VITE_EXTERNAL_SUPABASE_URL=${VITE_EXTERNAL_SUPABASE_URL}
+        - VITE_EXTERNAL_SUPABASE_ANON_KEY=${VITE_EXTERNAL_SUPABASE_ANON_KEY}
+        - VITE_RUNTIME_URL=${VITE_RUNTIME_URL}
+        - VITE_BACKEND_URL=${VITE_BACKEND_URL}
+
+    container_name: chatbot-frontend
+    restart: always
+    networks:
+      - builderchat_net
+    labels:
+      - "traefik.enable=true"
+      # Router HTTPS
+      - "traefik.http.routers.chatbot-frontend.rule=Host(`${FRONTEND_DOMAIN}`)"
+      # Booking-provisioned tenant domains: flow-<booking-subdomain>.zailom.com
+      - "traefik.http.routers.chatbot-frontend-tenant.rule=HostRegexp(`^flow-[a-z0-9-]+\\.zailom\\.comservices:
+  server:
+    image: talkbuilder-server:latest
+    build:
+      context: ./server
+      dockerfile: Dockerfile
+    container_name: chatbot-server
+    restart: always
+    environment:
+      - SUPABASE_URL=${SUPABASE_URL}
+      - SUPABASE_ANON_KEY=${SUPABASE_ANON_KEY}
+      - SUPABASE_SERVICE_ROLE_KEY=${SUPABASE_SERVICE_ROLE_KEY}
+      - EVO_BASE_URL=${EVO_BASE_URL}
+      - EVO_GLOBAL_KEY=${EVO_GLOBAL_KEY}
+      - WA_SERVICE_URL=${WA_SERVICE_URL}
+      - WA_SERVICE_ADMIN_TOKEN=${WA_SERVICE_ADMIN_TOKEN}
+      - WA_WEBHOOK_SIGNING_SECRET=${WA_WEBHOOK_SIGNING_SECRET}
+      - BOOKING_API_URL=${BOOKING_API_URL}
+      - BOOKING_API_KEY=${BOOKING_API_KEY}
+      - BOOKING_ROUTE_PATH=${BOOKING_ROUTE_PATH}
+      - CHANNEL_ROUTE_TTL_MS=${CHANNEL_ROUTE_TTL_MS}
+      - STRICT_CHANNEL_ROUTE=${STRICT_CHANNEL_ROUTE}
+      - PORT=3000
+
+    networks:
+      - builderchat_net
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.chatbot-server.rule=Host(`${SERVER_DOMAIN}`)"
+      - "traefik.http.routers.chatbot-server.entrypoints=websecure"
+      - "traefik.http.routers.chatbot-server.tls=true"
+      - "traefik.http.routers.chatbot-server.priority=1"
+      # - "traefik.http.routers.chatbot-server.tls.certresolver=letsencrypt"
+      - "traefik.http.services.chatbot-server.loadbalancer.server.port=3000"
+      - "traefik.docker.network=builderchat_net"
+
+  booking-proxy:
+    image: mirror.gcr.io/library/nginx:1.27-alpine
+    container_name: chatbot-booking-proxy
+    restart: always
+    command:
+      - /bin/sh
+      - -c
+      - |
+        cat > /etc/nginx/nginx.conf <<NGINX_CONF
+        worker_processes 1;
+        events { worker_connections 1024; }
+
+        http {
+          resolver 1.1.1.1 8.8.8.8 valid=300s ipv6=off;
+          resolver_timeout 5s;
+
+          server {
+            listen 80;
+            server_name _;
+
+            location = /booking-api/health {
+              add_header Content-Type application/json;
+              return 200 '{"ok":true,"service":"booking-api","timestamp":"$${time_iso8601}"}';
+            }
+
+            location = /booking-api/health/ {
+              add_header Content-Type application/json;
+              return 200 '{"ok":true,"service":"booking-api","timestamp":"$${time_iso8601}"}';
+            }
+
+            location /booking-api/ {
+              proxy_http_version 1.1;
+              proxy_set_header Host              fwoescubnnagdvwasbjl.supabase.co;
+              proxy_set_header X-Real-IP         \$$remote_addr;
+              proxy_set_header X-Forwarded-For   \$$proxy_add_x_forwarded_for;
+              proxy_set_header X-Forwarded-Proto \$$scheme;
+              proxy_ssl_server_name on;
+              proxy_ssl_name        fwoescubnnagdvwasbjl.supabase.co;
+              proxy_pass https://fwoescubnnagdvwasbjl.supabase.co/functions/v1/booking-api/;
+            }
+
+            location = / {
+              add_header Content-Type application/json;
+              return 200 '{"status":"ok","service":"booking-api-proxy"}';
+            }
+          }
+        }
+        NGINX_CONF
+        nginx -g 'daemon off;'
+    networks:
+      - builderchat_net
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.booking-proxy.rule=Host(`${SERVER_DOMAIN}`) && PathPrefix(`/booking-api`)"
+      - "traefik.http.routers.booking-proxy.entrypoints=websecure"
+      - "traefik.http.routers.booking-proxy.tls=true"
+      - "traefik.http.routers.booking-proxy.priority=100"
+      - "traefik.http.services.booking-proxy.loadbalancer.server.port=80"
+      - "traefik.docker.network=builderchat_net"
+
+  frontend:
+    image: talkbuilder-frontend:latest
+    build:
+      context: .
+      dockerfile: Dockerfile.frontend
+      args:
+        - VITE_SUPABASE_URL=${VITE_SUPABASE_URL}
+        - VITE_SUPABASE_ANON_KEY=${VITE_SUPABASE_ANON_KEY}
+        - VITE_SUPABASE_PUBLISHABLE_KEY=${VITE_SUPABASE_PUBLISHABLE_KEY}
+        - VITE_SUPABASE_PROJECT_ID=${VITE_SUPABASE_PROJECT_ID}
+        - VITE_EXTERNAL_SUPABASE_URL=${VITE_EXTERNAL_SUPABASE_URL}
+        - VITE_EXTERNAL_SUPABASE_ANON_KEY=${VITE_EXTERNAL_SUPABASE_ANON_KEY}
+        - VITE_RUNTIME_URL=${VITE_RUNTIME_URL}
+        - VITE_BACKEND_URL=${VITE_BACKEND_URL}
+
+    container_name: chatbot-frontend
+    restart: always
+    networks:
+      - builderchat_net
+    labels:
+      - "traefik.enable=true"
+      # Router HTTPS
+      - "traefik.http.routers.chatbot-frontend.rule=Host(`${FRONTEND_DOMAIN}`)"
+      # Booking-provisioned tenant domains: flow-<booking-subdomain>.zailom.com
+)"
+      - "traefik.http.routers.chatbot-frontend-tenant.priority=1000"
+      - "traefik.http.routers.chatbot-frontend-tenant.entrypoints=websecure"
+      - "traefik.http.routers.chatbot-frontend-tenant.tls=true"
+      - "traefik.http.routers.chatbot-frontend-tenant.service=chatbot-frontend"
+)"
+      - "traefik.http.routers.chatbot-frontend-tenant-http.priority=1000"
       - "traefik.http.routers.chatbot-frontend-tenant-http.entrypoints=web"
       - "traefik.http.routers.chatbot-frontend-tenant-http.middlewares=https-redirect"
 
