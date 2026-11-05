@@ -1,4 +1,5 @@
 import {createClient} from "https://esm.sh/@supabase/supabase-js@2.45.4";
+import {ensureFlowDnsRecord} from "../_shared/cloudflare-flow.ts";
 const cors={"Access-Control-Allow-Origin":"*","Access-Control-Allow-Headers":"authorization, apikey, content-type","Access-Control-Allow-Methods":"POST, OPTIONS"};
 const reply=(body:unknown,status=200)=>new Response(JSON.stringify(body),{status,headers:{...cors,"Content-Type":"application/json"}});
 const cleanSlug=(s:string)=>s.toLowerCase().replace(/[^a-z0-9-]+/g,"-").replace(/^-+|-+$/g,"");
@@ -33,8 +34,11 @@ Deno.serve(async req=>{
   if(workspaceError||!workspace)return reply({success:false,error:"Não foi possível criar workspace.",details:workspaceError?.message},500);
   workspaceId=workspace.id;
  }
- const {error:domainError}=await admin.from("flow_workspace_domains").insert({workspace_id:workspaceId,source:"standalone",hostname:slug,domain_type:"standalone",is_primary:true,is_verified:true});
- if(domainError)return reply({success:false,error:"Não foi possível registrar o identificador do workspace."},500);
+ const flowHostname=`flow-${slug}.zailom.com`;
+ try { await ensureFlowDnsRecord(flowHostname); }
+ catch(error) { return reply({success:false,error:"Não foi possível configurar o subdomínio do Flow no Cloudflare.",details:error instanceof Error?error.message:String(error)},502); }
+ const {error:domainError}=await admin.from("flow_workspace_domains").insert({workspace_id:workspaceId,source:"standalone",hostname:flowHostname,domain_type:"standalone",is_primary:true,is_verified:true});
+ if(domainError)return reply({success:false,error:"Não foi possível registrar o domínio do workspace.",details:domainError.message},409);
  const {error:memberError}=await admin.from("workspace_members").upsert({workspace_id:workspaceId,user_id:userId,role:"owner"},{onConflict:"workspace_id,user_id"});
  if(memberError)return reply({success:false,error:"Não foi possível vincular o proprietário.",details:memberError.message},500);
  await admin.from("profiles").update({display_name:displayName,plan}).eq("id",userId);
