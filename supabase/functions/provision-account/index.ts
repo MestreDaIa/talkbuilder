@@ -66,16 +66,14 @@ Deno.serve(async req => {
   }
 
   if (!userId) {
-    if (!password) return json(400, { success: false, error: "password é obrigatório para criar usuário" }, origin);
+    // A identidade global do Auth guarda somente o perfil/e-mail.
+    // A senha empresarial é gravada separadamente por workspace.
     const { data, error } = await admin.auth.admin.createUser({
-      email, password, email_confirm: true,
+      email, email_confirm: true,
       user_metadata: { full_name: body.display_name, display_name: body.display_name, slug },
     });
     if (error || !data.user) return json(500, { success: false, error: error?.message || "Falha ao criar usuário" }, origin);
     userId = data.user.id;
-  } else if (password) {
-    const { error } = await admin.auth.admin.updateUserById(userId, { email, password });
-    if (error) return json(500, { success: false, error: "Falha ao sincronizar senha no Flow", details: error.message }, origin);
   }
 
   // Atualiza apenas dados pessoais; empresa/workspace é uma relação N:N e não
@@ -128,6 +126,33 @@ Deno.serve(async req => {
     }
   }
   if (!workspaceId) return json(500, { success: false, error: "Workspace não resolvido" }, origin);
+
+  // Senha contextual por empresa/workspace; nunca gravar ou atualizar senha no Auth.
+  if (password) {
+    const { data: credentialResult, error: credentialError } = await admin.rpc("set_flow_workspace_credential", {
+      p_workspace_id: workspaceId, p_user_id: userId, p_email: email, p_password: password,
+    });
+    if (credentialError || !credentialResult?.success) {
+      return json(500, { success: false, error: credentialResult?.error || "Falha ao salvar credencial contextual", details: credentialError?.message }, origin);
+    }
+  }
+
+  const accessHost = String(body.access_host || "").trim().toLowerCase();
+  if (accessHost) {
+    if (!/^(?=.{4,253}$)(?:[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?\\.)+[a-z]{2,}$/i.test(accessHost)) {
+      return json(400, { success: false, error: "Domínio de acesso do Flow inválido." }, origin);
+    }
+    const { error: domainError } = await admin.from("flow_workspace_domains").upsert({
+      workspace_id: workspaceId, source: isBooking ? "booking" : "standalone",
+      external_company_id: isBooking ? String(body.company_id) : null,
+      hostname: accessHost, domain_type: String(body.domain_type || (isBooking ? "subdomain" : "standalone")),
+      is_primary: true, is_verified: Boolean(body.domain_verified),
+      updated_at: new Date().toISOString(),
+    }, { onConflict: "source,external_company_id" });
+    if (domainError) {
+      return json(409, { success: false, error: "Este domínio já está vinculado a outro workspace ou não pôde ser registrado.", details: domainError.message }, origin);
+    }
+  }
 
   const { error: memberError } = await admin.from("workspace_members")
     .upsert({ workspace_id: workspaceId, user_id: userId, role: "owner" }, { onConflict: "workspace_id,user_id", ignoreDuplicates: true });
