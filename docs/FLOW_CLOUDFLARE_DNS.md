@@ -19,7 +19,7 @@ Crie um API Token no Cloudflare limitado à zona `zailom.com`, com permissão **
 Opcional:
 - `FLOW_CLOUDFLARE_TARGET`: destino do CNAME. O padrão é `flow-builder.zailom.com`.
 
-Esses valores são lidos pelas Edge Functions `provision-account` e `signup-standalone`; não são variáveis do frontend nem precisam ser expostas no container web.
+Esses valores são lidos pelas Edge Functions `provision-account`, `signup-standalone` e `resolve-flow-tenant`; não são variáveis do frontend nem precisam ser expostas no container web.
 
 ## Comportamento
 
