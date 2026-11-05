@@ -140,10 +140,10 @@ Deno.serve(async req => {
     }
   }
 
-  const accessHost = String(body.access_host || "").trim().toLowerCase();
+  const accessHost = String(body.access_host || slug).trim().toLowerCase();
   if (accessHost) {
     let validHost = false;
-    try { const parsedHost = new URL("https://" + accessHost); validHost = parsedHost.hostname === accessHost && accessHost.includes("."); } catch { validHost = false; }
+    try { const parsedHost = new URL("https://" + accessHost); validHost = accessHost === slug || (parsedHost.hostname === accessHost && accessHost.includes(".")); } catch { validHost = accessHost === slug; }
     if (!validHost) {
       return json(400, { success: false, error: "Domínio de acesso do Flow inválido." }, origin);
     }
