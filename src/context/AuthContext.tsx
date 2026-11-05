@@ -204,6 +204,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 	}
 
 	function switchWorkspace(slug: string) {
+		const host = window.location.hostname.toLowerCase();
+		// Em domínio dedicado, a empresa do hostname não pode ser trocada pela UI.
+		if (host !== "flow-builder.zailom.com" && host !== "localhost" && host !== "127.0.0.1") return;
 		const found = workspaces.find(w => w.slug === slug);
 		if (found) setCurrentWorkspace(found);
 	}
