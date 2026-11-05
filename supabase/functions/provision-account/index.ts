@@ -34,7 +34,7 @@ Deno.serve(async req => {
   if (req.method !== "POST") return json(405, { success: false, error: "Method not allowed" }, origin);
   const secret = Deno.env.get("EMBED_SHARED_SECRET");
   if (!secret) return json(500, { success: false, error: "EMBED_SHARED_SECRET não configurado" }, origin);
-  const auth = (req.headers.get("authorization") ?? "").replace(/^Bearer\\s+/i, "").trim();
+  const auth = (req.headers.get("authorization") ?? "").replace(/^Bearer\s+/i, "").trim();
   const verified = await verify(auth, secret);
   if (!verified.ok) return json(401, { success: false, error: verified.reason }, origin);
 
