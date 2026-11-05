@@ -1,4 +1,5 @@
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.45.4";
+import { ensureFlowDnsRecord } from "../_shared/cloudflare-flow.ts";
 
 const ALLOWED_ORIGINS = ["https://booking.zailom.com", "https://zailom-booking.lovable.app"];
 function corsHeaders(origin: string | null): HeadersInit {
@@ -140,27 +141,43 @@ Deno.serve(async req => {
     }
   }
 
-  const accessHost = String(body.access_host || slug).trim().toLowerCase();
-  if (accessHost) {
-    let validHost = false;
-    try { const parsedHost = new URL("https://" + accessHost); validHost = accessHost === slug || (parsedHost.hostname === accessHost && accessHost.includes(".")); } catch { validHost = accessHost === slug; }
-    if (!validHost) {
-      return json(400, { success: false, error: "Domínio de acesso do Flow inválido." }, origin);
+  const requestedDomainType = String(body.domain_type || (isBooking ? "subdomain" : "standalone")).trim().toLowerCase();
+  const requestedHost = String(body.access_host || "").trim().toLowerCase();
+  const isCustomDomain = requestedDomainType === "custom";
+  const accessHost = isCustomDomain
+    ? requestedHost
+    : (requestedHost.startsWith("flow-") && requestedHost.endsWith(".zailom.com")
+      ? requestedHost
+      : `flow-${slug}.zailom.com`);
+
+  if (!accessHost) return json(400, { success: false, error: "Domínio de acesso do Flow não informado." }, origin);
+  let validHost = false;
+  try {
+    const parsedHost = new URL("https://" + accessHost);
+    validHost = parsedHost.hostname === accessHost && !accessHost.includes("/") && !accessHost.includes(":");
+  } catch { validHost = false; }
+  if (!validHost) return json(400, { success: false, error: "Domínio de acesso do Flow inválido." }, origin);
+
+  if (!isCustomDomain) {
+    try {
+      await ensureFlowDnsRecord(accessHost);
+    } catch (error) {
+      return json(502, { success: false, error: "Não foi possível configurar o subdomínio do Flow no Cloudflare.", details: error instanceof Error ? error.message : String(error) }, origin);
     }
-    const domainRecord = {
-      workspace_id: workspaceId, source: isBooking ? "booking" : "standalone",
-      external_company_id: isBooking ? String(body.company_id) : null,
-      hostname: accessHost, domain_type: String(body.domain_type || (isBooking ? "subdomain" : "standalone")),
-      is_primary: true, is_verified: Boolean(body.domain_verified),
-      updated_at: new Date().toISOString(),
-    };
-    const domainWrite = isBooking
-      ? await admin.from("flow_workspace_domains").upsert(domainRecord, { onConflict: "source,external_company_id" })
-      : await admin.from("flow_workspace_domains").upsert(domainRecord, { onConflict: "hostname" });
-    const domainError = domainWrite.error;
-    if (domainError) {
-      return json(409, { success: false, error: "Este domínio já está vinculado a outro workspace ou não pôde ser registrado.", details: domainError.message }, origin);
-    }
+  }
+
+  const domainRecord = {
+    workspace_id: workspaceId, source: isBooking ? "booking" : "standalone",
+    external_company_id: isBooking ? String(body.company_id) : null,
+    hostname: accessHost, domain_type: requestedDomainType,
+    is_primary: true, is_verified: !isCustomDomain,
+    updated_at: new Date().toISOString(),
+  };
+  const domainWrite = isBooking
+    ? await admin.from("flow_workspace_domains").upsert(domainRecord, { onConflict: "source,external_company_id" })
+    : await admin.from("flow_workspace_domains").upsert(domainRecord, { onConflict: "hostname" });
+  if (domainWrite.error) {
+    return json(409, { success: false, error: "Este domínio já está vinculado a outro workspace ou não pôde ser registrado.", details: domainWrite.error.message }, origin);
   }
 
   const { error: memberError } = await admin.from("workspace_members")
