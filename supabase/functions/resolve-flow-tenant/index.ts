@@ -9,7 +9,8 @@ Deno.serve(async req=>{
   const admin=createClient(url,key,{auth:{persistSession:false,autoRefreshToken:false}});
   const body=await req.json().catch(()=>({}));
   const hostHeader=(req.headers.get("x-forwarded-host")||req.headers.get("host")||"").split(",")[0].trim().toLowerCase().split(":")[0];
-  const identifier=String(body.identifier||hostHeader||"").trim().toLowerCase().replace(/^https?:\/\//,"").replace(/\/$/,"");
+  const rawIdentifier=String(body.identifier||hostHeader||"").trim().toLowerCase().replace(/^https?:\/\//,"").replace(/\/$/,"");
+  const identifier=/^flow-[a-z0-9-]+$/.test(rawIdentifier) ? `${rawIdentifier}.zailom.com` : rawIdentifier;
   if(!identifier) return reply({success:false,error:"Informe o identificador da empresa."},400);
   const {data,error}=await admin.rpc("resolve_flow_workspace",{p_identifier:identifier});
   if(error) return reply({success:false,error:"Falha ao localizar a empresa.",details:error.message},500);
