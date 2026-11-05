@@ -17,7 +17,7 @@ Deno.serve(async req=>{
  const {data:reset,error}=await admin.rpc("create_flow_workspace_password_reset",{p_workspace_id:tenant.workspace_id,p_email:email});
  if(error)return reply({success:false,error:"Não foi possível iniciar a recuperação."},500);
  if(reset?.token){
-   const base=tenant.hostname?("https://"+tenant.hostname):"https://flow-builder.zailom.com";
+   const base=tenant.hostname && String(tenant.hostname).includes(".") ? ("https://"+tenant.hostname) : "https://flow-builder.zailom.com";
    const resetUrl=base+"/reset-password?token="+encodeURIComponent(reset.token)+"&tenant="+encodeURIComponent(tenant.hostname||tenant.workspace_slug);
    const response=await fetch("https://api.resend.com/emails",{method:"POST",headers:{"Content-Type":"application/json",Authorization:"Bearer "+resend},body:JSON.stringify({
      from,to:[email],subject:"Zailom Flow — redefinição de senha",
