@@ -30,3 +30,15 @@ verify_jwt = false
 
 [functions.booking-whatsapp-binding]
 verify_jwt = false
+
+[functions.resolve-flow-tenant]
+verify_jwt = false
+
+[functions.login-workspace]
+verify_jwt = false
+
+[functions.request-workspace-password-reset]
+verify_jwt = false
+
+[functions.reset-workspace-password]
+verify_jwt = false
