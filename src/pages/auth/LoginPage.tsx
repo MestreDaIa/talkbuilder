@@ -88,22 +88,17 @@ export default function LoginPage() {
 
 			console.log("[Login] Auth sucesso, user ID:", data.user?.id);
 
-			// Busca slug do profile pra montar a URL do workspace
+			// Resolve o workspace pela membership; um usuário pode pertencer a várias empresas.
 			let target = redirectTo;
 			if (target === "/" && data.user) {
-				const { data: prof, error: profileError } = await supabase
-					.from("profiles")
-					.select("slug")
-					.eq("id", data.user.id)
-					.maybeSingle();
-				
-				if (profileError) {
-					console.error("[Login] Falha ao carregar profile:", profileError);
+				const { data: workspaces, error: workspaceError } = await supabase.rpc("get_my_workspaces");
+				if (workspaceError) {
+					console.error("[Login] Falha ao carregar workspaces:", workspaceError);
 				}
-				
-				if (prof?.slug) {
-					target = `/${prof.slug}/workspace`;
-				}
+				const list = Array.isArray(workspaces) ? workspaces : [];
+				const first = list[0] as { slug?: string; workspace_slug?: string } | undefined;
+				const workspaceSlug = first?.slug || first?.workspace_slug;
+				if (workspaceSlug) target = `/${workspaceSlug}/workspace`;
 			}
 
 			console.log("[Login] Redirecionando para:", target);
