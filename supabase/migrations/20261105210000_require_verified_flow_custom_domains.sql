@@ -4,9 +4,11 @@ LANGUAGE sql STABLE SECURITY DEFINER SET search_path = public AS $$
   SELECT w.id,w.slug,w.name,d.hostname,d.source
   FROM public.flow_workspace_domains d
   JOIN public.workspaces w ON w.id=d.workspace_id
-  WHERE (lower(d.hostname)=lower(trim(regexp_replace(p_identifier,'^https?://','')))
-      OR lower(w.slug)=lower(trim(regexp_replace(p_identifier,'^https?://',''))))
-    AND (d.domain_type <> 'custom' OR d.is_verified = true)
+  WHERE (
+    (lower(d.hostname)=lower(trim(regexp_replace(p_identifier,'^https?://','')))
+      AND (d.domain_type <> 'custom' OR d.is_verified = true))
+    OR lower(w.slug)=lower(trim(regexp_replace(p_identifier,'^https?://','')))
+  )
   ORDER BY d.is_primary DESC LIMIT 1;
 $$;
 REVOKE ALL ON FUNCTION public.resolve_flow_workspace(TEXT) FROM PUBLIC,anon,authenticated;
