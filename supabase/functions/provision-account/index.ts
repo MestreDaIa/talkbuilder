@@ -139,16 +139,22 @@ Deno.serve(async req => {
 
   const accessHost = String(body.access_host || "").trim().toLowerCase();
   if (accessHost) {
-    if (!/^(?=.{4,253}$)(?:[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?\\.)+[a-z]{2,}$/i.test(accessHost)) {
+    let validHost = false;
+    try { const parsedHost = new URL("https://" + accessHost); validHost = parsedHost.hostname === accessHost && accessHost.includes("."); } catch { validHost = false; }
+    if (!validHost) {
       return json(400, { success: false, error: "Domínio de acesso do Flow inválido." }, origin);
     }
-    const { error: domainError } = await admin.from("flow_workspace_domains").upsert({
+    const domainRecord = {
       workspace_id: workspaceId, source: isBooking ? "booking" : "standalone",
       external_company_id: isBooking ? String(body.company_id) : null,
       hostname: accessHost, domain_type: String(body.domain_type || (isBooking ? "subdomain" : "standalone")),
       is_primary: true, is_verified: Boolean(body.domain_verified),
       updated_at: new Date().toISOString(),
-    }, { onConflict: "source,external_company_id" });
+    };
+    const domainWrite = isBooking
+      ? await admin.from("flow_workspace_domains").upsert(domainRecord, { onConflict: "source,external_company_id" })
+      : await admin.from("flow_workspace_domains").upsert(domainRecord, { onConflict: "hostname" });
+    const domainError = domainWrite.error;
     if (domainError) {
       return json(409, { success: false, error: "Este domínio já está vinculado a outro workspace ou não pôde ser registrado.", details: domainError.message }, origin);
     }
