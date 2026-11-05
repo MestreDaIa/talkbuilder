@@ -15,5 +15,5 @@ Deno.serve(async req=>{
   if(error) return reply({success:false,error:"Falha ao localizar a empresa.",details:error.message},500);
   const row=Array.isArray(data)?data[0]:data;
   if(!row?.workspace_id) return reply({success:false,error:"Empresa/ambiente não encontrado. Confira o endereço informado."},404);
-  return reply({success:true,workspace_id:row.workspace_id,workspace_slug:row.workspace_slug,workspace_name:row.workspace_name,hostname:row.hostname});
+  return reply({success:true,workspace_id:row.workspace_id,workspace_slug:row.workspace_slug,workspace_name:row.workspace_name,hostname:row.hostname,workspace_source:row.workspace_source});
 });
