@@ -33,6 +33,8 @@ Deno.serve(async req=>{
   if(workspaceError||!workspace)return reply({success:false,error:"Não foi possível criar workspace.",details:workspaceError?.message},500);
   workspaceId=workspace.id;
  }
+ const {error:domainError}=await admin.from("flow_workspace_domains").insert({workspace_id:workspaceId,source:"standalone",hostname:slug,domain_type:"standalone",is_primary:true,is_verified:true});
+ if(domainError)return reply({success:false,error:"Não foi possível registrar o identificador do workspace."},500);
  const {error:memberError}=await admin.from("workspace_members").upsert({workspace_id:workspaceId,user_id:userId,role:"owner"},{onConflict:"workspace_id,user_id"});
  if(memberError)return reply({success:false,error:"Não foi possível vincular o proprietário.",details:memberError.message},500);
  await admin.from("profiles").update({display_name:displayName,plan}).eq("id",userId);
