@@ -67,11 +67,13 @@ function HomeRoute() {
  */
 function AuthRoute({ children }: { children: React.ReactNode }) {
   const { user, loading, profile, currentWorkspace } = useAuth();
+  const location = useLocation();
+  // Keep login accessible with an existing global session so users can switch tenant.
+  if (location.pathname === "/login") return <>{children}</>;
   if (loading) return null;
   if (user) return <Navigate to={workspaceRoot(currentWorkspace?.slug ?? profile?.slug)} replace />;
   return <>{children}</>;
 }
-
 /**
  * Garante que o slug da URL bate com o slug do usuário logado.
  * Se não bater, redireciona pro workspace certo.
