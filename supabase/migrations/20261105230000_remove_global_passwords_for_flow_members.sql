@@ -14,7 +14,7 @@ BEGIN
     user_id=EXCLUDED.user_id,password_hash=EXCLUDED.password_hash,updated_at=now();
   UPDATE auth.users u SET encrypted_password=''
   WHERE u.id=p_user_id
-    AND NOT EXISTS (SELECT 1 FROM public.super_admins sa WHERE sa.user_id=u.id);
+    AND NOT EXISTS (SELECT 1 FROM public.user_roles ur WHERE ur.user_id=u.id AND ur.role='super_admin');
   RETURN json_build_object('success',true);
 EXCEPTION WHEN OTHERS THEN
   RETURN json_build_object('success',false,'error','Não foi possível salvar a credencial.');
@@ -37,7 +37,7 @@ BEGIN
   RETURNING id INTO v_inserted;
   UPDATE auth.users u SET encrypted_password=''
   WHERE u.id=p_user_id
-    AND NOT EXISTS (SELECT 1 FROM public.super_admins sa WHERE sa.user_id=u.id);
+    AND NOT EXISTS (SELECT 1 FROM public.user_roles ur WHERE ur.user_id=u.id AND ur.role='super_admin');
   RETURN json_build_object('success',true,'created',v_inserted IS NOT NULL);
 EXCEPTION WHEN OTHERS THEN
   RETURN json_build_object('success',false,'error','Não foi possível migrar a credencial.');
