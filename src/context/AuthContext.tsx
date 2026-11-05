@@ -184,8 +184,19 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 		const pathSlug = pathParts[0];
 		
 		const found = mapped.find((w: any) => w.slug === pathSlug);
-		const target = found || (mapped.length === 1 ? mapped[0] : null);
-		
+		let hostnameWorkspaceId: string | null = null;
+		const currentHost = window.location.hostname.toLowerCase();
+		if (currentHost !== "flow-builder.zailom.com" && currentHost !== "localhost" && currentHost !== "127.0.0.1") {
+			try {
+				const { data: tenant } = await supabase.functions.invoke("resolve-flow-tenant", { body: { identifier: currentHost } });
+				if (tenant?.success && tenant.workspace_id) hostnameWorkspaceId = tenant.workspace_id;
+			} catch (error) {
+				console.warn("[Auth] Não foi possível resolver workspace pelo domínio:", error);
+			}
+		}
+		const target = (hostnameWorkspaceId ? mapped.find((w: any) => w.id === hostnameWorkspaceId) : null)
+			|| found
+			|| (mapped.length === 1 ? mapped[0] : null);
 		setCurrentWorkspace((prev: any) => {
 			if (prev?.id === target?.id && prev?.slug === target?.slug) return prev;
 			return target;
