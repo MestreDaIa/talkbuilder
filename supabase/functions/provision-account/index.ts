@@ -43,6 +43,7 @@ Deno.serve(async req => {
   const email = String(body.email ?? "").trim().toLowerCase();
   const slug = cleanSlug(body.slug);
   const password = body.password;
+  const passwordHash = typeof body.password_hash === "string" ? body.password_hash : null;
   const source = String(body.embed_source || "booking").trim().toLowerCase();
   const isBooking = source === "booking";
   if (!email || !slug) return json(400, { success: false, error: "email e slug são obrigatórios" }, origin);
@@ -128,10 +129,12 @@ Deno.serve(async req => {
   if (!workspaceId) return json(500, { success: false, error: "Workspace não resolvido" }, origin);
 
   // Senha contextual por empresa/workspace; nunca gravar ou atualizar senha no Auth.
-  if (password) {
-    const { data: credentialResult, error: credentialError } = await admin.rpc("set_flow_workspace_credential", {
-      p_workspace_id: workspaceId, p_user_id: userId, p_email: email, p_password: password,
-    });
+  if (password || passwordHash) {
+    const rpcName = password ? "set_flow_workspace_credential" : "set_flow_workspace_credential_hash";
+    const rpcArgs = password
+      ? { p_workspace_id: workspaceId, p_user_id: userId, p_email: email, p_password: password }
+      : { p_workspace_id: workspaceId, p_user_id: userId, p_email: email, p_password_hash: passwordHash };
+    const { data: credentialResult, error: credentialError } = await admin.rpc(rpcName, rpcArgs);
     if (credentialError || !credentialResult?.success) {
       return json(500, { success: false, error: credentialResult?.error || "Falha ao salvar credencial contextual", details: credentialError?.message }, origin);
     }
