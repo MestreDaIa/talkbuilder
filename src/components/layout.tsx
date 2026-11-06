@@ -57,7 +57,7 @@ function WorkspaceLayoutContent({ children }: { children: React.ReactNode }) {
 			// de workspace e header) e mostramos só a área de trabalho dos flows.
 			const showBreadcrumb = mode !== "embedded" && !isBotEditor && (isWorkspaceRoot || isFolderRoute);
 
-			const showToolbar = showBreadcrumb;
+			const showToolbar = showBreadcrumb || (mode === "embedded" && isWorkspaceRoute && !isBotEditor);
 		
 			const [openModalADD, setOpenModalADD] = useState(false);
 			const [addOption, setAddOption] = useState<"folder" | "bot">("folder");
@@ -131,7 +131,7 @@ function WorkspaceLayoutContent({ children }: { children: React.ReactNode }) {
 					{showBreadcrumb && <Breadcrumb />}
 					<div className="flex-1 flex relative overflow-hidden">
 						{showWorkspaceNavigation && <WorkspaceSidebar />}
-						{showBreadcrumb && (
+						{(showBreadcrumb || showToolbar) && (
 							<div className="flex ">
 								<FoldersSidebarNavigation />
 								{showToolbar && (
