@@ -72,7 +72,7 @@ export default function WorkspaceSidebar() {
   }
 
   return (
-    <aside className={`${collapsed ? "w-[64px]" : "w-[220px]"} shrink-0 border-r bg-[#08060d] text-white h-full flex flex-col transition-[width] duration-200`}>
+    <aside className={`${collapsed ? "w-[64px]" : "w-[220px]"} shrink-0 border-r bg-[#08060d] text-white h-full min-h-0 flex flex-col overflow-hidden transition-[width] duration-200`}>
       <div className={`flex items-center border-b border-white/10 h-[72px] ${collapsed ? "justify-center px-2" : "justify-between px-4"}`}>
         {!collapsed && (
           <div className="min-w-0">
@@ -90,7 +90,7 @@ export default function WorkspaceSidebar() {
         </button>
       </div>
 
-      <nav className="flex-1 p-3 space-y-1">
+      <nav className="flex-1 min-h-0 overflow-y-auto overscroll-contain p-3 space-y-1">
         {items.map(({ label, icon: Icon, path }) => (
           <button
             key={label}
@@ -114,7 +114,7 @@ export default function WorkspaceSidebar() {
         ))}
       </nav>
 
-      <div className="border-t border-white/10 p-3 space-y-1">
+      <div className="shrink-0 border-t border-white/10 p-3 space-y-1">
         {flags.showProfile && (
           <button
             type="button"
