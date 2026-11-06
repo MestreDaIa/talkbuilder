@@ -127,31 +127,37 @@ function WorkspaceLayoutContent({ children }: { children: React.ReactNode }) {
 					className="flex flex-col h-svh relative overflow-y-hidden"
 					data-embed-mode={mode}
 				>
-				{!isBotEditor && flags.showHeader && <Header />}
-					{showBreadcrumb && <Breadcrumb />}
-					<div className="flex-1 flex relative overflow-hidden">
+					{!isBotEditor && flags.showHeader && <Header />}
+					<div className="flex-1 flex relative overflow-hidden min-h-0">
 						{showWorkspaceNavigation && <WorkspaceSidebar />}
 						{(showBreadcrumb || showToolbar) && (
-							<div className="flex ">
+							<div className="flex shrink-0 h-full">
 								<FoldersSidebarNavigation />
 								{showToolbar && (
-									<div className="px-3 pt-3 ">
-										<AddOptionToolbar
-											onAddFolder={() => {
-												setAddOption("folder");
-												setOpenModalADD(true);
-											}}
-											onAddBot={() => {
-												setAddOption("bot");
-												setOpenModalADD(true);
-											}}
-										/>
-									</div>
+								<aside className="w-32 min-w-32 shrink-0 h-full overflow-y-auto px-2 py-16">
+									<AddOptionToolbar
+										onAddFolder={() => {
+											setAddOption("folder");
+											setOpenModalADD(true);
+										}}
+										onAddBot={() => {
+											setAddOption("bot");
+											setOpenModalADD(true);
+										}}
+									/>
+								</aside>
 								)}
 							</div>
 						)}
-						<main className="flex flex-1 overflow-hidden">
-							<div className=" w-full px-0 overflow-y-auto">{children}</div>
+						<main className="flex flex-1 min-w-0 flex-col overflow-hidden">
+							{showWorkspaceNavigation && (
+								<div className="flex h-12 min-h-12 shrink-0 items-center border-b border-white/10 px-3">
+									{isFolderRoute && mode !== "embedded" && !isBotEditor && (
+										<div className="min-w-0 flex-1 animate-in fade-in slide-in-from-top-1 duration-200"><Breadcrumb /></div>
+									)}
+								</div>
+							)}
+							<div className="flex-1 min-h-0 overflow-y-auto">{children}</div>
 							<Toaster />
 						</main>
 					</div>
