@@ -45,3 +45,6 @@ verify_jwt = false
 
 [functions.signup-standalone]
 verify_jwt = false
+
+[functions.exchange-booking-embed-token]
+verify_jwt = false
