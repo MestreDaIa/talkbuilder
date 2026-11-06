@@ -1,10 +1,13 @@
 "use client";
 
+import { getSupabase } from "../lib/supabaseClient";
+
 import {
 	createContext,
 	useContext,
 	useEffect,
 	useMemo,
+	useRef,
 	useState,
 } from "react";
 
@@ -228,6 +231,44 @@ export function EmbedProvider({ children }: { children: React.ReactNode }) {
 		detectInitialMode()
 	);
 	const [isReady] = useState(true);
+	const exchangedTokenRef = useRef<string | null>(null);
+
+	// O token Booking é validado no servidor e trocado por uma sessão Supabase
+	// real. Isso permite que o workspace incorporado use as mesmas operações
+	// protegidas por RLS do Flow standalone, sem confiar no payload decodificado
+	// no navegador como mecanismo de autorização.
+	useEffect(() => {
+		if (mode !== "embedded" || host !== "booking" || !session) return;
+		if (exchangedTokenRef.current === session.rawToken) return;
+		exchangedTokenRef.current = session.rawToken;
+		let cancelled = false;
+
+		void (async () => {
+			try {
+				const supabase = getSupabase();
+				if (!supabase) throw new Error("Supabase do Flow não configurado.");
+				const { data, error: exchangeError } = await supabase.functions.invoke(
+					"exchange-booking-embed-token",
+					{ body: { token: session.rawToken } },
+				);
+				if (exchangeError || !data?.success || !data?.token_hash) {
+					throw new Error(data?.error || exchangeError?.message || "Não foi possível autenticar o workspace incorporado.");
+				}
+				const { error: authError } = await supabase.auth.verifyOtp({
+					token_hash: data.token_hash,
+					type: "magiclink",
+				});
+				if (authError) throw authError;
+			} catch (cause) {
+				if (cancelled) return;
+				const message = cause instanceof Error ? cause.message : "Falha ao autenticar o workspace incorporado.";
+				console.error("[Embed] Falha ao trocar token Booking por sessão Flow:", cause);
+				setState((current) => ({ ...current, error: message }));
+			}
+		})();
+
+		return () => { cancelled = true; };
+	}, [mode, host, session]);
 
 	useEffect(() => {
 		if (typeof window === "undefined") return;
