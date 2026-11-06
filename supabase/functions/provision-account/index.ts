@@ -196,20 +196,24 @@ Deno.serve(async req => {
     }
   }
 
-  const requestedDomainType = String(body.domain_type || (isBooking ? "subdomain" : "standalone")).trim().toLowerCase();
-  const requestedHost = String(body.access_host || "").trim().toLowerCase();
+  const requestedDomainType = String(body.domain_type || (isBooking ? "platform" : "standalone")).trim().toLowerCase();
+  const requestedHost = String(body.access_host || "").trim().toLowerCase().replace(/\\.$/, "");
   const isCustomDomain = requestedDomainType === "custom";
-  const accessHost = isCustomDomain
-    ? requestedHost
-    : (requestedHost.startsWith("flow-") && requestedHost.endsWith(".zailom.com")
-      ? requestedHost
-      : `flow-${slug}.zailom.com`);
 
-  if (!accessHost) return json(400, { success: false, error: "Domínio de acesso do Flow não informado." }, origin);
+  // Booking is the source of truth for the public subdomain. Never silently
+  // derive a tenant hostname from its internal random slug.
+  if (isBooking && !requestedHost) {
+    return json(400, { success: false, error: "Booking não enviou access_host para esta empresa; provisionamento interrompido para evitar hostname incorreto." }, origin);
+  }
+
+  let accessHost = requestedHost;
+  if (!isBooking && !accessHost) accessHost = `flow-${slug}.zailom.com`;
+
   let validHost = false;
   try {
     const parsedHost = new URL("https://" + accessHost);
     validHost = parsedHost.hostname === accessHost && !accessHost.includes("/") && !accessHost.includes(":");
+    if (!isCustomDomain) validHost = validHost && /^flow-[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?\\.zailom\\.com$/.test(accessHost);
   } catch { validHost = false; }
   if (!validHost) return json(400, { success: false, error: "Domínio de acesso do Flow inválido." }, origin);
 
