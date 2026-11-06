@@ -8,8 +8,7 @@ export default function EmbedErrorScreen() {
 	const { mode, error } = useEmbed();
 
 	// Só renderiza dentro do iframe quando a autenticação/token falha.
-	if (!isInIframe()) return null;
-	if (mode !== "embedded" && !error) return null;
+	if (!isInIframe() || !error) return null;
 
 	return (
 		<div className="fixed inset-0 z-[9999] flex items-center justify-center bg-background p-6">
