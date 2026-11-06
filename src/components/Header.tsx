@@ -16,16 +16,16 @@ export default function Header() {
   const slug = currentWorkspace?.slug || profile?.slug;
 
   return (
-    <div className="relative top-0 left-0 w-full bg-[#08060d] border-b border-white/5 text-white flex items-center justify-between py-2 px-4 sm:px-9 z-[99] gap-3">
+    <div className="relative top-0 left-0 w-full bg-[#08060d] border-b border-white/5 text-white flex items-center justify-between h-14 py-1.5 px-3 sm:px-6 z-[99] gap-3">
       <button
         type="button"
         className="cursor-pointer shrink-0 flex items-center gap-2"
         onClick={() => navigate(workspaceRoot(slug))}
       >
-        <img src={logoMark} alt="Zailom Flow" className="h-7 w-auto" />
+        <img src={logoMark} alt="Zailom Flow" className="h-6 w-auto" />
       </button>
       <h1 className="flex-1 text-center flex items-center justify-center gap-2 truncate">
-        <img src={logoWordmark} alt="Zailom Flow" className="h-6 w-auto inline-block" />
+        <img src={logoWordmark} alt="Zailom Flow" className="h-5 w-auto inline-block" />
         <span className="text-base sm:text-lg font-semibold truncate">
           {slug ? `@${slug}` : ""}
           {profile?.display_name ? ` - ${profile.display_name}` : ""}
