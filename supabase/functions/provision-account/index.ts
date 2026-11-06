@@ -197,7 +197,7 @@ Deno.serve(async req => {
   }
 
   const requestedDomainType = String(body.domain_type || (isBooking ? "platform" : "standalone")).trim().toLowerCase();
-  const requestedHost = String(body.access_host || "").trim().toLowerCase().replace(/\\.$/, "");
+  const requestedHost = String(body.access_host || "").trim().toLowerCase().replace(/\.$/, "");
   const isCustomDomain = requestedDomainType === "custom";
 
   // Booking is the source of truth for the public subdomain. Never silently
@@ -213,7 +213,7 @@ Deno.serve(async req => {
   try {
     const parsedHost = new URL("https://" + accessHost);
     validHost = parsedHost.hostname === accessHost && !accessHost.includes("/") && !accessHost.includes(":");
-    if (!isCustomDomain) validHost = validHost && /^flow-[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?\\.zailom\\.com$/.test(accessHost);
+    if (!isCustomDomain) validHost = validHost && /^flow-[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?\.zailom\.com$/.test(accessHost);
   } catch { validHost = false; }
   if (!validHost) return json(400, { success: false, error: "Domínio de acesso do Flow inválido." }, origin);
 
