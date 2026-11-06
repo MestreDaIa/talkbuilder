@@ -9,8 +9,8 @@ export default function Breadcrumb() {
   const { items } = useWorkspace();
   const router = useNavigate();
   const { pathname } = useLocation();
-  const { profile } = useAuth();
-  const slug = profile?.slug;
+  const { profile, currentWorkspace } = useAuth();
+  const slug = currentWorkspace?.slug ?? profile?.slug;
 
   const folderId = folderIdFromPath(pathname);
 
