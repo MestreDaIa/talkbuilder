@@ -55,9 +55,9 @@ function WorkspaceLayoutContent({ children }: { children: React.ReactNode }) {
 
 			// No modo embedded, escondemos a navegação institucional (breadcrumb com seletor
 			// de workspace e header) e mostramos só a área de trabalho dos flows.
-			const showBreadcrumb = mode !== "embedded" && !isBotEditor && (isWorkspaceRoot || isFolderRoute);
+			const showBreadcrumb = !isBotEditor && isFolderRoute;
 
-			const showToolbar = showBreadcrumb || (mode === "embedded" && isWorkspaceRoute && !isBotEditor);
+			const showWorkspaceControls = !isBotEditor && isWorkspaceRoute;
 		
 			const [openModalADD, setOpenModalADD] = useState(false);
 			const [addOption, setAddOption] = useState<"folder" | "bot">("folder");
@@ -127,40 +127,30 @@ function WorkspaceLayoutContent({ children }: { children: React.ReactNode }) {
 					className="flex flex-col h-svh relative overflow-y-hidden"
 					data-embed-mode={mode}
 				>
-					{!isBotEditor && flags.showHeader && <Header />}
-					<div className="flex-1 flex relative overflow-hidden min-h-0">
-						{showWorkspaceNavigation && <WorkspaceSidebar />}
-						{(showBreadcrumb || showToolbar) && (
-							<div className="flex shrink-0 h-full">
-								<FoldersSidebarNavigation />
-								{showToolbar && (
-								<aside className="w-32 min-w-32 shrink-0 h-full overflow-y-auto px-2 py-16">
-									<AddOptionToolbar
-										onAddFolder={() => {
-											setAddOption("folder");
-											setOpenModalADD(true);
-										}}
-										onAddBot={() => {
-											setAddOption("bot");
-											setOpenModalADD(true);
-										}}
-									/>
-								</aside>
-								)}
+				{!isBotEditor && flags.showHeader && <Header />}
+					<div className="flex-1 flex relative overflow-hidden">
+					{showWorkspaceNavigation && <WorkspaceSidebar />}
+					{showWorkspaceControls && (
+						<>
+							<FoldersSidebarNavigation />
+							<aside className="w-32 min-w-32 shrink-0 h-full overflow-y-auto px-2 py-16">
+								<AddOptionToolbar
+									onAddFolder={() => { setAddOption("folder"); setOpenModalADD(true); }}
+									onAddBot={() => { setAddOption("bot"); setOpenModalADD(true); }}
+								/>
+							</aside>
+						</>
+					)}
+					<main className="flex flex-1 min-w-0 flex-col overflow-hidden">
+						{showWorkspaceControls && (
+							<div className="flex h-12 min-h-12 shrink-0 items-center border-b border-white/10 px-3">
+								{showBreadcrumb && <div className="min-w-0 flex-1 animate-in fade-in slide-in-from-top-1 duration-200"><Breadcrumb /></div>}
 							</div>
 						)}
-						<main className="flex flex-1 min-w-0 flex-col overflow-hidden">
-							{showWorkspaceNavigation && (
-								<div className="flex h-12 min-h-12 shrink-0 items-center border-b border-white/10 px-3">
-									{isFolderRoute && mode !== "embedded" && !isBotEditor && (
-										<div className="min-w-0 flex-1 animate-in fade-in slide-in-from-top-1 duration-200"><Breadcrumb /></div>
-									)}
-								</div>
-							)}
-							<div className="flex-1 min-h-0 overflow-y-auto">{children}</div>
-							<Toaster />
-						</main>
-					</div>
+						<div className="flex-1 min-h-0 overflow-y-auto">{children}</div>
+						<Toaster />
+				</main>
+				</div>
 
 					<Dialog open={openModalADD} onOpenChange={setOpenModalADD}>
 						<DialogContent>
