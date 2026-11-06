@@ -106,8 +106,8 @@ function SidebarItem({
 	hasChildren,
 }: SidebarItemProps) {
 	const router = useNavigate();
-	const { profile } = useAuth();
-	const slug = profile?.slug;
+	const { profile, currentWorkspace } = useAuth();
+  const slug = currentWorkspace?.slug ?? profile?.slug;
 
 	const {
 		attributes,
