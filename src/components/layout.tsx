@@ -58,7 +58,7 @@ function WorkspaceLayoutContent({ children }: { children: React.ReactNode }) {
 			const showBreadcrumb = !isBotEditor && isFolderRoute;
 
 			const showFoldersSidebar = !isBotEditor && (isWorkspaceRoot || isFolderRoute);
-			const showAddControls = !isBotEditor && isFolderRoute;
+			const showAddControls = !isBotEditor && (isWorkspaceRoot || isFolderRoute);
 		
 			const [openModalADD, setOpenModalADD] = useState(false);
 			const [addOption, setAddOption] = useState<"folder" | "bot">("folder");
