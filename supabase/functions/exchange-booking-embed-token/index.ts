@@ -84,37 +84,51 @@ Deno.serve(async (request) => {
     auth: { autoRefreshToken: false, persistSession: false },
   });
 
-  const { data: profile, error: profileError } = await admin
-    .from("profiles")
-    .select("id, slug, embed_company_id")
-    .eq("embed_company_id", claims.company_id)
+  // O vínculo Booking ↔ Flow é armazenado na tabela relacional
+  // booking_workspace_links. Não usar profiles.embed_company_id: a relação
+  // não pertence ao perfil global, pois um usuário pode ter várias empresas.
+  const { data: companyLink, error: companyLinkError } = await admin
+    .from("booking_workspace_links")
+    .select("workspace_id")
+    .eq("source", "booking")
+    .eq("external_company_id", claims.company_id)
     .maybeSingle();
 
-  if (profileError) return json({ success: false, error: "Could not resolve the Flow account.", details: profileError.message }, 500);
-  if (!profile?.id || profile.slug !== claims.workspace_slug) {
+  if (companyLinkError) {
+    return json({ success: false, error: "Could not resolve the Booking/Flow link.", details: companyLinkError.message }, 500);
+  }
+  if (!companyLink?.workspace_id) {
     return json({ success: false, error: "The Booking company is not linked to this Flow workspace." }, 403);
   }
 
   const { data: workspace, error: workspaceError } = await admin
     .from("workspaces")
-    .select("id, slug")
-    .eq("slug", claims.workspace_slug)
+    .select("id, slug, owner_id")
+    .eq("id", companyLink.workspace_id)
     .maybeSingle();
 
   if (workspaceError) return json({ success: false, error: "Could not resolve the Flow workspace.", details: workspaceError.message }, 500);
   if (!workspace?.id) return json({ success: false, error: "Flow workspace not found." }, 404);
+  if (workspace.slug !== claims.workspace_slug) {
+    return json({ success: false, error: "The Booking company is not linked to this Flow workspace." }, 403);
+  }
+  if (!workspace.owner_id) {
+    return json({ success: false, error: "Flow workspace owner was not found." }, 404);
+  }
 
   const { data: membership, error: membershipError } = await admin
     .from("workspace_members")
-    .select("workspace_id")
+    .select("workspace_id, role")
     .eq("workspace_id", workspace.id)
-    .eq("user_id", profile.id)
+    .eq("user_id", workspace.owner_id)
     .maybeSingle();
 
   if (membershipError) return json({ success: false, error: "Could not verify workspace membership.", details: membershipError.message }, 500);
-  if (!membership) return json({ success: false, error: "Flow account is not a member of this workspace." }, 403);
+  if (!membership || membership.role !== "owner") {
+    return json({ success: false, error: "Flow owner is not a member of this workspace." }, 403);
+  }
 
-  const { data: authUser, error: authUserError } = await admin.auth.admin.getUserById(profile.id);
+  const { data: authUser, error: authUserError } = await admin.auth.admin.getUserById(workspace.owner_id);
   if (authUserError || !authUser.user?.email) {
     return json({ success: false, error: "Flow owner account was not found." }, 404);
   }
