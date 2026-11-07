@@ -57,7 +57,8 @@ function WorkspaceLayoutContent({ children }: { children: React.ReactNode }) {
 			// de workspace e header) e mostramos só a área de trabalho dos flows.
 			const showBreadcrumb = !isBotEditor && isFolderRoute;
 
-			const showFoldersSidebar = !isBotEditor && (isWorkspaceRoot || isFolderRoute);\n\t\t\tconst showAddControls = !isBotEditor && isFolderRoute;
+			const showFoldersSidebar = !isBotEditor && (isWorkspaceRoot || isFolderRoute);
+			const showAddControls = !isBotEditor && isFolderRoute;
 		
 			const [openModalADD, setOpenModalADD] = useState(false);
 			const [addOption, setAddOption] = useState<"folder" | "bot">("folder");
