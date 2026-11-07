@@ -139,7 +139,7 @@ function WorkspaceLayoutContent({ children }: { children: React.ReactNode }) {
 									onAddFolder={() => { setAddOption("folder"); setOpenModalADD(true); }}
 									onAddBot={() => { setAddOption("bot"); setOpenModalADD(true); }}
 								/>
-							</aside>
+							</aside>}
 						</>
 					)}
 					<main className="flex flex-1 min-w-0 flex-col overflow-hidden">
