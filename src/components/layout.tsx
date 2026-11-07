@@ -57,7 +57,7 @@ function WorkspaceLayoutContent({ children }: { children: React.ReactNode }) {
 			// de workspace e header) e mostramos só a área de trabalho dos flows.
 			const showBreadcrumb = !isBotEditor && isFolderRoute;
 
-			const showWorkspaceControls = !isBotEditor && isWorkspaceRoute;
+			const showFoldersSidebar = !isBotEditor && (isWorkspaceRoot || isFolderRoute);\n\t\t\tconst showAddControls = !isBotEditor && isFolderRoute;
 		
 			const [openModalADD, setOpenModalADD] = useState(false);
 			const [addOption, setAddOption] = useState<"folder" | "bot">("folder");
@@ -130,10 +130,10 @@ function WorkspaceLayoutContent({ children }: { children: React.ReactNode }) {
 				{!isBotEditor && flags.showHeader && <Header />}
 					<div className="flex-1 flex relative overflow-hidden">
 					{showWorkspaceNavigation && <WorkspaceSidebar />}
-					{showWorkspaceControls && (
+					{showFoldersSidebar && (
 						<>
 							<FoldersSidebarNavigation />
-							<aside className="w-32 min-w-32 shrink-0 h-full overflow-y-auto px-2 py-16">
+							{showAddControls && <aside className="w-32 min-w-32 shrink-0 h-full overflow-y-auto px-2 py-16">
 								<AddOptionToolbar
 									onAddFolder={() => { setAddOption("folder"); setOpenModalADD(true); }}
 									onAddBot={() => { setAddOption("bot"); setOpenModalADD(true); }}
@@ -142,7 +142,7 @@ function WorkspaceLayoutContent({ children }: { children: React.ReactNode }) {
 						</>
 					)}
 					<main className="flex flex-1 min-w-0 flex-col overflow-hidden">
-						{showWorkspaceControls && (
+						{showFoldersSidebar && (
 							<div className="flex h-12 min-h-12 shrink-0 items-center border-b border-white/10 px-3">
 								{showBreadcrumb && <div className="min-w-0 flex-1 animate-in fade-in slide-in-from-top-1 duration-200"><Breadcrumb /></div>}
 							</div>
