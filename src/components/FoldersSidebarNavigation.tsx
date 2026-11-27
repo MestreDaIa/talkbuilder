@@ -2,14 +2,14 @@
 
 import { useState, type CSSProperties  } from "react";
 import { useWorkspace } from "../context/WorkspaceContext";
-import { ChevronDown, ChevronRight } from "lucide-react";
+import { ChevronDown, ChevronRight, Menu } from "lucide-react";
 import { useDraggable, useDroppable } from "@dnd-kit/core";
 import { useLocation, useNavigate } from "react-router-dom";
 import { useAuth } from "../context/AuthContext";
 import { folderRoute, botRoute, folderIdFromPath, rememberBotBackRoute, workspaceRoot } from "../lib/workspaceRoutes";
 import { sortByIndex } from "../lib/workspaceOrder";
 
-export default function FoldersSidebarNavigation() {
+export default function FoldersSidebarNavigation({ onToggleMenu }: { onToggleMenu?: () => void }) {
 	const { items } = useWorkspace();
 	const router = useNavigate();
 	
@@ -77,7 +77,7 @@ export default function FoldersSidebarNavigation() {
 			className="w-36 min-w-36 max-w-36 shrink-0 sm:w-44 sm:min-w-44 sm:max-w-44 flex bg-gray-800 h-full min-h-0 overflow-hidden"
 			style={{ userSelect: "none" }}
 		>
-			<div className="w-full min-w-0 min-h-0 flex-1 flex flex-col py-3 px-2 pb-6 gap-2 overflow-x-hidden overflow-y-auto overscroll-contain">
+			<div className="w-full min-w-0 min-h-0 flex-1 flex flex-col py-2 px-1 sm:px-2 pb-6 gap-2 overflow-x-hidden overflow-y-auto overscroll-contain">\n\t\t\t\t<button type="button" onClick={onToggleMenu} title="Abrir menu Workspace" aria-label="Abrir menu Workspace" className="md:hidden sticky top-0 z-10 flex h-8 w-full shrink-0 items-center justify-center rounded-md border border-white/10 bg-gray-900 text-gray-200 hover:bg-gray-700">\n\t\t\t\t\t<Menu className="h-4 w-4" />\n\t\t\t\t</button>
 				{hasSidebarContent ? renderTree(null) : <p className="px-2 py-3 text-xs text-gray-300/70">Nenhuma pasta ou bot criado</p>}
 			</div>
 		</div>
