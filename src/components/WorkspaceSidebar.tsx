@@ -39,7 +39,7 @@ export default function WorkspaceSidebar({ mobile = false, onMobileClose }: { mo
     void loadProblemCount();
 
     const channel = supabase
-      .channel(`workspace-sidebar-logs-${currentWorkspace.id}`)
+      .channel(`workspace-sidebar-logs-${currentWorkspace.id}-${crypto.randomUUID()}`)
       .on("postgres_changes", {
         event: "INSERT",
         schema: "public",
@@ -105,7 +105,7 @@ export default function WorkspaceSidebar({ mobile = false, onMobileClose }: { mo
             }`}
           >
             <Icon className="h-4 w-4 shrink-0" />
-            {!collapsed && <span>{label}</span>}
+            {!isCollapsed && <span>{label}</span>}
             {label === "Logs" && problemCount > 0 && (
               <span className={`ml-auto min-w-5 rounded-full bg-destructive px-1.5 py-0.5 text-center text-[10px] font-bold text-white ${isCollapsed ? "absolute -right-1 -top-1" : ""}`}>
                 {problemCount > 99 ? "99+" : problemCount}
@@ -124,7 +124,7 @@ export default function WorkspaceSidebar({ mobile = false, onMobileClose }: { mo
             className={`w-full flex items-center rounded-lg py-2.5 text-sm text-white/65 hover:bg-white/5 hover:text-white transition-colors ${isCollapsed ? "justify-center px-0" : "gap-3 px-3 text-left"}`}
           >
             <UserRound className="h-4 w-4 shrink-0" />
-            {!collapsed && <span>Perfil</span>}
+            {!isCollapsed && <span>Perfil</span>}
           </button>
         )}
 
@@ -135,7 +135,7 @@ export default function WorkspaceSidebar({ mobile = false, onMobileClose }: { mo
           className={`w-full flex items-center rounded-lg py-2.5 text-sm text-white/65 hover:bg-white/5 hover:text-white transition-colors ${isCollapsed ? "justify-center px-0" : "gap-3 px-3 text-left"}`}
         >
           <Settings2 className="h-4 w-4 shrink-0" />
-          {!collapsed && <span>Configurações</span>}
+          {!isCollapsed && <span>Configurações</span>}
         </button>
 
         {flags.allowLogout && user && (
@@ -146,7 +146,7 @@ export default function WorkspaceSidebar({ mobile = false, onMobileClose }: { mo
             className={`w-full flex items-center rounded-lg py-2.5 text-sm text-white/65 hover:bg-white/5 hover:text-white transition-colors ${isCollapsed ? "justify-center px-0" : "gap-3 px-3 text-left"}`}
           >
             <LogOut className="h-4 w-4 shrink-0" />
-            {!collapsed && <span>Sair</span>}
+            {!isCollapsed && <span>Sair</span>}
           </button>
         )}
       </div>
