@@ -9,7 +9,7 @@ import { useEmbed } from "../context/EmbedContext";
 import { getSupabase } from "../lib/supabaseClient";
 
 export default function WorkspaceSidebar({ mobile = false, onMobileClose }: { mobile?: boolean; onMobileClose?: () => void }) {
-  const { flags, mode } = useEmbed();
+  const { flags } = useEmbed();
   const [collapsed, setCollapsed] = useState(false);
   const { profile, currentWorkspace, signOut, user } = useAuth();
   const { pathname } = useLocation();
