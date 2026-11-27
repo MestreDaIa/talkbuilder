@@ -77,7 +77,10 @@ export default function FoldersSidebarNavigation({ onToggleMenu }: { onToggleMen
 			className="w-36 min-w-36 max-w-36 shrink-0 sm:w-44 sm:min-w-44 sm:max-w-44 flex bg-gray-800 h-full min-h-0 overflow-hidden"
 			style={{ userSelect: "none" }}
 		>
-			<div className="w-full min-w-0 min-h-0 flex-1 flex flex-col py-2 px-1 sm:px-2 pb-6 gap-2 overflow-x-hidden overflow-y-auto overscroll-contain">\n\t\t\t\t<button type="button" onClick={onToggleMenu} title="Abrir menu Workspace" aria-label="Abrir menu Workspace" className="md:hidden sticky top-0 z-10 flex h-8 w-full shrink-0 items-center justify-center rounded-md border border-white/10 bg-gray-900 text-gray-200 hover:bg-gray-700">\n\t\t\t\t\t<Menu className="h-4 w-4" />\n\t\t\t\t</button>
+			<div className="w-full min-w-0 min-h-0 flex-1 flex flex-col py-2 px-1 sm:px-2 pb-6 gap-2 overflow-x-hidden overflow-y-auto overscroll-contain">
+\t\t\t\t<button type="button" onClick={onToggleMenu} title="Abrir menu Workspace" aria-label="Abrir menu Workspace" className="md:hidden sticky top-0 z-10 flex h-8 w-full shrink-0 items-center justify-center rounded-md border border-white/10 bg-gray-900 text-gray-200 hover:bg-gray-700">
+\t\t\t\t\t<Menu className="h-4 w-4" />
+\t\t\t\t</button>
 				{hasSidebarContent ? renderTree(null) : <p className="px-2 py-3 text-xs text-gray-300/70">Nenhuma pasta ou bot criado</p>}
 			</div>
 		</div>
