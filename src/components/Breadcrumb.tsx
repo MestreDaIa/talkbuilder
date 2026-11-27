@@ -46,20 +46,20 @@ export default function Breadcrumb() {
   }
 
   return (
-    <div className="p-3 h-12 flex items-center border-b relative gap-2">
+    <div className="h-full min-w-0 w-full flex items-center relative gap-2 overflow-x-auto overflow-y-hidden whitespace-nowrap [scrollbar-width:thin]">
       {folderId && (
-        <button onClick={handleBack}>
+        <button className="shrink-0" onClick={handleBack}>
           <ArrowLeft className="w-7 h-7 rounded-lg border p-1 text-white bg-gray-500/50 shadow-black shadow-[2px_3px_6px_-1px]" />
         </button>
       )}
       {path.map((folder) => (
         <div
-          className="flex items-start justify-center relative text-gray-500 font-semibold cursor-pointer"
+          className="flex shrink-0 items-center justify-center relative text-gray-500 font-semibold cursor-pointer whitespace-nowrap"
           key={folder.id}
           onClick={() => router(folderRoute(slug, folder.id))}
         >
           <p
-            className={`flex items-center mr-2 ml-2 justify-center ${
+            className={`flex items-center mx-2 justify-center whitespace-nowrap ${
               folder.id === folderId ? "font-bold text-green-400" : ""
             }`}
           >
