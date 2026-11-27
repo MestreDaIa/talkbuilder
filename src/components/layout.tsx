@@ -131,21 +131,19 @@ function WorkspaceLayoutContent({ children }: { children: React.ReactNode }) {
 				>
 				{!isBotEditor && flags.showHeader && <Header />}
 					<div className="flex-1 flex relative overflow-hidden">
-					{showWorkspaceNavigation && (mode === "embedded" ? (
-						<div className="flex h-full min-h-0 shrink-0"><WorkspaceSidebar /></div>
-					) : (
+					{showWorkspaceNavigation && mode !== "embedded" && (
 						<div className="hidden md:flex h-full min-h-0 shrink-0"><WorkspaceSidebar /></div>
-					))}
-					{showWorkspaceNavigation && mode !== "embedded" && mobileMenuOpen && (
-						<div className="md:hidden absolute inset-0 z-40 flex">
-							<button type="button" aria-label="Fechar menu" className="absolute inset-0 bg-black/50" onClick={() => setMobileMenuOpen(false)} />
-							<div className="relative z-10 h-full shadow-2xl"><WorkspaceSidebar mobile onMobileClose={() => setMobileMenuOpen(false)} /></div>
+					)}
+					{showWorkspaceNavigation && mobileMenuOpen && (
+						<div className={`absolute inset-0 z-50 flex ${mode === "embedded" ? "" : "md:hidden"}`}>
+							<button type="button" aria-label="Fechar menu" className="absolute inset-0 bg-black/55" onClick={() => setMobileMenuOpen(false)} />
+							<div className="relative z-10 h-full min-h-0 shadow-2xl"><WorkspaceSidebar mobile onMobileClose={() => setMobileMenuOpen(false)} /></div>
 						</div>
 					)}
 					{showFoldersSidebar && (
 						<>
-							<FoldersSidebarNavigation showMenuToggle={mode !== "embedded"} onToggleMenu={() => setMobileMenuOpen((open) => !open)} />
-							{showAddControls && <aside className={`${mode === "embedded" ? "w-12 min-w-12 sm:w-20 sm:min-w-20 md:w-28 md:min-w-28" : "w-16 min-w-16 sm:w-24 sm:min-w-24 md:w-32 md:min-w-32"} shrink-0 h-full overflow-y-auto px-1 sm:px-2 py-8 sm:py-16`}>
+							<FoldersSidebarNavigation compact={mode === "embedded"} showMenuToggle={true} onToggleMenu={() => setMobileMenuOpen((open) => !open)} />
+							{showAddControls && <aside className={`${mode === "embedded" ? "w-10 min-w-10 sm:w-12 sm:min-w-12 md:w-16 md:min-w-16" : "w-16 min-w-16 sm:w-24 sm:min-w-24 md:w-32 md:min-w-32"} shrink-0 h-full overflow-y-auto px-1 sm:px-2 py-8 sm:py-16`}>
 								<AddOptionToolbar
 									onAddFolder={() => { setAddOption("folder"); setOpenModalADD(true); }}
 									onAddBot={() => { setAddOption("bot"); setOpenModalADD(true); }}
