@@ -49,9 +49,6 @@ export default function FoldersSidebarNavigation({ onToggleMenu, showMenuToggle 
 	const hasSidebarContent = items.some(
 		(item) => item.type === "folder" || item.type === "bot",
 	);
-
-	if (!hasSidebarContent) return null;
-
 	function renderTree(parentId: string | null, level = 0) {
 		return sortByIndex(items.filter((i) => i.parentId === parentId && i.type))
 			.map((folder) => (
