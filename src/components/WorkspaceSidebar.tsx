@@ -9,9 +9,9 @@ import { useEmbed } from "../context/EmbedContext";
 import { getSupabase } from "../lib/supabaseClient";
 
 export default function WorkspaceSidebar() {
-  const [collapsed, setCollapsed] = useState(false);
+  const { flags, mode } = useEmbed();
+  const [collapsed, setCollapsed] = useState(mode === "embedded");
   const { profile, currentWorkspace, signOut, user } = useAuth();
-  const { flags } = useEmbed();
   const { pathname } = useLocation();
   const navigate = useNavigate();
   const slug = currentWorkspace?.slug ?? profile?.slug;
