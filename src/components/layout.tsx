@@ -143,7 +143,7 @@ function WorkspaceLayoutContent({ children }: { children: React.ReactNode }) {
 					{showFoldersSidebar && (
 						<>
 							<FoldersSidebarNavigation showMenuToggle={mode !== "embedded"} onToggleMenu={() => setMobileMenuOpen((open) => !open)} />
-							{showAddControls && <aside className={`${mode === "embedded" ? "w-12 min-w-12 sm:w-16 sm:min-w-16" : "w-16 min-w-16 sm:w-24 sm:min-w-24 md:w-32 md:min-w-32"} shrink-0 h-full overflow-y-auto px-1 sm:px-2 py-8 sm:py-16`}>
+							{showAddControls && <aside className={`${mode === "embedded" ? "w-12 min-w-12 sm:w-20 sm:min-w-20 md:w-28 md:min-w-28" : "w-16 min-w-16 sm:w-24 sm:min-w-24 md:w-32 md:min-w-32"} shrink-0 h-full overflow-y-auto px-1 sm:px-2 py-8 sm:py-16`}>
 								<AddOptionToolbar
 									onAddFolder={() => { setAddOption("folder"); setOpenModalADD(true); }}
 									onAddBot={() => { setAddOption("bot"); setOpenModalADD(true); }}
