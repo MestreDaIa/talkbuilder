@@ -9,7 +9,7 @@ import { useAuth } from "../context/AuthContext";
 import { folderRoute, botRoute, folderIdFromPath, rememberBotBackRoute, workspaceRoot } from "../lib/workspaceRoutes";
 import { sortByIndex } from "../lib/workspaceOrder";
 
-export default function FoldersSidebarNavigation({ onToggleMenu, showMenuToggle = true }: { onToggleMenu?: () => void; showMenuToggle?: boolean }) {
+export default function FoldersSidebarNavigation({ onToggleMenu, showMenuToggle = true, compact = false }: { onToggleMenu?: () => void; showMenuToggle?: boolean; compact?: boolean }) {
 	const { items } = useWorkspace();
 	const router = useNavigate();
 	
@@ -74,7 +74,7 @@ export default function FoldersSidebarNavigation({ onToggleMenu, showMenuToggle 
 	return (
 		<div
 			ref={setNodeRef}
-			className="w-28 min-w-28 max-w-28 sm:w-32 sm:min-w-32 sm:max-w-32 md:w-36 md:min-w-36 md:max-w-36 flex shrink-0 bg-gray-800 h-full min-h-0 overflow-hidden"
+			className={`${compact ? "w-[104px] min-w-[104px] max-w-[104px] sm:w-28 sm:min-w-28 sm:max-w-28 lg:w-32 lg:min-w-32 lg:max-w-32" : "w-28 min-w-28 max-w-28 sm:w-32 sm:min-w-32 sm:max-w-32 md:w-36 md:min-w-36 md:max-w-36"} flex shrink-0 bg-gray-800 h-full min-h-0 overflow-hidden`}
 			style={{ userSelect: "none" }}
 		>
 			<div className="w-full min-w-0 min-h-0 flex-1 flex flex-col py-2 px-1 sm:px-2 pb-6 gap-2 overflow-x-hidden overflow-y-auto overscroll-contain">
