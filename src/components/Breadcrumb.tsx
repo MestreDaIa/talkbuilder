@@ -48,7 +48,7 @@ export default function Breadcrumb() {
   return (
     <div className="flex h-full min-w-0 w-full items-center gap-2 overflow-hidden">
       {folderId && (
-        <button className="z-10 shrink-0" onClick={handleBack} title="Voltar uma pasta" aria-label="Voltar uma pasta">
+        <button className="z-10 mx-[3px] shrink-0 flex items-center justify-center" onClick={handleBack} title="Voltar uma pasta" aria-label="Voltar uma pasta">
           <ArrowLeft className="w-7 h-7 rounded-lg border p-1 text-white bg-gray-500/50 shadow-black shadow-[2px_3px_6px_-1px]" />
         </button>
       )}
