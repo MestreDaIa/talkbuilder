@@ -66,18 +66,33 @@ Deno.serve(async req=>{
   const admin=createClient(url,key,{auth:{persistSession:false,autoRefreshToken:false}});
   const body=await req.json().catch(()=>({}));
   const hostHeader=(req.headers.get("x-forwarded-host")||req.headers.get("host")||"").split(",")[0].trim().toLowerCase().split(":")[0];
-  const rawIdentifier=String(body.identifier||hostHeader||"").trim().toLowerCase().replace(/^https?:\/\//,"").replace(/\/$/,"");
-  const identifier=/^flow-[a-z0-9-]+$/.test(rawIdentifier) ? `${rawIdentifier}.zailom.com` : rawIdentifier;
-  if(!identifier) return reply({success:false,error:"Informe o identificador da empresa."},400);
+  const rawIdentifier=String(body.identifier||hostHeader||"").trim().toLowerCase()
+    .replace(/^https?:\\/\\//,"").split(/[/?#]/)[0].replace(/\\.$/,"");
+  if(!rawIdentifier) return reply({success:false,error:"Informe o identificador da empresa."},400);
+  if(!/^[a-z0-9.-]+$/.test(rawIdentifier) || rawIdentifier.includes("..")) return reply({success:false,error:"Identificador da empresa inválido."},400);
 
-  let {data,error}=await admin.rpc("resolve_flow_workspace",{p_identifier:identifier});
-  if(error) return reply({success:false,error:"Falha ao localizar a empresa.",details:error.message},500);
-  let row=Array.isArray(data)?data[0]:data;
-  const hostnameMatch=identifier.match(/^(flow-[a-z0-9-]+)\.zailom\.com$/);
+  // Aceita slug do Booking, hostname do Booking e hostname dedicado do Flow.
+  const candidates = new Set<string>([rawIdentifier]);
+  const isHostname = rawIdentifier.includes(".");
+  const baseSlug = rawIdentifier.replace(/\\.zailom\\.com$/,"").replace(/^flow-/,"");
+  if (!isHostname) {
+    candidates.add(rawIdentifier + ".zailom.com");
+    candidates.add("flow-" + baseSlug + ".zailom.com");
+  } else if (rawIdentifier.endsWith(".zailom.com") && !rawIdentifier.startsWith("flow-")) {
+    candidates.add("flow-" + baseSlug + ".zailom.com");
+  }
+
+  let row:any = null;
+  for (const candidate of candidates) {
+    const {data,error}=await admin.rpc("resolve_flow_workspace",{p_identifier:candidate});
+    if(error) return reply({success:false,error:"Falha ao localizar a empresa.",details:error.message},500);
+    row=Array.isArray(data)?data[0]:data;
+    if(row?.workspace_id) break;
+  }
+  const resolvedIdentifier = row?.hostname || rawIdentifier;
+  const hostnameMatch=resolvedIdentifier.match(/^(flow-[a-z0-9-]+)\\.zailom\\.com$/);
   const legacySlug=hostnameMatch ? hostnameMatch[1].slice(5) : null;
 
-  // Compatibilidade: workspaces provisionados antes do hostname dedicado podem
-  // ainda estar registrados apenas pelo slug antigo.
   if(!row?.workspace_id && legacySlug){
     const fallback=await admin.rpc("resolve_flow_workspace",{p_identifier:legacySlug});
     if(fallback.error) return reply({success:false,error:"Falha ao localizar o workspace legado.",details:fallback.error.message},500);
@@ -87,12 +102,12 @@ Deno.serve(async req=>{
 
   // Migra o domínio legado para o hostname Flow e cria o DNS individual uma
   // única vez, sem tocar no wildcard utilizado pelo Booking.
-  if(hostnameMatch && String(row.hostname||"").toLowerCase()!==identifier){
-    try { await ensureFlowDnsRecord(identifier); }
+  if(hostnameMatch && String(row.hostname||"").toLowerCase()!==resolvedIdentifier){
+    try { await ensureFlowDnsRecord(resolvedIdentifier); }
     catch(error) { return reply({success:false,error:"Não foi possível configurar o domínio dedicado do Flow.",details:error instanceof Error?error.message:String(error)},502); }
 
     const source=String(row.workspace_source||"standalone").toLowerCase();
-    const domainRecord: Record<string, unknown>={workspace_id:row.workspace_id,source:source==="booking"?"booking":"standalone",external_company_id:null,hostname:identifier,domain_type:"subdomain",is_primary:true,is_verified:true,updated_at:new Date().toISOString()};
+    const domainRecord: Record<string, unknown>={workspace_id:row.workspace_id,source:source==="booking"?"booking":"standalone",external_company_id:null,hostname:resolvedIdentifier,domain_type:"subdomain",is_primary:true,is_verified:true,updated_at:new Date().toISOString()};
     if(source==="booking"){
       const {data:link,error:linkError}=await admin.from("booking_workspace_links").select("external_company_id").eq("workspace_id",row.workspace_id).eq("source","booking").maybeSingle();
       if(linkError||!link?.external_company_id) return reply({success:false,error:"Não foi possível localizar o vínculo Booking/Flow para atualizar o domínio.",details:linkError?.message},500);
@@ -103,7 +118,7 @@ Deno.serve(async req=>{
       const {error:writeError}=await admin.from("flow_workspace_domains").upsert(domainRecord,{onConflict:"hostname"});
       if(writeError) return reply({success:false,error:"Não foi possível atualizar o domínio do workspace.",details:writeError.message},500);
     }
-    row.hostname=identifier;
+    row.hostname=resolvedIdentifier;
   }
 
   return reply({success:true,workspace_id:row.workspace_id,workspace_slug:row.workspace_slug,workspace_name:row.workspace_name,hostname:row.hostname,workspace_source:row.workspace_source});
