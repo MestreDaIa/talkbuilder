@@ -153,7 +153,7 @@ function WorkspaceLayoutContent({ children }: { children: React.ReactNode }) {
 					)}
 					<main className="flex flex-1 min-w-0 flex-col overflow-hidden">
 						{showFoldersSidebar && (
-							<div className="flex h-12 min-h-12 shrink-0 items-center overflow-hidden border-b border-white/10 px-3">
+							<div className="flex h-[53px] min-h-[53px] shrink-0 items-center overflow-hidden border-b border-white/10 px-3 py-[3px]">
 								{showBreadcrumb && <div className="min-w-0 flex-1 overflow-hidden animate-in fade-in slide-in-from-top-1 duration-200"><Breadcrumb /></div>}
 							</div>
 						)}
