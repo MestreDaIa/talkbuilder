@@ -131,8 +131,8 @@ function WorkspaceLayoutContent({ children }: { children: React.ReactNode }) {
 				>
 				{!isBotEditor && flags.showHeader && <Header />}
 					<div className="flex-1 flex relative overflow-hidden">
-					{showWorkspaceNavigation && (mode === "embedded" || window.innerWidth >= 768) && (
-						<div className="flex h-full min-h-0 shrink-0"><WorkspaceSidebar /></div>
+					{showWorkspaceNavigation && (
+						<div className={`${mode === "embedded" ? "flex" : "hidden md:flex"} h-full min-h-0 shrink-0`}><WorkspaceSidebar /></div>
 					)}
 					{showWorkspaceNavigation && mode !== "embedded" && mobileMenuOpen && (
 						<div className="absolute inset-0 z-50 flex md:hidden">
