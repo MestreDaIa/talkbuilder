@@ -74,10 +74,10 @@ export default function FoldersSidebarNavigation() {
 	return (
 		<div
 			ref={setNodeRef}
-			className=" max-w-44 min-w-44 flex  bg-gray-800 h-full overflow-x-hidden"
+			className="w-44 min-w-44 max-w-44 shrink-0 flex bg-gray-800 h-full min-h-0 overflow-hidden"
 			style={{ userSelect: "none" }}
 		>
-			<div className="py-3 max-w-44 min-w-44 flex flex-col h-full px-2 gap-2 overflow-x-hidden ">
+			<div className="w-full min-w-0 min-h-0 flex-1 flex flex-col py-3 px-2 pb-6 gap-2 overflow-x-hidden overflow-y-auto overscroll-contain">
 				{hasSidebarContent ? renderTree(null) : <p className="px-2 py-3 text-xs text-gray-300/70">Nenhuma pasta ou bot criado</p>}
 			</div>
 		</div>
