@@ -67,14 +67,14 @@ Deno.serve(async req=>{
   const body=await req.json().catch(()=>({}));
   const hostHeader=(req.headers.get("x-forwarded-host")||req.headers.get("host")||"").split(",")[0].trim().toLowerCase().split(":")[0];
   const rawIdentifier=String(body.identifier||hostHeader||"").trim().toLowerCase()
-    .replace(/^https?:\\/\\//,"").split(/[/?#]/)[0].replace(/\\.$/,"");
+    .replace(/^https?:\/\//,"").split(/[/?#]/)[0].replace(/\.$/,"");
   if(!rawIdentifier) return reply({success:false,error:"Informe o identificador da empresa."},400);
   if(!/^[a-z0-9.-]+$/.test(rawIdentifier) || rawIdentifier.includes("..")) return reply({success:false,error:"Identificador da empresa inválido."},400);
 
   // Aceita slug do Booking, hostname do Booking e hostname dedicado do Flow.
   const candidates = new Set<string>([rawIdentifier]);
   const isHostname = rawIdentifier.includes(".");
-  const baseSlug = rawIdentifier.replace(/\\.zailom\\.com$/,"").replace(/^flow-/,"");
+  const baseSlug = rawIdentifier.replace(/\.zailom\.com$/,"").replace(/^flow-/,"");
   if (!isHostname) {
     candidates.add(rawIdentifier + ".zailom.com");
     candidates.add("flow-" + baseSlug + ".zailom.com");
@@ -90,7 +90,7 @@ Deno.serve(async req=>{
     if(row?.workspace_id) break;
   }
   const resolvedIdentifier = row?.hostname || rawIdentifier;
-  const hostnameMatch=resolvedIdentifier.match(/^(flow-[a-z0-9-]+)\\.zailom\\.com$/);
+  const hostnameMatch=resolvedIdentifier.match(/^(flow-[a-z0-9-]+)\.zailom\.com$/);
   const legacySlug=hostnameMatch ? hostnameMatch[1].slice(5) : null;
 
   if(!row?.workspace_id && legacySlug){
