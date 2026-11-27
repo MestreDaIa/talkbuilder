@@ -10,7 +10,7 @@ import { getSupabase } from "../lib/supabaseClient";
 
 export default function WorkspaceSidebar({ mobile = false, onMobileClose }: { mobile?: boolean; onMobileClose?: () => void }) {
   const { flags, mode } = useEmbed();
-  const [collapsed, setCollapsed] = useState(mode === "embedded");
+  const [collapsed, setCollapsed] = useState(false);
   const { profile, currentWorkspace, signOut, user } = useAuth();
   const { pathname } = useLocation();
   const navigate = useNavigate();
@@ -73,7 +73,7 @@ export default function WorkspaceSidebar({ mobile = false, onMobileClose }: { mo
   }
 
   return (
-    <aside className={`${mobile ? "w-[220px] max-w-[78vw]" : isCollapsed ? (mode === "embedded" ? "w-[56px]" : "w-[64px]") : "w-[220px]"} shrink-0 border-r border-white/10 bg-[#08060d] text-white h-full min-h-0 flex flex-col overflow-hidden transition-[width] duration-200`}>
+    <aside className={`${mobile ? "w-[220px] max-w-[78vw]" : isCollapsed ? "w-[64px]" : "w-[220px]"} shrink-0 border-r border-white/10 bg-[#08060d] text-white h-full min-h-0 flex flex-col overflow-hidden transition-[width] duration-200`}>
       <div className={`flex items-center border-b border-white/10 h-[72px] ${isCollapsed ? "justify-center px-2" : "justify-between px-4"}`}>
         {!isCollapsed && (
           <div className="min-w-0">
