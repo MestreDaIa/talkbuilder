@@ -10,7 +10,7 @@ import { useSuperAdmin } from "../hooks/useSuperAdmin";
 
 export default function Header() {
   const navigate = useNavigate();
-  const { flags, mode } = useEmbed();
+  const { mode } = useEmbed();
   const { profile, currentWorkspace } = useAuth();
   const { isSuperAdmin } = useSuperAdmin();
   const slug = currentWorkspace?.slug || profile?.slug;
@@ -32,7 +32,7 @@ export default function Header() {
         </span>
       </h1>
       <div className="flex items-center shrink-0 gap-2">
-        {mode !== "embedded" && <NotificationBell />}
+        <NotificationBell />
         {isSuperAdmin && (
           <button
             onClick={() => navigate("/admin")}
