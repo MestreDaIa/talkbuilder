@@ -129,12 +129,12 @@ function WorkspaceLayoutContent({ children }: { children: React.ReactNode }) {
 					className="flex flex-col h-svh relative overflow-y-hidden"
 					data-embed-mode={mode}
 				>
-				{!isBotEditor && flags.showHeader && <Header />}
+				{!isBotEditor && <Header />}
 					<div className="flex-1 flex relative overflow-hidden">
 					{showWorkspaceNavigation && (
 						<div className="flex h-full min-h-0 shrink-0"><WorkspaceSidebar /></div>
 					)}
-					{showWorkspaceNavigation && mode !== "embedded" && mobileMenuOpen && (
+					{showWorkspaceNavigation && mobileMenuOpen && (
 						<div className="absolute inset-0 z-50 flex md:hidden">
 							<button type="button" aria-label="Fechar menu" className="absolute inset-0 bg-black/55" onClick={() => setMobileMenuOpen(false)} />
 							<div className="relative z-10 h-full min-h-0 shadow-2xl"><WorkspaceSidebar mobile onMobileClose={() => setMobileMenuOpen(false)} /></div>
@@ -142,7 +142,7 @@ function WorkspaceLayoutContent({ children }: { children: React.ReactNode }) {
 					)}
 					{showFoldersSidebar && (
 						<>
-							<FoldersSidebarNavigation showMenuToggle={mode !== "embedded"} onToggleMenu={() => setMobileMenuOpen((open) => !open)} />
+							<FoldersSidebarNavigation showMenuToggle={true} onToggleMenu={() => setMobileMenuOpen((open) => !open)} />
 							{showAddControls && <aside className="w-16 min-w-16 sm:w-24 sm:min-w-24 md:w-32 md:min-w-32 shrink-0 h-full overflow-y-auto px-1 sm:px-2 py-8 sm:py-16">
 								<AddOptionToolbar
 									onAddFolder={() => { setAddOption("folder"); setOpenModalADD(true); }}
