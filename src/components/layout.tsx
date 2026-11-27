@@ -131,9 +131,11 @@ function WorkspaceLayoutContent({ children }: { children: React.ReactNode }) {
 				>
 				{!isBotEditor && flags.showHeader && <Header />}
 					<div className="flex-1 flex relative overflow-hidden">
-					{showWorkspaceNavigation && (
+					{showWorkspaceNavigation && (mode === "embedded" ? (
+						<div className="flex h-full min-h-0 shrink-0"><WorkspaceSidebar /></div>
+					) : (
 						<div className="hidden md:flex h-full min-h-0 shrink-0"><WorkspaceSidebar /></div>
-					)}
+					))}
 					{showWorkspaceNavigation && mode !== "embedded" && mobileMenuOpen && (
 						<div className="md:hidden absolute inset-0 z-40 flex">
 							<button type="button" aria-label="Fechar menu" className="absolute inset-0 bg-black/50" onClick={() => setMobileMenuOpen(false)} />
