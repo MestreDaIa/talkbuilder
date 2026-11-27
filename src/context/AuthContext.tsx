@@ -104,7 +104,12 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 				const alreadyLoaded = lastLoadedUserIdRef.current === newUser.id;
 				const alreadyLoading = loadingUserIdRef.current === newUser.id;
 				if (event !== "TOKEN_REFRESHED" && !alreadyLoaded && !alreadyLoading) {
-					void loadAll(newUser.id, event !== "INITIAL_SESSION");
+					// IMPORTANTE: não executar chamadas Supabase dentro do callback
+					// onAuthStateChange. O cliente mantém um lock de auth durante o
+					// callback; consultar profiles/RPC ali pode bloquear para sempre.
+					setTimeout(() => {
+						void loadAll(newUser.id, event !== "INITIAL_SESSION");
+					}, 0);
 				}
 			} else {
 				lastLoadedUserIdRef.current = null;
