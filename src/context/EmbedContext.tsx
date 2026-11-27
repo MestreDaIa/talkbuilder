@@ -77,8 +77,8 @@ const STANDALONE_FLAGS: EmbedFeatureFlags = {
 };
 
 const EMBEDDED_DEFAULT_FLAGS: EmbedFeatureFlags = {
-	showHeader: false,
-	showProfile: false,
+	showHeader: true,
+	showProfile: true,
 	showBilling: false,
 	showCompanyTab: false,
 	showBookingfyIntegrationCard: false,
