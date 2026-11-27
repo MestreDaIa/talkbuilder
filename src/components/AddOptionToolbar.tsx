@@ -212,9 +212,9 @@ export default function AddOptionToolbar({ onAddFolder, onAddBot }: Props) {
 			<div className="flex flex-col gap-2 items-center">
 				<DropdownMenu.Root>
 					<DropdownMenu.Trigger asChild>
-						<button className="group hover:border-green-400 flex flex-col bg-green-400 hover:bg-transparent gap-2 items-center justify-center w-28 p-6 rounded-lg border border-black">
-							<Plus className="w-8 h-8 group-hover:text-green-400 text-white" />
-							<span className=" group-hover:text-green-400 text-white text-sm font-bold uppercase">
+						<button className="group hover:border-green-400 flex h-12 w-12 sm:h-20 sm:w-20 md:h-auto md:w-28 flex-col bg-green-400 hover:bg-transparent gap-1 md:gap-2 items-center justify-center p-1 md:p-6 rounded-lg border border-black">
+							<Plus className="h-5 w-5 md:h-8 md:w-8 group-hover:text-green-400 text-white" />
+							<span className="hidden md:block group-hover:text-green-400 text-white text-sm font-bold uppercase">
 								Adicionar Novo
 							</span>
 						</button>
@@ -263,14 +263,14 @@ export default function AddOptionToolbar({ onAddFolder, onAddBot }: Props) {
 							? "Importar bot a partir de arquivo JSON"
 							: `Limite atingido (${botsUsed}/${limitLabel})`
 					}
-					className={`flex items-center gap-1.5 w-28 justify-center px-2 py-2 rounded-lg border text-xs font-semibold transition ${
+					className={`flex items-center gap-1.5 w-12 sm:w-20 md:w-28 justify-center px-1 md:px-2 py-2 rounded-lg border text-xs font-semibold transition ${
 						canAddBot
 							? "border-green-400 text-green-400 hover:bg-green-400 hover:text-white cursor-pointer"
 							: "border-gray-400 text-gray-400 cursor-not-allowed opacity-60"
 					}`}
 				>
 					{canAddBot ? <Upload className="w-3.5 h-3.5" /> : <Lock className="w-3.5 h-3.5" />}
-					Importar
+					<span className="hidden md:inline">Importar</span>
 				</button>
 			</div>
 
