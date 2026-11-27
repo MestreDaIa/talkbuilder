@@ -134,7 +134,7 @@ function WorkspaceLayoutContent({ children }: { children: React.ReactNode }) {
 					{showWorkspaceNavigation && (
 						<div className="hidden md:flex h-full min-h-0 shrink-0"><WorkspaceSidebar /></div>
 					)}
-					{showWorkspaceNavigation && mobileMenuOpen && (
+					{showWorkspaceNavigation && mode !== "embedded" && mobileMenuOpen && (
 						<div className="md:hidden absolute inset-0 z-40 flex">
 							<button type="button" aria-label="Fechar menu" className="absolute inset-0 bg-black/50" onClick={() => setMobileMenuOpen(false)} />
 							<div className="relative z-10 h-full shadow-2xl"><WorkspaceSidebar mobile onMobileClose={() => setMobileMenuOpen(false)} /></div>
@@ -142,8 +142,8 @@ function WorkspaceLayoutContent({ children }: { children: React.ReactNode }) {
 					)}
 					{showFoldersSidebar && (
 						<>
-							<FoldersSidebarNavigation onToggleMenu={() => setMobileMenuOpen((open) => !open)} />
-							{showAddControls && <aside className="w-16 min-w-16 sm:w-24 sm:min-w-24 md:w-32 md:min-w-32 shrink-0 h-full overflow-y-auto px-1 sm:px-2 py-8 sm:py-16">
+							<FoldersSidebarNavigation showMenuToggle={mode !== "embedded"} onToggleMenu={() => setMobileMenuOpen((open) => !open)} />
+							{showAddControls && <aside className={`${mode === "embedded" ? "w-12 min-w-12 sm:w-16 sm:min-w-16" : "w-16 min-w-16 sm:w-24 sm:min-w-24 md:w-32 md:min-w-32"} shrink-0 h-full overflow-y-auto px-1 sm:px-2 py-8 sm:py-16`}>
 								<AddOptionToolbar
 									onAddFolder={() => { setAddOption("folder"); setOpenModalADD(true); }}
 									onAddBot={() => { setAddOption("bot"); setOpenModalADD(true); }}
