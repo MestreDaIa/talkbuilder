@@ -56,12 +56,36 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 	const isConfigured = useMemo(() => isSupabaseConfigured(), []);
 
 	const lastLoadedUserIdRef = useRef<string | null>(null);
+	const loadingUserIdRef = useRef<string | null>(null);
 
 	useEffect(() => {
 		const supabase = getSupabase();
 		if (!supabase) {
 			setLoading(false);
 			return;
+		}
+
+		async function loadAll(userId: string, silent = false) {
+			// Evita consultas duplicadas quando INITIAL_SESSION e eventos de auth
+			// chegam enquanto a mesma carga ainda está em andamento.
+			if (lastLoadedUserIdRef.current === userId || loadingUserIdRef.current === userId) return;
+			loadingUserIdRef.current = userId;
+			if (!silent) setLoading(true);
+
+			try {
+				await Promise.all([
+					loadProfile(userId),
+					loadWorkspaces(userId)
+				]);
+				lastLoadedUserIdRef.current = userId;
+			} catch (error) {
+				console.error("[Auth] Erro ao carregar dados do usuário:", error);
+			} finally {
+				if (loadingUserIdRef.current === userId) {
+					loadingUserIdRef.current = null;
+					setLoading(false);
+				}
+			}
 		}
 
 		const {
@@ -74,13 +98,17 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 				if (prev?.id === newUser?.id) return prev;
 				return newUser;
 			});
-			
+
 			if (newUser) {
-				// Evita loader global se for apenas atualização de token ou se o usuário for o mesmo
-				const isSilent = event === 'TOKEN_REFRESHED' || lastLoadedUserIdRef.current === newUser.id;
-				loadAll(newUser.id, isSilent);
+				// Renovação de token não exige recarregar perfil nem workspaces.
+				const alreadyLoaded = lastLoadedUserIdRef.current === newUser.id;
+				const alreadyLoading = loadingUserIdRef.current === newUser.id;
+				if (event !== "TOKEN_REFRESHED" && !alreadyLoaded && !alreadyLoading) {
+					void loadAll(newUser.id, event !== "INITIAL_SESSION");
+				}
 			} else {
 				lastLoadedUserIdRef.current = null;
+				loadingUserIdRef.current = null;
 				setProfile(null);
 				setWorkspaces([]);
 				setCurrentWorkspace(null);
@@ -88,32 +116,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 			}
 		});
 
-		async function loadAll(userId: string, silent = false) {
-			if (!silent) setLoading(true);
-			
-			try {
-				await Promise.all([
-					loadProfile(userId),
-					loadWorkspaces(userId)
-				]);
-				lastLoadedUserIdRef.current = userId;
-			} catch (error) {
-				console.error("[Auth] Erro ao carregar dados do usuário:", error);
-			} finally {
-				setLoading(false);
-			}
-		}
-
-		supabase.auth.getSession().then(({ data: { session: s } }) => {
-			setSession(s);
-			setUser(s?.user ?? null);
-			if (s?.user) {
-				loadAll(s.user.id);
-			} else {
-				setLoading(false);
-			}
-		});
-
+		// INITIAL_SESSION, emitido pela própria inscrição, é a fonte única
+		// para a sessão inicial. Não fazemos getSession() em paralelo.
 		return () => subscription.unsubscribe();
 	}, []);
 
