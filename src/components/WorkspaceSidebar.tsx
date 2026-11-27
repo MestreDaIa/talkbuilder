@@ -10,7 +10,7 @@ import { getSupabase } from "../lib/supabaseClient";
 
 export default function WorkspaceSidebar({ mobile = false, onMobileClose }: { mobile?: boolean; onMobileClose?: () => void }) {
   const { flags, mode } = useEmbed();
-  const [collapsed, setCollapsed] = useState(mode === "embedded");
+  const [collapsed, setCollapsed] = useState(false);
   const { profile, currentWorkspace, signOut, user } = useAuth();
   const { pathname } = useLocation();
   const navigate = useNavigate();
