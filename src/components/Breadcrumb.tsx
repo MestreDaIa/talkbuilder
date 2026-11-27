@@ -46,12 +46,13 @@ export default function Breadcrumb() {
   }
 
   return (
-    <div className="h-full min-w-0 w-full flex items-center relative gap-2 overflow-x-auto overflow-y-hidden whitespace-nowrap [scrollbar-width:thin]">
+    <div className="flex h-full min-w-0 w-full items-center gap-2 overflow-hidden">
       {folderId && (
-        <button className="shrink-0" onClick={handleBack}>
+        <button className="z-10 shrink-0" onClick={handleBack} title="Voltar uma pasta" aria-label="Voltar uma pasta">
           <ArrowLeft className="w-7 h-7 rounded-lg border p-1 text-white bg-gray-500/50 shadow-black shadow-[2px_3px_6px_-1px]" />
         </button>
       )}
+      <div className="flex h-full min-w-0 flex-1 items-center gap-2 overflow-x-auto overflow-y-hidden whitespace-nowrap [scrollbar-width:thin]">
       {path.map((folder) => (
         <div
           className="flex shrink-0 items-center justify-center relative text-gray-500 font-semibold cursor-pointer whitespace-nowrap"
@@ -76,6 +77,7 @@ export default function Breadcrumb() {
           </p>
         </div>
       ))}
+      </div>
     </div>
   );
 }
