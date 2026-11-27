@@ -8,7 +8,7 @@ import { configsRoute, perfilRoute, workspaceRoot } from "../lib/workspaceRoutes
 import { useEmbed } from "../context/EmbedContext";
 import { getSupabase } from "../lib/supabaseClient";
 
-export default function WorkspaceSidebar() {
+export default function WorkspaceSidebar({ mobile = false, onMobileClose }: { mobile?: boolean; onMobileClose?: () => void }) {
   const { flags, mode } = useEmbed();
   const [collapsed, setCollapsed] = useState(mode === "embedded");
   const { profile, currentWorkspace, signOut, user } = useAuth();
@@ -72,7 +72,7 @@ export default function WorkspaceSidebar() {
   }
 
   return (
-    <aside className={`${collapsed ? "w-[64px]" : "w-[220px]"} shrink-0 border-r bg-[#08060d] text-white h-full min-h-0 flex flex-col overflow-hidden transition-[width] duration-200`}>
+    <aside className={`${mobile ? "w-[220px] max-w-[78vw]" : collapsed ? "w-[64px]" : "w-[220px]"} shrink-0 border-r border-white/10 bg-[#08060d] text-white h-full min-h-0 flex flex-col overflow-hidden transition-[width] duration-200`}>
       <div className={`flex items-center border-b border-white/10 h-[72px] ${collapsed ? "justify-center px-2" : "justify-between px-4"}`}>
         {!collapsed && (
           <div className="min-w-0">
@@ -82,11 +82,11 @@ export default function WorkspaceSidebar() {
         )}
         <button
           type="button"
-          onClick={() => setCollapsed((value) => !value)}
+          onClick={() => mobile ? onMobileClose?.() : setCollapsed((value) => !value)}
           title={collapsed ? "Expandir sidebar" : "Recolher sidebar"}
           className="h-9 w-9 shrink-0 rounded-lg flex items-center justify-center text-white/65 hover:bg-white/10 hover:text-white transition-colors"
         >
-          {collapsed ? <ChevronRight className="h-5 w-5" /> : <ChevronLeft className="h-5 w-5" />}
+          {mobile ? <ChevronLeft className="h-5 w-5" /> : collapsed ? <ChevronRight className="h-5 w-5" /> : <ChevronLeft className="h-5 w-5" />}
         </button>
       </div>
 
