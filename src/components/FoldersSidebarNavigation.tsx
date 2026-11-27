@@ -9,7 +9,7 @@ import { useAuth } from "../context/AuthContext";
 import { folderRoute, botRoute, folderIdFromPath, rememberBotBackRoute, workspaceRoot } from "../lib/workspaceRoutes";
 import { sortByIndex } from "../lib/workspaceOrder";
 
-export default function FoldersSidebarNavigation({ onToggleMenu }: { onToggleMenu?: () => void }) {
+export default function FoldersSidebarNavigation({ onToggleMenu, showMenuToggle = true }: { onToggleMenu?: () => void; showMenuToggle?: boolean }) {
 	const { items } = useWorkspace();
 	const router = useNavigate();
 	
@@ -74,7 +74,7 @@ export default function FoldersSidebarNavigation({ onToggleMenu }: { onToggleMen
 	return (
 		<div
 			ref={setNodeRef}
-			className="w-36 min-w-36 max-w-36 shrink-0 sm:w-44 sm:min-w-44 sm:max-w-44 flex bg-gray-800 h-full min-h-0 overflow-hidden"
+			className="w-28 min-w-28 max-w-28 sm:w-32 sm:min-w-32 sm:max-w-32 md:w-36 md:min-w-36 md:max-w-36 flex shrink-0 bg-gray-800 h-full min-h-0 overflow-hidden"
 			style={{ userSelect: "none" }}
 		>
 			<div className="w-full min-w-0 min-h-0 flex-1 flex flex-col py-2 px-1 sm:px-2 pb-6 gap-2 overflow-x-hidden overflow-y-auto overscroll-contain">
