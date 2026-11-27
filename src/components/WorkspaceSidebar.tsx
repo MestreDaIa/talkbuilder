@@ -16,6 +16,7 @@ export default function WorkspaceSidebar({ mobile = false, onMobileClose }: { mo
   const navigate = useNavigate();
   const slug = currentWorkspace?.slug ?? profile?.slug;
   const [problemCount, setProblemCount] = useState(0);
+  const isCollapsed = mobile ? false : collapsed;
 
   useEffect(() => {
     if (!currentWorkspace?.id) {
@@ -72,8 +73,8 @@ export default function WorkspaceSidebar({ mobile = false, onMobileClose }: { mo
   }
 
   return (
-    <aside className={`${mobile ? "w-[220px] max-w-[78vw]" : collapsed ? "w-[64px]" : "w-[220px]"} shrink-0 border-r border-white/10 bg-[#08060d] text-white h-full min-h-0 flex flex-col overflow-hidden transition-[width] duration-200`}>
-      <div className={`flex items-center border-b border-white/10 h-[72px] ${collapsed ? "justify-center px-2" : "justify-between px-4"}`}>
+    <aside className={`${mobile ? "w-[220px] max-w-[78vw]" : isCollapsed ? "w-[64px]" : "w-[220px]"} shrink-0 border-r border-white/10 bg-[#08060d] text-white h-full min-h-0 flex flex-col overflow-hidden transition-[width] duration-200`}>
+      <div className={`flex items-center border-b border-white/10 h-[72px] ${isCollapsed ? "justify-center px-2" : "justify-between px-4"}`}>
         {!collapsed && (
           <div className="min-w-0">
             <div className="text-[10px] font-semibold uppercase tracking-[0.18em] text-white/45">Workspace</div>
@@ -83,10 +84,10 @@ export default function WorkspaceSidebar({ mobile = false, onMobileClose }: { mo
         <button
           type="button"
           onClick={() => mobile ? onMobileClose?.() : setCollapsed((value) => !value)}
-          title={collapsed ? "Expandir sidebar" : "Recolher sidebar"}
+          title={isCollapsed ? "Expandir sidebar" : "Recolher sidebar"}
           className="h-9 w-9 shrink-0 rounded-lg flex items-center justify-center text-white/65 hover:bg-white/10 hover:text-white transition-colors"
         >
-          {mobile ? <ChevronLeft className="h-5 w-5" /> : collapsed ? <ChevronRight className="h-5 w-5" /> : <ChevronLeft className="h-5 w-5" />}
+          {mobile ? <ChevronLeft className="h-5 w-5" /> : isCollapsed ? <ChevronRight className="h-5 w-5" /> : <ChevronLeft className="h-5 w-5" />}
         </button>
       </div>
 
@@ -96,8 +97,8 @@ export default function WorkspaceSidebar({ mobile = false, onMobileClose }: { mo
             key={label}
             type="button"
             onClick={() => navigate(path)}
-            title={collapsed ? label : undefined}
-            className={`relative w-full flex items-center rounded-lg py-2.5 text-sm transition-colors ${collapsed ? "justify-center px-0" : "gap-3 px-3 text-left"} ${
+            title={isCollapsed ? label : undefined}
+            className={`relative w-full flex items-center rounded-lg py-2.5 text-sm transition-colors ${isCollapsed ? "justify-center px-0" : "gap-3 px-3 text-left"} ${
               isActive(path, label)
                 ? "bg-white/10 text-white"
                 : "text-white/60 hover:bg-white/5 hover:text-white"
@@ -106,7 +107,7 @@ export default function WorkspaceSidebar({ mobile = false, onMobileClose }: { mo
             <Icon className="h-4 w-4 shrink-0" />
             {!collapsed && <span>{label}</span>}
             {label === "Logs" && problemCount > 0 && (
-              <span className={`ml-auto min-w-5 rounded-full bg-destructive px-1.5 py-0.5 text-center text-[10px] font-bold text-white ${collapsed ? "absolute -right-1 -top-1" : ""}`}>
+              <span className={`ml-auto min-w-5 rounded-full bg-destructive px-1.5 py-0.5 text-center text-[10px] font-bold text-white ${isCollapsed ? "absolute -right-1 -top-1" : ""}`}>
                 {problemCount > 99 ? "99+" : problemCount}
               </span>
             )}
@@ -119,8 +120,8 @@ export default function WorkspaceSidebar({ mobile = false, onMobileClose }: { mo
           <button
             type="button"
             onClick={() => navigate(perfilRoute(slug))}
-            title={collapsed ? "Perfil" : undefined}
-            className={`w-full flex items-center rounded-lg py-2.5 text-sm text-white/65 hover:bg-white/5 hover:text-white transition-colors ${collapsed ? "justify-center px-0" : "gap-3 px-3 text-left"}`}
+            title={isCollapsed ? "Perfil" : undefined}
+            className={`w-full flex items-center rounded-lg py-2.5 text-sm text-white/65 hover:bg-white/5 hover:text-white transition-colors ${isCollapsed ? "justify-center px-0" : "gap-3 px-3 text-left"}`}
           >
             <UserRound className="h-4 w-4 shrink-0" />
             {!collapsed && <span>Perfil</span>}
@@ -130,8 +131,8 @@ export default function WorkspaceSidebar({ mobile = false, onMobileClose }: { mo
         <button
           type="button"
           onClick={() => navigate(configsRoute(slug))}
-          title={collapsed ? "Configurações" : undefined}
-          className={`w-full flex items-center rounded-lg py-2.5 text-sm text-white/65 hover:bg-white/5 hover:text-white transition-colors ${collapsed ? "justify-center px-0" : "gap-3 px-3 text-left"}`}
+          title={isCollapsed ? "Configurações" : undefined}
+          className={`w-full flex items-center rounded-lg py-2.5 text-sm text-white/65 hover:bg-white/5 hover:text-white transition-colors ${isCollapsed ? "justify-center px-0" : "gap-3 px-3 text-left"}`}
         >
           <Settings2 className="h-4 w-4 shrink-0" />
           {!collapsed && <span>Configurações</span>}
@@ -141,8 +142,8 @@ export default function WorkspaceSidebar({ mobile = false, onMobileClose }: { mo
           <button
             type="button"
             onClick={handleLogout}
-            title={collapsed ? "Sair" : undefined}
-            className={`w-full flex items-center rounded-lg py-2.5 text-sm text-white/65 hover:bg-white/5 hover:text-white transition-colors ${collapsed ? "justify-center px-0" : "gap-3 px-3 text-left"}`}
+            title={isCollapsed ? "Sair" : undefined}
+            className={`w-full flex items-center rounded-lg py-2.5 text-sm text-white/65 hover:bg-white/5 hover:text-white transition-colors ${isCollapsed ? "justify-center px-0" : "gap-3 px-3 text-left"}`}
           >
             <LogOut className="h-4 w-4 shrink-0" />
             {!collapsed && <span>Sair</span>}
