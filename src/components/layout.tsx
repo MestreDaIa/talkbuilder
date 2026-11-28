@@ -132,10 +132,10 @@ function WorkspaceLayoutContent({ children }: { children: React.ReactNode }) {
 				{!isBotEditor && <Header />}
 					<div className="flex-1 flex relative overflow-hidden">
 					{showWorkspaceNavigation && (
-						<div className="flex h-full min-h-0 shrink-0"><WorkspaceSidebar /></div>
+						<div className="hidden min-[840px]:flex h-full min-h-0 shrink-0"><WorkspaceSidebar /></div>
 					)}
 					{showWorkspaceNavigation && mobileMenuOpen && (
-						<div className="absolute inset-0 z-50 flex md:hidden">
+						<div className="absolute inset-0 z-50 flex min-[840px]:hidden">
 							<button type="button" aria-label="Fechar menu" className="absolute inset-0 bg-black/55" onClick={() => setMobileMenuOpen(false)} />
 							<div className="relative z-10 h-full min-h-0 shadow-2xl"><WorkspaceSidebar mobile onMobileClose={() => setMobileMenuOpen(false)} /></div>
 						</div>
