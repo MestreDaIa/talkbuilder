@@ -76,7 +76,7 @@ export default function FoldersSidebarNavigation({ onToggleMenu, showMenuToggle 
 		>
 			<div className="w-full min-w-0 min-h-0 flex-1 flex flex-col py-2 px-1 sm:px-2 pb-6 gap-2 overflow-x-hidden overflow-y-auto overscroll-contain">
 				{showMenuToggle && (
-				<button type="button" onClick={onToggleMenu} title="Abrir menu Workspace" aria-label="Abrir menu Workspace" className="sticky top-0 z-10 flex md:hidden h-8 w-full shrink-0 items-center justify-center rounded-md border border-white/10 bg-gray-900 text-gray-200 hover:bg-gray-700">
+				<button type="button" onClick={onToggleMenu} title="Abrir menu Workspace" aria-label="Abrir menu Workspace" className="sticky top-0 z-10 flex min-[840px]:hidden h-8 w-full shrink-0 items-center justify-center rounded-md border border-white/10 bg-gray-900 text-gray-200 hover:bg-gray-700">
 					<Menu className="h-4 w-4" />
 				</button>
 				)}
